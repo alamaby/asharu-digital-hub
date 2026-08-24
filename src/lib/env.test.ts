@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseEnv } from './env';
 
@@ -55,5 +57,44 @@ describe('parseEnv', () => {
     expect(() =>
       parseEnv({ ...VALID, NEXT_PUBLIC_SITE_URL: 'http://asharu.id' })
     ).toThrow(/https/);
+  });
+});
+
+describe('.env.example placeholder integrity', () => {
+  it('placeholders parse cleanly so copying the file never breaks the build', () => {
+    const raw = readFileSync(resolve(process.cwd(), '.env.example'), 'utf8');
+    const parsed = Object.fromEntries(
+      raw
+        .split(/\r?\n/)
+        .filter((line) => /^[A-Z0-9_]+=/.test(line))
+        .map((line) => {
+          const separator = line.indexOf('=');
+          return [line.slice(0, separator), line.slice(separator + 1)];
+        })
+    );
+
+    const result = parseEnv(parsed);
+
+    expect(result.siteUrl).toBe('https://asharu.id');
+    expect(result.gaMeasurementId).toMatch(/^G-[A-Z0-9]+$/);
+    expect(result.whatsappUrl).toBe('https://wa.me/628000000000');
+    expect(result.contactEmail).toContain('@asharu.id');
+  });
+
+  it('keeps the documented variable set in sync with env.ts', () => {
+    const raw = readFileSync(resolve(process.cwd(), '.env.example'), 'utf8');
+    const keys = raw
+      .split(/\r?\n/)
+      .filter((line) => /^[A-Z0-9_]+=/.test(line))
+      .map((line) => line.slice(0, line.indexOf('=')));
+
+    expect(keys.sort()).toEqual(
+      [
+        'NEXT_PUBLIC_SITE_URL',
+        'NEXT_PUBLIC_GA_MEASUREMENT_ID',
+        'NEXT_PUBLIC_WHATSAPP_URL',
+        'NEXT_PUBLIC_CONTACT_EMAIL'
+      ].sort()
+    );
   });
 });
