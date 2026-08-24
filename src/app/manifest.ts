@@ -4,6 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Asharu',
     short_name: 'Asharu',
+    lang: 'id',
     description:
       'Digital hub Asharu — toko online, produk pilihan, media sosial, dan properti dalam satu tempat.',
     start_url: '/',

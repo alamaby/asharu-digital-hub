@@ -27,19 +27,25 @@ export function ContactCTA({
           {t('heading')}
         </h2>
         <p className="mt-2 max-w-2xl text-base text-ink-muted">{t('description')}</p>
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-3" data-link-position={linkPosition}>
           {whatsappUrl ? (
-            <ExternalLink href={whatsappUrl} className="btn-primary" data-link-position={linkPosition}>
+            <ExternalLink
+              href={whatsappUrl}
+              aria-label="WhatsApp Asharu"
+              className="btn-primary"
+            >
               <MessageCircle className="size-4" aria-hidden />
               WhatsApp
-              <span className="sr-only">Asharu</span>
             </ExternalLink>
           ) : null}
           {email ? (
-            <ExternalLink href={`mailto:${email}`} className="btn-secondary">
+            <ExternalLink
+              href={`mailto:${email}`}
+              aria-label="Email Asharu"
+              className="btn-secondary"
+            >
               <Mail className="size-4" aria-hidden />
               Email
-              <span className="sr-only">Asharu</span>
             </ExternalLink>
           ) : null}
         </div>

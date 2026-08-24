@@ -11,18 +11,20 @@ import {
 
 /**
  * Non-blocking bottom banner. Shown until a decision exists; reopenable via
- * the footer "Analytics preferences" button (CONSENT_OPEN_EVENT).
+ * the footer "Analytics preferences" button (CONSENT_OPEN_EVENT). Rendered
+ * only when analytics is actually configured (`enabled`).
  */
-export function ConsentBanner() {
+export function ConsentBanner({ enabled = true }: { enabled?: boolean }) {
   const t = useTranslations('consent');
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     setVisible(readConsent(window.localStorage) === null);
     const reopen = () => setVisible(true);
     window.addEventListener(CONSENT_OPEN_EVENT, reopen);
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, reopen);
-  }, []);
+  }, [enabled]);
 
   function decide(analytics: boolean) {
     writeConsent(window.localStorage, analytics);
@@ -30,7 +32,7 @@ export function ConsentBanner() {
     setVisible(false);
   }
 
-  if (!visible) return null;
+  if (!enabled || !visible) return null;
 
   return (
     <div

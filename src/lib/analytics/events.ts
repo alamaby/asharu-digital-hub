@@ -21,17 +21,23 @@ export interface AnalyticsEventParams {
   link_position?: string;
 }
 
-type GtagFunction = (
-  command: 'event',
-  name: AnalyticsEventName,
-  params: AnalyticsEventParams
-) => void;
+export interface PageViewParams {
+  page_location: string;
+  page_title?: string;
+}
+
+/** Loose at the wire level; public helpers below stay strictly typed. */
+type GtagFunction = (...args: unknown[]) => void;
 
 declare global {
   interface Window {
     gtag?: GtagFunction;
     dataLayer?: unknown[];
   }
+}
+
+function isGtagAvailable(): boolean {
+  return typeof window !== 'undefined' && typeof window.gtag === 'function';
 }
 
 /**
@@ -42,9 +48,18 @@ export function trackEvent(
   name: AnalyticsEventName,
   params: AnalyticsEventParams = {}
 ): boolean {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') {
+  if (!isGtagAvailable()) {
     return false;
   }
-  window.gtag('event', name, params);
+  window.gtag!('event', name, params);
+  return true;
+}
+
+/** Standard GA4 page_view hit (used by PageViewTracker on client navigation). */
+export function trackPageView(params: PageViewParams): boolean {
+  if (!isGtagAvailable()) {
+    return false;
+  }
+  window.gtag!('event', 'page_view', params);
   return true;
 }

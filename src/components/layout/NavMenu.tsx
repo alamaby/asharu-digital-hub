@@ -28,10 +28,7 @@ export function NavMenu({ variant, onNavigate }: NavMenuProps) {
     <nav aria-label={tHeader('nav')} className={variant === 'desktop' ? undefined : 'pb-2'}>
       <ul className={cn(variant === 'desktop' && 'flex items-center gap-1')}>
         {mainNavItems.map((item) => {
-          const active =
-            !item.isAnchor &&
-            pathname === item.pathname &&
-            !(item.key === 'home' && item.hash);
+          const active = !item.isAnchor && pathname === item.pathname;
           return (
             <li key={item.key}>
               <Link

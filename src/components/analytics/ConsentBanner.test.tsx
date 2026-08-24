@@ -33,6 +33,13 @@ describe('ConsentBanner', () => {
     );
   });
 
+  it('never renders when analytics is not configured (enabled=false)', async () => {
+    renderWithMessages(<ConsentBanner enabled={false} />);
+    await waitFor(() =>
+      expect(screen.queryByRole('region')).not.toBeInTheDocument()
+    );
+  });
+
   it('accept stores analytics=true locally and dismisses', async () => {
     const user = userEvent.setup();
     renderWithMessages(<ConsentBanner />);

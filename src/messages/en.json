@@ -147,6 +147,7 @@
     "emptyDescription": "Try adjusting the filters, or contact us for a custom search request."
   },
   "propertyPage": {
+    "listTitle": "Properties",
     "backToList": "Back to all properties",
     "specsHeading": "Specifications",
     "detailContactHeading": "Interested in this property?",

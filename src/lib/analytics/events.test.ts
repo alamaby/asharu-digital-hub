@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ANALYTICS_EVENT_NAMES, trackEvent } from './events';
+import { ANALYTICS_EVENT_NAMES, trackEvent, trackPageView } from './events';
 
 describe('trackEvent', () => {
   const gtag = vi.fn();
@@ -46,5 +46,39 @@ describe('trackEvent', () => {
       'click_property_contact',
       'change_language'
     ]);
+  });
+});
+
+describe('trackPageView', () => {
+  const gtag = vi.fn();
+
+  beforeEach(() => {
+    window.gtag = gtag;
+  });
+
+  afterEach(() => {
+    delete window.gtag;
+    vi.clearAllMocks();
+  });
+
+  it('sends page_location and optional title', () => {
+    expect(trackPageView({ page_location: 'https://asharu.id/id/produk' })).toBe(true);
+    expect(gtag).toHaveBeenCalledWith('event', 'page_view', {
+      page_location: 'https://asharu.id/id/produk'
+    });
+
+    expect(
+      trackPageView({ page_location: 'https://asharu.id/en', page_title: 'Home' })
+    ).toBe(true);
+    expect(gtag).toHaveBeenLastCalledWith('event', 'page_view', {
+      page_location: 'https://asharu.id/en',
+      page_title: 'Home'
+    });
+  });
+
+  it('is a no-op without gtag', () => {
+    delete window.gtag;
+    expect(trackPageView({ page_location: 'https://asharu.id/' })).toBe(false);
+    expect(gtag).not.toHaveBeenCalled();
   });
 });

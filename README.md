@@ -135,7 +135,7 @@ Setup:
    - Pantau laporan **Realtime** sambil menekan CTA toko/sosial/produk dan mengganti bahasa.
 6. Pastikan analytics **tidak dimuat dua kali**: tag hanya dirender oleh `<GoogleAnalytics>` di `[locale]/layout.tsx` (single mount, `strategy="afterInteractive"`); tidak ada tag manual di HTML.
 
-Event yang tersedia (lihat `src/lib/analytics/events.ts`): `click_online_store`, `click_social_media`, `click_affiliate_product`, `view_property`, `click_property_contact`, `change_language`. Parameter diizinkan: `item_id`, `item_category`, `platform`, `locale`, `link_position`. **Dilarang mengirim**: nama, email, nomor telepon, alamat lengkap, isi pesan.
+Event kustom yang tersedia (lihat `src/lib/analytics/events.ts`): `click_online_store`, `click_social_media`, `click_affiliate_product`, `view_property` (otomatis via `ViewPropertyTracker` di halaman detail), `click_property_contact`, `change_language`. Selain itu `PageViewTracker` mengirim `page_view` standar pada setiap navigasi client-side (Next.js tidak melakukannya otomatis). Parameter diizinkan: `item_id`, `item_category`, `platform`, `locale`, `link_position`. **Dilarang mengirim**: nama, email, nomor telepon, alamat lengkap, isi pesan.
 
 ## Deployment ke Vercel
 

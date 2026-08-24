@@ -12,6 +12,8 @@ import { env } from '@/lib/env';
 import { formatArea } from '@/lib/utils/format';
 import { getPropertyBySlug, properties } from '@/data/properties';
 import { contactConfig } from '@/config/site';
+import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
+import { ViewPropertyTracker } from '@/components/analytics/ViewPropertyTracker';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { ResponsiveImage } from '@/components/ui/ResponsiveImage';
 import { JsonLd } from '@/components/ui/JsonLd';
@@ -96,7 +98,7 @@ export default async function PropertyDetailPage({ params }: PropertyDetailPageP
   const breadcrumb = breadcrumbSchema([
     { name: 'Asharu', url: `${env.siteUrl}${localizedPathname('/', locale)}` },
     {
-      name: tPage('backToList'),
+      name: tPage('listTitle'),
       url: `${env.siteUrl}${localizedPathname('/properties', locale)}`
     },
     {
@@ -177,16 +179,25 @@ export default async function PropertyDetailPage({ params }: PropertyDetailPageP
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               {contactConfig.whatsappUrl ? (
-                <ExternalLink href={contactConfig.whatsappUrl} className="btn-primary">
+                <TrackedExternalLink
+                  href={contactConfig.whatsappUrl}
+                  event="click_property_contact"
+                  params={{ item_id: property.slug, link_position: 'property-detail' }}
+                  aria-label={tProperty('whatsappAria', { title: property.title[locale] })}
+                  className="btn-primary"
+                >
                   <MessageCircle className="size-4" aria-hidden />
                   {tProperty('whatsappCta')}
-                </ExternalLink>
+                </TrackedExternalLink>
               ) : null}
               {contactConfig.email ? (
-                <ExternalLink href={`mailto:${contactConfig.email}`} className="btn-secondary">
+                <ExternalLink
+                  href={`mailto:${contactConfig.email}`}
+                  aria-label="Email Asharu"
+                  className="btn-secondary"
+                >
                   <Mail className="size-4" aria-hidden />
                   Email
-                  <span className="sr-only">Asharu</span>
                 </ExternalLink>
               ) : null}
             </div>
@@ -194,6 +205,7 @@ export default async function PropertyDetailPage({ params }: PropertyDetailPageP
         </div>
       </div>
 
+      <ViewPropertyTracker itemId={property.slug} />
       <JsonLd data={realEstateListingSchema(property, locale)} />
       <JsonLd data={breadcrumb} />
     </article>

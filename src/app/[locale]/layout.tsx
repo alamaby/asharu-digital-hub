@@ -14,6 +14,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { ConsentBanner } from '@/components/analytics/ConsentBanner';
 import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
+import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -62,9 +63,12 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
             {children}
           </main>
           <Footer showAnalyticsPrefs={Boolean(env.gaMeasurementId)} />
-          <ConsentBanner />
+          <ConsentBanner enabled={Boolean(env.gaMeasurementId)} />
           {env.gaMeasurementId ? (
-            <GoogleAnalytics measurementId={env.gaMeasurementId} />
+            <>
+              <GoogleAnalytics measurementId={env.gaMeasurementId} />
+              <PageViewTracker />
+            </>
           ) : null}
           <JsonLd data={websiteSchema()} />
           <JsonLd data={organizationSchema()} />

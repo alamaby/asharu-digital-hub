@@ -26,7 +26,7 @@ export function MobileNav() {
   }
 
   return (
-    <div className="relative md:hidden" onKeyDown={onKeyDown}>
+    <div className="md:hidden" onKeyDown={onKeyDown}>
       <button
         ref={toggleRef}
         type="button"
