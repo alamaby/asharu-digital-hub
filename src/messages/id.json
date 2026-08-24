@@ -1,0 +1,226 @@
+{
+  "meta": {
+    "tagline": "Semua yang Anda cari, dalam satu tempat.",
+    "home": {
+      "title": "Asharu | Toko, Produk Pilihan, Media Sosial & Properti",
+      "description": "Temukan toko online, produk afiliasi pilihan, kanal media sosial, serta properti dijual dan disewakan melalui digital hub Asharu."
+    },
+    "products": {
+      "title": "Produk Afiliasi Pilihan | Asharu",
+      "description": "Kurasi produk afiliasi dari berbagai merchant terpercaya. Harga selalu diperbarui di platform penjual.",
+      "intro": "Berikut adalah produk-produk pilihan yang kami kurasi dari berbagai merchant. Setiap tautan di halaman ini merupakan tautan afiliasi yang ditandai secara jelas."
+    },
+    "properties": {
+      "title": "Properti Dijual & Disewakan | Asharu",
+      "description": "Daftar properti dijual dan disewakan melalui kanal resmi Asharu. Lokasi umum, spesifikasi jelas, tanpa data yang belum diverifikasi.",
+      "intro": "Daftar properti yang saat ini kami pasarkan. Kami hanya menampilkan informasi yang telah kami verifikasi; harga dan detail lengkap tersedia melalui kontak resmi."
+    },
+    "about": {
+      "title": "Tentang Asharu | Asharu",
+      "description": "Mengenal Asharu: pusat digital untuk toko online, produk afiliasi, media sosial, dan properti dengan prinsip transparansi."
+    },
+    "privacy": {
+      "title": "Kebijakan Privasi | Asharu",
+      "description": "Bagaimana Asharu menangani data pengunjung: cookie, penyimpanan lokal, analytics, dan hak Anda sebagai pengunjung."
+    },
+    "disclosure": {
+      "title": "Disclosure Afiliasi | Asharu",
+      "description": "Penjelasan mengenai tautan afiliasi di Asharu: cara kerjanya, dampaknya bagi Anda, dan komitmen independensi editorial kami."
+    },
+    "notFound": {
+      "title": "Halaman Tidak Ditemukan | Asharu",
+      "description": "Halaman yang Anda cari tidak tersedia. Silakan kembali ke beranda Asharu."
+    }
+  },
+  "a11y": {
+    "newTab": "(membuka di tab baru)"
+  },
+  "header": {
+    "skipToContent": "Langsung ke konten utama",
+    "openMenu": "Buka menu navigasi",
+    "closeMenu": "Tutup menu navigasi",
+    "language": "Pilih bahasa",
+    "nav": "Navigasi utama"
+  },
+  "nav": {
+    "home": "Beranda",
+    "stores": "Toko",
+    "products": "Produk Afiliasi",
+    "properties": "Properti",
+    "about": "Tentang"
+  },
+  "hero": {
+    "title": "Semua yang Anda cari, dalam satu tempat.",
+    "tagline": "Asharu · asharu.id",
+    "description": "Asharu adalah pusat digital yang menghubungkan Anda dengan toko online, produk afiliasi pilihan, kanal media sosial, serta properti yang dijual dan disewakan.",
+    "primaryCta": "Jelajahi Sekarang",
+    "secondaryCta": "Lihat Properti"
+  },
+  "home": {
+    "stores": {
+      "heading": "Toko Online",
+      "description": "Belanja langsung di toko resmi Asharu pada platform berikut."
+    },
+    "socials": {
+      "heading": "Media Sosial",
+      "description": "Ikuti aktivitas terbaru Asharu di kanal sosial pilihan Anda."
+    },
+    "products": {
+      "heading": "Produk Afiliasi Pilihan",
+      "description": "Kurasi produk dari merchant mitra, dipilih secara independen.",
+      "viewAll": "Lihat semua produk"
+    },
+    "properties": {
+      "heading": "Properti Dijual & Disewakan",
+      "description": "Listing properti dengan informasi yang jujur dan terverifikasi.",
+      "viewAll": "Lihat semua properti"
+    },
+    "about": {
+      "heading": "Tentang Asharu",
+      "p1": "Asharu adalah digital hub personal: satu alamat, banyak tujuan. Dari sini Anda dapat menjangkau toko online kami, kanal media sosial, kurasi produk afiliasi, hingga listing properti.",
+      "p2": "Kami percaya kepercayaan dibangun lewat transparansi. Setiap tautan afiliasi ditandai secara jelas, dan kami tidak pernah menampilkan data — harga, legalitas, atau fasilitas — yang belum dapat kami verifikasi.",
+      "p3": "Tidak ada checkout di situs ini. Transaksi tetap berlangsung di platform mitra resmi, sehingga Anda dilindungi oleh kebijakan mereka."
+    },
+    "contact": {
+      "heading": "Hubungi Kami",
+      "description": "Ada pertanyaan tentang produk atau properti? Hubungi kami melalui kanal berikut."
+    }
+  },
+  "shops": {
+    "cta": "Kunjungi Toko"
+  },
+  "socials": {
+    "profileAria": "{name} Asharu ({handle})"
+  },
+  "categories": {
+    "electronics": "Elektronik",
+    "home-living": "Rumah Tangga",
+    "fashion": "Fashion",
+    "sports-hobby": "Olahraga & Hobi"
+  },
+  "product": {
+    "badge": "Tautan afiliasi",
+    "merchantSrOnly": "Merchant: ",
+    "checkPrice": "Cek harga terbaru",
+    "priceNote": "Harga dapat berubah di platform penjual.",
+    "cta": "Lihat Produk"
+  },
+  "disclosure": {
+    "title": "Disclosure Afiliasi",
+    "body": "Sebagian tautan di bawah merupakan tautan afiliasi. Asharu dapat menerima komisi tanpa biaya tambahan bagi Anda."
+  },
+  "property": {
+    "statusLabel": "Status",
+    "sale": "Dijual",
+    "rent": "Disewakan",
+    "specBedrooms": "Kamar Tidur",
+    "specBathrooms": "Kamar Mandi",
+    "specBuildingArea": "Luas Bangunan",
+    "specLandArea": "Luas Tanah",
+    "contactForPrice": "Hubungi untuk harga",
+    "bedroomsSrOnly": "kamar tidur",
+    "bathroomsSrOnly": "kamar mandi",
+    "buildingAreaSrOnly": "luas bangunan",
+    "landAreaSrOnly": "luas tanah",
+    "bedroomsShort": "KT",
+    "bathroomsShort": "KM",
+    "detailCta": "Lihat Detail",
+    "whatsappCta": "Hubungi via WhatsApp",
+    "whatsappAria": "{title} — hubungi via WhatsApp",
+    "exampleNotice": "Contoh listing — data belum diverifikasi."
+  },
+  "propertyFilters": {
+    "legend": "Filter properti",
+    "transaction": "Transaksi",
+    "type": "Tipe properti",
+    "allTransactions": "Semua transaksi",
+    "allTypes": "Semua tipe",
+    "sale": "Dijual",
+    "rent": "Disewakan",
+    "house": "Rumah",
+    "apartment": "Apartemen",
+    "land": "Tanah",
+    "shop-house": "Ruko",
+    "reset": "Atur ulang filter",
+    "resultCount": "{count} properti ditampilkan",
+    "emptyTitle": "Tidak ada properti yang cocok",
+    "emptyDescription": "Coba ubah kombinasi filter, atau hubungi kami untuk permintaan pencarian khusus."
+  },
+  "propertyPage": {
+    "backToList": "Kembali ke daftar properti",
+    "specsHeading": "Spesifikasi",
+    "detailContactHeading": "Tertarik dengan properti ini?",
+    "detailContactDescription": "Harga, legalitas, dan penjadwalan survei dibahas langsung melalui kontak resmi kami."
+  },
+  "aboutPage": {
+    "heading": "Tentang Asharu",
+    "lead": "Asharu (asharu.id) adalah pusat digital yang mengonsolidasikan seluruh kanal online kami: toko, produk afiliasi pilihan, media sosial, dan properti.",
+    "purposeHeading": "Untuk apa Asharu ada?",
+    "purposeBody": "Alih-alih menyebarkan informasi di banyak platform, kami memusatkan semuanya di satu alamat yang mudah diingat. Anda mencari toko? Ada di sini. Ingin melihat kurasi produk? Ada di sini. Sedang mencari properti? Juga di sini.",
+    "principlesHeading": "Prinsip kami",
+    "principlesIntro": "Tiga prinsip yang kami pegang di seluruh kanal Asharu:",
+    "principle1Title": "Transparansi tautan",
+    "principle1Body": "Setiap tautan afiliasi ditandai jelas sebelum Anda mengkliknya. Tidak ada tautan terselubung.",
+    "principle2Title": "Data yang diverifikasi",
+    "principle2Body": "Kami tidak menampilkan harga, sertifikat, atau klaim yang belum dapat diverifikasi. Yang belum pasti, kami nyatakan belum pasti.",
+    "principle3Title": "Transaksi di platform resmi",
+    "principle3Body": "Situs ini tidak memproses pembayaran. Pembelian dan negosiasi tetap berlangsung di marketplace resmi atau melalui kontak resmi kami.",
+    "contactHeading": "Kontak",
+    "contactBody": "Untuk pertanyaan, koreksi data, atau kerja sama, silakan gunakan kanal kontak yang tertera di beranda."
+  },
+  "privacyPage": {
+    "heading": "Kebijakan Privasi",
+    "updated": "Terakhir diperbarui: {date}",
+    "intro": "Dokumen ini menjelaskan data apa yang diproses saat Anda mengunjungi asharu.id, dasar pemrosesannya, dan cara mengendalikannya.",
+    "s1h": "Data yang kami kumpulkan",
+    "s1p1": "Asharu tidak memiliki akun pengguna, formulir, maupun checkout. Kami tidak meminta dan tidak menyimpan nama, email, nomor telepon, atau isi pesan Anda di situs ini.",
+    "s1p2": "Satu-satunya penyimpanan di perangkat Anda adalah preferensi persetujuan analytics, disimpan melalui localStorage browser Anda.",
+    "s2h": "Analytics",
+    "s2p1": "Apabila Anda memberikan persetujuan, kami menggunakan Google Analytics 4 untuk statistik agregat kunjungan (halaman yang dilihat, jenis perangkat, sumber kunjungan). Google Analytics tidak dimuat sama sekali sebelum Anda menyetujui.",
+    "s2p2": "Kami tidak mengirimkan data pribadi seperti nama, email, nomor telepon, atau alamat properti lengkap ke Google Analytics. Persetujuan dapat Anda tarik kapan saja melalui tautan \"Preferensi analytics\" di bagian bawah setiap halaman.",
+    "s3h": "Cookie & penyimpanan lokal",
+    "s3p1": "Situs ini tidak menggunakan cookie pelacak. Preferensi bahasa dan status persetujuan analytics disimpan di localStorage, hanya diakses oleh situs ini, dan tidak dikirim ke mana pun sebelum analytics aktif atas persetujuan Anda.",
+    "s4h": "Tautan ke situs pihak ketiga",
+    "s4p1": "Halaman ini berisi tautan ke marketplace, media sosial, dan merchant pihak ketiga. Setelah Anda meninggalkan asharu.id, kebijakan privasi platform tujuanlah yang berlaku. Kami menyarankan Anda membacanya sebelum memberikan data pribadi di sana.",
+    "s5h": "Hak Anda",
+    "s5p1": "Anda dapat menolak atau menarik persetujuan analytics kapan pun melalui tautan preferensi di footer. Untuk menghapus seluruh jejak lokal, bersihkan data situs (site data) asharu.id melalui pengaturan browser Anda.",
+    "s6h": "Perubahan kebijakan",
+    "s6p1": "Bila kebijakan ini berubah, tanggal pembaruan di bagian atas halaman akan direvisi, dan perubahan material akan diumumkan di kanal media sosial kami.",
+    "s7h": "Kontak privasi",
+    "s7p1": "Pertanyaan tentang dokumen ini dapat diajukan melalui kanal kontak resmi yang tertera pada beranda."
+  },
+  "disclosurePage": {
+    "heading": "Disclosure Afiliasi",
+    "updated": "Terakhir diperbarui: {date}",
+    "intro": "Halaman ini menjelaskan hubungan Asharu dengan merchant dan marketplace mitra, agar Anda dapat menilai rekomendasi kami dengan konteks yang utuh.",
+    "howHeading": "Bagaimana tautan afiliasi bekerja",
+    "howP1": "Sebagian tautan produk di situs ini adalah tautan afiliasi: apabila Anda melakukan pembelian melalui tautan tersebut, Asharu dapat menerima komisi dari platform atau merchant. Persetujuan ini sesuai ketentuan program afiliasi masing-masing platform.",
+    "howP2": "Yang penting bagi Anda: komisi itu tidak membuat harga yang Anda bayar menjadi lebih mahal. Harga yang Anda lihat di platform penjual adalah harga yang berlaku bagi semua pembeli.",
+    "pricingHeading": "Harga dan ketersediaan",
+    "pricingP1": "Kami tidak menampilkan harga real-time karena tidak memiliki akses data langsung ke sistem merchant. Kartu produk selalu mengarahkan Anda ke platform penjual untuk melihat harga terbaru, dan kami mencantumkan keterangan bahwa harga dapat berubah.",
+    "independenceHeading": "Independensi kurasi",
+    "independenceP1": "Keputusan produk apa yang ditampilkan dibuat oleh tim Asharu, bukan ditentukan merchant. Komisi memengaruhi pendapatan kami, bukan pilihan editorial kami. Produk yang tidak lagi relevan atau bermasalah akan kami turunkan dari kurasi.",
+    "questionsHeading": "Pertanyaan",
+    "questionsP1": "Bila ada pertanyaan tentang disclosure ini atau ingin melaporkan masalah pada salah satu tautan, silakan hubungi kami melalui kanal kontak resmi di beranda."
+  },
+  "footer": {
+    "tagline": "Digital hub Asharu — toko, produk pilihan, media sosial, dan properti dalam satu tempat.",
+    "navHeading": "Navigasi",
+    "legalHeading": "Legal",
+    "privacy": "Kebijakan Privasi",
+    "disclosureLink": "Disclosure Afiliasi",
+    "consentSettings": "Preferensi analytics",
+    "rights": "© {year} Asharu · asharu.id"
+  },
+  "notFound": {
+    "heading": "Halaman tidak ditemukan",
+    "description": "Alamat yang Anda buka tidak tersedia atau sudah dipindahkan. Mari kembali ke jalur yang benar.",
+    "backHome": "Kembali ke Beranda"
+  },
+  "consent": {
+    "title": "Statistik kunjungan",
+    "description": "Kami ingin menggunakan Google Analytics untuk memahami bagaimana situs ini digunakan. Data bersifat agregat dan tidak mencakup identitas pribadi Anda. Analytics baru aktif jika Anda menyetujui.",
+    "accept": "Setuju",
+    "decline": "Tidak, terima kasih"
+  }
+}

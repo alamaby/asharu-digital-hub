@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="">
+  <rect width="1200" height="800" fill="#DBEAFE"/>
+  <circle cx="1010" cy="150" r="60" fill="#FDE68A"/>
+  <path d="M0 560 L260 380 L520 560 Z M420 560 L680 330 L940 560 Z" fill="#94A3B8" opacity="0.55"/>
+  <rect y="540" width="1200" height="260" fill="#CBD5E1"/>
+  <g stroke="#0F172A" stroke-width="14" fill="#FFFFFF">
+    <path d="M430 560 v-160 l170-130 170 130 v160 z"/>
+    <rect x="560" y="470" width="80" height="90" fill="#075985" opacity="0.25"/>
+  </g>
+  <rect x="180" y="600" width="120" height="80" fill="#FFFFFF" opacity="0.7"/>
+  <rect x="900" y="620" width="140" height="60" fill="#FFFFFF" opacity="0.7"/>
+  <text x="600" y="740" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="600" fill="#334155">Contoh gambar properti</text>
+  <text x="600" y="782" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#64748B">Example property image</text>
+</svg>

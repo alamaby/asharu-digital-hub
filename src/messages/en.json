@@ -1,0 +1,226 @@
+{
+  "meta": {
+    "tagline": "Everything you need, in one place.",
+    "home": {
+      "title": "Asharu | Shops, Curated Products, Social Media & Properties",
+      "description": "Discover online shops, curated affiliate products, social channels, and properties for sale or rent through the Asharu digital hub."
+    },
+    "products": {
+      "title": "Curated Affiliate Products | Asharu",
+      "description": "A curated selection of affiliate products from trusted merchants. Prices are always current on the seller's platform.",
+      "intro": "Below is our curated selection of products from various merchants. Every link on this page is an affiliate link and is clearly labelled as such."
+    },
+    "properties": {
+      "title": "Properties for Sale & Rent | Asharu",
+      "description": "Properties for sale or rent through official Asharu channels. General locations, clear specifications, and no unverified data.",
+      "intro": "Current listings we are marketing. We only publish information we have verified; pricing and full details are available through our official contact."
+    },
+    "about": {
+      "title": "About Asharu | Asharu",
+      "description": "Get to know Asharu: a digital hub for online shops, affiliate products, social media, and properties built on transparency."
+    },
+    "privacy": {
+      "title": "Privacy Policy | Asharu",
+      "description": "How Asharu handles visitor data: cookies, local storage, analytics, and your rights as a visitor."
+    },
+    "disclosure": {
+      "title": "Affiliate Disclosure | Asharu",
+      "description": "How affiliate links work on Asharu, what they mean for you, and our commitment to independent curation."
+    },
+    "notFound": {
+      "title": "Page Not Found | Asharu",
+      "description": "The page you are looking for is not available. Please return to the Asharu homepage."
+    }
+  },
+  "a11y": {
+    "newTab": "(opens in a new tab)"
+  },
+  "header": {
+    "skipToContent": "Skip to main content",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "language": "Choose language",
+    "nav": "Main navigation"
+  },
+  "nav": {
+    "home": "Home",
+    "stores": "Shops",
+    "products": "Affiliate Products",
+    "properties": "Properties",
+    "about": "About"
+  },
+  "hero": {
+    "title": "Everything you need, in one place.",
+    "tagline": "Asharu · asharu.id",
+    "description": "Asharu is a digital hub connecting you with our online shops, curated affiliate products, social channels, and properties for sale or rent.",
+    "primaryCta": "Explore Now",
+    "secondaryCta": "View Properties"
+  },
+  "home": {
+    "stores": {
+      "heading": "Online Stores",
+      "description": "Shop directly at the official Asharu stores on these platforms."
+    },
+    "socials": {
+      "heading": "Social Media",
+      "description": "Follow the latest from Asharu on your preferred channel."
+    },
+    "products": {
+      "heading": "Curated Affiliate Products",
+      "description": "Hand-picked products from partner merchants, chosen independently.",
+      "viewAll": "View all products"
+    },
+    "properties": {
+      "heading": "Properties for Sale & Rent",
+      "description": "Property listings presented honestly, with verified information only.",
+      "viewAll": "View all properties"
+    },
+    "about": {
+      "heading": "About Asharu",
+      "p1": "Asharu is a personal digital hub: one address, many destinations. From here you can reach our online stores, social channels, curated affiliate products, and property listings.",
+      "p2": "We believe trust is built through transparency. Every affiliate link is clearly labelled, and we never display data — prices, legal status, or facilities — that we have not been able to verify.",
+      "p3": "There is no checkout on this site. Transactions happen entirely on official partner platforms, so you remain protected by their policies."
+    },
+    "contact": {
+      "heading": "Contact Us",
+      "description": "Questions about a product or property? Reach us through one of these channels."
+    }
+  },
+  "shops": {
+    "cta": "Visit Store"
+  },
+  "socials": {
+    "profileAria": "Asharu on {name} ({handle})"
+  },
+  "categories": {
+    "electronics": "Electronics",
+    "home-living": "Home & Living",
+    "fashion": "Fashion",
+    "sports-hobby": "Sports & Hobbies"
+  },
+  "product": {
+    "badge": "Affiliate link",
+    "merchantSrOnly": "Merchant: ",
+    "checkPrice": "Check latest price",
+    "priceNote": "Prices may change on the seller's platform.",
+    "cta": "View Product"
+  },
+  "disclosure": {
+    "title": "Affiliate Disclosure",
+    "body": "Some links below are affiliate links. Asharu may earn a commission at no additional cost to you."
+  },
+  "property": {
+    "statusLabel": "Status",
+    "sale": "For Sale",
+    "rent": "For Rent",
+    "specBedrooms": "Bedrooms",
+    "specBathrooms": "Bathrooms",
+    "specBuildingArea": "Building Area",
+    "specLandArea": "Land Area",
+    "contactForPrice": "Contact for price",
+    "bedroomsSrOnly": "bedrooms",
+    "bathroomsSrOnly": "bathrooms",
+    "buildingAreaSrOnly": "building area",
+    "landAreaSrOnly": "land area",
+    "bedroomsShort": "BD",
+    "bathroomsShort": "BA",
+    "detailCta": "View Details",
+    "whatsappCta": "Contact via WhatsApp",
+    "whatsappAria": "{title} — contact via WhatsApp",
+    "exampleNotice": "Example listing — data not yet verified."
+  },
+  "propertyFilters": {
+    "legend": "Filter properties",
+    "transaction": "Transaction",
+    "type": "Property type",
+    "allTransactions": "All transactions",
+    "allTypes": "All types",
+    "sale": "For Sale",
+    "rent": "For Rent",
+    "house": "House",
+    "apartment": "Apartment",
+    "land": "Land",
+    "shop-house": "Shop House",
+    "reset": "Reset filters",
+    "resultCount": "{count} properties shown",
+    "emptyTitle": "No matching properties",
+    "emptyDescription": "Try adjusting the filters, or contact us for a custom search request."
+  },
+  "propertyPage": {
+    "backToList": "Back to all properties",
+    "specsHeading": "Specifications",
+    "detailContactHeading": "Interested in this property?",
+    "detailContactDescription": "Pricing, legal documents, and viewing schedules are discussed directly through our official contact."
+  },
+  "aboutPage": {
+    "heading": "About Asharu",
+    "lead": "Asharu (asharu.id) is a digital hub that consolidates all of our online channels: shops, curated affiliate products, social media, and properties.",
+    "purposeHeading": "Why does Asharu exist?",
+    "purposeBody": "Instead of scattering information across many platforms, we centralise everything under one memorable address. Looking for our shop? It's here. Want curated product picks? Here. Searching for a property? Also here.",
+    "principlesHeading": "Our principles",
+    "principlesIntro": "Three principles guide everything we publish across Asharu:",
+    "principle1Title": "Link transparency",
+    "principle1Body": "Every affiliate link is labelled clearly before you click it. No cloaked links.",
+    "principle2Title": "Verified data",
+    "principle2Body": "We do not display prices, certificates, or claims that cannot be verified. When something is uncertain, we say so.",
+    "principle3Title": "Transactions on official platforms",
+    "principle3Body": "This site processes no payments. Purchases and negotiations happen on official marketplaces or through our official contact.",
+    "contactHeading": "Contact",
+    "contactBody": "For questions, data corrections, or partnerships, please use the contact channels listed on the homepage."
+  },
+  "privacyPage": {
+    "heading": "Privacy Policy",
+    "updated": "Last updated: {date}",
+    "intro": "This document explains what data is processed when you visit asharu.id, the basis for that processing, and how you stay in control.",
+    "s1h": "Data we collect",
+    "s1p1": "Asharu has no user accounts, forms, or checkout. We do not ask for and do not store your name, email address, phone number, or message contents on this site.",
+    "s1p2": "The only storage on your device is your analytics consent preference, kept in your browser's localStorage.",
+    "s2h": "Analytics",
+    "s2p1": "If you grant consent, we use Google Analytics 4 for aggregate visit statistics (pages viewed, device type, traffic source). Google Analytics is not loaded at all before you agree.",
+    "s2p2": "We never send personal data — names, emails, phone numbers, or full property addresses — to Google Analytics. You can withdraw consent at any time via the \"Analytics preferences\" link in the footer of every page.",
+    "s3h": "Cookies & local storage",
+    "s3p1": "This site uses no tracking cookies. Language preference and analytics consent status are stored in localStorage, accessed only by this site, and sent nowhere unless you consent to analytics.",
+    "s4h": "Links to third-party sites",
+    "s4p1": "These pages contain links to third-party marketplaces, social networks, and merchants. Once you leave asharu.id, the destination platform's privacy policy applies. We recommend reading it before sharing personal data there.",
+    "s5h": "Your rights",
+    "s5p1": "You can refuse or withdraw analytics consent at any time via the preferences link in the footer. To erase all local traces, clear asharu.id site data in your browser settings.",
+    "s6h": "Changes to this policy",
+    "s6p1": "When this policy changes, the date at the top of the page will be revised, and material changes will be announced on our social channels.",
+    "s7h": "Privacy contact",
+    "s7p1": "Questions about this document can be raised through the official contact channels listed on the homepage."
+  },
+  "disclosurePage": {
+    "heading": "Affiliate Disclosure",
+    "updated": "Last updated: {date}",
+    "intro": "This page explains Asharu's relationship with merchant and marketplace partners, so you can judge our recommendations with full context.",
+    "howHeading": "How affiliate links work",
+    "howP1": "Some product links on this site are affiliate links: if you make a purchase after clicking one, Asharu may receive a commission from the platform or merchant, as defined by each platform's affiliate program.",
+    "howP2": "What matters to you: this commission never makes your purchase more expensive. The price you see on the seller's platform is the same price every buyer pays.",
+    "pricingHeading": "Pricing and availability",
+    "pricingP1": "We do not display real-time prices because we have no live feed into merchant systems. Product cards always point you to the seller's platform for current pricing, and we state plainly that prices may change.",
+    "independenceHeading": "Curation independence",
+    "independenceP1": "Decisions about which products appear here are made by the Asharu team, not by merchants. Commissions influence our revenue, not our editorial choices. Products that stop being relevant or develop problems are removed from curation.",
+    "questionsHeading": "Questions",
+    "questionsP1": "If you have questions about this disclosure or want to report an issue with any link, please reach us through the official contact channels on the homepage."
+  },
+  "footer": {
+    "tagline": "The Asharu digital hub — shops, curated picks, social media, and properties in one place.",
+    "navHeading": "Navigation",
+    "legalHeading": "Legal",
+    "privacy": "Privacy Policy",
+    "disclosureLink": "Affiliate Disclosure",
+    "consentSettings": "Analytics preferences",
+    "rights": "© {year} Asharu · asharu.id"
+  },
+  "notFound": {
+    "heading": "Page not found",
+    "description": "The address you opened is unavailable or has moved. Let's get you back on track.",
+    "backHome": "Back to Home"
+  },
+  "consent": {
+    "title": "Visit statistics",
+    "description": "We would like to use Google Analytics to understand how this site is used. Data is aggregated and contains no personal identity. Analytics stays off unless you agree.",
+    "accept": "Agree",
+    "decline": "No, thanks"
+  }
+}

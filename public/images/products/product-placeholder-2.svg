@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="">
+  <rect width="800" height="600" fill="#E2E8F0"/>
+  <circle cx="400" cy="250" r="110" fill="#075985" opacity="0.12"/>
+  <path d="M340 300 v-70 l60 -45 60 45 v70 z" fill="#FFFFFF" stroke="#075985" stroke-width="10"/>
+  <rect x="382" y="255" width="36" height="45" fill="#075985" opacity="0.3"/>
+  <text x="400" y="450" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="600" fill="#475569">Contoh gambar produk</text>
+  <text x="400" y="492" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="#64748B">Example product image</text>
+</svg>
