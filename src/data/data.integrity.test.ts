@@ -19,6 +19,23 @@ describe('static dataset integrity', () => {
     }
   });
 
+  it('shopee store uses the clean canonical URL with a tracked affiliate fallback', () => {
+    const shopee = shopLinks.find((link) => link.id === 'shopee');
+    expect(shopee?.url).toBe('https://shopee.co.id/shop/9268731');
+    expect(shopee?.affiliateUrl).toMatch(/^https:\/\/id\.shp\.ee\//);
+  });
+
+  it('shopee store identity matches the verified owner-provided name', () => {
+    const shopee = shopLinks.find((link) => link.id === 'shopee');
+    expect(shopee?.name.id).toBe('Asharu x Nopi.NY');
+    expect(shopee?.name.en).toBe('Asharu x Nopi.NY');
+  });
+
+  it('shop destination URLs are unique', () => {
+    const urls = shopLinks.map((link) => link.affiliateUrl ?? link.url);
+    expect(new Set(urls).size).toBe(urls.length);
+  });
+
   it('base social links validate against the schema', () => {
     for (const link of getSocialLinks()) {
       expect(socialLinkSchema.safeParse(link).success).toBe(true);

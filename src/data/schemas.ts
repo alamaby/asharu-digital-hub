@@ -32,7 +32,15 @@ export const shopLinkSchema = z.object({
   platform: shopPlatformSchema,
   name: localizedTextSchema,
   description: localizedTextSchema,
+  /** Clean, permanent destination URL. */
   url: httpsUrl,
+  /**
+   * Affiliate-tracked link (optional). When present, cards link here with
+   * `rel="sponsored nofollow"`; delete the value to fall back to `url`.
+   */
+  affiliateUrl: httpsUrl.optional(),
+  /** Short public handle shown on the card, e.g. `@namatoko` (optional). */
+  handle: z.string().min(1).optional(),
   icon: z.enum(['bag', 'store', 'video', 'globe'])
 });
 export type ShopLink = z.infer<typeof shopLinkSchema>;

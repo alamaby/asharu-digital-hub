@@ -113,6 +113,11 @@ Nilai invalid (mis. ID GA salah format) **membuat build gagal** dengan pesan jel
 Semua file di `src/data/` dan gambar di `public/images/` adalah **placeholder berlabel contoh**. Sebelum launch:
 
 1. **Toko** — `shop-links.ts`: ganti URL ke profil toko asli.
+   - `url` = tujuan kanonis permanen (mis. `https://shopee.co.id/shop/9268731`).
+   - `affiliateUrl` *(opsional)* = link terlacak program afiliasi; kartu otomatis memakainya dengan `rel="sponsored nofollow"` dan jatuh kembali ke `url` jika field dikosongkan/dihapus.
+   - ⚠️ Komisi afiliasi tidak berlaku untuk pembelian Anda sendiri (self-referral dilarang program afiliasi marketplace).
+   - Link share seperti `shp.ee/...` dapat kedaluwarsa bila diedit di dashboard — refresh nilainya berkala atau hapus field tersebut.
+   - `handle` *(opsional)* menampilkan baris kecil `@namatoko` di kartu.
 2. **Sosial** — `social-links.ts`: ganti handle/URL; WhatsApp otomatis muncul begitu env diset.
 3. **Produk afiliasi** — `affiliate-products.ts`: ganti `url` dengan link afiliasi resmi, `image` dengan foto produk WebP/JPG (rasio 4:3, min. 800×600). Setiap kartu sudah otomatis memakai `rel="sponsored nofollow"`.
 4. **Properti** — `properties.ts`: isi data terverifikasi saja (harga sengaja tidak ada di skema; sertifikat/legalitas tidak boleh dikarang).
