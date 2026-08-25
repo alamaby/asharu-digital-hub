@@ -7,6 +7,7 @@ import { routing } from '@/i18n/routing';
 import { env } from '@/lib/env';
 import { buildMetadata } from '@/lib/seo/metadata';
 import type { Metadata } from 'next';
+import '../globals.css';
 import { JsonLd } from '@/components/ui/JsonLd';
 import { organizationSchema, websiteSchema } from '@/lib/seo/jsonld';
 import { SkipLink } from '@/components/layout/SkipLink';
