@@ -9,7 +9,7 @@ import {
 } from './schemas';
 import { affiliateProducts } from './affiliate-products';
 import { properties } from './properties';
-import { shopLinks } from './shop-links';
+import { shopLinks, getVisibleShopLinks } from './shop-links';
 import { getSocialLinks } from './social-links';
 
 describe('static dataset integrity', () => {
@@ -34,6 +34,16 @@ describe('static dataset integrity', () => {
   it('shop destination URLs are unique', () => {
     const urls = shopLinks.map((link) => link.affiliateUrl ?? link.url);
     expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it('only the verified Shopee store is published right now', () => {
+    const visible = getVisibleShopLinks();
+    expect(visible.map((link) => link.id)).toEqual(['shopee']);
+    // Hidden scaffold entries stay schema-valid for future publishing.
+    expect(shopLinks.length).toBeGreaterThan(visible.length);
+    for (const link of shopLinks) {
+      expect(shopLinkSchema.safeParse(link).success).toBe(true);
+    }
   });
 
   it('base social links validate against the schema', () => {

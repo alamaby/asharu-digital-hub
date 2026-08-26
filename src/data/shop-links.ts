@@ -23,6 +23,7 @@ export const shopLinks: ShopLink[] = [
   {
     id: 'tokopedia',
     platform: 'tokopedia',
+    hidden: true,
     name: { id: 'Toko Tokopedia Asharu', en: 'Asharu Tokopedia Store' },
     description: {
       id: 'Kunjungi toko resmi Asharu di Tokopedia.',
@@ -34,6 +35,7 @@ export const shopLinks: ShopLink[] = [
   {
     id: 'tiktok-shop',
     platform: 'tiktok-shop',
+    hidden: true,
     name: { id: 'TikTok Shop Asharu', en: 'Asharu TikTok Shop' },
     description: {
       id: 'Lihat produk Asharu di TikTok Shop.',
@@ -45,6 +47,7 @@ export const shopLinks: ShopLink[] = [
   {
     id: 'web-store',
     platform: 'web-store',
+    hidden: true,
     name: { id: 'Website Toko Asharu', en: 'Asharu Store Website' },
     description: {
       id: 'Toko mandiri Asharu di luar marketplace.',
@@ -54,3 +57,8 @@ export const shopLinks: ShopLink[] = [
     icon: 'globe'
   }
 ];
+
+/** Only verified, published stores reach the UI. */
+export function getVisibleShopLinks(): ShopLink[] {
+  return shopLinks.filter((link) => !link.hidden);
+}

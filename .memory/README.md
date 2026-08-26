@@ -24,7 +24,7 @@ Last updated: 2026-08-25 10:00 (local time)
 
 ## Open Items / Blockers
 
-- [ ] Data placeholder (`src/data/*`, `public/images/*`) HARUS diganti data terverifikasi sebelum launch publik — README §Mengganti Konten Placeholder.
+- [ ] Data placeholder (`src/data/*`, `public/images/*`) HARUS diganti data terverifikasi sebelum launch publik — README §Mengganti Konten Placeholder. Status toko: Shopee = publish (Asharu x Nopi.NY); Tokopedia/TikTok Shop/web-store = `hidden: true` sampai URL riil ada (hapus flag untuk menampilkan).
 - [ ] Set `NEXT_PUBLIC_*` di Vercel Environment Variables (Production) — `.env.local` lokal tidak otomatis ikut; saat ini deploy berjalan tanpa GA/kontak (CTA WhatsApp/email tersembunyi, banner consent nonaktif).
 - [ ] Hubungkan domain produksi asharu.id (saat ini preview `asharu-digital-hub.vercel.app`); setelah itu set `NEXT_PUBLIC_SITE_URL=https://asharu.id` + redeploy agar canonical/hreflang/sitemap benar.
 - [ ] QA manual: Lighthouse ≥90/95/95/95, screen reader/keyboard di perangkat nyata.

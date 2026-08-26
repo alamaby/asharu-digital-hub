@@ -7,7 +7,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { productListSchema } from '@/lib/seo/jsonld';
-import { shopLinks } from '@/data/shop-links';
+import { getVisibleShopLinks } from '@/data/shop-links';
 import { getSocialLinks } from '@/data/social-links';
 import { affiliateProducts, getFeaturedProducts } from '@/data/affiliate-products';
 import { getFeaturedProperties } from '@/data/properties';
@@ -86,7 +86,7 @@ export default async function HomePage({ params }: HomePageProps) {
             description={tHome('stores.description')}
           />
           <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {shopLinks.map((shop) => (
+            {getVisibleShopLinks().map((shop) => (
               <li key={shop.id} className="h-full">
                 <ShopCard shop={shop} linkPosition="home-stores" />
               </li>

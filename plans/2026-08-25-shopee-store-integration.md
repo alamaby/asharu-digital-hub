@@ -35,6 +35,7 @@ Mengganti entri placeholder Shopee dengan data toko riil (`shopee.co.id/shop/926
 ## Progress Log
 - 2026-08-25 10:20 — Plan disetujui user ("tulis plan, lanjut implement"); keputusan terkunci: URL kanonis + afiliasi tracking aktif + aksen warna brand.
 - 2026-08-25 10:45 — Implementasi selesai. Skema +2 field opsional; entri Shopee kanonis `shopee.co.id/shop/9268731` + affiliateUrl `id.shp.ee/u1L2EQuP`; ShopCard fallback href + sponsored rel kondisional + chip #EE4D2D + handle opsional + aria-label unik per kartu; README §Toko & link afiliasi (self-referral warning). Gates: lint ✓ typecheck ✓ test **102/102** ✓ build 33 halaman ✓. Belum di-commit (menunggu instruksi user).
+- 2026-08-25 11:30 — Follow-up: toko non-Shopee disembunyikan via field `hidden` baru pada schema (data scaffold tetap tersimpan) + helper `getVisibleShopLinks()`; homepage memakai helper; guard test "hanya Shopee yang publish". Gates: lint ✓ typecheck ✓ test **104/104** ✓ build ✓.
 
 ## Notes
 - Riset: tidak ada embed/widget resmi Shopee untuk situs pihak ketiga; simbol/logo penuh berisiko trademark — dipilih aksen warna + teks.

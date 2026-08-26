@@ -41,6 +41,11 @@ export const shopLinkSchema = z.object({
   affiliateUrl: httpsUrl.optional(),
   /** Short public handle shown on the card, e.g. `@namatoko` (optional). */
   handle: z.string().min(1).optional(),
+  /**
+   * Hide the card from the site while its URL/name is unverified
+   * (data stays here as scaffold). Omit or set false to publish.
+   */
+  hidden: z.boolean().optional(),
   icon: z.enum(['bag', 'store', 'video', 'globe'])
 });
 export type ShopLink = z.infer<typeof shopLinkSchema>;
