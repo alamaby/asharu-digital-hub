@@ -6,6 +6,7 @@ import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server
 import { routing } from '@/i18n/routing';
 import { env } from '@/lib/env';
 import { buildMetadata } from '@/lib/seo/metadata';
+import { pickClientMessages } from '@/lib/i18n/client-messages';
 import type { Metadata } from 'next';
 import '../globals.css';
 import { JsonLd } from '@/components/ui/JsonLd';
@@ -52,7 +53,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   }
   setRequestLocale(locale);
 
-  const messages = await getMessages();
+  const messages = pickClientMessages(await getMessages());
 
   return (
     <html lang={locale} className={inter.variable}>

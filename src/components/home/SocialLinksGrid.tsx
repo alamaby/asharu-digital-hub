@@ -1,4 +1,4 @@
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import type { Locale } from '@/i18n/routing';
 import type { SocialLink } from '@/data/schemas';
 import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
@@ -11,7 +11,6 @@ interface SocialLinksGridProps {
 
 /** Icon + text social entries; never icon-only (WCAG). */
 export function SocialLinksGrid({ links, linkPosition }: SocialLinksGridProps) {
-  const t = useTranslations('socials');
   const locale = useLocale() as Locale;
 
   return (
@@ -22,10 +21,6 @@ export function SocialLinksGrid({ links, linkPosition }: SocialLinksGridProps) {
             href={link.url}
             event="click_social_media"
             params={{ platform: link.platform, link_position: linkPosition }}
-            aria-label={t('profileAria', {
-              name: link.name[locale],
-              handle: link.handle
-            })}
             className="flex min-h-touch items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-card transition-colors hover:border-primary"
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

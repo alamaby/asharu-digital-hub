@@ -189,6 +189,8 @@ Pemeriksaan manual yang direkomendasikan sebelum launch: responsif 320/375/768/1
 6. **`localeDetection` dimatikan** — root selalu → `/id` deterministik untuk crawler; preferensi bahasa tetap disimpan di cookie `NEXT_LOCALE` untuk pemakaian mendatang.
 7. **Warning build `metadataBase` dari `/_not-found`** — Next membuat route not-found internal tanpa metadataBase; semua halaman nyata sudah menyetelnya. Kosmetik, tidak berdampak.
 8. **Tailwind v3.4 (bukan v4)** — stabilitas config dan ekosistem plugin; upgrade dilakukan terpisah bila dibutuhkan.
+9. **Pesan i18n di-scope untuk Client Components** (`src/lib/i18n/client-messages.ts`) — hanya namespace yang dipakai client island yang dikirim ke browser; memangkas ukuran dokumen & biaya hidrasi. Tambahkan namespace baru ke `CLIENT_MESSAGE_NAMESPACES` bila Client Component baru butuh terjemahan.
+10. **Target browser modern** (browserslist: Chrome/Edge ≥105, Firefox ≥104, Safari ≥15.4, Opera ≥91) — memangkas polyfill legacy (~11 KB). Browser lama tidak didukung secara eksplisit.
 
 ## Checklist Sebelum Launch
 

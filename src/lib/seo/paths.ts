@@ -5,9 +5,8 @@ type PathnameMap = Record<string, string | Partial<Record<Locale, string>>>;
 
 /**
  * Resolves an internal pathname (e.g. `/products`, `/properties/[slug]`)
- * to the concrete, locale-prefixed path (e.g. `/id/produk`).
- * Pure function — used for canonical URLs, hreflang alternates and the
- * sitemap so those never depend on runtime request context.
+ * to the concrete, locale-prefixed path (e.g. `/id/produk`). Output never
+ * carries a trailing slash so canonical URLs match the served URL exactly.
  */
 export function localizedPathname(
   internal: string,
@@ -24,5 +23,8 @@ export function localizedPathname(
       result = result.replace(`[${key}]`, encodeURIComponent(value));
     }
   }
-  return `/${locale}${result}`;
+
+  const fullPath = `/${locale}${result}`;
+  const trimmed = fullPath.replace(/\/+$/, '');
+  return trimmed.length > `/${locale}`.length ? trimmed : `/${locale}`;
 }

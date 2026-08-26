@@ -89,9 +89,7 @@
   "shops": {
     "cta": "Kunjungi Toko"
   },
-  "socials": {
-    "profileAria": "{name} Asharu ({handle})"
-  },
+  "socials": {},
   "categories": {
     "electronics": "Elektronik",
     "home-living": "Rumah Tangga",

@@ -89,9 +89,7 @@
   "shops": {
     "cta": "Visit Store"
   },
-  "socials": {
-    "profileAria": "Asharu on {name} ({handle})"
-  },
+  "socials": {},
   "categories": {
     "electronics": "Electronics",
     "home-living": "Home & Living",

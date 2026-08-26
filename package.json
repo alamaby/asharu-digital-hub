@@ -41,5 +41,12 @@
   },
   "engines": {
     "node": ">=20.9.0"
-  }
+  },
+  "browserslist": [
+    "chrome >= 105",
+    "edge >= 105",
+    "firefox >= 104",
+    "opera >= 91",
+    "safari >= 15.4"
+  ]
 }

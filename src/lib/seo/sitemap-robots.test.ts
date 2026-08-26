@@ -7,8 +7,8 @@ describe('sitemap', () => {
   const urls = entries.map((entry) => entry.url);
 
   it('contains both locales for every public route', () => {
-    expect(urls).toContain('https://asharu.id/id/');
-    expect(urls).toContain('https://asharu.id/en/');
+    expect(urls).toContain('https://asharu.id/id');
+    expect(urls).toContain('https://asharu.id/en');
     expect(urls).toContain('https://asharu.id/id/produk');
     expect(urls).toContain('https://asharu.id/en/products');
     expect(urls).toContain('https://asharu.id/id/properti');
@@ -31,10 +31,10 @@ describe('sitemap', () => {
   });
 
   it('declares id/en/x-default alternates', () => {
-    const home = entries.find((entry) => entry.url === 'https://asharu.id/id/');
+    const home = entries.find((entry) => entry.url === 'https://asharu.id/id');
     expect(home?.alternates?.languages).toMatchObject({
-      en: 'https://asharu.id/en/',
-      'x-default': 'https://asharu.id/id/'
+      en: 'https://asharu.id/en',
+      'x-default': 'https://asharu.id/id'
     });
   });
 

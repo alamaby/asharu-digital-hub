@@ -31,6 +31,7 @@ Last updated: 2026-08-25 10:00 (local time)
 
 ## Recent Entries
 
+- [2026-08-26 090500-lighthouse-perf-seo-fixes.md](2026-08-26/090500-lighthouse-perf-seo-fixes.md) — perf/SEO fixes dari audit LH (canonical slash, scoped i18n, modern browserslist).
 - [2026-08-25 124500-property-review-fixes.md](2026-08-25/124500-property-review-fixes.md) — 7 temuan review properti ditutup + ads.txt.
 - [2026-08-25 121000-property-migration.md](2026-08-25/121000-property-migration.md) — 3 listing riil migrated (harga publik, galeri, FAQ, occupied-aware).
 - [2026-08-25 111000-shopee-review-fixes.md](2026-08-25/111000-shopee-review-fixes.md) — identitas riil Shopee + perbaikan accessible name.
