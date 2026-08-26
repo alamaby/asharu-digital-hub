@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import type { Locale } from '@/i18n/routing';
 import type { GalleryPhoto } from '@/data/schemas';
 import { ResponsiveImage } from '@/components/ui/ResponsiveImage';
 
@@ -12,12 +13,15 @@ interface PropertyGalleryProps {
 
 /**
  * Photo grid + keyboard-accessible lightbox (Esc closes, arrows navigate,
- * focus moves to the close button while open).
+ * focus moves to the close button while open and returns to the invoking
+ * thumbnail on close).
  */
 export function PropertyGallery({ photos }: PropertyGalleryProps) {
   const t = useTranslations('property');
+  const locale = useLocale() as Locale;
   const [active, setActive] = useState<number | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const invokerRef = useRef<HTMLElement | null>(null);
 
   const close = useCallback(() => setActive(null), []);
   const step = useCallback(
@@ -31,7 +35,11 @@ export function PropertyGallery({ photos }: PropertyGalleryProps) {
   );
 
   useEffect(() => {
-    if (active === null) return;
+    if (active === null) {
+      invokerRef.current?.focus();
+      invokerRef.current = null;
+      return;
+    }
     closeRef.current?.focus();
     document.body.style.overflow = 'hidden';
 
@@ -54,14 +62,18 @@ export function PropertyGallery({ photos }: PropertyGalleryProps) {
           <li key={photo.src}>
             <button
               type="button"
-              onClick={() => setActive(index)}
-              aria-label={photo.alt.id}
+              onClick={() => {
+                invokerRef.current =
+                  (document.activeElement as HTMLElement) ?? null;
+                setActive(index);
+              }}
+              aria-label={photo.alt[locale]}
               className="block w-full overflow-hidden rounded-lg border border-line bg-background transition-colors hover:border-primary"
             >
               <span className="relative block aspect-[4/3]">
                 <ResponsiveImage
                   src={photo.src}
-                  alt={photo.alt.id}
+                  alt={photo.alt[locale]}
                   width={photo.width}
                   height={photo.height}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -93,7 +105,7 @@ export function PropertyGallery({ photos }: PropertyGalleryProps) {
           <ResponsiveImage
             key={photos[active]!.src}
             src={photos[active]!.src}
-            alt={photos[active]!.alt.id}
+            alt={photos[active]!.alt[locale]}
             width={photos[active]!.width}
             height={photos[active]!.height}
             priority
@@ -101,7 +113,7 @@ export function PropertyGallery({ photos }: PropertyGalleryProps) {
           />
 
           <p className="text-sm text-surface/80" aria-live="polite">
-            {(active ?? 0) + 1} / {photos.length} — {photos[active]!.alt.id}
+            {(active ?? 0) + 1} / {photos.length} — {photos[active]!.alt[locale]}
           </p>
 
           <div className="flex gap-3">

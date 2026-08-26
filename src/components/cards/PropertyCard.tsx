@@ -18,7 +18,15 @@ interface PropertyCardProps {
 export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
   const t = useTranslations('property');
   const locale = useLocale() as Locale;
-  const whatsappUrl = contactConfig.whatsappUrl;
+  const primaryContact = property.contacts?.[0];
+
+  const waHref = primaryContact
+    ? `https://wa.me/${primaryContact.international}?text=${encodeURIComponent(
+        `${t('waPrefill')} "${property.title[locale]}"${
+          property.price ? ` (${property.price.label[locale]})` : ''
+        }. ${t('waSuffix')}`
+      )}`
+    : contactConfig.whatsappUrl;
 
   const specs: Array<{ key: string; value: string; srLabel: string; Icon: typeof Ruler }> = [];
   if (property.buildingAreaSqm !== undefined) {
@@ -128,11 +136,6 @@ export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
 
         <p className="text-sm text-ink-muted">{property.description[locale]}</p>
 
-        <p className="mt-auto inline-flex items-start gap-1.5 pt-1 text-xs italic text-ink-muted">
-          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          {t('exampleNotice')}
-        </p>
-
         <div className="flex flex-wrap gap-2 pt-2">
           <Link
             href={{ pathname: '/properties/[slug]', params: { slug: property.slug } }}
@@ -140,12 +143,14 @@ export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
           >
             {t('detailCta')}
           </Link>
-          {whatsappUrl ? (
+          {waHref ? (
             <TrackedExternalLink
-              href={whatsappUrl}
+              href={waHref}
               event="click_property_contact"
               params={{ item_id: property.slug, link_position: linkPosition }}
-              aria-label={t('whatsappAria', { title: property.title[locale] })}
+              aria-label={`${t('whatsappCta')}${
+                primaryContact ? ` ${primaryContact.display}` : ''
+              }`}
               className="btn-primary"
             >
               {t('whatsappCta')}

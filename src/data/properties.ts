@@ -517,9 +517,5 @@ export function getFeaturedProperties(max = 6): Property[] {
     .slice(0, max);
 }
 
-export function getPropertyBySlug(slug: string): Property | undefined {
-  return properties.find((property) => property.slug === slug);
-}
-
 export const propertyTransactionTypes = ['sale', 'rent'] as const;
 export const propertyTypes = ['house', 'apartment', 'land', 'shop-house'] as const;

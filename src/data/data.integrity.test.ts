@@ -10,6 +10,7 @@ import {
 import { affiliateProducts } from './affiliate-products';
 import { properties } from './properties';
 import { shopLinks, getVisibleShopLinks } from './shop-links';
+import { getPublishedProperties } from './properties';
 import { getSocialLinks } from './social-links';
 
 describe('static dataset integrity', () => {
@@ -44,6 +45,14 @@ describe('static dataset integrity', () => {
     for (const link of shopLinks) {
       expect(shopLinkSchema.safeParse(link).success).toBe(true);
     }
+  });
+
+  it('published properties are exactly the three migrated listings', () => {
+    expect(getPublishedProperties().map((property) => property.slug)).toEqual([
+      'dijual-rumah-kamarasan-bandung-timur',
+      'dijual-apartemen-studio-buah-batu-park-bandung',
+      'disewakan-rumah-toko-sukaraja-jatiwangi-majalengka'
+    ]);
   });
 
   it('base social links validate against the schema', () => {

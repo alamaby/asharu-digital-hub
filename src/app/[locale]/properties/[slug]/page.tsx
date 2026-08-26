@@ -350,7 +350,7 @@ export default async function PropertyDetailPage({
           <ul className="mt-4 flex flex-wrap gap-2">
             {property.facilities.map((facility) => (
               <li key={facility.en} className="chip border border-line bg-surface text-ink">
-                {facility.id}
+                {facility[locale]}
               </li>
             ))}
           </ul>

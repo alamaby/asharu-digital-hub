@@ -142,8 +142,7 @@
     "lightboxClose": "Tutup galeri",
     "lightboxPrev": "Foto sebelumnya",
     "lightboxNext": "Foto berikutnya",
-    "mapsCta": "Buka di Google Maps",
-    "exampleNotice": "Contoh listing — data belum diverifikasi."
+    "mapsCta": "Buka di Google Maps"
   },
   "propertyFilters": {
     "legend": "Filter properti",

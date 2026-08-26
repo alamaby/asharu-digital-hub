@@ -142,8 +142,7 @@
     "lightboxClose": "Close gallery",
     "lightboxPrev": "Previous photo",
     "lightboxNext": "Next photo",
-    "mapsCta": "Open in Google Maps",
-    "exampleNotice": "Example listing — data not yet verified."
+    "mapsCta": "Open in Google Maps"
   },
   "propertyFilters": {
     "legend": "Filter properties",
