@@ -120,7 +120,9 @@ Semua file di `src/data/` dan gambar di `public/images/` adalah **placeholder be
    - `handle` *(opsional)* menampilkan baris kecil `@namatoko` di kartu.
 2. **Sosial** — `social-links.ts`: ganti handle/URL; WhatsApp otomatis muncul begitu env diset.
 3. **Produk afiliasi** — `affiliate-products.ts`: ganti `url` dengan link afiliasi resmi, `image` dengan foto produk WebP/JPG (rasio 4:3, min. 800×600). Setiap kartu sudah otomatis memakai `rel="sponsored nofollow"`.
-4. **Properti** — `properties.ts`: isi data terverifikasi saja (harga sengaja tidak ada di skema; sertifikat/legalitas tidak boleh dikarang).
+4. **Properti** — `properties.ts`: tiga listing riil (owner-verified) sudah aktif — Kamarasan Residence (dijual), Buah Batu Park (dijual), Sukaraja Jatiwangi (disewakan, *occupied*). Entri contoh lama ditandai `hidden: true`; hapus flag + isi data untuk mempublikasikan. Harga & alamat lengkap hanya diisi dari data pemilik.
+   - Media: foto dioptimasi ke WebP via `node scripts/optimize-property-images.mjs --src <dir> --dest public/images/properties/<slug> [--copy]` — manifest dimensi yang dicetak dipakai mengisi `gallery`.
+   - **EN copy pada listing migrated adalah hasil terjemahan asisten** — review owner sebelum launch.
 5. **Gambar**: hapus SVG placeholder, unggah aset asli. `ResponsiveImage` otomatis mengaktifkan optimasi next/image untuk non-SVG.
 6. **Kebijakan** — `src/config/content.ts`: perbarui tanggal revisi; baca ulang isi `privacy-policy`/`affiliate-disclosure` di `src/messages/*.json`.
 7. Cari sisa penanda: `grep -rn "Replace with verified production data" src/`.

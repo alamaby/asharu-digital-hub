@@ -19,13 +19,15 @@ describe('sitemap', () => {
     expect(urls).toContain('https://asharu.id/id/disclosure-afiliasi');
   });
 
-  it('includes every property listing in both locales', () => {
+  it('includes every published property listing in both locales', () => {
     expect(
       urls.filter((url) => url.startsWith('https://asharu.id/id/properti/')).length
-    ).toBe(6);
+    ).toBe(3);
     expect(
       urls.filter((url) => url.startsWith('https://asharu.id/en/properties/')).length
-    ).toBe(6);
+    ).toBe(3);
+    // Hidden placeholder scaffolds must never leak into the sitemap.
+    expect(urls.join('\n')).not.toContain('contoh');
   });
 
   it('declares id/en/x-default alternates', () => {

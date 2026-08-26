@@ -83,6 +83,12 @@ export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
             )}
             {property.transactionType === 'sale' ? t('sale') : t('rent')}
           </span>
+          {property.availability === 'occupied' ? (
+            <span className="chip bg-danger/10 text-danger">
+              <Info className="size-3" aria-hidden />
+              {t('occupiedBadge')}
+            </span>
+          ) : null}
           <span className="inline-flex items-center gap-1 text-sm text-ink-muted">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             {property.location[locale]}
@@ -93,7 +99,20 @@ export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
           {property.title[locale]}
         </h3>
 
-        <p className="text-sm font-semibold text-primary">{t('contactForPrice')}</p>
+        {property.price ? (
+          <p className="text-sm">
+            <span className="font-semibold text-primary">
+              {property.price.label[locale]}
+            </span>
+            {property.price.note ? (
+              <span className="block text-xs text-ink-muted">
+                {property.price.note[locale]}
+              </span>
+            ) : null}
+          </p>
+        ) : (
+          <p className="text-sm font-semibold text-primary">{t('contactForPrice')}</p>
+        )}
 
         {specs.length > 0 ? (
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">

@@ -3,7 +3,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { env } from '@/lib/env';
 import { localizedPathname } from '@/lib/seo/paths';
-import { properties } from '@/data/properties';
+import { getPublishedProperties } from '@/data/properties';
 
 interface SitemapEntry {
   path: string;
@@ -17,7 +17,7 @@ const staticPaths: SitemapEntry[] = [
   { path: '/about' },
   { path: '/privacy-policy' },
   { path: '/affiliate-disclosure' },
-  ...properties.map((property) => ({
+  ...getPublishedProperties().map((property) => ({
     path: '/properties/[slug]',
     params: { slug: property.slug }
   }))

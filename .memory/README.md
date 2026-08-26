@@ -31,6 +31,7 @@ Last updated: 2026-08-25 10:00 (local time)
 
 ## Recent Entries
 
+- [2026-08-25 121000-property-migration.md](2026-08-25/121000-property-migration.md) — 3 listing riil migrated (harga publik, galeri, FAQ, occupied-aware).
 - [2026-08-25 111000-shopee-review-fixes.md](2026-08-25/111000-shopee-review-fixes.md) — identitas riil Shopee + perbaikan accessible name.
 - [2026-08-25 104500-shopee-store-integration.md](2026-08-25/104500-shopee-store-integration.md) — Shopee riil: kanonis + affiliate fallback + kartu branded.
 - [2026-08-24 131000-asharu-code-review-fixes.md](2026-08-24/131000-asharu-code-review-fixes.md) — remediasi 9 temuan review.

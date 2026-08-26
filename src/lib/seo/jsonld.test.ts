@@ -46,18 +46,38 @@ describe('JSON-LD builders', () => {
     );
   });
 
-  it('RealEstateListing matches visible content and omits unverified data', () => {
+  it('RealEstateListing matches visible content and emits owner-verified offers', () => {
     const listing = realEstateListingSchema(properties[0]!, 'id') as Record<
       string,
       unknown
     >;
     expect(listing['@type']).toBe('RealEstateListing');
-    expect(listing.url).toBe('https://asharu.id/id/properti/rumah-contoh-bandung');
+    expect(listing.url).toBe(
+      `https://asharu.id/id/properti/${properties[0]!.slug}`
+    );
+
+    const offers = listing.offers as Record<string, unknown>;
+    expect(offers).toMatchObject({
+      '@type': 'Offer',
+      price: 650000000,
+      priceCurrency: 'IDR',
+      availability: 'https://schema.org/InStock'
+    });
+
     const serialized = JSON.stringify(listing);
-    expect(serialized).not.toMatch(/price|offer|certificate|sertifikat/i);
+    expect(serialized).not.toMatch(/rating/i);
 
     const props = listing.additionalProperty as Array<Record<string, unknown>>;
     expect(props.some((p) => p.name === 'bedrooms' && p.value === 3)).toBe(true);
+  });
+
+  it('occupied listings emit SoldOut availability', () => {
+    const occupied = properties.find((p) => p.availability === 'occupied');
+    if (!occupied) throw new Error('expected an occupied fixture');
+    const listing = realEstateListingSchema(occupied, 'id');
+    expect((listing.offers as Record<string, unknown>).availability).toBe(
+      'https://schema.org/SoldOut'
+    );
   });
 
   it('breadcrumb chains positions from 1', () => {

@@ -7,7 +7,7 @@ import { breadcrumbSchema, propertyListSchema } from '@/lib/seo/jsonld';
 import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
 import { pageHeading } from '@/lib/utils/title';
-import { properties } from '@/data/properties';
+import { getPublishedProperties } from '@/data/properties';
 import { PropertyBrowser } from '@/components/cards/PropertyBrowser';
 import { JsonLd } from '@/components/ui/JsonLd';
 
@@ -53,11 +53,11 @@ export default async function PropertiesPage({ params }: PropertiesPageProps) {
       </p>
 
       <div className="mt-8">
-        <PropertyBrowser properties={properties} linkPosition="properties-grid" />
+        <PropertyBrowser properties={getPublishedProperties()} linkPosition="properties-grid" />
       </div>
 
       <JsonLd data={breadcrumb} />
-      <JsonLd data={propertyListSchema(properties, locale)} />
+      <JsonLd data={propertyListSchema(getPublishedProperties(), locale)} />
     </div>
   );
 }

@@ -85,7 +85,7 @@ function localizedPropertyUrl(slug: string, locale: Locale): string {
   return `${env.siteUrl}${localizedPathname('/properties/[slug]', locale, { slug })}`;
 }
 
-/** RealEstateListing restricted to data visible on the page; no prices/legal claims. */
+/** RealEstateListing restricted to data visible on the page; owner-verified prices emit an Offer. */
 export function realEstateListingSchema(
   property: Property,
   locale: Locale
@@ -128,12 +128,16 @@ export function realEstateListingSchema(
     });
   }
 
-  return {
+  const images = property.gallery?.length
+    ? property.gallery.map((photo) => `${env.siteUrl}${photo.src}`)
+    : [`${env.siteUrl}${property.image}`];
+
+  const listing: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'RealEstateListing',
     name: property.title[locale],
     url: localizedPropertyUrl(property.slug, locale),
-    image: `${env.siteUrl}${property.image}`,
+    image: images,
     description: property.description[locale],
     location: {
       '@type': 'Place',
@@ -144,6 +148,36 @@ export function realEstateListingSchema(
       }
     },
     additionalProperty
+  };
+
+  if (property.price?.amount !== undefined) {
+    listing.offers = {
+      '@type': 'Offer',
+      price: property.price.amount,
+      priceCurrency: 'IDR',
+      availability:
+        property.availability === 'occupied'
+          ? 'https://schema.org/SoldOut'
+          : 'https://schema.org/InStock'
+    };
+  }
+
+  return listing;
+}
+
+/** FAQPage markup; only emit alongside visibly rendered Q&A content (per locale). */
+export function faqSchema(
+  faq: NonNullable<Property['faq']>,
+  locale: Locale
+): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question[locale],
+      acceptedAnswer: { '@type': 'Answer', text: item.answer[locale] }
+    }))
   };
 }
 

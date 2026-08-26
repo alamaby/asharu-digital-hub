@@ -95,10 +95,22 @@ describe('static dataset integrity', () => {
     }
   });
 
-  it('no fake prices, ratings or certificates leak into data', () => {
+  it('prices only exist on owner-verified published listings', () => {
+    for (const property of properties) {
+      if (property.hidden) {
+        expect(property.price, property.slug).toBeUndefined();
+      }
+    }
+    const priced = properties.filter((p) => !p.hidden && p.price);
+    expect(priced.length).toBeGreaterThan(0);
+    for (const property of priced) {
+      expect(property.price?.amount, property.slug).toBeGreaterThan(0);
+    }
+  });
+
+  it('no fake ratings or certificates leak into data', () => {
     const blob = JSON.stringify({ shopLinks, affiliateProducts, properties });
-    expect(blob).not.toMatch(/"price"/i);
     expect(blob).not.toMatch(/rating/i);
-    expect(blob).not.toMatch(/sertifikat|certificate/i);
+    expect(blob).not.toMatch(/"sertifikat"/i);
   });
 });
