@@ -75,6 +75,12 @@
       "description": "Listing properti dengan informasi yang jujur dan terverifikasi.",
       "viewAll": "Lihat semua properti"
     },
+    "math": {
+      "badge": "Baru",
+      "heading": "Belajar Matematika Kelas 2 SD",
+      "description": "Bantu anak menguasai penjumlahan dan pengurangan bersusun dengan langkah interaktif, susun angka yang akurat, serta tanpa data pribadi anak — aplikasi PWA yang bisa dipasang dan berjalan offline.",
+      "cta": "Mulai Belajar di math.asharu.id"
+    },
     "about": {
       "heading": "Tentang Asharu",
       "p1": "Asharu adalah digital hub personal: satu alamat, banyak tujuan. Dari sini Anda dapat menjangkau toko online kami, kanal media sosial, kurasi produk afiliasi, hingga listing properti.",
@@ -223,6 +229,7 @@
     "legalHeading": "Legal",
     "privacy": "Kebijakan Privasi",
     "disclosureLink": "Disclosure Afiliasi",
+    "mathLink": "Belajar Matematika",
     "consentSettings": "Preferensi analytics",
     "rights": "© {year} Asharu · asharu.id"
   },

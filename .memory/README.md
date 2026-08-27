@@ -1,11 +1,11 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-08-25 10:00 (local time)
+Last updated: 2026-08-26 12:35 (local time)
 
 ## Current State
 
-- **Status:** LIVE di Vercel (preview domain `https://asharu-digital-hub.vercel.app`) dan **terverifikasi visual benar oleh user** setelah fix `globals.css` import (commit `7606c2f`). Gates: lint ✓, typecheck ✓, test 95/95 ✓, build 33 halaman ✓. Tiga commit terakhir ter-push ke `origin/main`.
+- **Status:** Section Belajar Matematika (math.asharu.id) selesai — homepage section + footer link + event click_math_app. Gates: lint ✓, typecheck ✓, test 115/115 ✓, build 27 halaman ✓. Menunggu commit & push.
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod. SSG penuh, tanpa database, tanpa backend form.
 - **Halaman:** `/id` & `/en` (home), produk, properti (+detail `[slug]`, 12 listing-lokale), tentang, kebijakan privasi, disclosure afiliasi, not-found terlokalisasi. Root `/` → 307 `/id`.
 - **Analytics:** GA4 consent-gated opt-in; 6 event kustom + `page_view` (PageViewTracker) + `view_property` (ViewPropertyTracker di detail); banner digate env GA; footer preferences.
@@ -31,6 +31,7 @@ Last updated: 2026-08-25 10:00 (local time)
 
 ## Recent Entries
 
+- [2026-08-26 123000-math-section.md](2026-08-26/123000-math-section.md) — section Belajar Matematika linking to math.asharu.id.
 - [2026-08-26 090500-lighthouse-perf-seo-fixes.md](2026-08-26/090500-lighthouse-perf-seo-fixes.md) — perf/SEO fixes dari audit LH (canonical slash, scoped i18n, modern browserslist).
 - [2026-08-25 124500-property-review-fixes.md](2026-08-25/124500-property-review-fixes.md) — 7 temuan review properti ditutup + ads.txt.
 - [2026-08-25 121000-property-migration.md](2026-08-25/121000-property-migration.md) — 3 listing riil migrated (harga publik, galeri, FAQ, occupied-aware).

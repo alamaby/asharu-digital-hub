@@ -75,6 +75,12 @@
       "description": "Property listings presented honestly, with verified information only.",
       "viewAll": "View all properties"
     },
+    "math": {
+      "badge": "New",
+      "heading": "Grade 2 Math Learning",
+      "description": "Help kids master column addition and subtraction with step-by-step learning, accurate number layouts, and no child personal data — an installable PWA that works offline.",
+      "cta": "Start Learning at math.asharu.id"
+    },
     "about": {
       "heading": "About Asharu",
       "p1": "Asharu is a personal digital hub: one address, many destinations. From here you can reach our online stores, social channels, curated affiliate products, and property listings.",
@@ -223,6 +229,7 @@
     "legalHeading": "Legal",
     "privacy": "Privacy Policy",
     "disclosureLink": "Affiliate Disclosure",
+    "mathLink": "Learn Math",
     "consentSettings": "Analytics preferences",
     "rights": "© {year} Asharu · asharu.id"
   },

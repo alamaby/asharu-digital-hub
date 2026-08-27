@@ -32,7 +32,7 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 | Data | File type-safe di `src/data/`, divalidasi skema Zod (`src/data/schemas.ts`); tidak ada database/API saat render |
 | Styling | Tailwind CSS 3.4 dengan palet color-blind-safe WCAG AA |
 | Font | Inter via `next/font` (self-hosted, zero layout shift) |
-| Analytics | GA4 consent-gated: script Google sama sekali tidak dimuat sebelum pengunjung menyetujui; 6 event type-safe tanpa PII |
+| Analytics | GA4 consent-gated: script Google sama sekali tidak dimuat sebelum pengunjung menyetujui; 7 event type-safe tanpa PII (termasuk click_math_app) |
 | SEO | Metadata per-halaman (canonical, hreflang id/en/x-default), sitemap dengan alternates, robots.txt, manifest, OG image dinamis build-time, JSON-LD (WebSite, Organization, ItemList, RealEstateListing, BreadcrumbList) |
 | Keamanan | CSP + HSTS + nosniff + Referrer-Policy + Permissions-Policy + frame-ancestors 'none' via `next.config.ts`; URL eksternal divalidasi protokol https/mailto/tel; JSON-LD di-escape terhadap `</script>` breakout |
 
@@ -50,7 +50,8 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 │   │   ├── shop-links.ts     # toko online
 │   │   ├── social-links.ts   # media sosial (WhatsApp dari env)
 │   │   ├── affiliate-products.ts
-│   │   └── properties.ts
+│   │   ├── properties.ts
+│   │   └── math-app.ts       # promosi Asharu Math (subdomain)
 │   ├── config/
 │   │   ├── site.ts           # nama site, domain, kanal kontak (env-driven)
 │   │   ├── navigation.ts     # item nav utama
@@ -91,8 +92,8 @@ Quality gates:
 ```bash
 npm run lint         # ESLint flat config (next/core-web-vitals + TS)
 npm run typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-npm run test         # Vitest + Testing Library (84 assertions)
-npm run build        # produksi — 32 halaman statis
+npm run test         # Vitest + Testing Library (115 assertions)
+npm run build        # produksi — 27 halaman statis
 ```
 
 ## Environment Variables
@@ -142,7 +143,7 @@ Setup:
    - Pantau laporan **Realtime** sambil menekan CTA toko/sosial/produk dan mengganti bahasa.
 6. Pastikan analytics **tidak dimuat dua kali**: tag hanya dirender oleh `<GoogleAnalytics>` di `[locale]/layout.tsx` (single mount, `strategy="afterInteractive"`); tidak ada tag manual di HTML.
 
-Event kustom yang tersedia (lihat `src/lib/analytics/events.ts`): `click_online_store`, `click_social_media`, `click_affiliate_product`, `view_property` (otomatis via `ViewPropertyTracker` di halaman detail), `click_property_contact`, `change_language`. Selain itu `PageViewTracker` mengirim `page_view` standar pada setiap navigasi client-side (Next.js tidak melakukannya otomatis). Parameter diizinkan: `item_id`, `item_category`, `platform`, `locale`, `link_position`. **Dilarang mengirim**: nama, email, nomor telepon, alamat lengkap, isi pesan.
+Event kustom yang tersedia (lihat `src/lib/analytics/events.ts`): `click_online_store`, `click_social_media`, `click_affiliate_product`, `view_property` (otomatis via `ViewPropertyTracker`), `click_property_contact`, `click_math_app` (CTA ke math.asharu.id — tracked via `platform: math-app`), `change_language`. Selain itu `PageViewTracker` mengirim `page_view` standar pada setiap navigasi client-side. Parameter diizinkan: `item_id`, `item_category`, `platform`, `locale`, `link_position`. **Dilarang mengirim**: nama, email, nomor telepon, alamat lengkap, isi pesan.
 
 ## Deployment ke Vercel
 
@@ -166,7 +167,7 @@ Event kustom yang tersedia (lihat `src/lib/analytics/events.ts`): `click_online_
 
 ## Testing & Quality Gates
 
-16 file test / 84 assertion (Vitest + Testing Library):
+21 file test / 115 assertions (Vitest + Testing Library):
 
 | Area | Cakupan |
 |---|---|
@@ -203,7 +204,7 @@ Pemeriksaan manual yang direkomendasikan sebelum launch: responsif 320/375/768/1
 - [ ] `/id`, `/en`, `/sitemap.xml`, `/robots.txt`, `/manifest.webmanifest`, `/icon.svg` dapat diakses
 - [ ] Root `/` → `/id`; language switcher menjaga halaman; mobile menu & consent banner bisa dioperasikan keyboard
 - [ ] Tautan afiliasi membawa `rel="sponsored nofollow noopener noreferrer"` + disclosure terlihat
-- [ ] GA4 Measurement ID terpasang + DebugView/Realtime menerima 6 event
+- [ ] GA4 Measurement ID terpasang + DebugView/Realtime menerima 7 event (termasuk click_math_app)
 - [ ] Lighthouse (mobile): Performance ≥90, A11y ≥95, Best Practices ≥95, SEO ≥95
 - [ ] Tidak ada error console di production build
 - [ ] Commit pertama dibuat (repo saat ini masih tanpa riwayat commit)

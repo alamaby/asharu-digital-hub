@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { ArrowDown, ArrowRight } from 'lucide-react';
+import { ArrowDown, ArrowRight, Calculator, Sparkles } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
@@ -19,6 +19,8 @@ import { AffiliateDisclosure } from '@/components/home/AffiliateDisclosure';
 import { ContactCTA } from '@/components/home/ContactCTA';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { PropertyBrowser } from '@/components/cards/PropertyBrowser';
+import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
+import { mathAppConfig } from '@/data/math-app';
 
 interface HomePageProps {
   params: Promise<{ locale: string }>;
@@ -167,7 +169,52 @@ export default async function HomePage({ params }: HomePageProps) {
           </div>
         </section>
 
-        {/* G. About teaser */}
+        {/* G. Belajar Matematika */}
+        <section
+          id="belajar-math"
+          aria-labelledby="belajar-math-heading"
+          className="scroll-mt-24 py-10"
+        >
+          <SectionHeading
+            id="belajar-math-heading"
+            title={tHome('math.heading')}
+            description={tHome('math.description')}
+          />
+          <div className="mt-6 rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="chip bg-accent/10 text-accent-dark">
+                <Sparkles className="size-3" aria-hidden />
+                {tHome('math.badge')}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                <Calculator className="size-4" aria-hidden />
+                math.asharu.id
+              </span>
+            </div>
+            <h3 className="mt-3 text-lg font-semibold text-ink">
+              {mathAppConfig.title[locale]}
+            </h3>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-muted marker:text-primary">
+              {mathAppConfig.bulletPoints.map((point) => (
+                <li key={point.id}>{point[locale]}</li>
+              ))}
+            </ul>
+            <div className="mt-5">
+              <TrackedExternalLink
+                href={mathAppConfig.url}
+                event="click_math_app"
+                params={{ platform: 'math-app', link_position: 'home-math' }}
+                className="btn-primary"
+              >
+                {tHome('math.cta')}
+                <ArrowRight className="size-4" aria-hidden />
+              </TrackedExternalLink>
+              <span className="sr-only">Asharu Math</span>
+            </div>
+          </div>
+        </section>
+
+        {/* H. About teaser */}
         <section aria-labelledby="about-teaser-heading" className="py-10">
           <SectionHeading id="about-teaser-heading" title={tHome('about.heading')} />
           <div className="mt-4 max-w-3xl space-y-3 text-base leading-relaxed text-ink-muted">

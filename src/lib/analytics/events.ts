@@ -4,6 +4,7 @@ export const ANALYTICS_EVENT_NAMES = [
   'click_affiliate_product',
   'view_property',
   'click_property_contact',
+  'click_math_app',
   'change_language'
 ] as const;
 

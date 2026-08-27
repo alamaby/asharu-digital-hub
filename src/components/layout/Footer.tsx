@@ -1,4 +1,5 @@
 import { useTranslations } from 'next-intl';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Link } from '@/i18n/navigation';
 import { ConsentSettingsButton } from './ConsentSettingsButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -45,6 +46,14 @@ export function Footer({ showAnalyticsPrefs }: FooterProps) {
                 </Link>
               </li>
             ))}
+            <li>
+              <ExternalLink
+                href="https://math.asharu.id"
+                className="inline-flex min-h-touch items-center text-sm text-ink-muted hover:text-primary"
+              >
+                {t('mathLink')}
+              </ExternalLink>
+            </li>
           </ul>
         </nav>
 

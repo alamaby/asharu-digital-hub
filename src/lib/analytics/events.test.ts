@@ -37,13 +37,14 @@ describe('trackEvent', () => {
     expect(trackEvent('view_property')).toBe(false);
   });
 
-  it('exposes exactly the six documented event names', () => {
+  it('exposes the documented event names including click_math_app', () => {
     expect([...ANALYTICS_EVENT_NAMES]).toEqual([
       'click_online_store',
       'click_social_media',
       'click_affiliate_product',
       'view_property',
       'click_property_contact',
+      'click_math_app',
       'change_language'
     ]);
   });
