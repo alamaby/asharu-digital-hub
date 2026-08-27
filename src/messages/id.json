@@ -107,7 +107,15 @@
     "merchantSrOnly": "Merchant: ",
     "checkPrice": "Cek harga terbaru",
     "priceNote": "Harga dapat berubah di platform penjual.",
-    "cta": "Lihat Produk"
+    "cta": "Lihat Produk",
+    "carousel": {
+      "regionLabel": "Produk afiliasi unggulan",
+      "prev": "Produk sebelumnya",
+      "next": "Produk berikutnya",
+      "play": "Putar",
+      "pause": "Jeda",
+      "slideLabel": "Slide {current} dari {total}"
+    }
   },
   "disclosure": {
     "title": "Disclosure Afiliasi",

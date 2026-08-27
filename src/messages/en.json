@@ -107,7 +107,15 @@
     "merchantSrOnly": "Merchant: ",
     "checkPrice": "Check latest price",
     "priceNote": "Prices may change on the seller's platform.",
-    "cta": "View Product"
+    "cta": "View Product",
+    "carousel": {
+      "regionLabel": "Featured affiliate products",
+      "prev": "Previous product",
+      "next": "Next product",
+      "play": "Play",
+      "pause": "Pause",
+      "slideLabel": "Slide {current} of {total}"
+    }
   },
   "disclosure": {
     "title": "Affiliate Disclosure",

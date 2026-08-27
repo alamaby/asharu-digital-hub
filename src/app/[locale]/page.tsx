@@ -17,7 +17,7 @@ import { ShopCard } from '@/components/home/ShopCard';
 import { SocialLinksGrid } from '@/components/home/SocialLinksGrid';
 import { AffiliateDisclosure } from '@/components/home/AffiliateDisclosure';
 import { ContactCTA } from '@/components/home/ContactCTA';
-import { ProductCard } from '@/components/cards/ProductCard';
+import { ProductCarousel } from '@/components/cards/ProductCarousel';
 import { PropertyBrowser } from '@/components/cards/PropertyBrowser';
 import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
 import { mathAppConfig } from '@/data/math-app';
@@ -126,13 +126,9 @@ export default async function HomePage({ params }: HomePageProps) {
           <div className="mt-6">
             <AffiliateDisclosure id="home-affiliate-disclosure" />
           </div>
-          <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featuredProducts.map((product) => (
-              <li key={product.id} className="h-full">
-                <ProductCard product={product} linkPosition="home-featured" />
-              </li>
-            ))}
-          </ul>
+          <div className="mt-6">
+            <ProductCarousel products={featuredProducts} linkPosition="home-featured" />
+          </div>
           <div className="mt-6">
             <Link
               href="/products"

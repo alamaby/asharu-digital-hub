@@ -27,7 +27,7 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 | Aspek | Keputusan |
 |---|---|
 | Framework | Next.js 15 (App Router), React 19, TypeScript strict |
-| Rendering | SSG untuk seluruh halaman (`generateStaticParams` + `setRequestLocale`); RSC default; hanya 6 client components (mobile nav, language switcher, property filter, consent banner + settings button, GA loader) |
+| Rendering | SSG untuk seluruh halaman (`generateStaticParams` + `setRequestLocale`); RSC default; client components terbatas (mobile nav, language switcher, property filter/gallery, product carousel, consent banner + settings button, GA loader) |
 | i18n | next-intl v4 — locale `id` (default) & `en`; localized pathnames (`/id/produk` ↔ `/en/products`); root `/` → `/id` via middleware **tanpa loop**; locale detection header dimatikan agar crawler selalu melihat `/id` deterministik |
 | Data | File type-safe di `src/data/`, divalidasi skema Zod (`src/data/schemas.ts`); tidak ada database/API saat render |
 | Styling | Tailwind CSS 3.4 dengan palet color-blind-safe WCAG AA |
@@ -65,7 +65,7 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 │   │   ├── layout/           # Header, NavMenu, MobileNav, LanguageSwitcher,
 │   │   │                     # Footer, SkipLink, ConsentSettingsButton
 │   │   ├── home/             # ShopCard, SocialLinksGrid, AffiliateDisclosure, ContactCTA
-│   │   ├── cards/            # ProductCard, PropertyCard, PropertyBrowser (filter client)
+│   │   ├── cards/            # ProductCard, ProductCarousel (auto-play, pause), PropertyCard, PropertyBrowser (filter client)
 │   │   ├── analytics/        # GoogleAnalytics (consent-gated), ConsentBanner
 │   │   └── ui/               # ExternalLink, TrackedExternalLink, SectionHeading,
 │   │                         # ResponsiveImage, JsonLd, EmptyState, PlatformIcon
