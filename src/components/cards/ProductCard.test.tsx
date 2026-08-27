@@ -4,7 +4,10 @@ import { ProductCard } from './ProductCard';
 import { affiliateProducts } from '@/data/affiliate-products';
 import { renderWithMessages } from '@/test/utils';
 
+// Choose a deterministic product for assertions from the (scraped) dataset.
 const product = affiliateProducts[0]!;
+// Expected category label in the id locale.
+const categoryLabel = { electronics: 'Elektronik', 'home-living': 'Rumah Tangga', fashion: 'Fashion', 'sports-hobby': 'Olahraga & Hobi' }[product.category];
 
 describe('ProductCard', () => {
   it('renders localized name, category and merchant', () => {
@@ -13,7 +16,7 @@ describe('ProductCard', () => {
     );
 
     expect(screen.getByRole('heading', { name: product.name.id })).toBeInTheDocument();
-    expect(screen.getByText('Elektronik')).toBeInTheDocument();
+    expect(screen.getByText(categoryLabel)).toBeInTheDocument();
     expect(screen.getByText(product.merchant)).toBeInTheDocument();
     expect(container.querySelector('.sr-only')?.textContent).toBe('Merchant: ');
   });

@@ -1,0 +1,54 @@
+name: Scrape affiliate products
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily 03:00 UTC — adjust to match the store's catalog update cadence.
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Scrape affiliate products
+        # No --insecure: CI uses a clean network with valid certificates.
+        run: npm run scrape:affiliate
+
+      - name: Validate gates
+        run: |
+          npm run typecheck
+          npm run test
+
+      - name: Commit changes if any
+        id: commit
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(data): refresh scraped affiliate products"
+            git push
+            echo "committed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            echo "No data changes to commit."
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Affiliate scrape failed. Check the run logs."

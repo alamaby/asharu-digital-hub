@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "scrape:affiliate": "node scripts/scrape-affiliate.mjs",
+    "scrape:affiliate:dry-run": "node scripts/scrape-affiliate.mjs --dry-run"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

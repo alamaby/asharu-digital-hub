@@ -121,6 +121,34 @@ Semua file di `src/data/` dan gambar di `public/images/` adalah **placeholder be
    - `handle` *(opsional)* menampilkan baris kecil `@namatoko` di kartu.
 2. **Sosial** — `social-links.ts`: ganti handle/URL; WhatsApp otomatis muncul begitu env diset.
 3. **Produk afiliasi** — `affiliate-products.ts`: ganti `url` dengan link afiliasi resmi, `image` dengan foto produk WebP/JPG (rasio 4:3, min. 800×600). Setiap kartu sudah otomatis memakai `rel="sponsored nofollow"`.
+
+### Scraper Produk Afiliasi (Shopee Linktree)
+
+Konten `affiliate-products.ts` dapat ditarik otomatis dari halaman afiliasi Shopee Linktree *"Racun outfit asharu"* (`collshp.com/asharu`) via **GraphQL API publik**-nya (tanpa auth, tanpa browser):
+
+- Endpoint: `POST https://collshp.com/api/v3/gql/graphql` — operation `getBaseInfoAndLinks` dengan `urlSuffix: "asharu"`.
+- Total tersedia kini **201 produk**; halaman support pagination (`pageSize`/`pageNum`) dan telah dibatasi ke **12 produk terbaru** di data saat ini.
+- Skema `AffiliateProduct` → `src/data/schemas.ts` dihasilkan `scripts/lib/data-writer.mjs`, divalidasi Zod sebelum ditulis.
+
+Jalankan scraper:
+
+```bash
+npm run scrape:affiliate:dry-run   # lihat hasil transform tanpa menulis file/unduh gambar
+npm run scrape:affiliate           # tarik SEMUA produk (~201), unduh+optimasi gambar, tulis data
+npm run scrape:affiliate -- --limit 12   # batasi jumlah produk
+npm run scrape:affiliate -- --first-page # hanya halaman pertama (tanpa pagination)
+```
+
+Perintah tambahan: `--max-width <px>` (default 800), `--insecure` (lewati verifikasi TLS — hanya untuk jaringan korporat/MITM; CI tidak memakainya).
+
+Proses:
+1. Fetch GraphQL → baris `linkList { linkId, link, linkName, image, linkType, groupIds }`; dedupe by `linkId`, filter `linkType: "ITEM"` .
+2. **Kategori** dipetakan heuristik (kata kunci ID/EN) ke enum `electronics | home-living | fashion | sports-hobby` — sumber kebenaran: `src/lib/affiliate/category.ts` + `scripts/lib/category-keywords.json`. Default fallback `fashion`.
+3. **Gambar** diunduh (module `https`) → dioptimasi Sharp ke WebP (max 800px, kalitas 80) → `public/images/products/affiliate/<linkId>-<hash>.webp`, dedupe by sha256.
+4. `featured: true` hanya untuk 6 produk pertama (batas homepage); sisanya `false`.
+5. Ditulis ulang ke `src/data/affiliate-products.ts`, lalu validasi `typecheck` + `test`.
+
+**Penjadwalan otomatis:** `.github/workflows/scrape-affiliate.yml` menjalankan `npm run scrape:affiliate` setiap hari 03:00 UTC (atau via *workflow_dispatch*), memvalidasi gate, lalu commit-perubahan bila ada. Nama kategori tidak tersedia pada data GraphQL item harus dipetakan dari judul — verifikasi hasil klasifikasi ukuran dataset penuh sebelum dipublikasikan.
 4. **Properti** — `properties.ts`: tiga listing riil (owner-verified) sudah aktif — Kamarasan Residence (dijual), Buah Batu Park (dijual), Sukaraja Jatiwangi (disewakan, *occupied*). Entri contoh lama ditandai `hidden: true`; hapus flag + isi data untuk mempublikasikan. Harga & alamat lengkap hanya diisi dari data pemilik.
    - Media: foto dioptimasi ke WebP via `node scripts/optimize-property-images.mjs --src <dir> --dest public/images/properties/<slug> [--copy]` — manifest dimensi yang dicetak dipakai mengisi `gallery`.
    - **EN copy pada listing migrated adalah hasil terjemahan asisten** — review owner sebelum launch.

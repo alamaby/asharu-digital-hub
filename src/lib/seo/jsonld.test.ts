@@ -32,7 +32,7 @@ describe('JSON-LD builders', () => {
     expect(items[0]).toMatchObject({
       '@type': 'ListItem',
       position: 1,
-      name: 'Smartwatch Aktivitas Harian'
+      name: affiliateProducts[0]!.name.id
     });
     expect(JSON.stringify(list)).not.toContain('"@type":"Product"');
     expect(JSON.stringify(list)).not.toContain('offers');
