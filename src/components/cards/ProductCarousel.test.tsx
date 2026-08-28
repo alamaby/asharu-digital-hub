@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { ProductCarousel } from './ProductCarousel';
 import { renderWithMessages } from '@/test/utils';
 import { affiliateProducts } from '@/data/affiliate-products';
@@ -15,8 +15,29 @@ function mockMatchMedia(matches = false) {
   }));
 }
 
+// Route rAF through setTimeout so `vi.useFakeTimers()` drives the countdown.
+function mockRafViaTimeout() {
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) =>
+    globalThis.setTimeout(() => cb(performance.now()), 16)
+  );
+  vi.stubGlobal('cancelAnimationFrame', (handle: NodeJS.Timeout) =>
+    globalThis.clearTimeout(handle)
+  );
+}
+
+function progressValue() {
+  const fill = screen.getByTestId('carousel-progress');
+  return Number((fill as HTMLElement).style.width.replace('%', ''));
+}
+
 beforeEach(() => {
   mockMatchMedia(false);
+  mockRafViaTimeout();
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // Use a small fixture so assertions don't depend on the scraped dataset size.
@@ -130,5 +151,60 @@ describe('ProductCarousel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Produk berikutnya' }));
     expect(slide(1)).not.toHaveAttribute('inert');
     expect(slide(0)).toHaveAttribute('inert');
+  });
+
+  it('progress bar starts at 0 and fills as the countdown advances', () => {
+    renderWithMessages(<ProductCarousel products={products} linkPosition="t" />);
+    expect(progressValue()).toBe(0);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(progressValue()).toBeGreaterThan(0);
+    expect(progressValue()).toBeLessThanOrEqual(100);
+  });
+
+  it('auto-advances to the next slide after the full 10 second countdown', () => {
+    renderWithMessages(<ProductCarousel products={products} linkPosition="t" />);
+    expect(
+      screen.getByRole('heading', { name: products[0]!.name.id })
+    ).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(
+      screen.getByRole('heading', { name: products[1]!.name.id })
+    ).toBeInTheDocument();
+  });
+
+  it('resets the progress to 0 when navigating manually to a new slide', () => {
+    renderWithMessages(<ProductCarousel products={products} linkPosition="t" />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(progressValue()).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Produk berikutnya' }));
+    expect(progressValue()).toBeLessThanOrEqual(1);
+  });
+
+  it('freezes the progress while paused, resuming from the same point', () => {
+    renderWithMessages(<ProductCarousel products={products} linkPosition="t" />);
+    const region = screen.getByRole('region');
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    const frozen = progressValue();
+    expect(frozen).toBeGreaterThan(0);
+
+    // Hovering pauses auto-play: the bar must no longer advance.
+    fireEvent.mouseEnter(region);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(progressValue()).toBeCloseTo(frozen, 1);
   });
 });

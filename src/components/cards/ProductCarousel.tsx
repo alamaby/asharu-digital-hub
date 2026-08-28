@@ -9,6 +9,28 @@ import { ProductCard } from './ProductCard';
 const AUTO_ADVANCE_MS = 10_000;
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
+const RAF_THROTTLE_MS = 50;
+
+type FrameHandle = number | ReturnType<typeof globalThis.setTimeout>;
+
+function requestFrame(callback: FrameRequestCallback): FrameHandle {
+  if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+    return window.requestAnimationFrame(callback);
+  }
+  return globalThis.setTimeout(
+    () => callback(performance.now()),
+    RAF_THROTTLE_MS
+  );
+}
+
+function cancelFrame(handle: FrameHandle): void {
+  if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+    window.cancelAnimationFrame(handle as number);
+    return;
+  }
+  globalThis.clearTimeout(handle);
+}
+
 interface ProductCarouselProps {
   products: AffiliateProduct[];
   linkPosition: string;
@@ -25,13 +47,16 @@ export function ProductCarousel({ products, linkPosition }: ProductCarouselProps
   const t = useTranslations('product.carousel');
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
   const reducedRef = useRef(false);
   const regionRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef<number>(0);
+  const elapsedRef = useRef<number>(0);
 
   const count = products.length;
   const hasMultiple = count > 1;
 
-  // Keep the reduced-motion preference in a ref (read inside the interval effect).
+  // Keep the reduced-motion preference in a ref (read inside the animation loop).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const media = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -43,17 +68,51 @@ export function ProductCarousel({ products, linkPosition }: ProductCarouselProps
     return () => media.removeEventListener('change', onChange);
   }, []);
 
-  // Auto-advance every AUTO_ADVANCE_MS unless paused or reduced-motion.
+  // Smooth countdown via requestAnimationFrame. Reset to a fresh slide only
+  // happens imperatively in `goTo` / at the moment the countdown wraps, so
+  // pausing here simply freezes `elapsedRef` and resumes from the same value.
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (!hasMultiple || paused || reducedRef.current) return;
-    const id = setInterval(() => {
-      setIndex((current) => (current + 1) % count);
-    }, AUTO_ADVANCE_MS);
-    return () => clearInterval(id);
+
+    const start = performance.now();
+    startRef.current = start;
+
+    let frame: FrameHandle = 0;
+    let lastPainted = -1;
+    const tick = (now: number) => {
+      const elapsed = elapsedRef.current + (now - startRef.current);
+      const pct = Math.min(100, (elapsed / AUTO_ADVANCE_MS) * 100);
+      if (pct - lastPainted >= 1 || pct === 100) {
+        lastPainted = pct;
+        setProgress(pct);
+      }
+      if (pct >= 100) {
+        elapsedRef.current = 0;
+        startRef.current = now;
+        lastPainted = -1;
+        setProgress(0);
+        setIndex((current) => (current + 1) % count);
+      }
+      frame = requestFrame(tick);
+    };
+    frame = requestFrame(tick);
+
+    return () => {
+      cancelFrame(frame);
+      // Carry elapsed time forward so a pause/resume continues from the same point.
+      elapsedRef.current += performance.now() - startRef.current;
+    };
   }, [hasMultiple, paused, count]);
 
   const goTo = useCallback(
-    (next: number) => setIndex(((next % count) + count) % count),
+    (next: number) => {
+      // Manual navigation restarts the countdown for the newly shown slide.
+      setProgress(0);
+      startRef.current = performance.now();
+      elapsedRef.current = 0;
+      setIndex(((next % count) + count) % count);
+    },
     [count]
   );
   const step = useCallback((delta: 1 | -1) => goTo(index + delta), [goTo, index]);
@@ -99,6 +158,16 @@ export function ProductCarousel({ products, linkPosition }: ProductCarouselProps
           </div>
         </div>
       </div>
+
+      {hasMultiple ? (
+        <div className="mx-auto mt-3 h-1 w-full max-w-3xl overflow-hidden rounded-full bg-line" aria-hidden>
+          <div
+            data-testid="carousel-progress"
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      ) : null}
 
       {hasMultiple ? (
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
