@@ -1,36 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
 import type { KeyRow } from '@/lib/llm/types';
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase service credentials missing');
-  return createClient(url, key, { auth: { persistSession: false } });
-}
+import { getServiceClient } from './service';
 
 /**
  * Decrypt a Vault secret by id (service_role only).
- * Returns the raw API key string.
+ * Supabase Vault exposes `vault.decrypted_secrets` view for service_role.
  */
 export async function getDecryptedKey(vaultSecretId: string): Promise<string> {
   const supabase = getServiceClient();
   const { data, error } = await supabase
-    .rpc('vault_decrypt', { secret_id: vaultSecretId })
+    .from('vault.decrypted_secrets')
+    .select('decrypted_secret')
+    .eq('id', vaultSecretId)
     .single();
-
-  // Fallback: direct vault query (supabase_vault extension)
-  if (error || !data) {
-    const { data: vaultData, error: vaultError } = await supabase
-      .from('vault.decrypted_secrets' as unknown as string)
-      .select('decrypted_secret')
-      .eq('id', vaultSecretId)
-      .single();
-    if (vaultError || !vaultData) throw new Error(`Vault decrypt failed: ${vaultError?.message ?? 'no data'}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (vaultData as any).decrypted_secret as string;
-  }
+  if (error || !data) throw new Error(`Vault decrypt failed: ${error?.message ?? 'no data'}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data as any).decrypted_secret ?? (data as unknown as string);
+  return (data as any).decrypted_secret as string;
 }
 
 /**
@@ -54,16 +38,19 @@ export async function fetchOrderedKeys(providerId: string): Promise<KeyRow[]> {
 
 export async function markKeyUsage(keyId: string): Promise<void> {
   const supabase = getServiceClient();
-  await supabase
+  const { data, error } = await supabase
     .from('llm_provider_keys')
-    .update({ usage_count: 0, last_used_at: new Date().toISOString() } as unknown as Record<string, unknown>)
-    // Use rpc increment to avoid race; fallback to simple update if rpc not exists
+    .select('usage_count')
+    .eq('id', keyId)
+    .single();
+  if (error) throw new Error(`markKeyUsage select: ${error.message}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const current = (data as any)?.usage_count ?? 0;
+  const { error: updError } = await supabase
+    .from('llm_provider_keys')
+    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() } as unknown as Record<string, unknown>)
     .eq('id', keyId);
-  // Proper increment via RPC if available
-  const { error } = await supabase.rpc('increment_key_usage', { p_key_id: keyId });
-  if (error) {
-    // Fallback already done above with set; ignore
-  }
+  if (updError) throw new Error(`markKeyUsage update: ${updError.message}`);
 }
 
 export async function markKeyFailure(keyId: string): Promise<void> {

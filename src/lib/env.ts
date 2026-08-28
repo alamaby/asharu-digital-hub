@@ -54,6 +54,10 @@ const supabaseServiceRoleKeySchema = z.preprocess(
   emptyToUndefined,
   z.string().min(20, 'Supabase service_role key looks too short').optional()
 );
+const cronSecretSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().min(10, 'Cron secret looks too short').optional()
+);
 
 const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: siteUrlSchema,
@@ -62,7 +66,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_CONTACT_EMAIL: emailSchema,
   NEXT_PUBLIC_SUPABASE_URL: supabaseUrlSchema,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKeySchema,
-  SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKeySchema
+  SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKeySchema,
+  CRON_SECRET: cronSecretSchema
 });
 
 export interface ParsedEnv {
@@ -73,6 +78,7 @@ export interface ParsedEnv {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
+  cronSecret?: string;
   hasSupabase: boolean;
 }
 
@@ -98,6 +104,7 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     supabaseUrl: result.data.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
+    cronSecret: result.data.CRON_SECRET,
     hasSupabase: Boolean(
       result.data.NEXT_PUBLIC_SUPABASE_URL &&
         result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY

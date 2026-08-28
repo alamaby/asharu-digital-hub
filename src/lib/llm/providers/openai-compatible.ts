@@ -48,10 +48,4 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 }
 
-export function createNarayaProvider(baseUrl = 'https://router.bynara.id/v1'): LLMProvider {
-  return new OpenAICompatibleProvider('naraya', baseUrl);
-}
 
-export function createOpenRouterProvider(baseUrl = 'https://openrouter.ai/api/v1'): LLMProvider {
-  return new OpenAICompatibleProvider('openrouter', baseUrl);
-}

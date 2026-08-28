@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { ProviderRegistry } from '@/lib/llm/registry';
 import { KeyPool } from '@/lib/llm/key-pool';
 import { OpenAICompatibleProvider } from '@/lib/llm/providers/openai-compatible';
@@ -7,15 +6,16 @@ import { GeminiProvider } from '@/lib/llm/providers/gemini';
 import { CloudflareProvider } from '@/lib/llm/providers/cloudflare';
 import { buildThreadPrompt, countPlaceholdersInThread } from '@/lib/llm/prompt';
 import type { ThreadGeneration } from '@/lib/llm/types';
+import { getServiceClient } from '@/lib/supabase/service';
+import { env } from '@/lib/env';
+import { z } from 'zod';
+
+const threadSchema = z.object({
+  main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
+  replies: z.array(z.object({ id: z.string().min(1), en: z.string().min(1) })).max(5)
+});
 
 export const maxDuration = 60;
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase service credentials missing');
-  return createClient(url, key, { auth: { persistSession: false } });
-}
 
 function providerFactory(slug: string, baseUrl: string) {
   if (slug === 'gemini') return new GeminiProvider(baseUrl);
@@ -24,12 +24,12 @@ function providerFactory(slug: string, baseUrl: string) {
 }
 
 function isCronAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get('authorization') === `Bearer ${secret}`) return true;
+  // Vercel Cron always sends x-vercel-cron
   if (request.headers.get('x-vercel-cron')) return true;
-  // Allow manual trigger via ?force=1 when CRON_SECRET not set (dev)
-  if (!secret && request.nextUrl.searchParams.get('force') === '1') return true;
-  if (!secret) return true; // dev without secret
+  const secret = env.cronSecret ?? process.env.CRON_SECRET;
+  if (secret && request.headers.get('authorization') === `Bearer ${secret}`) return true;
+  // Dev only: allow without secret
+  if (!secret && process.env.NODE_ENV !== 'production') return true;
   return false;
 }
 
@@ -69,8 +69,15 @@ async function handle(request: NextRequest) {
 
   for (const req of requests) {
     try {
-      // Mark processing
-      await supabase.from('content_requests').update({ status: 'processing' }).eq('id', req.id);
+      // Optimistic lock: only move to processing if still pending (mitigates concurrent cron without SKIP LOCKED)
+      const { data: claimed, error: claimError } = await supabase
+        .from('content_requests')
+        .update({ status: 'processing' })
+        .eq('id', req.id)
+        .eq('status', 'pending')
+        .select('id')
+        .single();
+      if (claimError || !claimed) throw new Error('Request already claimed by another worker');
 
       // Pick 1 product
       let productQuery = supabase
@@ -157,8 +164,19 @@ async function handle(request: NextRequest) {
               if (!match) throw new Error(`Invalid JSON: ${out.text.slice(0, 200)}`);
               parsed = JSON.parse(match[0]) as ThreadGeneration;
             }
-            if (!parsed.main?.id || !parsed.main?.en) throw new Error('Missing main.id/en');
+            const parsedResult = threadSchema.safeParse(parsed);
+            if (!parsedResult.success) throw new Error(`Thread shape invalid: ${parsedResult.error.message}`);
             if (countPlaceholdersInThread(parsed) !== 1) throw new Error(`Expected exactly 1 {{PRODUCT_URL}}, got ${countPlaceholdersInThread(parsed)}`);
+            // Validate max_chars per platform
+            const maxChars = (platform as { max_chars: number | null } | null)?.max_chars;
+            if (maxChars) {
+              const allPosts = [parsed.main, ...parsed.replies];
+              for (const p of allPosts) {
+                if (p.id.length > maxChars || p.en.length > maxChars) {
+                  throw new Error(`Post exceeds max_chars ${maxChars}: id ${p.id.length}, en ${p.en.length}`);
+                }
+              }
+            }
             return { parsed, model, out };
           });
           success = {
@@ -182,8 +200,16 @@ async function handle(request: NextRequest) {
       const replaced = threadStr.replaceAll('{{PRODUCT_URL}}', product.url);
       const thread = JSON.parse(replaced) as ThreadGeneration;
 
-      // Detect post_index where product was injected
-      const postIndex = thread.main.id.includes(product.url) || thread.main.en.includes(product.url) ? 0 : 1;
+      // Detect post_index where product was injected (check all posts)
+      let postIndex = 0;
+      const allPosts = [thread.main, ...thread.replies];
+      for (let i = 0; i < allPosts.length; i++) {
+        const p = allPosts[i]!;
+        if (p.id.includes(product.url) || p.en.includes(product.url)) {
+          postIndex = i;
+          break;
+        }
+      }
 
       const { data: draft, error: draftError } = await supabase
         .from('content_drafts')
