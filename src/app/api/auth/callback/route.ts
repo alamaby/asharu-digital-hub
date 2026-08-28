@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next') ?? '/id/konten/review';
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
-        return [];
+        return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {

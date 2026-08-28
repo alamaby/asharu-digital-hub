@@ -8,12 +8,12 @@ const intlMiddleware = createMiddleware(routing);
 export default async function middleware(request: NextRequest) {
   const intlResponse = intlMiddleware(request);
 
-  // Refresh Supabase session on every matched request so cookies stay in sync.
-  // When env is not yet provisioned, skip silently — the static pages still build.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   let supabaseResponse = intlResponse;
+  let user: import('@supabase/supabase-js').User | null = null;
+
   if (supabaseUrl && supabaseKey) {
     const response = intlResponse ?? NextResponse.next({ request });
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -29,8 +29,31 @@ export default async function middleware(request: NextRequest) {
         }
       }
     });
-    await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
     supabaseResponse = response;
+  }
+
+  // Guard /konten/review — only admin; anon or non-admin → /masuk
+  const pathname = request.nextUrl.pathname;
+  const isReview = /^\/(id|en)\/konten\/review(\/|$)/.test(pathname);
+  if (isReview) {
+    if (!supabaseUrl || !supabaseKey) {
+      // Supabase not configured — treat as not authenticated
+      const locale = pathname.startsWith('/en/') ? 'en' : 'id';
+      return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
+    }
+    if (!user) {
+      const locale = pathname.startsWith('/en/') ? 'en' : 'id';
+      return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
+    }
+    const email = (user.email ?? '').toLowerCase();
+    const isAdmin =
+      email === 'alam.aby.b@gmail.com' || email === 'alamaby@gmail.com';
+    if (!isAdmin) {
+      const locale = pathname.startsWith('/en/') ? 'en' : 'id';
+      return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
+    }
   }
 
   return supabaseResponse ?? intlResponse;
