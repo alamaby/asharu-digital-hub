@@ -140,7 +140,7 @@ export function ProductCarousel({ products, linkPosition }: ProductCarouselProps
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={resumeIfFocusLeft}
     >
-      <div className="max-w-3xl overflow-hidden">
+      <div className="mx-auto max-w-3xl overflow-hidden">
         <div
           className="transition-transform duration-300 ease-out will-change-transform"
           style={{ transform: `translateX(-${index * 100}%)` }}
