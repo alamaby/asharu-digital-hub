@@ -119,7 +119,10 @@ describe('static dataset integrity', () => {
 
   it('no fake ratings or certificates leak into data', () => {
     const blob = JSON.stringify({ shopLinks, affiliateProducts, properties });
-    expect(blob).not.toMatch(/rating/i);
+    // Word-boundary matches: "rating" must not appear as a standalone token
+    // (e.g. a 4.8-rating badge). "Hydrating" is fine because the substring is
+    // not a separate word.
+    expect(blob).not.toMatch(/\brating\b/i);
     expect(blob).not.toMatch(/"sertifikat"/i);
   });
 });
