@@ -1,0 +1,61 @@
+import type { Metadata } from 'next';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import type { Locale } from '@/i18n/routing';
+import { routing } from '@/i18n/routing';
+import { buildMetadata } from '@/lib/seo/metadata';
+import { ContentRequestForm } from '@/components/content/ContentRequestForm';
+import { env } from '@/lib/env';
+
+interface PageProps {
+  params: Promise<{ locale: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'meta.konten.baru' });
+  return buildMetadata({
+    locale: locale as Locale,
+    path: '/konten/baru',
+    title: t('title'),
+    description: t('description')
+  });
+}
+
+export default async function KontenBaruPage({ params }: PageProps) {
+  const rawLocale = (await params).locale;
+  const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
+  setRequestLocale(locale);
+
+  const t = await getTranslations({ locale, namespace: 'content.form' });
+
+  // Fetch platforms for select — fallback to hardcoded if Supabase not configured
+  let platforms: { slug: string; display_name: string }[] = [
+    { slug: 'threads', display_name: 'Threads' },
+    { slug: 'twitter', display_name: 'Twitter' },
+    { slug: 'instagram', display_name: 'Instagram' },
+    { slug: 'tiktok', display_name: 'TikTok' },
+    { slug: 'linkedin', display_name: 'LinkedIn' },
+    { slug: 'facebook', display_name: 'Facebook' }
+  ];
+
+  if (env.hasSupabase) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(env.supabaseUrl!, env.supabaseAnonKey!, { auth: { persistSession: false } });
+      const { data } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
+      if (data && data.length > 0) platforms = data as typeof platforms;
+    } catch {
+      // fallback to hardcoded
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
+      <p className="mt-3 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
+      <div className="mt-8">
+        <ContentRequestForm platforms={platforms} />
+      </div>
+    </div>
+  );
+}
