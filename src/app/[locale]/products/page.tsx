@@ -9,7 +9,7 @@ import { env } from '@/lib/env';
 import { pageHeading } from '@/lib/utils/title';
 import { affiliateProducts } from '@/data/affiliate-products';
 import { AffiliateDisclosure } from '@/components/home/AffiliateDisclosure';
-import { ProductCard } from '@/components/cards/ProductCard';
+import { ProductBrowser } from '@/components/cards/ProductBrowser';
 import { JsonLd } from '@/components/ui/JsonLd';
 
 interface ProductsPageProps {
@@ -57,13 +57,9 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
         <AffiliateDisclosure id="products-disclosure" />
       </div>
 
-      <ul className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {affiliateProducts.map((product) => (
-          <li key={product.id} className="h-full">
-            <ProductCard product={product} linkPosition="products-grid" />
-          </li>
-        ))}
-      </ul>
+      <div className="mt-8">
+        <ProductBrowser products={affiliateProducts} linkPosition="products-grid" />
+      </div>
 
       <JsonLd data={breadcrumb} />
       <JsonLd data={productListSchema(affiliateProducts, locale)} />

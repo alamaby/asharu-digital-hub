@@ -115,6 +115,15 @@
       "play": "Putar",
       "pause": "Jeda",
       "slideLabel": "Slide {current} dari {total}"
+    },
+    "filters": {
+      "legend": "Filter kategori",
+      "all": "Semua",
+      "reset": "Reset filter",
+      "loadMore": "Muat 8 lagi",
+      "emptyTitle": "Tidak ada produk",
+      "emptyDescription": "Tidak ada produk pada kategori yang dipilih.",
+      "resultCount": "Menampilkan {visible} dari {total} produk"
     }
   },
   "disclosure": {

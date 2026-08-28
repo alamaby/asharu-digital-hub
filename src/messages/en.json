@@ -115,6 +115,15 @@
       "play": "Play",
       "pause": "Pause",
       "slideLabel": "Slide {current} of {total}"
+    },
+    "filters": {
+      "legend": "Category filter",
+      "all": "All",
+      "reset": "Reset filter",
+      "loadMore": "Load 8 more",
+      "emptyTitle": "No products",
+      "emptyDescription": "No products in the selected categories.",
+      "resultCount": "Showing {visible} of {total} products"
     }
   },
   "disclosure": {
