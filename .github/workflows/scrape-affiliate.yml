@@ -3,8 +3,8 @@ name: Scrape affiliate products
 on:
   workflow_dispatch:
   schedule:
-    # Daily 03:00 UTC — adjust to match the store's catalog update cadence.
-    - cron: '0 3 * * *'
+    # Every 4 days at 03:00 UTC — matches the store's catalog update cadence.
+    - cron: '0 3 */4 * *'
 
 permissions:
   contents: write
