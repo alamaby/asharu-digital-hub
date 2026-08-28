@@ -7,7 +7,10 @@ const VALID = {
   NEXT_PUBLIC_SITE_URL: 'https://asharu.id/',
   NEXT_PUBLIC_GA_MEASUREMENT_ID: 'G-ABCDEF1234',
   NEXT_PUBLIC_WHATSAPP_URL: 'https://wa.me/628123456789',
-  NEXT_PUBLIC_CONTACT_EMAIL: 'hello@asharu.id'
+  NEXT_PUBLIC_CONTACT_EMAIL: 'hello@asharu.id',
+  NEXT_PUBLIC_SUPABASE_URL: 'https://abcxyz.supabase.co',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon.placeholder',
+  SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service.placeholder'
 };
 
 describe('parseEnv', () => {
@@ -17,6 +20,8 @@ describe('parseEnv', () => {
     expect(result.gaMeasurementId).toBe('G-ABCDEF1234');
     expect(result.whatsappUrl).toBe('https://wa.me/628123456789');
     expect(result.contactEmail).toBe('hello@asharu.id');
+    expect(result.hasSupabase).toBe(true);
+    expect(result.supabaseUrl).toBe('https://abcxyz.supabase.co');
   });
 
   it('falls back to the production URL and disables optional features', () => {
@@ -25,6 +30,7 @@ describe('parseEnv', () => {
     expect(result.gaMeasurementId).toBeUndefined();
     expect(result.whatsappUrl).toBeUndefined();
     expect(result.contactEmail).toBeUndefined();
+    expect(result.hasSupabase).toBe(false);
   });
 
   it('treats whitespace-only values as unset', () => {
@@ -93,7 +99,10 @@ describe('.env.example placeholder integrity', () => {
         'NEXT_PUBLIC_SITE_URL',
         'NEXT_PUBLIC_GA_MEASUREMENT_ID',
         'NEXT_PUBLIC_WHATSAPP_URL',
-        'NEXT_PUBLIC_CONTACT_EMAIL'
+        'NEXT_PUBLIC_CONTACT_EMAIL',
+        'NEXT_PUBLIC_SUPABASE_URL',
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        'SUPABASE_SERVICE_ROLE_KEY'
       ].sort()
     );
   });

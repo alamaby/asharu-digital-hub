@@ -27,6 +27,20 @@
       "title": "Disclosure Afiliasi | Asharu",
       "description": "Penjelasan mengenai tautan afiliasi di Asharu: cara kerjanya, dampaknya bagi Anda, dan komitmen independensi editorial kami."
     },
+    "masuk": {
+      "title": "Masuk Admin | Asharu",
+      "description": "Halaman masuk admin untuk tim Asharu."
+    },
+    "konten": {
+      "baru": {
+        "title": "Buat Konten Afiliasi | Asharu",
+        "description": "Hasilkan draf konten Threads, Twitter, dan platform lainnya dengan satu produk afiliasi yang disisipkan natural."
+      },
+      "review": {
+        "title": "Tinjau Draf Konten | Asharu",
+        "description": "Daftar draf konten yang menunggu tinjauan admin."
+      }
+    },
     "notFound": {
       "title": "Halaman Tidak Ditemukan | Asharu",
       "description": "Halaman yang Anda cari tidak tersedia. Silakan kembali ke beranda Asharu."
@@ -260,5 +274,72 @@
     "description": "Kami ingin menggunakan Google Analytics untuk memahami bagaimana situs ini digunakan. Data bersifat agregat dan tidak mencakup identitas pribadi Anda. Analytics baru aktif jika Anda menyetujui.",
     "accept": "Setuju",
     "decline": "Tidak, terima kasih"
+  },
+  "auth": {
+    "login": {
+      "title": "Masuk Admin",
+      "intro": "Masukkan email admin. Kami akan mengirim tautan masuk satu kali ke kotak masuk Anda.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "nama@email.com",
+      "submit": "Kirim Tautan Masuk",
+      "submitting": "Mengirim…",
+      "success": "Tautan telah dikirim. Cek email Anda untuk masuk. Tautan berlaku selama 1 jam.",
+      "error": "Gagal mengirim tautan. Periksa email atau coba lagi."
+    },
+    "logout": "Keluar",
+    "loggedInAs": "Masuk sebagai {email}",
+    "guard": "Halaman ini hanya untuk admin."
+  },
+  "content": {
+    "form": {
+      "title": "Buat Konten Afiliasi",
+      "intro": "Isi formulir di bawah. Sistem akan memilih satu produk afiliasi secara otomatis dan menghasilkan draf konten untuk Anda tinjau.",
+      "topic": "Topik / angle",
+      "topicPlaceholder": "Cth: kenapa casing HP bening cepat kuning dan solusinya",
+      "platform": "Platform",
+      "tone": "Nada",
+      "language": "Bahasa",
+      "languageOptions": { "id": "Bahasa Indonesia saja", "en": "English saja", "both": "ID + EN (bilingual)" },
+      "targetCategory": "Kategori produk (opsional)",
+      "targetCategoryPlaceholder": "Semua kategori",
+      "audience": "Audiens",
+      "audiencePlaceholder": "Cth: ibu muda 25-35, Gen Z Jakarta",
+      "ctaStyle": "Gaya CTA",
+      "ctaStyleOptions": {
+        "soft_sell": "Soft sell",
+        "hard_sell": "Hard sell",
+        "question": "Pertanyaan / diskusi",
+        "urgency": "Urgensi / FOMO",
+        "storytelling": "Storytelling"
+      },
+      "purpose": "Tujuan",
+      "purposePlaceholder": "Cth: edukasi masalah, bawa solusi (produk afiliasi)",
+      "constraints": "Batasan (opsional)",
+      "constraintsPlaceholder": "Cth: tanpa emoji berlebihan, hindari kata diskon",
+      "keywords": "Kata kunci (opsional)",
+      "keywordsPlaceholder": "Cth: casing hp, uv protection, tahan lama",
+      "submit": "Buat Draf",
+      "submitting": "Mengirim…",
+      "errorTitle": "Tidak dapat membuat draf",
+      "errorRateLimit": "Anda sudah membuat {count} draf dalam 1 jam terakhir. Coba lagi nanti.",
+      "errorHoneypot": "Aktivitas mencurigakan terdeteksi."
+    },
+    "review": {
+      "title": "Tinjau Draf Konten",
+      "empty": "Belum ada draf yang perlu ditinjau.",
+      "loading": "Memuat draf…",
+      "productChip": "Produk ASH-{code}",
+      "postMain": "Post Utama",
+      "reply": "Balasan {n}",
+      "tabId": "ID",
+      "tabEn": "EN",
+      "copyOne": "Salin",
+      "copyAll": "Salin Thread",
+      "copied": "Tersalin",
+      "edit": "Sunting",
+      "approve": "Setujui",
+      "reject": "Tolak",
+      "realtime": "Memperbarui otomatis"
+    }
   }
 }

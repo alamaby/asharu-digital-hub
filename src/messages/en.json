@@ -25,7 +25,21 @@
     },
     "disclosure": {
       "title": "Affiliate Disclosure | Asharu",
-      "description": "How affiliate links work on Asharu, what they mean for you, and our commitment to independent curation."
+      "description": "Full transparency on Asharu's affiliate program and how affiliate links are labelled."
+    },
+    "masuk": {
+      "title": "Admin Sign In | Asharu",
+      "description": "Admin sign-in for the Asharu team."
+    },
+    "konten": {
+      "baru": {
+        "title": "Generate Affiliate Content | Asharu",
+        "description": "Generate draft content for Threads, Twitter and other platforms with one affiliate product woven in naturally."
+      },
+      "review": {
+        "title": "Review Content Drafts | Asharu",
+        "description": "Drafts awaiting admin review."
+      }
     },
     "notFound": {
       "title": "Page Not Found | Asharu",
@@ -260,5 +274,72 @@
     "description": "We would like to use Google Analytics to understand how this site is used. Data is aggregated and contains no personal identity. Analytics stays off unless you agree.",
     "accept": "Agree",
     "decline": "No, thanks"
+  },
+  "auth": {
+    "login": {
+      "title": "Admin Sign In",
+      "intro": "Enter your admin email. We will send a one-time sign-in link to your inbox.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "name@email.com",
+      "submit": "Send Sign-In Link",
+      "submitting": "Sending…",
+      "success": "A link has been sent. Check your email to sign in. The link is valid for 1 hour.",
+      "error": "Could not send the link. Check the email or try again."
+    },
+    "logout": "Sign out",
+    "loggedInAs": "Signed in as {email}",
+    "guard": "This page is for admins only."
+  },
+  "content": {
+    "form": {
+      "title": "Generate Affiliate Content",
+      "intro": "Fill the form below. The system will pick one affiliate product and produce a draft for you to review.",
+      "topic": "Topic / angle",
+      "topicPlaceholder": "E.g. why clear phone cases turn yellow and the fix",
+      "platform": "Platform",
+      "tone": "Tone",
+      "language": "Language",
+      "languageOptions": { "id": "Bahasa Indonesia only", "en": "English only", "both": "ID + EN (bilingual)" },
+      "targetCategory": "Product category (optional)",
+      "targetCategoryPlaceholder": "All categories",
+      "audience": "Audience",
+      "audiencePlaceholder": "E.g. young moms 25-35, Gen Z Jakarta",
+      "ctaStyle": "CTA style",
+      "ctaStyleOptions": {
+        "soft_sell": "Soft sell",
+        "hard_sell": "Hard sell",
+        "question": "Question / discussion",
+        "urgency": "Urgency / FOMO",
+        "storytelling": "Storytelling"
+      },
+      "purpose": "Purpose",
+      "purposePlaceholder": "E.g. educate on the problem, bring in the product as a solution",
+      "constraints": "Constraints (optional)",
+      "constraintsPlaceholder": "E.g. no emoji overload, avoid the word 'discount'",
+      "keywords": "Keywords (optional)",
+      "keywordsPlaceholder": "E.g. phone case, uv protection, durable",
+      "submit": "Create Draft",
+      "submitting": "Submitting…",
+      "errorTitle": "Could not create the draft",
+      "errorRateLimit": "You already created {count} drafts in the last hour. Please try again later.",
+      "errorHoneypot": "Suspicious activity detected."
+    },
+    "review": {
+      "title": "Review Content Drafts",
+      "empty": "No drafts to review yet.",
+      "loading": "Loading drafts…",
+      "productChip": "Product ASH-{code}",
+      "postMain": "Main Post",
+      "reply": "Reply {n}",
+      "tabId": "ID",
+      "tabEn": "EN",
+      "copyOne": "Copy",
+      "copyAll": "Copy Thread",
+      "copied": "Copied",
+      "edit": "Edit",
+      "approve": "Approve",
+      "reject": "Reject",
+      "realtime": "Auto-refreshing"
+    }
   }
 }

@@ -8,8 +8,10 @@ import type { AbstractIntlMessages } from 'next-intl';
  */
 export const CLIENT_MESSAGE_NAMESPACES = [
   'a11y',
+  'auth',
   'categories',
   'consent',
+  'content',
   'header',
   'nav',
   'notFound',

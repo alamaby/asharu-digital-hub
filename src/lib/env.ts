@@ -36,11 +36,33 @@ const emailSchema = z.preprocess(
   z.string().email('Must be a valid email address').optional()
 );
 
+// Supabase — required because the content-factory workflow reads the affiliate
+// catalog and the content-request insert at build/render time. Empty values
+// are allowed via emptyToUndefined so existing pages still build when the
+// env is not yet provisioned; pages that require Supabase check `env.hasSupabase`.
+const supabaseUrlSchema = z.preprocess(
+  emptyToUndefined,
+  httpsUrl.refine((value) => /\.supabase\.co$/.test(new URL(value).hostname), {
+    message: 'Must be a Supabase project URL (https://xxx.supabase.co)'
+  }).optional()
+);
+const supabaseAnonKeySchema = z.preprocess(
+  emptyToUndefined,
+  z.string().min(20, 'Supabase anon key looks too short').optional()
+);
+const supabaseServiceRoleKeySchema = z.preprocess(
+  emptyToUndefined,
+  z.string().min(20, 'Supabase service_role key looks too short').optional()
+);
+
 const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: siteUrlSchema,
   NEXT_PUBLIC_GA_MEASUREMENT_ID: gaMeasurementIdSchema,
   NEXT_PUBLIC_WHATSAPP_URL: whatsappUrlSchema,
-  NEXT_PUBLIC_CONTACT_EMAIL: emailSchema
+  NEXT_PUBLIC_CONTACT_EMAIL: emailSchema,
+  NEXT_PUBLIC_SUPABASE_URL: supabaseUrlSchema,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKeySchema,
+  SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKeySchema
 });
 
 export interface ParsedEnv {
@@ -48,6 +70,10 @@ export interface ParsedEnv {
   gaMeasurementId?: string;
   whatsappUrl?: string;
   contactEmail?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  supabaseServiceRoleKey?: string;
+  hasSupabase: boolean;
 }
 
 /**
@@ -68,7 +94,14 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     siteUrl: result.data.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, ''),
     gaMeasurementId: result.data.NEXT_PUBLIC_GA_MEASUREMENT_ID,
     whatsappUrl: result.data.NEXT_PUBLIC_WHATSAPP_URL,
-    contactEmail: result.data.NEXT_PUBLIC_CONTACT_EMAIL
+    contactEmail: result.data.NEXT_PUBLIC_CONTACT_EMAIL,
+    supabaseUrl: result.data.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseServiceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
+    hasSupabase: Boolean(
+      result.data.NEXT_PUBLIC_SUPABASE_URL &&
+        result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )
   };
 }
 

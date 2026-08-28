@@ -33,6 +33,18 @@ export const routing = defineRouting({
     '/affiliate-disclosure': {
       id: '/disclosure-afiliasi',
       en: '/affiliate-disclosure'
+    },
+    '/masuk': {
+      id: '/masuk',
+      en: '/sign-in'
+    },
+    '/konten/baru': {
+      id: '/konten/baru',
+      en: '/content/new'
+    },
+    '/konten/review': {
+      id: '/konten/review',
+      en: '/content/review'
     }
   }
 });
