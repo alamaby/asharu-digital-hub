@@ -13,10 +13,17 @@
 
 ## Tempat Secret yang Benar
 
-- **Lokal:** `.env.local` (git-ignored, `SUPABASE_SECRET_KEY=sb_secret_...` + `NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...`).
-- **Vercel:** Project → Settings → Environment Variables (Production + Preview).
-- **Supabase Vault:** `vault.create_secret` untuk `llm_provider_keys.vault_secret_id` (service_role only).
-- **Build check:** `src/lib/env.ts` (`hasSupabase`, Zod `sb_secret_`/`eyJ` + `min 20`). `.env.example` placeholder harus lulus `npm run typecheck` tanpa bocor.
+- **Supabase (env, bukan Vault):**
+  - **Lokal:** `.env.local` (git-ignored) → `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...` (atau deprecated `ANON_KEY`), `SUPABASE_SECRET_KEY=sb_secret_...` (atau deprecated `SERVICE_ROLE_KEY`), `CRON_SECRET`.
+  - **Vercel:** Project → Settings → Environment Variables (Production + Preview) — isi 4 key di atas.
+  - **Build check:** `src/lib/env.ts` (`hasSupabase`, Zod `sb_publishable_`/`sb_secret_`/`eyJ` + `min 20`). `.env.example` hanya placeholder kosong, jadi `hasSupabase=false` dan build tetap hijau.
+
+- **LLM Provider Keys (Vault, BUKAN .env):**
+  - **Kenapa tidak di `.env.example`?** Karena 1 provider bisa punya **banyak key** (round-robin), dan key LLM (Naraya/OpenRouter/Gemini/Cloudflare) jumlahnya dinamis, bukan 1 env var. Menyimpan di `.env` akan butuh `NARAYA_KEY_1`, `NARAYA_KEY_2` … dan redeploy tiap tambah key.
+  - **Disimpan di:** Supabase Vault (tabel `llm_provider_keys.vault_secret_id` → `vault.decrypted_secrets`), terenkripsi `pgsodium`, RLS `service_role` only.
+  - **Cara isi (MVP, tanpa log secret):** `node --env-file=.env.local scripts/seed-llm-keys.mjs` (interactive, tanya `Provider slug` + `API key` + `priority`, hash `sha256` untuk dedup, tidak `console.log` key). Atau Dashboard → Database → Vault → Create secret.
+  - **Rotasi:** Jika bocor, `UPDATE llm_provider_keys SET is_active=false WHERE key_hash='...'` + seed key baru + revoke di provider Dashboard.
+  - **Fallback:** `src/lib/llm/key-pool.ts` sudah `ORDER BY priority, last_used_at` + `failure_count >5` circuit breaker → otomatis pindah key/provider berikutnya.
 
 ## Contoh Aman vs Tidak Aman
 

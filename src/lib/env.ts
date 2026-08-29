@@ -53,10 +53,11 @@ const supabaseAnonKeySchema = z.preprocess(
     .min(20, 'Supabase anon key looks too short')
     .refine(
       (v) => v.startsWith('eyJ') || v.startsWith('sb_publishable_'),
-      'Must be a JWT (eyJ...) or sb_publishable_...'
+      'Must be a JWT (eyJ...) or sb_publishable_... (anon deprecated, use sb_publishable_...)'
     )
     .optional()
 );
+const supabasePublishableKeySchema = supabaseAnonKeySchema;
 const supabaseSecretKeySchema = z.preprocess(
   emptyToUndefined,
   z
@@ -79,6 +80,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_WHATSAPP_URL: whatsappUrlSchema,
   NEXT_PUBLIC_CONTACT_EMAIL: emailSchema,
   NEXT_PUBLIC_SUPABASE_URL: supabaseUrlSchema,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabasePublishableKeySchema,
+  // Deprecated alias — will be removed after anon deprecation. Prefer NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.
   NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKeySchema,
   SUPABASE_SECRET_KEY: supabaseSecretKeySchema,
   // Deprecated alias — will be removed after 2025-12. Prefer SUPABASE_SECRET_KEY.
@@ -93,6 +96,9 @@ export interface ParsedEnv {
   contactEmail?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  /** @deprecated Use supabasePublishableKey — kept for backward compat */
+  supabaseAnonKeyDeprecated?: string;
+  supabasePublishableKey?: string;
   supabaseSecretKey?: string;
   /** @deprecated Use supabaseSecretKey — kept for backward compat */
   supabaseServiceRoleKey?: string;
@@ -116,6 +122,9 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
 
   const secretKey =
     result.data.SUPABASE_SECRET_KEY ?? result.data.SUPABASE_SERVICE_ROLE_KEY;
+  const publishableKey =
+    result.data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   return {
     siteUrl: result.data.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, ''),
@@ -123,13 +132,14 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     whatsappUrl: result.data.NEXT_PUBLIC_WHATSAPP_URL,
     contactEmail: result.data.NEXT_PUBLIC_CONTACT_EMAIL,
     supabaseUrl: result.data.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseAnonKey: publishableKey,
+    supabaseAnonKeyDeprecated: result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabasePublishableKey: publishableKey,
     supabaseSecretKey: secretKey,
     supabaseServiceRoleKey: secretKey,
     cronSecret: result.data.CRON_SECRET,
     hasSupabase: Boolean(
-      result.data.NEXT_PUBLIC_SUPABASE_URL &&
-        result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      result.data.NEXT_PUBLIC_SUPABASE_URL && publishableKey
     )
   };
 }

@@ -9,7 +9,9 @@ export default async function middleware(request: NextRequest) {
   const intlResponse = intlMiddleware(request);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   let supabaseResponse = intlResponse;
   let user: import('@supabase/supabase-js').User | null = null;

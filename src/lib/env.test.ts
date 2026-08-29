@@ -9,6 +9,7 @@ const VALID = {
   NEXT_PUBLIC_WHATSAPP_URL: 'https://wa.me/628123456789',
   NEXT_PUBLIC_CONTACT_EMAIL: 'hello@asharu.id',
   NEXT_PUBLIC_SUPABASE_URL: 'https://abcxyz.supabase.co',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc1234567890placeholder',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_abc1234567890placeholder',
   SUPABASE_SECRET_KEY: 'sb_secret_abc1234567890placeholder_1234567890',
   SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service.placeholder'
@@ -102,6 +103,7 @@ describe('.env.example placeholder integrity', () => {
         'NEXT_PUBLIC_WHATSAPP_URL',
         'NEXT_PUBLIC_CONTACT_EMAIL',
         'NEXT_PUBLIC_SUPABASE_URL',
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
         'NEXT_PUBLIC_SUPABASE_ANON_KEY',
         'SUPABASE_SECRET_KEY',
         'SUPABASE_SERVICE_ROLE_KEY',
