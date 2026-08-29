@@ -38,23 +38,41 @@ if (!provider) {
   process.exit(2);
 }
 
-// Create Vault secret (supabase vault)
-const { data: secret, error: vaultError } = await supabase.rpc('vault_create_secret', {
-  p_secret: rawKey,
-  p_name: `llm_${slug}_${hash}`,
-  p_description: `LLM key for ${slug}`
-});
+// Create Vault secret (supabase vault — schema `vault`)
+const { data: secret, error: vaultError } = await supabase
+  .schema('vault')
+  .rpc('create_secret', {
+    secret: rawKey,
+    name: `llm_${slug}_${hash}`,
+    description: `LLM key for ${slug}`
+  } as unknown as Record<string, unknown>);
 
-// Fallback: direct insert with vault extension
+// Fallback: direct insert into vault.secrets
 let vaultId = secret;
 if (vaultError) {
-  console.error('vault_create_secret failed, trying direct vault insert:', vaultError.message);
-  const { data, error } = await supabase.from('vault.secrets').insert({ secret: rawKey, name: `llm_${slug}_${hash}` }).select('id').single();
+  console.error('vault.create_secret failed, trying direct vault insert:', vaultError.message);
+  const { data, error } = await supabase
+    .schema('vault')
+    .from('secrets')
+    .insert({ secret: rawKey, name: `llm_${slug}_${hash}` } as unknown as Record<string, unknown>)
+    .select('id')
+    .single();
   if (error) {
     console.error('Vault insert failed:', error.message);
-    process.exit(3);
+    // Last fallback: try public.vault_secrets if extension uses different view
+    const { data: data2, error: err2 } = await supabase
+      .from('vault.secrets' as unknown as string)
+      .insert({ secret: rawKey, name: `llm_${slug}_${hash}` } as unknown as Record<string, unknown>)
+      .select('id')
+      .single();
+    if (err2) {
+      console.error('All vault inserts failed:', err2.message);
+      process.exit(3);
+    }
+    vaultId = (data2 as { id: string }).id;
+  } else {
+    vaultId = (data as { id: string }).id;
   }
-  vaultId = data.id;
 }
 
 const { error: insertError } = await supabase.from('llm_provider_keys').insert({
