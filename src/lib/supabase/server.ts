@@ -27,8 +27,9 @@ export async function createSupabaseServer() {
 
 /** Service-role client — bypasses RLS. Only call from trusted server contexts. */
 export function createSupabaseService() {
-  if (!env.supabaseServiceRoleKey) return null;
-  return createClient(env.supabaseUrl!, env.supabaseServiceRoleKey!, {
+  const key = env.supabaseSecretKey ?? env.supabaseServiceRoleKey;
+  if (!key) return null;
+  return createClient(env.supabaseUrl!, key, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }

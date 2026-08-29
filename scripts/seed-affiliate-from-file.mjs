@@ -5,7 +5,8 @@
  *
  * Usage:
  *   export SUPABASE_URL=https://xxx.supabase.co
- *   export SUPABASE_SERVICE_ROLE_KEY=eyJ...
+ *   export SUPABASE_SECRET_KEY=sb_secret_...
+ *   # Legacy: SUPABASE_SERVICE_ROLE_KEY (JWT) still works until 2025-12
  *   node scripts/seed-affiliate-from-file.mjs
  */
 import { readFileSync } from 'node:fs';
@@ -14,9 +15,12 @@ import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const key =
+  process.env.SUPABASE_SECRET_KEY ??
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SECRET_KEY; // fallback for new naming
 if (!url || !key) {
-  console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+  console.error('SUPABASE_URL and SUPABASE_SECRET_KEY (or legacy SUPABASE_SERVICE_ROLE_KEY) are required.');
   process.exit(1);
 }
 

@@ -48,11 +48,25 @@ const supabaseUrlSchema = z.preprocess(
 );
 const supabaseAnonKeySchema = z.preprocess(
   emptyToUndefined,
-  z.string().min(20, 'Supabase anon key looks too short').optional()
+  z
+    .string()
+    .min(20, 'Supabase anon key looks too short')
+    .refine(
+      (v) => v.startsWith('eyJ') || v.startsWith('sb_publishable_'),
+      'Must be a JWT (eyJ...) or sb_publishable_...'
+    )
+    .optional()
 );
-const supabaseServiceRoleKeySchema = z.preprocess(
+const supabaseSecretKeySchema = z.preprocess(
   emptyToUndefined,
-  z.string().min(20, 'Supabase service_role key looks too short').optional()
+  z
+    .string()
+    .min(20, 'Supabase secret key looks too short')
+    .refine(
+      (v) => v.startsWith('eyJ') || v.startsWith('sb_secret_'),
+      'Must be a JWT (eyJ...) or sb_secret_... (service_role deprecated end 2025)'
+    )
+    .optional()
 );
 const cronSecretSchema = z.preprocess(
   emptyToUndefined,
@@ -66,7 +80,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_CONTACT_EMAIL: emailSchema,
   NEXT_PUBLIC_SUPABASE_URL: supabaseUrlSchema,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKeySchema,
-  SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKeySchema,
+  SUPABASE_SECRET_KEY: supabaseSecretKeySchema,
+  // Deprecated alias — will be removed after 2025-12. Prefer SUPABASE_SECRET_KEY.
+  SUPABASE_SERVICE_ROLE_KEY: supabaseSecretKeySchema,
   CRON_SECRET: cronSecretSchema
 });
 
@@ -77,6 +93,8 @@ export interface ParsedEnv {
   contactEmail?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  supabaseSecretKey?: string;
+  /** @deprecated Use supabaseSecretKey — kept for backward compat */
   supabaseServiceRoleKey?: string;
   cronSecret?: string;
   hasSupabase: boolean;
@@ -96,6 +114,9 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     throw new Error(`Invalid environment variables — ${issues}`);
   }
 
+  const secretKey =
+    result.data.SUPABASE_SECRET_KEY ?? result.data.SUPABASE_SERVICE_ROLE_KEY;
+
   return {
     siteUrl: result.data.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, ''),
     gaMeasurementId: result.data.NEXT_PUBLIC_GA_MEASUREMENT_ID,
@@ -103,7 +124,8 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     contactEmail: result.data.NEXT_PUBLIC_CONTACT_EMAIL,
     supabaseUrl: result.data.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    supabaseServiceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseSecretKey: secretKey,
+    supabaseServiceRoleKey: secretKey,
     cronSecret: result.data.CRON_SECRET,
     hasSupabase: Boolean(
       result.data.NEXT_PUBLIC_SUPABASE_URL &&

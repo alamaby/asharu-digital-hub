@@ -21,6 +21,7 @@ Last updated: 2026-08-26 12:35 (local time)
 6. JSON-LD: Organization (bukan Person); tanpa Product/offers sampai harga terverifikasi ada; breadcrumb detail memakai label halaman (bukan teks aksi).
 7. GtagFunction wire-level loose, helper publik typed; tracker client islands kecil (PageView/ViewProperty).
 8. Tidak ada commit/push ke remote tanpa instruksi eksplisit user.
+9. Supabase secret key `sb_secret_...` ganti `service_role` JWT (deprecated 2025-12). Env: `SUPABASE_SECRET_KEY` (prefer) + alias `SUPABASE_SERVICE_ROLE_KEY`. Guard: `AGENTS.md` § Safety → Env Guard + `.memory/ENV_GUARD.md`; `.env.example` hanya placeholder, real di `.env.local` (gitignore).
 
 ## Open Items / Blockers
 

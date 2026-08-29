@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Seed LLM provider keys into Vault (interactive, no secret logged).
- * Reads SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from env.
+ * Reads SUPABASE_URL + SUPABASE_SECRET_KEY (or legacy SERVICE_ROLE) from env.
  * Usage: node scripts/seed-llm-keys.mjs
  */
 import { createInterface } from 'node:readline';
@@ -10,7 +10,9 @@ import { createHash } from 'node:crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  process.env.SUPABASE_SECRET_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    '',
   { auth: { persistSession: false } }
 );
 
