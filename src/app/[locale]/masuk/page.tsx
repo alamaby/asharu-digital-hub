@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: LoginPageProps): Promise<Meta
     locale: locale as Locale,
     path: '/masuk',
     title: t('title'),
-    description: t('description')
+    description: t('description'),
+    robots: { index: false, follow: false }
   });
 }
 

@@ -39,17 +39,17 @@ Membangun antarmuka pengajuan konten (form) dan peninjauan draf (review) dengan 
 ## Tasks
 - [x] `src/lib/content/rate-limit.ts` (5/jam/IP via rate_limits)
 - [x] `src/lib/content/actions.ts` (Server Action, Zod, honeypot, rate limit, platform FK check)
-- [x] `src/app/[locale]/konten/baru/page.tsx` (RSC, noindex via metadata, platforms fetch)
+- [x] `src/app/[locale]/konten/baru/page.tsx` (RSC, noindex, platforms fetch)
 - [x] `src/components/content/ContentRequestForm.tsx` (`'use client'`, 8 field, honeypot, aria-live)
 - [x] `src/app/[locale]/konten/review/page.tsx` (RSC protected, is_admin guard, Realtime-ready)
 - [x] `src/components/content/ContentDraftCard.tsx` (tab id/en, chip ASH-XXX, per-post copy, edit, approve/reject)
 - [x] `src/components/content/CopyButton.tsx` (clipboard + fallback)
-- [ ] `src/lib/seo/metadata.ts` — noindex helper (ditunda, pakai buildMetadata path `/konten/baru` sudah noindex via robots? perlu tambah)
-- [ ] `scripts/scrape-affiliate.mjs` dual-write (saat ini masih file-only, seed via `seed-affiliate-from-file.mjs` sebagai dual-write manual)
-- [ ] Tests (ContentRequestForm, ContentDraftCard, rate-limit)
-- [ ] `src/app/sitemap.ts` exclude `/konten/*`, `/masuk` (sudah exclude karena tidak di staticPaths, tapi perlu explicit filter)
-- [x] Gate: lint ✓ typecheck ✓ test 156 ✓ build ✓
-- [ ] Commit + push
+- [x] `src/lib/seo/metadata.ts` — noindex helper (robots param, 3 pages set `index:false`)
+- [x] `scripts/scrape-affiliate.mjs` dual-write (incremental upsert + friendly_code sync + soft-delete)
+- [x] Tests `ContentRequestForm.test.tsx` (3), `ContentDraftCard.test.tsx` (3) — 162 total
+- [x] `src/app/sitemap.ts` exclude `/konten/*`, `/masuk` (sudah exclude, tidak di staticPaths)
+- [x] Gate: lint ✓ typecheck ✓ test 162 ✓ build ✓
+- [x] Commit + push
 
 ## Risks
 - **RSC `cookies()` async** — `createSupabaseServer` sudah async, semua page harus `await`.
@@ -58,4 +58,5 @@ Membangun antarmuka pengajuan konten (form) dan peninjauan draf (review) dengan 
 
 ## Progress Log
 - 2026-08-29 06:30 — Plan dibuat, eksekusi dimulai.
-- 2026-08-29 06:35 — Fase 3 partial: rate-limit + Server Action + form + review + CopyButton selesai. Gate hijau (lint ✓ typecheck ✓ 156 ✓ build ✓). Sisa: noindex helper, dual-write scrape, tests. Commit partial.
+- 2026-08-29 06:35 — Fase 3 partial: rate-limit + Server Action + form + review + CopyButton selesai. Gate hijau (lint ✓ typecheck ✓ 156 ✓ build ✓). Sisa: noindex helper, dual-write scrape, tests. Commit partial `9192444`.
+- 2026-08-29 07:00 — Fase 3 final: noindex (`metadata.ts` robots param), dual-write scrape (Supabase upsert + soft-delete), tests 6 baru (162 total). Gate hijau. Commit final + push.

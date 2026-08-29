@@ -10,6 +10,7 @@ export interface BuildMetadataInput {
   title: string;
   description: string;
   params?: Record<string, string>;
+  robots?: { index: boolean; follow: boolean };
 }
 
 export function buildMetadata({
@@ -17,7 +18,8 @@ export function buildMetadata({
   path,
   title,
   description,
-  params
+  params,
+  robots
 }: BuildMetadataInput): Metadata {
   const canonicalPath = localizedPathname(path, locale, params);
   const canonical = `${env.siteUrl}${canonicalPath}`;
@@ -48,6 +50,6 @@ export function buildMetadata({
       title,
       description
     },
-    robots: { index: true, follow: true }
+    robots: robots ?? { index: true, follow: true }
   };
 }

@@ -152,6 +152,46 @@ async function main() {
   const outPath = path.join(process.cwd(), 'src', 'data', 'affiliate-products.ts');
   await fs.writeFile(outPath, renderDataFile(products, { urlSuffix: URL_SUFFIX }), 'utf8');
   console.error(`\nWrote ${outPath} with ${products.length} products.`);
+
+  // Dual-write to Supabase (incremental, friendly_code ASH-XXX auto-generated)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+      console.error('Upserting to Supabase affiliate_products...');
+      const rows = products.map((p) => ({
+        external_id: p.id.replace('affiliate-', ''),
+        name_id: p.name.id,
+        name_en: p.name.en,
+        category: p.category,
+        merchant: p.merchant,
+        url: p.url,
+        image: p.image,
+        is_active: true
+      }));
+      for (let i = 0; i < rows.length; i += 50) {
+        const batch = rows.slice(i, i + 50);
+        const { error } = await supabase.from('affiliate_products').upsert(batch, { onConflict: 'external_id' });
+        if (error) throw new Error(`Supabase upsert batch ${i}: ${error.message}`);
+        console.error(`  upserted ${i + batch.length}/${rows.length}`);
+      }
+      // Soft-delete: mark missing as inactive
+      const remoteIds = new Set(rows.map((r) => r.external_id));
+      const { data: existing } = await supabase.from('affiliate_products').select('external_id').eq('is_active', true);
+      const toDeactivate = (existing ?? []).filter((r) => !remoteIds.has(r.external_id)).map((r) => r.external_id);
+      if (toDeactivate.length > 0) {
+        await supabase.from('affiliate_products').update({ is_active: false }).in('external_id', toDeactivate);
+        console.error(`  deactivated ${toDeactivate.length} removed products`);
+      }
+      console.error('Supabase sync done.');
+    } catch (e) {
+      console.error(`Supabase sync failed (file still written): ${e.message}`);
+    }
+  } else {
+    console.error('Supabase env not set — skipping DB sync (file-only).');
+  }
 }
 
 main().catch((err) => {
