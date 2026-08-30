@@ -1,5 +1,5 @@
 import type { KeyRow, ProviderRow } from './types';
-import { fetchOrderedKeys, getDecryptedKey, markKeyFailure, markKeyUsage } from '@/lib/supabase/vault';
+import { fetchOrderedKeys, getApiKeyForRow, markKeyFailure, markKeyUsage } from '@/lib/supabase/vault';
 
 export interface AcquiredKey {
   row: KeyRow;
@@ -17,8 +17,7 @@ export class KeyPool {
     const keys = await fetchOrderedKeys(this.provider.id);
     if (keys.length === 0) return null;
     const row = keys[0]!;
-    if (!row.vault_secret_id) throw new Error(`Key ${row.id} has no vault_secret_id`);
-    const apiKey = await getDecryptedKey(row.vault_secret_id);
+    const apiKey = await getApiKeyForRow(row);
     await markKeyUsage(row.id);
     return { row, apiKey };
   }
@@ -33,10 +32,9 @@ export class KeyPool {
     const keys = await fetchOrderedKeys(this.provider.id);
     let lastError: unknown;
     for (const row of keys) {
-      if (!row.vault_secret_id) continue;
       let apiKey: string;
       try {
-        apiKey = await getDecryptedKey(row.vault_secret_id);
+        apiKey = await getApiKeyForRow(row);
       } catch (e) {
         lastError = e;
         continue;

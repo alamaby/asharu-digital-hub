@@ -2,13 +2,13 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // Mock Vault helpers so KeyPool is testable without Supabase.
 const mockFetchOrderedKeys = vi.fn();
-const mockGetDecryptedKey = vi.fn();
+const mockGetApiKeyForRow = vi.fn();
 const mockMarkUsage = vi.fn();
 const mockMarkFailure = vi.fn();
 
 vi.mock('@/lib/supabase/vault', () => ({
   fetchOrderedKeys: (...args: unknown[]) => mockFetchOrderedKeys(...args),
-  getDecryptedKey: (...args: unknown[]) => mockGetDecryptedKey(...args),
+  getApiKeyForRow: (...args: unknown[]) => mockGetApiKeyForRow(...args),
   markKeyUsage: (...args: unknown[]) => mockMarkUsage(...args),
   markKeyFailure: (...args: unknown[]) => mockMarkFailure(...args)
 }));
@@ -46,7 +46,7 @@ beforeEach(() => {
 describe('KeyPool', () => {
   it('acquires the first ordered key', async () => {
     mockFetchOrderedKeys.mockResolvedValue([keyRow('k1', 0), keyRow('k2', 1)]);
-    mockGetDecryptedKey.mockResolvedValue('sk-test');
+    mockGetApiKeyForRow.mockResolvedValue('sk-test');
     const pool = new KeyPool(provider);
     const acquired = await pool.acquire();
     expect(acquired?.row.id).toBe('k1');
@@ -55,7 +55,7 @@ describe('KeyPool', () => {
 
   it('falls back to next key on 429', async () => {
     mockFetchOrderedKeys.mockResolvedValue([keyRow('k1', 0), keyRow('k2', 1)]);
-    mockGetDecryptedKey.mockResolvedValue('sk-test');
+    mockGetApiKeyForRow.mockResolvedValue('sk-test');
     const pool = new KeyPool(provider);
     const result = await pool.withFallback(async (apiKey, row) => {
       if (row.id === 'k1') throw new Error('429 rate limited');
@@ -76,7 +76,7 @@ describe('KeyPool', () => {
     const k = keyRow('k1', 0);
     k.failure_count = 5;
     mockFetchOrderedKeys.mockResolvedValue([k]);
-    mockGetDecryptedKey.mockResolvedValue('sk-test');
+    mockGetApiKeyForRow.mockResolvedValue('sk-test');
     const pool = new KeyPool(provider);
     await expect(
       pool.withFallback(async () => {

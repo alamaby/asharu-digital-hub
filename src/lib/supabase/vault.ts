@@ -3,18 +3,39 @@ import { getServiceClient } from './service';
 
 /**
  * Decrypt a Vault secret by id (service_role only).
- * Supabase Vault exposes `vault.decrypted_secrets` view for service_role.
+ * Uses the public `vault_decrypt_secret` RPC wrapper (SECURITY DEFINER) —
+ * the `vault` schema itself is not exposed via PostgREST.
  */
 export async function getDecryptedKey(vaultSecretId: string): Promise<string> {
   const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('vault.decrypted_secrets')
-    .select('decrypted_secret')
-    .eq('id', vaultSecretId)
-    .single();
+  const { data, error } = await supabase.rpc('vault_decrypt_secret', { p_id: vaultSecretId });
   if (error || !data) throw new Error(`Vault decrypt failed: ${error?.message ?? 'no data'}`);
+  return data as string;
+}
+
+/**
+ * Get API key for a KeyRow — tries Vault, falls back to api_key_encrypted column.
+ */
+export async function getApiKeyForRow(row: KeyRow): Promise<string> {
+  if (row.vault_secret_id) {
+    try {
+      return await getDecryptedKey(row.vault_secret_id);
+    } catch {
+      // Fall through to direct column
+    }
+  }
+  // Fallback: direct column (when Vault not exposed)
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from('llm_provider_keys')
+    .select('api_key_encrypted')
+    .eq('id', row.id)
+    .single();
+  if (error || !data) throw new Error(`No key material for ${row.id}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data as any).decrypted_secret as string;
+  const encrypted = (data as any).api_key_encrypted as string | null;
+  if (!encrypted) throw new Error(`No api_key_encrypted for ${row.id}`);
+  return encrypted;
 }
 
 /**
