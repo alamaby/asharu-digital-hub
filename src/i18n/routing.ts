@@ -45,6 +45,10 @@ export const routing = defineRouting({
     '/konten/review': {
       id: '/konten/review',
       en: '/content/review'
+    },
+    '/auth/exchange': {
+      id: '/autentikasi/pertukaran',
+      en: '/auth/exchange'
     }
   }
 });
