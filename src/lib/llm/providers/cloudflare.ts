@@ -13,19 +13,23 @@ export class CloudflareProvider implements LLMProvider {
     // The account id is provider config (identifier, not secret); the API
     // token is the Vault-backed apiKey. Model e.g. "@cf/meta/llama-3.1-8b-instruct".
     if (!this.accountId) throw new Error('Cloudflare provider missing account_id config');
+    // Model ids contain slashes (e.g. @cf/meta/llama-3.1-8b-instruct) that are
+    // part of the path — must NOT be percent-encoded.
     const url = this.baseUrl
       .replace('{account_id}', encodeURIComponent(this.accountId))
-      .replace(/\/$/, '') + `/run/${encodeURIComponent(input.model)}`;
-    const prompt = input.messages.map((m) => `${m.role}: ${m.content}`).join('\n\n');
+      .replace(/\/$/, '') + `/run/${input.model}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`
       },
+      // Workers AI chat models accept `messages` only; sending `prompt` too
+      // violates the API's oneOf schema.
       body: JSON.stringify({
         messages: input.messages,
-        prompt
+        max_tokens: input.maxTokens ?? 1024,
+        temperature: input.temperature ?? 0.7
       })
     });
     if (!res.ok) {
@@ -33,10 +37,13 @@ export class CloudflareProvider implements LLMProvider {
       throw new Error(`LLM cloudflare ${res.status}: ${text.slice(0, 500)}`);
     }
     const json = (await res.json()) as {
-      result?: { response?: string };
+      result?: { response?: string; choices?: { message?: { content?: string } }[] };
       response?: string;
     };
-    const content = json.result?.response ?? json.response ?? '';
+    // Workers AI returns OpenAI-style choices for chat models, plus a legacy
+    // `result.response` string for text models.
+    const content =
+      json.result?.choices?.[0]?.message?.content ?? json.result?.response ?? json.response ?? '';
     return {
       text: typeof content === 'string' ? content : JSON.stringify(content),
       model: input.model,

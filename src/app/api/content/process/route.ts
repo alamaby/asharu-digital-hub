@@ -127,7 +127,7 @@ async function handle(request: NextRequest) {
 
       // Try providers in priority order
       const providers = await registry.listActive();
-      let lastError: unknown;
+      const providerErrors: string[] = [];
       let success: { thread: ThreadGeneration; providerSlug: string; model: string; keyHash: string; latency: number } | null = null;
 
       for (const prov of providers) {
@@ -142,7 +142,7 @@ async function handle(request: NextRequest) {
               .eq('provider_id', prov.id)
               .eq('is_default', true)
               .limit(1);
-            const model = (models?.[0] as { model_id: string } | undefined)?.model_id ?? (prov.slug === 'naraya' ? 'naraya/nemotron-3-ultra' : 'openai/gpt-4o-mini');
+            const model = (models?.[0] as { model_id: string } | undefined)?.model_id ?? (prov.slug === 'naraya' ? 'nemotron-3-ultra' : 'openai/gpt-4o-mini');
             const out = await provider.chat(
               {
                 model,
@@ -188,12 +188,13 @@ async function handle(request: NextRequest) {
           };
           break;
         } catch (e) {
-          lastError = e;
+          const msg = e instanceof Error ? e.message : String(e);
+          providerErrors.push(`${prov.slug}: ${msg.slice(0, 300)}`);
           // Try next provider
         }
       }
 
-      if (!success) throw lastError ?? new Error('All providers failed');
+      if (!success) throw new Error(`All providers failed — ${providerErrors.join(' | ') || 'no providers'}`);
 
       // Replace placeholder with real URL
       const threadStr = JSON.stringify(success.thread);
