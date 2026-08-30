@@ -110,3 +110,8 @@ Migrasi dataset 201 affiliate dari `src/data/affiliate-products.ts` ke tabel `af
 
 ## Progress Log
 - 2026-08-28 09:00 — Plan final disusun. Fase 1 siap dieksekusi (submodule + migration + auth + env).
+- 2026-08-28 (Fase 1) — Selesai: submodule `asharu-supabase`, migration `20260828000000_content_factory.sql` (11 tabel + RLS + trigger), auth magic link, env `sb_secret_`/`sb_publishable_`, guard middleware. Commit `b72a086` + review fix `e4294b3`.
+- 2026-08-28 (Fase 2) — Selesai: provider abstraction (4 provider), key pool round-robin + circuit breaker, processor route `maxDuration 60`, seed script. Commit `7a1f59f` + review fix `58045a0` (vault DRY, optimistic lock, Zod thread, CRON_SECRET).
+- 2026-08-29 (Fase 3) — Selesai: form + review UI + rate limit + honeypot, noindex `/konten/*`, dual-write scrape, CopyButton, 162 tests. Commit `9192444` + `a607f8b`. Detail per fase di file plan `*-fase1/2/3.md`.
+- 2026-08-29/30 (Hardening pasca-deploy) — Vault RPC wrappers, cloudflare base_url + account_id config, fix model ids, CSP, magic-link client exchange + site_url + allow-list, cron Vercel → Supabase pg_cron (hobby limit). Commit `b85da09`…`738fd93`. Domain `https://asharu.id` live.
+- 2026-08-30 21:45 — Audit keamanan/konsistensi: 2 P0 (processor menerima `x-vercel-cron` spoofable + pg_cron belum kirim Bearer secret), 5 P1 (INSERT anon tanpa limit DB, `get_llm_key` public, key plaintext fallback, KeyPool menghukum key untuk error konten, retry tanpa cap), 5 P2, 7 P3. Belum ada fix — menunggu keputusan. Detail: `.memory/2026-08-30/214500-content-factory-audit.md`.
