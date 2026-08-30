@@ -29,10 +29,18 @@ function ask(q) {
 const slug = (await ask('Provider slug (naraya/openrouter/gemini/cloudflare): ')).trim();
 const rawKey = (await ask('API key: ')).trim();
 const priority = Number((await ask('Priority (0 = highest, default 0): ')).trim() || '0');
+// Cloudflare Workers AI needs the account id (URL identifier, not a secret).
+const accountId = slug === 'cloudflare'
+  ? (await ask('Cloudflare account id: ')).trim()
+  : '';
 rl.close();
 
 if (!slug || !rawKey) {
   console.error('Slug and key are required.');
+  process.exit(1);
+}
+if (slug === 'cloudflare' && !accountId) {
+  console.error('Cloudflare requires an account id.');
   process.exit(1);
 }
 
@@ -42,6 +50,18 @@ const { data: provider } = await supabase.from('llm_providers').select('id').eq(
 if (!provider) {
   console.error(`Provider ${slug} not found.`);
   process.exit(2);
+}
+
+// Persist provider-level config (account id) — non-secret, safe in plain column.
+if (accountId) {
+  const { error: cfgError } = await supabase
+    .from('llm_providers')
+    .update({ config: { account_id: accountId } })
+    .eq('slug', slug);
+  if (cfgError) {
+    console.error('Provider config update failed:', cfgError.message);
+    process.exit(5);
+  }
 }
 
 // Create Vault secret via the public RPC wrapper (SECURITY DEFINER, service_role only).

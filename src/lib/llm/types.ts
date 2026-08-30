@@ -38,6 +38,8 @@ export interface ProviderRow {
   base_url: string;
   is_active: boolean;
   priority: number;
+  /** Provider-level non-secret config (e.g. { account_id } for cloudflare). */
+  config?: Record<string, string>;
 }
 
 export interface KeyRow {

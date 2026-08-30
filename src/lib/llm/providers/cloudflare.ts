@@ -2,16 +2,20 @@ import type { ChatInput, ChatOutput, LLMProvider } from '../types';
 
 export class CloudflareProvider implements LLMProvider {
   readonly slug = 'cloudflare' as const;
-  constructor(private baseUrl = 'https://api.cloudflare.com/client/v4') {}
+  constructor(
+    private baseUrl = 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1',
+    private accountId = ''
+  ) {}
 
   async chat(input: ChatInput, apiKey: string): Promise<Omit<ChatOutput, 'keyId' | 'provider'>> {
     const started = Date.now();
-    // Cloudflare Workers AI: POST /accounts/{id}/ai/run/{model}
-    // For MVP we expect model like "@cf/meta/llama-3.1-8b-instruct"
-    // apiKey is expected to be "CF_API_TOKEN" and account_id via env or baseUrl param.
-    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID ?? '';
-    const model = input.model;
-    const url = `${this.baseUrl.replace(/\/$/, '')}/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`;
+    // Cloudflare Workers AI: POST /accounts/{account_id}/ai/run/{model}
+    // The account id is provider config (identifier, not secret); the API
+    // token is the Vault-backed apiKey. Model e.g. "@cf/meta/llama-3.1-8b-instruct".
+    if (!this.accountId) throw new Error('Cloudflare provider missing account_id config');
+    const url = this.baseUrl
+      .replace('{account_id}', encodeURIComponent(this.accountId))
+      .replace(/\/$/, '') + `/run/${encodeURIComponent(input.model)}`;
     const prompt = input.messages.map((m) => `${m.role}: ${m.content}`).join('\n\n');
     const res = await fetch(url, {
       method: 'POST',

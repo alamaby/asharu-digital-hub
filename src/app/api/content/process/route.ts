@@ -17,9 +17,9 @@ const threadSchema = z.object({
 
 export const maxDuration = 60;
 
-function providerFactory(slug: string, baseUrl: string) {
+function providerFactory(slug: string, baseUrl: string, config?: Record<string, string>) {
   if (slug === 'gemini') return new GeminiProvider(baseUrl);
-  if (slug === 'cloudflare') return new CloudflareProvider(baseUrl);
+  if (slug === 'cloudflare') return new CloudflareProvider(baseUrl, config?.account_id ?? '');
   return new OpenAICompatibleProvider(slug as never, baseUrl);
 }
 
@@ -134,7 +134,7 @@ async function handle(request: NextRequest) {
         const pool = new KeyPool(prov);
         try {
           const { result, keyRow } = await pool.withFallback(async (apiKey) => {
-            const provider = providerFactory(prov.slug, prov.base_url);
+            const provider = providerFactory(prov.slug, prov.base_url, prov.config);
             // Use default model for provider
             const { data: models } = await supabase
               .from('llm_models')
