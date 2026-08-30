@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
+import { env } from '@/lib/env';
 
 export function LoginForm() {
   const t = useTranslations('auth.login');
@@ -25,9 +26,15 @@ export function LoginForm() {
       return;
     }
 
+    // Prefer the configured public site URL so magic links always point at
+    // the production domain (e.g. https://asharu.id), even if a user is
+    // somehow on a preview URL. Fall back to the current origin in dev.
+    const base = (env.siteUrl && env.siteUrl.length > 0) ? env.siteUrl : window.location.origin;
+    const emailRedirectTo = `${base.replace(/\/$/, '')}/id/auth/exchange`;
+
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/id/auth/exchange` }
+      options: { emailRedirectTo }
     });
 
     if (error) {
