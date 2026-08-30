@@ -13,11 +13,16 @@ const contentSecurityPolicy = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
+  // 'unsafe-eval' is required by Next.js dev-mode HMR/source-maps; production
+  // ships without it. Supabase auth/realtime calls run from the browser, so
+  // *.supabase.co must be allowed in connect-src in both modes.
+  isProd
+    ? "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://www.google.com",
+  "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://www.google.com https://*.supabase.co wss://*.supabase.co",
   ...(isProd ? ['upgrade-insecure-requests'] : [])
 ].join('; ');
 
