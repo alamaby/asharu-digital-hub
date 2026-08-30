@@ -1,8 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/content/process",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "_note": "Vercel Hobby plan allows only 1 cron/day. Processor cron is set up via Supabase pg_cron (free) — see supabase/migrations/20260829000007_processor_cron.sql. Add new crons back here only when on Vercel Pro.",
+  "crons": []
 }
