@@ -31,10 +31,9 @@ export default function ExchangePage() {
     }
 
     (async () => {
-      // detectSessionInUrl + exchangeCodeForSession handle the ?code= from
-      // the magic-link redirect. The PKCE verifier cookie is in the same
-      // origin, so the client SDK can read it.
       const url = new URL(window.location.href);
+      // Supabase sends ?code= on success; ?error=&error_description= on failure.
+      // Handle both, plus the hash-based #access_token flow as a safety net.
       const code = url.searchParams.get('code');
       const next = url.searchParams.get('next') ?? '/id/konten/review';
       const errorParam = url.searchParams.get('error_description') ?? url.searchParams.get('error');
@@ -44,21 +43,31 @@ export default function ExchangePage() {
         setMessage(errorParam);
         return;
       }
-      if (!code) {
-        setStatus('error');
-        setMessage('Tautan tidak berisi kode. Coba minta tautan baru.');
+
+      // Magic-link (PKCE): code in query string.
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setStatus('error');
+          setMessage(error.message);
+          return;
+        }
+        setStatus('ok');
+        router.replace(next);
         return;
       }
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        setStatus('error');
-        setMessage(error.message);
+      // Fallback: implicit flow sends tokens in the URL hash (e.g. #access_token=...).
+      // detectSessionInUrl is on by default when the supabase client mounts — give it a moment.
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        setStatus('ok');
+        router.replace(next);
         return;
       }
-      setStatus('ok');
-      // Use replace so the back button doesn't bring us back to the error page.
-      router.replace(next);
+
+      setStatus('error');
+      setMessage('Tautan tidak berisi kode. Coba minta tautan baru.');
     })();
   }, [router]);
 

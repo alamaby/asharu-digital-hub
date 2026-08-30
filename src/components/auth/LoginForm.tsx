@@ -27,8 +27,15 @@ export function LoginForm() {
     }
 
     // Prefer the configured public site URL so magic links always point at
-    // the production domain (e.g. https://asharu.id), even if a user is
-    // somehow on a preview URL. Fall back to the current origin in dev.
+    // the production domain (e.g. https://asharu.id), even when the dashboard
+    // opens a preview URL. Fall back to the current origin in local dev.
+    //
+    // Supabase GoTrue only honors redirect_to when its origin/path is listed
+    // in Supabase Dashboard → Auth → URL Configuration → Redirect URLs.
+    // Ensure https://asharu.id/** and your dev http://localhost:3000/** are
+    // both allow-listed there; otherwise the link still arrives but the PKCE
+    // code_verifier cookie won't match and the exchange will report
+    // "PKCE code verifier not found".
     const base = (env.siteUrl && env.siteUrl.length > 0) ? env.siteUrl : window.location.origin;
     const emailRedirectTo = `${base.replace(/\/$/, '')}/id/auth/exchange`;
 
