@@ -1,3 +1,8 @@
 {
-  "crons": []
+  "crons": [],
+  "functions": {
+    "app/api/content/process/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }
