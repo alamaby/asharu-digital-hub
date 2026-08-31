@@ -1,11 +1,11 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-08-31 08:04 (local time)
+Last updated: 2026-08-31 09:40 (local time)
 
 ## Current State
 
-- **Status:** Content Factory (form → Supabase → processor pg_cron → multi-provider LLM → review admin) selesai Fase 1–3 dan sudah deploy; domain produksi `https://asharu.id` live. **P0 audit (cron auth spoofable) sudah diperbaiki** (31 Agu): endpoint kini Bearer-only, pg_cron membaca secret dari Vault — menunggu setup secret user (seed Vault + Vercel CRON_SECRET + apply migration). P1/P2 audit lain belum diperbaiki.
+- **Status:** Content Factory (form → Supabase → processor pg_cron → multi-provider LLM → review admin) selesai Fase 1–3 dan sudah deploy; domain produksi `https://asharu.id` live. **P0 audit (cron auth spoofable) sudah diperbaiki** (31 Agu) DAN **Fase 2 P1 sudah dikerjakan + di-apply ke DB live** (31 Agu ~09:40): `get_llm_key` oracle di-lock (hanya service_role), KeyPool hanya blame 401/403/429, retry cap `MAX_ATTEMPTS=3` → status `failed` + kolom `attempts`, Gemini key → header `x-goog-api-key`. Factory MASIH berhenti (fail-closed) menunggu setup P0 user (seed Vault `asharu_cron_secret` + Vercel `CRON_SECRET` + apply `20260831000001`). Commit Fase 2 LOKAL saja (belum push — memory decision #7). Sisa P1 (INSERT anon limit) + P2/P3 belum.
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; content factory = dinamis.
 - **Halaman publik:** `/id` & `/en` (home + carousel afiliasi 6 produk), produk (~201 dari scraper), properti (+detail), tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
 - **Content factory:** `/konten/baru` (form, anon, rate limit 5/jam/IP + honeypot), `/konten/review` (admin, copy per-post, approve/reject), `/masuk` (magic link), `/api/content/process` (processor, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault (fallback kolom plaintext — lihat audit).
@@ -32,9 +32,13 @@ Last updated: 2026-08-31 08:04 (local time)
 ## Open Items / Blockers
 
 - [ ] **Setup pasca-fix P0 (urutan wajib):** (1) jalankan `node --env-file=.env.local scripts/seed-cron-secret.mjs`, (2) set `CRON_SECRET` (nilai sama) di Vercel Production, (3) apply migration `20260831000001_processor_cron_bearer.sql` ke DB asharu. Sebelum lengkap, endpoint 401 untuk semua (fail-closed — processing berhenti sementara).
-- [ ] **P1 (audit):** INSERT anon tanpa limit DB; `get_llm_key()` belum di-REVOKE dari PUBLIC; key plaintext di `api_key_encrypted` (re-seed Vault + drop kolom); KeyPool menghukum key karena error konten; retry request tanpa cap. Plus P2/P3 (race claim, soft-delete guard, duplikasi email admin & getServiceClient, dll).
+- [x] **P1 (audit) — Fase 2 selesai 31 Agu ~09:40:** `get_llm_key` REVOKE dari PUBLIC/anon/authenticated ✓; key plaintext → Vault (semua sudah di Vault, no-op) ✓; KeyPool hanya blame 401/403/429 (5xx & error konten tidak) ✓; retry cap 3 → `failed` + `attempts` column ✓; P2 race claim ditutup (`claimedByUs` + `.eq('status','processing')`) ✓. Commit lokal `5b7e5d9` + submodule `7fb73d8`/`7bf4f30`; DB applied+verified via MCP asharu. **Belum push** (memory #7).
+- [ ] **Sisa P1 (butuh keputusan desain user):** INSERT anon tanpa limit DB (opsi: wajib login / Turnstile / terima risiko rate limit app-level).
+- [ ] **3 baris `content_requests` status='processing' nyangkut** — korban fail-closed P0 (di-claim lalu endpoint 401). Saat factory resume, claim hanya pick `pending` → 3 baris tidak diproses. Tidak di-auto-reset (mutasi data prod). Opsi user: reset `pending` (attempts=0) untuk reprocess, atau `failed`.
+- [ ] **P2/P3 audit lain belum:** soft-delete guard scraper, ContentDraftCard error surfacing, konsolidasi email admin → `profiles.is_admin`, duplikasi `getServiceClient`, `rate_limits` cleanup, realtime review (`supabase.channel`), middleware matcher persempit, `target_category` validasi saat submit, dll.
+- [ ] **Magic-link `token_hash` flow** (`src/app/[locale]/auth/exchange/page.tsx` + `supabase/templates/magic_link.html`) — uncommitted, konsep terpisah & kemungkinan belum selesai (template masih `{{ .ConfirmationURL }}`, tak kirim `token_hash` → cabang exchange dead code). Butuh plan/keputusan terpisah.
 - [ ] Verifikasi env produksi: `CRON_SECRET` & `NEXT_PUBLIC_*` sudah diset di Vercel? (domain sudah live — indikasi ya, tapi konfirmasi manual).
-- [ ] Verifikasi DB live via Dashboard asharu (MCP session ini tersambung ke project lain `albot-be`): mode penyimpanan key (Vault vs plaintext), distribusi status `content_requests`, error `llm_call_logs`.
+- [x] Verifikasi DB live via MCP asharu (blocker lama "tersambung albot-be" teratasi 31 Agu): key storage = semua 4 di Vault (0 plaintext) ✓; distribusi `content_requests` = {needs_review:1, processing:3 nyangkut} ✓; `get_llm_key` grants ✓ (kini service_role saja). Sisa: cek error `llm_call_logs` terakhir.
 - [ ] Data placeholder (`src/data/*`, `public/images/*`) HARUS diganti data terverifikasi sebelum launch publik penuh; Tokopedia/TikTok Shop masih `hidden: true`.
 - [ ] Realtime review (`supabase.channel`) direncanakan tapi belum diimplementasi.
 - [ ] QA manual: Lighthouse ≥90/95/95/95, screen reader/keyboard di perangkat nyata.
@@ -42,6 +46,7 @@ Last updated: 2026-08-31 08:04 (local time)
 
 ## Recent Entries
 
+- [2026-08-31 094000-fase2-p1-llm-key-retry-hardening.md](2026-08-31/094000-fase2-p1-llm-key-retry-hardening.md) — Fase 2 P1: lock get_llm_key, key pool classification (401/403/429 only), retry cap 3→failed + attempts, Gemini key→header; DB applied+verified via MCP asharu; commit lokal (belum push).
 - [2026-08-31 080400-p0-processor-cron-auth-fix.md](2026-08-31/080400-p0-processor-cron-auth-fix.md) — fix P0: endpoint Bearer-only + pg_cron baca secret dari Vault.
 - [2026-08-30 214500-content-factory-audit.md](2026-08-30/214500-content-factory-audit.md) — audit keamanan/konsistensi: 2 P0, 5 P1, 5 P2, 7 P3.
 - [2026-08-30 214400-content-factory-hardening.md](2026-08-30/214400-content-factory-hardening.md) — vault RPC, cloudflare, model ids, magic-link exchange, pg_cron (29–30 Agu).

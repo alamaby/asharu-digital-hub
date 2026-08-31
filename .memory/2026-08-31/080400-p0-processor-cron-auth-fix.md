@@ -29,7 +29,7 @@ Menutup temuan P0 audit 30 Agu: `/api/content/process` menerima header `x-vercel
 ## Verification
 - Gate hijau: lint ✓ typecheck ✓ test 172/172 (6 test baru) ✓ build ✓.
 - Push: submodule `f872aa1..dab480e`, parent `738fd93..ff0407c`.
-- Pasca-deploy: POST tanpa auth dan POST spoof `x-vercel-cron: 1` diharapkan 401 (cek log di plan).
+- Pasca-deploy (31 Agu 08:10): POST tanpa auth → 401 ✓; POST spoof `x-vercel-cron: 1` → 401 ✓ (P0 tertutup, fix live); GET `/` → 307 ✓.
 
 ## Commit Proposal
 (sudah ter-commit: `5b6330c`)

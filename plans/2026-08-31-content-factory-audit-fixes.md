@@ -26,8 +26,35 @@ Menutup P0 audit 2026-08-30: `/api/content/process` tidak lagi menerima header `
 - [x] Commit (submodule `dab480e` + parent `5b6330c`, `ff0407c`)
 - [x] Push submodule `f872aa1..dab480e` → parent `738fd93..ff0407c`
 - [x] Entri memory + README update
-- [ ] Verifikasi pasca-deploy: POST tanpa auth → 401 (lihat progress log)
+- [x] Verifikasi pasca-deploy: POST tanpa auth → 401 ✓, POST spoof `x-vercel-cron: 1` → 401 ✓ (fix live), GET `/` → 307 ✓
 - [ ] **Setup user:** seed Vault → set CRON_SECRET di Vercel → apply migration ke DB
+
+## Fase 2 — P1 Fixes (batch kedua, sama-sama dari audit 30 Agu)
+
+### Scope
+1. `get_llm_key()` REVOKE dari PUBLIC/anon/authenticated, GRANT service_role (migration).
+2. Migrasi data: key plaintext di `api_key_encrypted` → Vault, lalu kolom di-NULL-kan (kolom tidak di-drop dulu — non-destruktif).
+3. KeyPool hanya menghukum key untuk error kredensial/limit (`LLMHttpError` 401/403/429) — error konten (JSON/shape/max_chars) dan 5xx tidak lagi menonaktifkan key.
+4. Retry cap: `content_requests.attempts` + status `failed` (cap 3 di processor); reset kondisional `.eq('status','processing')` (sekalian menutup P2 race claim).
+5. Bonus keamanan kecil: Gemini API key pindah dari query string ke header `x-goog-api-key`.
+
+### Tasks Fase 2
+- [x] Migration `20260831000002_lock_get_llm_key.sql` (+ commit foundational `20260829000002_add_api_key_fallback.sql` — prasyarat, sebelumnya untracked)
+- [x] Migration `20260831000003_migrate_plaintext_keys_to_vault.sql` (no-op di live — semua key sudah di Vault; kolom dibiarkan NULL, tidak di-drop)
+- [x] Migration `20260831000004_request_attempts_failed.sql`
+- [x] `LLMHttpError` di types.ts + 3 provider throw dengan status
+- [x] key-pool.ts: markKeyFailure kondisional (401/403/429 saja; 5xx & error konten tidak blame) + tests update (5 test, klasifikasi)
+- [x] route.ts: attempts cap (MAX_ATTEMPTS=3 → 'failed') + reset kondisional `.eq('status','processing')` + flag `claimedByUs` (tutup P2 race claim juga)
+- [x] Bonus: Gemini key query string → header `x-goog-api-key`
+- [x] Gate: lint ✓ typecheck ✓ test 173/173 ✓ build ✓
+- [x] DB live asharu (via MCP): 3 migration applied + verified — `get_llm_key` kini hanya postgres+service_role; `attempts` int default 0; status check termasuk `failed`
+- [x] Commit lokal: submodule `7fb73d8`+`7bf4f30`, parent `5b7e5d9`
+- [ ] **Push** (menunggu instruksi eksplisit user — memory decision #7)
+- [x] Docs (plan + memory)
+
+### Di luar batch ini (butuh keputusan desain)
+- **INSERT anon tanpa limit DB** — opsi: (a) wajib login, (b) captcha/Turnstile, (c) terima risiko (rate limit app-level tetap). Keputusan produk → user.
+- P2 lain: soft-delete guard scraper, ContentDraftCard error surfacing, konsolidasi email admin.
 
 ## Urutan Deploy (penting — fail-closed)
 1. Jalankan `node --env-file=.env.local scripts/seed-cron-secret.mjs` → catat secret.
@@ -46,6 +73,11 @@ Bila route fix aktif sebelum langkah 2–3: endpoint menolak semua (401) — pro
 - 2026-08-31 09:00 — Plan dibuat setelah user menyetujui lanjutan post-audit ("ya lanjut").
 - 2026-08-31 08:05 — Implementasi selesai & ter-push: cron-auth.ts (Bearer-only, timingSafeEqual, fail-closed), 6 test baru (172 total hijau), route bersih, migration submodule `20260831000001`, seed script, .env.example. Commit: submodule `dab480e`, parent `5b6330c` + `ff0407c`. Push: submodule `f872aa1..dab480e`, parent `738fd93..ff0407c`. Vercel deploy berjalan otomatis.
 - 2026-08-31 08:05 — Status: MENUNGGU SETUP USER (seed Vault → Vercel CRON_SECRET → apply migration). Sampai itu, endpoint 401 untuk semua pemanggil termasuk cron lama (fail-closed, disengaja).
+- 2026-08-31 08:10 — Verifikasi deploy: POST tanpa auth → 401 ✓; POST spoof `x-vercel-cron: 1` → 401 ✓ (P0 tertutup, fix live); GET `/` → 307 ✓. Cron lama kini memang 401 → processing factory berhenti sampai setup user selesai (diharapkan).
+- 2026-08-31 08:15 — Fase 2 (P1) dimulai: lock get_llm_key, migrasi plaintext key → Vault, KeyPool error classification, retry cap. Detail scope di atas.
+- 2026-08-31 ~09:40 — Fase 2 (P1) SELESAI (kerja lanjutan dari sesi sebelumnya yang belum di-commit). Implementasi: LLMHttpError (types.ts) + 3 provider throw status; key-pool markKeyFailure kondisional (401/403/429 saja — 5xx & error konten tidak blame, sesuai plan yang menyempurnakan audit); route.ts attempts cap MAX_ATTEMPTS=3 → 'failed' + reset kondisional `.eq('status','processing')` + flag `claimedByUs` (menutup P2 race claim juga); Gemini key → header `x-goog-api-key`. Migrations 0002_lock/0003_migrate/0004_attempts + foundational 0002_add (sebelumnya untracked, prasyarat). Gate hijau: lint ✓ typecheck ✓ test 173/173 ✓ build ✓.
+- 2026-08-31 ~09:40 — DB live asharu (via MCP `supabase-asharu-be-production`, blocker lama "MCP tersambung ke albot-be" kini teratasi): 3 migration di-apply + verified — `get_llm_key` kini hanya postgres+service_role (oracle PUBLIC/anon/authenticated tertutup); `content_requests.attempts` int default 0; status check termasuk `failed`. Ditemukan: semua 4 key sudah di Vault (0 plaintext) → 0003 no-op di live. Ditemukan 3 baris `content_requests` status='processing' NYANGKUT (korban fail-closed P0 — di-claim tapi tidak terselesaikan karena endpoint 401) — TIDAK di-reset otomatis (mutasi data prod menunggu keputusan user); saat factory resume mereka tidak akan di-pick-up (claim hanya `status='pending''). Opsi: reset ke `pending` (attempts=0) untuk reprocess, atau `failed`.
+- 2026-08-31 ~09:40 — Commit lokal (belum push, memory decision #7): submodule `7fb73d8` (foundational 0002_add) + `7bf4f30` (Fase 2 migrations); parent `5b7e5d9`. Sisa uncommitted sengaja: `src/app/[locale]/auth/exchange/page.tsx` + `supabase/templates/magic_link.html` (magic-link `token_hash` flow — KONSEP TERPISAH & kemungkinan belum selesai: template masih pakai `{{ .ConfirmationURL }}` tak kirim `token_hash` → cabang `token_hash` di exchange page dead code; butuh plan/keputusan terpisah, tidak ikut commit Fase 2).
 
 ## Notes
 - Vercel Cron (bila suatu saat dipakai lagi) otomatis mengirim `Authorization: Bearer <CRON_SECRET>` saat env `CRON_SECRET` diset — jadi helper Bearer-only tetap kompatibel.
