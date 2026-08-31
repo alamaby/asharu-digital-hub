@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
+import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { ContentRequestForm } from '@/components/content/ContentRequestForm';
 import { env } from '@/lib/env';
@@ -28,6 +29,7 @@ export default async function KontenBaruPage({ params }: PageProps) {
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: 'content.form' });
+  const tNav = await getTranslations({ locale, namespace: 'content.form' });
 
   // Fetch platforms for select — fallback to hardcoded if Supabase not configured
   let platforms: { slug: string; display_name: string }[] = [
@@ -52,6 +54,21 @@ export default async function KontenBaruPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <div className="mb-4 flex items-center justify-between gap-3 text-sm">
+        <Link
+          href={{ pathname: '/admin' }}
+          className="inline-flex items-center gap-1 text-ink-muted transition-colors hover:text-primary"
+        >
+          <span aria-hidden>←</span>
+          {tNav('backToDashboard')}
+        </Link>
+        <Link
+          href={{ pathname: '/admin/konten' }}
+          className="text-ink-muted transition-colors hover:text-primary"
+        >
+          {tNav('goToList')}
+        </Link>
+      </div>
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-3 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
       <div className="mt-8">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { createContentRequest } from '@/lib/content/actions';
 
 interface ContentRequestFormProps {
@@ -45,6 +46,49 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
     setPending(false);
   }
 
+  if (status === 'success') {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-card"
+      >
+        <div className="flex items-center gap-2">
+          <span aria-hidden className="inline-flex size-8 items-center justify-center rounded-full bg-emerald-600 text-white">
+            <svg viewBox="0 0 20 20" fill="currentColor" className="size-5" aria-hidden>
+              <path
+                fillRule="evenodd"
+                d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </span>
+          <h2 className="text-lg font-semibold text-emerald-900">{t('successTitle')}</h2>
+        </div>
+        <p className="mt-2 text-sm text-emerald-800">{t('successBody')}</p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Link
+            href={{ pathname: '/admin/konten', query: { type: 'requests', status: 'pending' } }}
+            className="btn-primary px-4 py-2 text-sm"
+          >
+            {t('successViewList')}
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setStatus('idle');
+              setMessage('');
+              setFieldErrors({});
+            }}
+            className="rounded-lg border border-emerald-300 bg-surface px-4 py-2 text-sm font-medium text-emerald-900 transition-colors hover:border-emerald-500"
+          >
+            {t('successCreateAnother')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form id="content-form" action={onSubmit} noValidate className="space-y-5">
       {/* Honeypot */}
@@ -74,7 +118,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="platform"
             name="platform"
             required
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {platforms.map((p) => (
               <option key={p.slug} value={p.slug}>
@@ -92,7 +137,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="tone"
             name="tone"
             required
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="casual">casual</option>
             <option value="formal">formal</option>
@@ -114,7 +160,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             name="language"
             required
             defaultValue="both"
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="id">{t('languageOptions.id')}</option>
             <option value="en">{t('languageOptions.en')}</option>
@@ -129,7 +176,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           <select
             id="targetCategory"
             name="targetCategory"
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">{t('targetCategoryPlaceholder')}</option>
             <option value="fashion">Fashion</option>
@@ -149,7 +197,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           name="audience"
           required
           placeholder={t('audiencePlaceholder')}
-          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          disabled={pending}
+          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {fieldErrors.audience ? <p className="mt-1 text-xs text-red-600">{fieldErrors.audience}</p> : null}
       </div>
@@ -163,7 +212,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="ctaStyle"
             name="ctaStyle"
             required
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="soft_sell">{t('ctaStyleOptions.soft_sell')}</option>
             <option value="hard_sell">{t('ctaStyleOptions.hard_sell')}</option>
@@ -182,7 +232,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             name="purpose"
             required
             placeholder={t('purposePlaceholder')}
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={pending}
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           {fieldErrors.purpose ? <p className="mt-1 text-xs text-red-600">{fieldErrors.purpose}</p> : null}
         </div>
@@ -197,7 +248,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           name="constraints"
           rows={2}
           placeholder={t('constraintsPlaceholder')}
-          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          disabled={pending}
+          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
 
@@ -209,23 +261,45 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           id="keywords"
           name="keywords"
           placeholder={t('keywordsPlaceholder')}
-          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          disabled={pending}
+          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
 
-      <button type="submit" disabled={pending} className="btn-primary w-full" aria-busy={pending}>
-        {pending ? t('submitting') : t('submit')}
+      <button
+        type="submit"
+        disabled={pending}
+        aria-busy={pending}
+        className="btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {pending ? (
+          <>
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              className="size-4 animate-spin"
+              aria-hidden
+            >
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path
+                d="M18 10a8 8 0 00-8-8"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>{t('submitting')}</span>
+          </>
+        ) : (
+          <span>{t('submit')}</span>
+        )}
       </button>
 
-      {status !== 'idle' ? (
+      {status === 'error' ? (
         <p
           role="status"
           aria-live="polite"
-          className={
-            status === 'success'
-              ? 'rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800'
-              : 'rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800'
-          }
+          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
         >
           {message}
         </p>

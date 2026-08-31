@@ -144,17 +144,19 @@ function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
       ) : (
         <ul className="space-y-2">
           {drafts.map((d) => (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 shadow-card"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink">{shortTopic(d.topic)}</p>
-                <p className="text-xs text-ink-muted">
-                  {d.llm_meta?.provider ?? '—'} · {d.llm_meta?.model ?? '—'}
-                </p>
-              </div>
-              <StatusBadge status={d.status} />
+            <li key={d.id}>
+              <Link
+                href={{ pathname: '/konten/review' }}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 shadow-card transition-colors hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{shortTopic(d.topic)}</p>
+                  <p className="text-xs text-ink-muted">
+                    {d.llm_meta?.provider ?? '—'} · {d.llm_meta?.model ?? '—'}
+                  </p>
+                </div>
+                <StatusBadge status={d.status} />
+              </Link>
             </li>
           ))}
         </ul>

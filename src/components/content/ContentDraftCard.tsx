@@ -21,6 +21,8 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<'approved' | 'rejected' | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const injections = draft.affiliate_injections[0];
   const allPosts = [draft.generated_thread.main, ...draft.generated_thread.replies];
@@ -28,23 +30,48 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
   async function updateStatus(status: 'approved' | 'rejected') {
     const supabase = createSupabaseBrowser();
     if (!supabase) return;
-    await supabase.from('content_drafts').update({ status }).eq('id', draft.id);
+    const previousStatus = draft.status;
+    setStatusUpdating(status);
+    setStatusError(null);
+    // Optimistic update
     setDraft({ ...draft, status });
+    const { error } = await supabase
+      .from('content_drafts')
+      .update({ status })
+      .eq('id', draft.id);
+    setStatusUpdating(null);
+    if (error) {
+      // Rollback
+      setDraft({ ...draft, status: previousStatus });
+      setStatusError(error.message);
+    }
   }
 
   async function saveEdit() {
     setSaving(true);
     const supabase = createSupabaseBrowser();
-    if (!supabase) return;
+    if (!supabase) {
+      setSaving(false);
+      return;
+    }
     // For MVP, edit only main post id/en (simple)
     const newThread = { ...draft.generated_thread, main: { ...draft.generated_thread.main, [lang]: editText } };
-    await supabase.from('content_drafts').update({ generated_thread: newThread as unknown as string }).eq('id', draft.id);
-    setDraft({ ...draft, generated_thread: newThread });
-    setEditing(false);
+    const { error } = await supabase
+      .from('content_drafts')
+      .update({ generated_thread: newThread as unknown as string })
+      .eq('id', draft.id);
+    if (!error) {
+      setDraft({ ...draft, generated_thread: newThread });
+      setEditing(false);
+    }
     setSaving(false);
   }
 
   const threadText = allPosts.map((p) => (lang === 'id' ? p.id : p.en)).join('\n\n---\n\n');
+
+  const isApproving = statusUpdating === 'approved';
+  const isRejecting = statusUpdating === 'rejected';
+  const isUpdating = isApproving || isRejecting;
 
   return (
     <article className="rounded-xl border border-line bg-surface p-4 shadow-card sm:p-6">
@@ -115,27 +142,65 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
             {t('edit')}
           </button>
         ) : (
-          <button type="button" onClick={saveEdit} disabled={saving} className="btn-primary px-3 py-1.5 text-xs">
-            {saving ? '...' : 'Simpan'}
+          <button type="button" onClick={saveEdit} disabled={saving} className="btn-primary flex items-center gap-1 px-3 py-1.5 text-xs">
+            {saving ? (
+              <>
+                <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>
+                  <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                  <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                <span>...</span>
+              </>
+            ) : (
+              'Simpan'
+            )}
           </button>
         )}
         <button
           type="button"
           onClick={() => updateStatus('approved')}
-          className="ml-auto btn-primary px-3 py-1.5 text-xs"
-          disabled={draft.status === 'approved'}
+          disabled={draft.status === 'approved' || isUpdating}
+          aria-busy={isApproving}
+          className="ml-auto btn-primary flex items-center gap-1 px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {t('approve')}
+          {isApproving ? (
+            <>
+              <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>
+                <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              <span>...</span>
+            </>
+          ) : (
+            t('approve')
+          )}
         </button>
         <button
           type="button"
           onClick={() => updateStatus('rejected')}
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-red-700 hover:border-red-300"
-          disabled={draft.status === 'rejected'}
+          disabled={draft.status === 'rejected' || isUpdating}
+          aria-busy={isRejecting}
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {t('reject')}
+          {isRejecting ? (
+            <span className="inline-flex items-center gap-1">
+              <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>
+                <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              ...
+            </span>
+          ) : (
+            t('reject')
+          )}
         </button>
       </div>
+
+      {statusError ? (
+        <p role="alert" className="mt-2 text-xs text-red-700">
+          {statusError}
+        </p>
+      ) : null}
 
       {draft.status !== 'needs_review' ? <p className="mt-2 text-xs text-ink-muted">Status: {draft.status}</p> : null}
     </article>

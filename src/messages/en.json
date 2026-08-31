@@ -324,10 +324,16 @@
       "keywords": "Keywords (optional)",
       "keywordsPlaceholder": "E.g. phone case, uv protection, durable",
       "submit": "Create Draft",
-      "submitting": "Submitting…",
+      "submitting": "Submitting...",
       "errorTitle": "Could not create the draft",
       "errorRateLimit": "You already created {count} drafts in the last hour. Please try again later.",
-      "errorHoneypot": "Suspicious activity detected."
+      "errorHoneypot": "Suspicious activity detected.",
+      "backToDashboard": "Back to Dashboard",
+      "goToList": "View all",
+      "successTitle": "Draft created",
+      "successBody": "Your request is in the queue. The draft will appear in the review page after processing.",
+      "successViewList": "View draft",
+      "successCreateAnother": "Create another"
     },
     "review": {
       "title": "Review Content Drafts",
@@ -348,6 +354,12 @@
     }
   },
   "admin": {
+    "error": {
+      "title": "Something went wrong",
+      "body": "The admin page could not be loaded. Try again, or return to the dashboard.",
+      "retry": "Retry",
+      "backToDashboard": "Back to Dashboard"
+    },
     "dashboard": {
       "title": "Admin Dashboard",
       "greeting": "Hi, {email}",

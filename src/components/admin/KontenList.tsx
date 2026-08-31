@@ -1,7 +1,9 @@
 'use client';
 
+import { useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
+import { useFormStatus } from 'react-dom';
 
 interface Platform {
   slug: string;
@@ -140,7 +142,7 @@ export function KontenList({
           { value: 'oldest', label: t('sortOldest') }
         ]} />
         <div className="col-span-2 flex items-end gap-2 sm:col-span-5">
-          <button type="submit" className="btn-primary px-4 py-2 text-sm">Terapkan</button>
+          <FilterSubmitButton label="Terapkan" />
           <Link href={pathname as never} className="rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink hover:border-primary">
             Reset
           </Link>
@@ -252,7 +254,7 @@ export function KontenList({
         </p>
         <div className="flex gap-2">
           {page > 1 ? (
-            <Link
+            <PaginationLink
               href={`${pathname}?${new URLSearchParams({
                 ...(filters.status !== 'all' ? { status: filters.status } : {}),
                 ...(filters.type !== 'both' ? { type: filters.type } : {}),
@@ -260,14 +262,12 @@ export function KontenList({
                 ...(filters.date !== 'all' ? { date: filters.date } : {}),
                 ...(filters.sort !== 'newest' ? { sort: filters.sort } : {}),
                 page: String(page - 1)
-              }).toString()}` as never}
-              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:border-primary"
-            >
-              {t('pagePrev')}
-            </Link>
+              }).toString()}`}
+              label={t('pagePrev')}
+            />
           ) : null}
           {page < totalPages ? (
-            <Link
+            <PaginationLink
               href={`${pathname}?${new URLSearchParams({
                 ...(filters.status !== 'all' ? { status: filters.status } : {}),
                 ...(filters.type !== 'both' ? { type: filters.type } : {}),
@@ -275,11 +275,9 @@ export function KontenList({
                 ...(filters.date !== 'all' ? { date: filters.date } : {}),
                 ...(filters.sort !== 'newest' ? { sort: filters.sort } : {}),
                 page: String(page + 1)
-              }).toString()}` as never}
-              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:border-primary"
-            >
-              {t('pageNext')}
-            </Link>
+              }).toString()}`}
+              label={t('pageNext')}
+            />
           ) : null}
         </div>
       </nav>
@@ -308,5 +306,51 @@ function FilterSelect({ label, name, value, options }: FilterSelectProps) {
         ))}
       </select>
     </label>
+  );
+}
+
+function FilterSubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending}
+      className="btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      {pending ? (
+        <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
+          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+          <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      ) : null}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function PaginationLink({ href, label }: { href: string; label: string }) {
+  const [isPending, startTransition] = useTransition();
+  return (
+    <Link
+      href={href as never}
+      onClick={(e) => {
+        e.preventDefault();
+        if (isPending) return;
+        startTransition(() => {
+          window.location.href = href;
+        });
+      }}
+      aria-busy={isPending}
+      className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink transition-colors hover:border-primary disabled:pointer-events-none disabled:opacity-60"
+    >
+      {isPending ? (
+        <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>
+          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+          <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      ) : null}
+      <span>{label}</span>
+    </Link>
   );
 }

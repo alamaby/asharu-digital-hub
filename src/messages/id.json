@@ -324,10 +324,16 @@
       "keywords": "Kata kunci (opsional)",
       "keywordsPlaceholder": "Cth: casing hp, uv protection, tahan lama",
       "submit": "Buat Draf",
-      "submitting": "Mengirim…",
+      "submitting": "Mengirim...",
       "errorTitle": "Tidak dapat membuat draf",
       "errorRateLimit": "Anda sudah membuat {count} draf dalam 1 jam terakhir. Coba lagi nanti.",
-      "errorHoneypot": "Aktivitas mencurigakan terdeteksi."
+      "errorHoneypot": "Aktivitas mencurigakan terdeteksi.",
+      "backToDashboard": "Kembali ke Dasbor",
+      "goToList": "Lihat semua",
+      "successTitle": "Draf berhasil dibuat",
+      "successBody": "Permintaan Anda sudah masuk antrian. Draf akan muncul di halaman review setelah diproses.",
+      "successViewList": "Lihat draf",
+      "successCreateAnother": "Buat lagi"
     },
     "review": {
       "title": "Tinjau Draf Konten",
@@ -348,6 +354,12 @@
     }
   },
   "admin": {
+    "error": {
+      "title": "Terjadi kesalahan",
+      "body": "Halaman admin tidak dapat dimuat. Coba lagi, atau kembali ke dasbor.",
+      "retry": "Coba lagi",
+      "backToDashboard": "Kembali ke Dasbor"
+    },
     "dashboard": {
       "title": "Dasbor Admin",
       "greeting": "Halo, {email}",
