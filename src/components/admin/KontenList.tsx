@@ -2,8 +2,7 @@
 
 import { useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link, usePathname } from '@/i18n/navigation';
-import { useFormStatus } from 'react-dom';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 
 interface Platform {
   slug: string;
@@ -98,6 +97,8 @@ export function KontenList({
 }: KontenListProps) {
   const t = useTranslations('admin.konten');
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const pageFrom = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageTo = Math.min(page * pageSize, totalCount);
@@ -110,8 +111,21 @@ export function KontenList({
       </header>
 
       <form
-        action={pathname}
-        method="get"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const params = new URLSearchParams();
+          for (const [key, value] of formData.entries()) {
+            const v = value.toString();
+            if (v && v !== 'all' && v !== 'both' && v !== 'newest') {
+              params.set(key, v);
+            }
+          }
+          const qs = params.toString();
+          startTransition(() => {
+            router.push(`${pathname}${qs ? `?${qs}` : ''}` as never);
+          });
+        }}
         className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-surface p-4 shadow-card sm:grid-cols-5"
       >
         <FilterSelect label={t('filterStatus')} name="status" value={filters.status} options={[
@@ -142,9 +156,22 @@ export function KontenList({
           { value: 'oldest', label: t('sortOldest') }
         ]} />
         <div className="col-span-2 flex items-end gap-2 sm:col-span-5">
-          <FilterSubmitButton label="Terapkan" />
+          <button
+            type="submit"
+            disabled={isPending}
+            aria-busy={isPending}
+            className="btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isPending ? (
+              <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
+                <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            ) : null}
+            <span>{t('apply')}</span>
+          </button>
           <Link href={pathname as never} className="rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink hover:border-primary">
-            Reset
+            {t('reset')}
           </Link>
         </div>
       </form>
@@ -264,6 +291,8 @@ export function KontenList({
                 page: String(page - 1)
               }).toString()}`}
               label={t('pagePrev')}
+              isPending={isPending}
+              onNavigate={(href) => startTransition(() => router.push(href as never))}
             />
           ) : null}
           {page < totalPages ? (
@@ -277,6 +306,8 @@ export function KontenList({
                 page: String(page + 1)
               }).toString()}`}
               label={t('pageNext')}
+              isPending={isPending}
+              onNavigate={(href) => startTransition(() => router.push(href as never))}
             />
           ) : null}
         </div>
@@ -309,38 +340,22 @@ function FilterSelect({ label, name, value, options }: FilterSelectProps) {
   );
 }
 
-function FilterSubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function PaginationLink({
+  href,
+  label,
+  isPending,
+  onNavigate
+}: {
+  href: string;
+  label: string;
+  isPending: boolean;
+  onNavigate: (href: string) => void;
+}) {
   return (
     <button
-      type="submit"
-      disabled={pending}
-      aria-busy={pending}
-      className="btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-    >
-      {pending ? (
-        <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
-          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-          <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
-      ) : null}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function PaginationLink({ href, label }: { href: string; label: string }) {
-  const [isPending, startTransition] = useTransition();
-  return (
-    <Link
-      href={href as never}
-      onClick={(e) => {
-        e.preventDefault();
-        if (isPending) return;
-        startTransition(() => {
-          window.location.href = href;
-        });
-      }}
+      type="button"
+      onClick={() => onNavigate(href)}
+      disabled={isPending}
       aria-busy={isPending}
       className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink transition-colors hover:border-primary disabled:pointer-events-none disabled:opacity-60"
     >
@@ -351,6 +366,6 @@ function PaginationLink({ href, label }: { href: string; label: string }) {
         </svg>
       ) : null}
       <span>{label}</span>
-    </Link>
+    </button>
   );
 }

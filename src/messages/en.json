@@ -416,7 +416,9 @@
       "empty": "No content matches the filters.",
       "pagePrev": "Previous",
       "pageNext": "Next",
-      "pageOf": "Page {page} of {total}"
+      "pageOf": "Page {page} of {total}",
+      "apply": "Apply",
+      "reset": "Reset"
     }
   }
 }

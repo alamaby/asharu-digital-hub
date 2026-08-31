@@ -416,7 +416,9 @@
       "empty": "Tidak ada konten yang cocok dengan filter.",
       "pagePrev": "Sebelumnya",
       "pageNext": "Berikutnya",
-      "pageOf": "Halaman {page} dari {total}"
+      "pageOf": "Halaman {page} dari {total}",
+      "apply": "Terapkan",
+      "reset": "Reset"
     }
   }
 }
