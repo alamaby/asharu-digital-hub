@@ -1,5 +1,20 @@
 export type ProviderSlug = 'naraya' | 'openrouter' | 'gemini' | 'cloudflare';
 
+/**
+ * HTTP-level failure from an LLM provider (non-2xx response). Carrying the
+ * status lets KeyPool distinguish key-blamable errors (401/403/429) from
+ * provider outages (5xx) and content validation failures (plain Error).
+ */
+export class LLMHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LLMHttpError';
+  }
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;

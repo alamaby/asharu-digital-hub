@@ -1,4 +1,5 @@
 import type { KeyRow, ProviderRow } from './types';
+import { LLMHttpError } from './types';
 import { fetchOrderedKeys, getApiKeyForRow, markKeyFailure, markKeyUsage } from '@/lib/supabase/vault';
 
 export interface AcquiredKey {
@@ -45,7 +46,12 @@ export class KeyPool {
         return { result, keyRow: row };
       } catch (e) {
         lastError = e;
-        await markKeyFailure(row.id);
+        // Only credential/limit errors blame the key (circuit breaker input);
+        // content validation failures (bad JSON, shape, max_chars) and 5xx
+        // outages are not the key's fault and must not deactivate it.
+        if (e instanceof LLMHttpError && [401, 403, 429].includes(e.status)) {
+          await markKeyFailure(row.id);
+        }
         // Continue to next key
       }
     }

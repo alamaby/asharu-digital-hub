@@ -1,4 +1,5 @@
 import type { ChatInput, ChatOutput, LLMProvider, ProviderSlug } from '../types';
+import { LLMHttpError } from '../types';
 
 export class OpenAICompatibleProvider implements LLMProvider {
   constructor(
@@ -25,7 +26,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`LLM ${this.slug} ${res.status}: ${text.slice(0, 500)}`);
+      throw new LLMHttpError(res.status, `LLM ${this.slug} ${res.status}: ${text.slice(0, 500)}`);
     }
 
     const json = (await res.json()) as {

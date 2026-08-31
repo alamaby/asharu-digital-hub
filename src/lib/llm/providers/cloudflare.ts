@@ -1,4 +1,5 @@
 import type { ChatInput, ChatOutput, LLMProvider } from '../types';
+import { LLMHttpError } from '../types';
 
 export class CloudflareProvider implements LLMProvider {
   readonly slug = 'cloudflare' as const;
@@ -34,7 +35,7 @@ export class CloudflareProvider implements LLMProvider {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`LLM cloudflare ${res.status}: ${text.slice(0, 500)}`);
+      throw new LLMHttpError(res.status, `LLM cloudflare ${res.status}: ${text.slice(0, 500)}`);
     }
     const json = (await res.json()) as {
       result?: { response?: string; choices?: { message?: { content?: string } }[] };

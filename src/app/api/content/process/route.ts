@@ -17,6 +17,11 @@ const threadSchema = z.object({
 
 export const maxDuration = 60;
 
+// Terminal retry cap for a single content_requests row: after this many failed
+// processing attempts the row flips to 'failed' instead of bouncing back to
+// 'pending', so a permanently-unprocessable request stops burning LLM calls.
+const MAX_ATTEMPTS = 3;
+
 function providerFactory(slug: string, baseUrl: string, config?: Record<string, string>) {
   if (slug === 'gemini') return new GeminiProvider(baseUrl);
   if (slug === 'cloudflare') return new CloudflareProvider(baseUrl, config?.account_id ?? '');
@@ -58,6 +63,7 @@ async function handle(request: NextRequest) {
   const errors: unknown[] = [];
 
   for (const req of requests) {
+    let claimedByUs = false;
     try {
       // Optimistic lock: only move to processing if still pending (mitigates concurrent cron without SKIP LOCKED)
       const { data: claimed, error: claimError } = await supabase
@@ -68,6 +74,7 @@ async function handle(request: NextRequest) {
         .select('id')
         .single();
       if (claimError || !claimed) throw new Error('Request already claimed by another worker');
+      claimedByUs = true;
 
       // Pick 1 product
       let productQuery = supabase
@@ -232,13 +239,23 @@ async function handle(request: NextRequest) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push({ id: req.id, error: msg });
-      await supabase.from('content_requests').update({ status: 'pending' }).eq('id', req.id);
-      await supabase.from('llm_call_logs').insert({
-        request_id: req.id,
-        provider_slug: 'unknown',
-        model_id: 'unknown',
-        error: msg
-      });
+      // Only touch rows we successfully claimed. A claim-failure means another
+      // worker owns the row now — resetting it would undo their claim (P2 race).
+      if (claimedByUs) {
+        const newAttempts = (req.attempts ?? 0) + 1;
+        const newStatus = newAttempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
+        await supabase
+          .from('content_requests')
+          .update({ status: newStatus, attempts: newAttempts })
+          .eq('id', req.id)
+          .eq('status', 'processing');
+        await supabase.from('llm_call_logs').insert({
+          request_id: req.id,
+          provider_slug: 'unknown',
+          model_id: 'unknown',
+          error: msg
+        });
+      }
     }
   }
 

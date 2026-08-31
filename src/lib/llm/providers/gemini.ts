@@ -1,4 +1,5 @@
 import type { ChatInput, ChatOutput, LLMProvider } from '../types';
+import { LLMHttpError } from '../types';
 
 export class GeminiProvider implements LLMProvider {
   readonly slug = 'gemini' as const;
@@ -12,10 +13,12 @@ export class GeminiProvider implements LLMProvider {
       parts: [{ text: m.content }]
     }));
     const model = input.model.replace(/^gemini\//, '');
-    const url = `${this.baseUrl.replace(/\/$/, '')}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    // Key goes in the x-goog-api-key header, not the query string — URLs end
+    // up in access logs far more often than headers do.
+    const url = `${this.baseUrl.replace(/\/$/, '')}/models/${model}:generateContent`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents,
         generationConfig: {
@@ -27,7 +30,7 @@ export class GeminiProvider implements LLMProvider {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`LLM gemini ${res.status}: ${text.slice(0, 500)}`);
+      throw new LLMHttpError(res.status, `LLM gemini ${res.status}: ${text.slice(0, 500)}`);
     }
     const json = (await res.json()) as {
       candidates?: { content?: { parts?: { text?: string }[] } }[];
