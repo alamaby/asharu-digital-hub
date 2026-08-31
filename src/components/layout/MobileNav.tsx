@@ -6,9 +6,15 @@ import { usePathname } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NavMenu } from './NavMenu';
+import { mainNavItems } from '@/config/navigation';
+import type { NavItem } from '@/config/navigation';
+
+interface MobileNavProps {
+  adminItems?: readonly NavItem[];
+}
 
 /** Mobile hamburger menu: Escape closes, route change closes, focus returns to the toggle. */
-export function MobileNav() {
+export function MobileNav({ adminItems }: MobileNavProps) {
   const t = useTranslations('header');
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -48,8 +54,13 @@ export function MobileNav() {
           id="mobile-menu"
           className="absolute inset-x-0 top-full z-40 mt-2 rounded-xl border border-line bg-surface p-4 shadow-card"
         >
-          <NavMenu variant="mobile" onNavigate={() => setOpen(false)} />
-          <div className="border-t border-line pt-3">
+          <NavMenu
+            variant="mobile"
+            items={mainNavItems}
+            adminItems={adminItems}
+            onNavigate={() => setOpen(false)}
+          />
+          <div className="mt-3 border-t border-line pt-3">
             <LanguageSwitcher />
           </div>
         </div>

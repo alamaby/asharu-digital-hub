@@ -40,15 +40,13 @@ export default async function ReviewPage({ params }: PageProps) {
     redirect({ href: '/masuk', locale });
   }
 
-  // Check is_admin via profiles
+  // Check is_admin via profiles — single source of truth (migration
+  // 20260901000001_consolidate_admin_auth.sql removed the hardcoded
+  // email fallback that used to live here).
   const { data: profile } = await supabase!.from('profiles').select('is_admin').eq('id', user!.id).maybeSingle();
-  const isAdmin = (profile as { is_admin?: boolean } | null)?.is_admin ?? false;
+  const isAdmin = Boolean((profile as { is_admin?: boolean } | null)?.is_admin);
   if (!isAdmin) {
-    const email = (user!.email ?? '').toLowerCase();
-    const fallbackAdmin = email === 'alam.aby.b@gmail.com' || email === 'alamaby@gmail.com';
-    if (!fallbackAdmin) {
-      redirect({ href: '/masuk', locale });
-    }
+    redirect({ href: '/masuk', locale });
   }
 
   const t = await getTranslations({ locale, namespace: 'content.review' });

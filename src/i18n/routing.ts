@@ -46,6 +46,14 @@ export const routing = defineRouting({
       id: '/konten/review',
       en: '/content/review'
     },
+    '/admin': {
+      id: '/admin',
+      en: '/admin'
+    },
+    '/admin/konten': {
+      id: '/admin/konten',
+      en: '/admin/content'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

@@ -15,10 +15,12 @@ export default async function middleware(request: NextRequest) {
 
   let supabaseResponse = intlResponse;
   let user: import('@supabase/supabase-js').User | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let supabase: any = null;
 
   if (supabaseUrl && supabaseKey) {
     const response = intlResponse ?? NextResponse.next({ request });
-    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -40,7 +42,7 @@ export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isReview = /^\/(id|en)\/konten\/review(\/|$)/.test(pathname);
   if (isReview) {
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabase) {
       // Supabase not configured — treat as not authenticated
       const locale = pathname.startsWith('/en/') ? 'en' : 'id';
       return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
@@ -49,9 +51,14 @@ export default async function middleware(request: NextRequest) {
       const locale = pathname.startsWith('/en/') ? 'en' : 'id';
       return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
     }
-    const email = (user.email ?? '').toLowerCase();
-    const isAdmin =
-      email === 'alam.aby.b@gmail.com' || email === 'alamaby@gmail.com';
+    // profiles.is_admin is the single source of truth — see migration
+    // 20260901000001_consolidate_admin_auth.sql.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle();
+    const isAdmin = Boolean((profile as { is_admin?: boolean } | null)?.is_admin);
     if (!isAdmin) {
       const locale = pathname.startsWith('/en/') ? 'en' : 'id';
       return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));

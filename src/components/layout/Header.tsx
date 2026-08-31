@@ -2,8 +2,12 @@ import { Link } from '@/i18n/navigation';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { MobileNav } from './MobileNav';
 import { NavMenu } from './NavMenu';
+import { adminNavItems, mainNavItems } from '@/config/navigation';
+import { isAdmin } from '@/lib/auth/is-admin';
 
-export function Header() {
+export async function Header() {
+  const admin = await isAdmin();
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
       <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
@@ -16,14 +20,18 @@ export function Header() {
         </Link>
 
         <div className="hidden md:block">
-          <NavMenu variant="desktop" />
+          <NavMenu
+            variant="desktop"
+            items={mainNavItems}
+            adminItems={admin ? adminNavItems : undefined}
+          />
         </div>
 
         <div className="flex items-center gap-2">
           <span className="hidden md:inline-flex">
             <LanguageSwitcher />
           </span>
-          <MobileNav />
+          <MobileNav adminItems={admin ? adminNavItems : undefined} />
         </div>
       </div>
     </header>

@@ -3,8 +3,25 @@
  * `pathnames` map in `src/i18n/routing.ts` so localized URLs stay consistent.
  */
 export interface NavItem {
-  key: 'home' | 'stores' | 'products' | 'properties' | 'about';
-  pathname: '/' | '/products' | '/properties' | '/about';
+  key:
+    | 'home'
+    | 'stores'
+    | 'products'
+    | 'properties'
+    | 'about'
+    | 'adminDashboard'
+    | 'adminKonten'
+    | 'adminBaru'
+    | 'adminReview';
+  pathname:
+    | '/'
+    | '/products'
+    | '/properties'
+    | '/about'
+    | '/admin'
+    | '/admin/konten'
+    | '/konten/baru'
+    | '/konten/review';
   /** In-page anchor (homepage sections). */
   hash?: string;
   /** Anchor-only entries never get `aria-current="page"`. */
@@ -17,4 +34,15 @@ export const mainNavItems: readonly NavItem[] = [
   { key: 'products', pathname: '/products' },
   { key: 'properties', pathname: '/properties' },
   { key: 'about', pathname: '/about' }
+];
+
+/**
+ * Admin-only nav items, rendered after the public items in Header/MobileNav
+ * when the current user is an admin (server-rendered check; no flicker).
+ */
+export const adminNavItems: readonly NavItem[] = [
+  { key: 'adminDashboard', pathname: '/admin' },
+  { key: 'adminKonten', pathname: '/admin/konten' },
+  { key: 'adminBaru', pathname: '/konten/baru' },
+  { key: 'adminReview', pathname: '/konten/review' }
 ];

@@ -39,7 +39,11 @@ export default function ExchangePage() {
 
     (async () => {
       const url = new URL(window.location.href);
-      const next = url.searchParams.get('next') ?? '/id/konten/review';
+      // Post-login landing: the admin dashboard by default. `?next=...`
+      // is still honoured for deep links — must be a local path (starts
+      // with `/`) and not an external URL (open-redirect guard).
+      const rawNext = url.searchParams.get('next');
+      const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/id/admin';
       const code = url.searchParams.get('code');
       const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
       const type = parseVerifyType(url.searchParams.get('type'));
