@@ -30,12 +30,14 @@ export function LoginForm() {
     // the production domain (e.g. https://asharu.id), even when the dashboard
     // opens a preview URL. Fall back to the current origin in local dev.
     //
-    // The email template (supabase/templates/magic_link.html) now embeds
-    // {{ .TokenHash }} + {{ .Type }} as a direct link to the exchange page,
-    // which exchanges via verifyOtp — no PKCE code_verifier cookie needed.
-    // emailRedirectTo below is still passed for the legacy ?code fallback flow
-    // and must remain in the Dashboard Auth → Redirect URLs allow-list;
-    // otherwise that fallback reports "PKCE code verifier not found".
+    // CRITICAL: the email template (supabase/templates/magic_link.html) builds
+    // the magic-link href from {{ .RedirectTo }} — i.e. THIS value — plus
+    // {{ .TokenHash }}/{{ .Type }}. So redirect_to must be a FULL URL pointing
+    // at the exchange page, and it MUST be listed in Supabase Dashboard →
+    // Auth → URL Configuration → Redirect URLs (GoTrue validates against it).
+    // We intentionally don't rely on {{ .SiteURL }} (Dashboard "Site URL"
+    // setting defaults to http://localhost:3000 and is configured separately).
+    // emailRedirectTo is also reused by the legacy ?code PKCE fallback flow.
     const base = (env.siteUrl && env.siteUrl.length > 0) ? env.siteUrl : window.location.origin;
     const emailRedirectTo = `${base.replace(/\/$/, '')}/id/auth/exchange`;
 
