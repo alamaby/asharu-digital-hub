@@ -12,7 +12,7 @@ Magic-link login sebelumnya rapuh: `{{ .ConfirmationURL }}` (template) → GoTru
 
 ## Decisions
 1. **Direct `token_hash` link** (bukan `.ConfirmationURL`) — `verifyOtp({ token_hash, type })` tidak butuh PKCE cookie → menghilangkan root-cause fragilitas. Ini pendekatan rekomendasi Supabase modern untuk magic link.
-2. Pakai `{{ .SiteURL }}` (bukan `.RedirectTo`) untuk base URL — `.SiteURL` = `https://asharu.id` (config.toml + extended sesi sebelumnya); stabil, tidak perlu encode. Path `/id/auth/exchange` di `additional_redirect_urls`. Direct link bypass redirect_to allow-list check (allow-list hanya untuk ConfirmationURL/redirect_to flow), tapi `verifyOtp` validasi hash server-side di GoTrue tetap berlaku.
+2. ~~Pakai `{{ .SiteURL }}` (bukan `.RedirectTo`) untuk base URL~~ → **DIKOREKSI 31 Agu ~10:50**: `.SiteURL` resolve ke **Dashboard "Site URL" setting** yang default-nya `http://localhost:3000` (config.toml = local-only, tidak sinkron ke produksi). Email produksi membawa URL localhost → klik gagal. Base URL kini `{{ .RedirectTo }}` (app dikontrol, ter-validasi allow-list, auto-adapt dev/prod via `env.siteUrl`). Lihat "Post-launch fix" di bawah.
 3. `next` param TIDAK dipass via template — exchange page default `/id/konten/review` (admin-only login, `enable_signup=false`). `emailRedirectTo` dari LoginForm = `${base}/id/auth/exchange` (exchange page sendiri) → tidak berguna sebagai `next`; biarkan default.
 4. Flow 2 (`?code=` PKCE) dipertahankan sebagai legacy fallback — exchange page mendukung keduanya. Tidak ada regresi untuk link lama/edge case.
 5. Komentar LoginForm di-update ringkas (bukan hapus) — penjelasan allow-list + "PKCE code verifier not found" tetap valid untuk Flow 2.
@@ -24,7 +24,10 @@ Magic-link login sebelumnya rapuh: `{{ .ConfirmationURL }}` (template) → GoTru
 - Tidak ada regresi: Flow 2 tetap berfungsi; jika Dashboard template belum diupdate, login produksi jalan seperti sebelumnya (fragil tapi tidak lebih buruk).
 
 ## Blockers / Unresolved
-- **[USER STEP] Update production Dashboard email template** — paste body `magic_link.html` (dengan link `{{ .SiteURL }}/id/auth/exchange?token_hash={{ .TokenHash }}&type={{ .Type }}`) ke Supabase Dashboard asharu → Auth → Email Templates → Magic Link. Tanpa ini, flow `token_hash` tidak aktif di produksi. Verifikasi: request magic link ke admin email → link harus mengandung `token_hash=` (bukan `/auth/v1/redirect`).
+- ~~**[USER STEP] Update production Dashboard email template**~~ → DONE 31 Agu ~10:10 (user konfirmasi).
+- **[USER STEP] Re-paste template ke Dashboard** (31 Agu ~10:50): template berubah (`{{ .SiteURL }}/id/auth/exchange?...` → `{{ .RedirectTo }}?...`). User paste body `supabase/templates/magic_link.html` baru ke **Supabase Dashboard → Auth → Email Templates → Magic Link**. Sebelum re-paste, produksi masih pakai template `.SiteURL` lama → link masih localhost.
+- **[USER STEP HYGIENE, opsional] Set Dashboard Site URL** = `https://asharu.id` (Dashboard → Auth → URL Configuration → Site URL; default-nya `http://localhost:3000`). Tidak lagi memblokir Flow 1 (karena base kini `.RedirectTo`), TAPI Flow 2 legacy `{{ .ConfirmationURL }}` (bila suatu saat dipakai) masih ikut Site URL. Higiene umum.
+- **Root cause 504 sebelumnya** = port SMTP salah di Supabase config (bukan kode kita) — user sudah fix; email kirim normal.
 - (Tetap) Setup P0 cron (`asharu_cron_secret` Vault + Vercel `CRON_SECRET` + apply `20260831000001`) — gate factory resume, independen dari magic-link.
 
 ## Verification
@@ -35,7 +38,13 @@ Magic-link login sebelumnya rapuh: `{{ .ConfirmationURL }}` (template) → GoTru
 ## Commit Proposal
 - (submodule, sudah push) `fix(auth): magic-link email embeds token_hash for verifyOtp flow` — `721e6a1`
 - (parent, sudah push) `fix(auth): exchange page supports token_hash verifyOtp flow` — `2df08a6`
-- (docs, akan commit) `docs: record magic-link token_hash flow`
+- (docs, sudah push) `docs: record magic-link token_hash flow` — `77f0901`
+- (submodule, sudah push) `fix(auth): magic-link href uses RedirectTo to avoid localhost site url default` — `2a8215d`
+- (parent, sudah push) `fix(auth): clarify redirect_to is critical for magic-link base url` — `0cab152`
+
+## Post-launch fix (31 Agu ~10:50)
+**Bug:** email produksi membawa URL `http://localhost:3000/id/auth/exchange?token_hash=...&type=magiclink` (bukan `https://asharu.id`). Root cause: template `{{ .SiteURL }}` resolve ke **Dashboard "Site URL" setting** (default `http://localhost:3000`); `config.toml` (`site_url = "https://asharu.id"`) = local CLI only, tidak sinkron ke produksi hosted. 504 awal = port SMTP salah di config Supabase (user sudah fix).
+**Fix:** template base URL `{{ .SiteURL }}/id/auth/exchange?...` → `{{ .RedirectTo }}?...`. `.RedirectTo` = `redirect_to` yang dipass app (`emailRedirectTo = ${env.siteUrl}/id/auth/exchange` = `https://asharu.id/id/auth/exchange` di prod, `http://localhost:3000/id/auth/exchange` di dev) → environment-aware + tidak bergantung Dashboard Site URL. LoginForm comment di-update: redirect_to kini KRITIKAL (base URL link email), bukan sekadar fallback Flow 2. Push: submodule `721e6a1..2a8215d`, parent `2df5762..0cab152`. **[USER STEP]** re-paste template ke Dashboard.
 
 ## Related Plans
 - `plans/2026-08-31-content-factory-audit-fixes.md` (catatan "Di luar batch ini" → magic-link dikerjakan terpisah di sini).

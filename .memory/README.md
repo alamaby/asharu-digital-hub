@@ -1,14 +1,14 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-08-31 10:10 (local time)
+Last updated: 2026-08-31 10:50 (local time)
 
 ## Current State
 
 - **Status:** Content Factory (form → Supabase → processor pg_cron → multi-provider LLM → review admin) selesai Fase 1–3 dan sudah deploy; domain produksi `https://asharu.id` live. **P0 audit (cron auth spoofable) sudah diperbaiki** (31 Agu), **Fase 2 P1 sudah dikerjakan + di-apply ke DB live + di-push** (31 Agu ~09:40), dan **magic-link `token_hash` flow sudah lengkap** (31 Agu ~10:05): kode + template local di-push; **template produksi Dashboard sudah diset user** (31 Agu ~10:10) → flow `verifyOtp` aktif di produksi. 3 baris `content_requests` nyangkut → `failed` (user decision). Factory MASIH berhenti (fail-closed) menunggu setup P0 user (seed Vault `asharu_cron_secret` + Vercel `CRON_SECRET` + apply `20260831000001`). Sisa P1 (INSERT anon limit) + P2/P3 belum.
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; content factory = dinamis.
 - **Halaman publik:** `/id` & `/en` (home + carousel afiliasi 6 produk), produk (~201 dari scraper), properti (+detail), tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
-- **Content factory:** `/konten/baru` (form, anon, rate limit 5/jam/IP + honeypot), `/konten/review` (admin, copy per-post, approve/reject), `/masuk` (magic link `token_hash` flow — template embed `{{ .TokenHash }}`), `/api/content/process` (processor, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault (semua 4 key sudah di Vault, 0 plaintext).
+- **Content factory:** `/konten/baru` (form, anon, rate limit 5/jam/IP + honeypot), `/konten/review` (admin, copy per-post, approve/reject), `/masuk` (magic link `token_hash` flow — template embed `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type={{ .Type }}`, base URL app-controlled), `/api/content/process` (processor, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault (semua 4 key sudah di Vault, 0 plaintext).
 - **Analytics:** GA4 consent-gated opt-in; event kustom + `page_view` + `view_property`.
 - **Keamanan:** CSP ketat (`unsafe-inline` script trade-off terdokumentasi, `unsafe-eval` dev-only), HSTS, frame-ancestors none; env divalidasi Zod fail-fast.
 
@@ -36,7 +36,7 @@ Last updated: 2026-08-31 10:10 (local time)
 - [ ] **Sisa P1 (butuh keputusan desain user):** INSERT anon tanpa limit DB (opsi: wajib login / Turnstile / terima risiko rate limit app-level).
 - [ ] **3 baris `content_requests` status='processing' nyangkut** — korban fail-closed P0 (di-claim lalu endpoint 401). Saat factory resume, claim hanya pick `pending` → 3 baris tidak diproses. Tidak di-auto-reset (mutasi data prod). Opsi user: reset `pending` (attempts=0) untuk reprocess, atau `failed`.
 - [ ] **P2/P3 audit lain belum:** soft-delete guard scraper, ContentDraftCard error surfacing, konsolidasi email admin → `profiles.is_admin`, duplikasi `getServiceClient`, `rate_limits` cleanup, realtime review (`supabase.channel`), middleware matcher persempit, `target_category` validasi saat submit, dll.
-- [x] **Magic-link `token_hash` flow:** kode + template (local) sudah di-push (`2df08a6` parent, `721e6a1` submodule). Template produksi (**Supabase Dashboard → Auth → Email Templates → Magic Link**) sudah diset user (31 Agu ~10:10) dengan body `supabase/templates/magic_link.html` (link `{{ .SiteURL }}/id/auth/exchange?token_hash={{ .TokenHash }}&type={{ .Type }}`). Verifikasi direkomendasikan: request magic link ke admin email → link harus berisi `token_hash=` (bukan `/auth/v1/redirect`), lalu klik → login sukses tanpa error "PKCE code verifier not found".
+- [ ] **Magic-link `token_hash` flow [USER STEP RE-PASTE]:** kode + template local di-push (`0cab152` parent, `2a8215d` submodule). Template base URL diubah `{{ .SiteURL }}/id/auth/exchange?...` → `{{ .RedirectTo }}?...` (fix bug email production bawa URL localhost — `.SiteURL` resolve ke Dashboard Site URL default `http://localhost:3000`). User **re-paste** body `supabase/templates/magic_link.html` ke Supabase Dashboard → Auth → Email Templates → Magic Link (template lama di Dashboard masih `{{ .SiteURL }}`). Verifikasi: request magic link → link harus `https://asharu.id/id/auth/exchange?token_hash=...` (bukan localhost). [HYGIENE opsional] Set Dashboard Site URL = `https://asharu.id`.
 - [ ] Verifikasi env produksi: `CRON_SECRET` & `NEXT_PUBLIC_*` sudah diset di Vercel? (domain sudah live — indikasi ya, tapi konfirmasi manual).
 - [x] Verifikasi DB live via MCP asharu (blocker lama "tersambung albot-be" teratasi 31 Agu): key storage = semua 4 di Vault (0 plaintext) ✓; distribusi `content_requests` = {needs_review:1, processing:3 nyangkut} ✓; `get_llm_key` grants ✓ (kini service_role saja). Sisa: cek error `llm_call_logs` terakhir.
 - [ ] Data placeholder (`src/data/*`, `public/images/*`) HARUS diganti data terverifikasi sebelum launch publik penuh; Tokopedia/TikTok Shop masih `hidden: true`.
