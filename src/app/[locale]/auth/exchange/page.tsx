@@ -6,17 +6,24 @@ import { Link } from '@/i18n/navigation';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
 /**
- * Client-side fallback for the magic-link PKCE exchange.
+ * Magic-link exchange page.
  *
- * The server-side /api/auth/callback can fail when the PKCE code_verifier
- * cookie isn't visible to Next.js' server cookies() — happens when the
- * cookie was set with attributes that prevent server-side reads, or when the
- * redirect_to is not in the Supabase allow list (GoTrue still redirects
- * but with a stripped / invalid code).
+ * Supports two flows:
+ * 1. `?token_hash=<hash>&type=magiclink` — recommended. The email template
+ *    embeds {{ .TokenHash }} so no PKCE verifier cookie is needed; the hash is
+ *    exchanged via `verifyOtp` (works client- or server-side).
+ * 2. `?code=<pkce-code>` — legacy PKCE fallback (requires the code_verifier
+ *    cookie set at signInWithOtp time and preserved across the redirect).
  *
- * This page does the exchange entirely in the browser, where the verifier
- * cookie lives in the same origin and is reliably readable.
+ * Also handles `?error=` / `?error_description=` from GoTrue rejections.
  */
+const VERIFY_TYPES = ['magiclink', 'signup', 'invite', 'recovery', 'email'] as const;
+type VerifyType = (typeof VERIFY_TYPES)[number];
+
+function parseVerifyType(value: string | null): VerifyType {
+  return VERIFY_TYPES.includes(value as VerifyType) ? (value as VerifyType) : 'magiclink';
+}
+
 export default function ExchangePage() {
   const router = useRouter();
   const [status, setStatus] = useState<'pending' | 'ok' | 'error'>('pending');
@@ -32,10 +39,10 @@ export default function ExchangePage() {
 
     (async () => {
       const url = new URL(window.location.href);
-      // Supabase sends ?code= on success; ?error=&error_description= on failure.
-      // Handle both, plus the hash-based #access_token flow as a safety net.
-      const code = url.searchParams.get('code');
       const next = url.searchParams.get('next') ?? '/id/konten/review';
+      const code = url.searchParams.get('code');
+      const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
+      const type = parseVerifyType(url.searchParams.get('type'));
       const errorParam = url.searchParams.get('error_description') ?? url.searchParams.get('error');
 
       if (errorParam) {
@@ -44,7 +51,20 @@ export default function ExchangePage() {
         return;
       }
 
-      // Magic-link (PKCE): code in query string.
+      // Flow 1: token_hash (no PKCE verifier needed — deterministic).
+      if (tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        if (error) {
+          setStatus('error');
+          setMessage(error.message);
+          return;
+        }
+        setStatus('ok');
+        router.replace(next);
+        return;
+      }
+
+      // Flow 2: legacy PKCE code (requires code_verifier cookie).
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
@@ -57,8 +77,7 @@ export default function ExchangePage() {
         return;
       }
 
-      // Fallback: implicit flow sends tokens in the URL hash (e.g. #access_token=...).
-      // detectSessionInUrl is on by default when the supabase client mounts — give it a moment.
+      // Fallback: implicit flow (#access_token=...) or an existing session.
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setStatus('ok');
@@ -79,12 +98,12 @@ export default function ExchangePage() {
         {status === 'error' && 'Gagal Masuk'}
       </h1>
       {status === 'error' ? (
-        <p className="mt-3 text-sm text-red-700">{message}</p>
-      ) : null}
-      {status === 'error' ? (
-        <Link className="mt-6 inline-block text-sm text-primary underline" href="/masuk">
-          Kembali ke halaman masuk
-        </Link>
+        <>
+          <p className="mt-3 text-sm text-red-700">{message}</p>
+          <Link className="mt-6 inline-block text-sm text-primary underline" href="/masuk">
+            Kembali ke halaman masuk
+          </Link>
+        </>
       ) : null}
     </div>
   );
