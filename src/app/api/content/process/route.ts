@@ -7,7 +7,7 @@ import { CloudflareProvider } from '@/lib/llm/providers/cloudflare';
 import { buildThreadPrompt, countPlaceholdersInThread } from '@/lib/llm/prompt';
 import type { ThreadGeneration } from '@/lib/llm/types';
 import { getServiceClient } from '@/lib/supabase/service';
-import { env } from '@/lib/env';
+import { isCronAuthorized } from '@/lib/content/cron-auth';
 import { z } from 'zod';
 
 const threadSchema = z.object({
@@ -21,16 +21,6 @@ function providerFactory(slug: string, baseUrl: string, config?: Record<string, 
   if (slug === 'gemini') return new GeminiProvider(baseUrl);
   if (slug === 'cloudflare') return new CloudflareProvider(baseUrl, config?.account_id ?? '');
   return new OpenAICompatibleProvider(slug as never, baseUrl);
-}
-
-function isCronAuthorized(request: NextRequest): boolean {
-  // Vercel Cron always sends x-vercel-cron
-  if (request.headers.get('x-vercel-cron')) return true;
-  const secret = env.cronSecret ?? process.env.CRON_SECRET;
-  if (secret && request.headers.get('authorization') === `Bearer ${secret}`) return true;
-  // Dev only: allow without secret
-  if (!secret && process.env.NODE_ENV !== 'production') return true;
-  return false;
 }
 
 export async function POST(request: NextRequest) {
