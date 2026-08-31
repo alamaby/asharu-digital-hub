@@ -1,11 +1,11 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-08-30 21:46 (local time)
+Last updated: 2026-08-31 08:04 (local time)
 
 ## Current State
 
-- **Status:** Content Factory (form → Supabase → processor pg_cron → multi-provider LLM → review admin) selesai Fase 1–3 dan sudah deploy; domain produksi `https://asharu.id` live (dicek 30 Agu). Audit keamanan/konsistensi 30 Agu menemukan 2 P0 (cron auth spoofable) + 5 P1 — menunggu keputusan fix (lihat entri audit).
+- **Status:** Content Factory (form → Supabase → processor pg_cron → multi-provider LLM → review admin) selesai Fase 1–3 dan sudah deploy; domain produksi `https://asharu.id` live. **P0 audit (cron auth spoofable) sudah diperbaiki** (31 Agu): endpoint kini Bearer-only, pg_cron membaca secret dari Vault — menunggu setup secret user (seed Vault + Vercel CRON_SECRET + apply migration). P1/P2 audit lain belum diperbaiki.
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; content factory = dinamis.
 - **Halaman publik:** `/id` & `/en` (home + carousel afiliasi 6 produk), produk (~201 dari scraper), properti (+detail), tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
 - **Content factory:** `/konten/baru` (form, anon, rate limit 5/jam/IP + honeypot), `/konten/review` (admin, copy per-post, approve/reject), `/masuk` (magic link), `/api/content/process` (processor, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault (fallback kolom plaintext — lihat audit).
@@ -31,17 +31,18 @@ Last updated: 2026-08-30 21:46 (local time)
 
 ## Open Items / Blockers
 
-- [ ] **P0 (audit 30 Agu):** `/api/content/process` menerima header `x-vercel-cron` spoofable; pg_cron belum kirim `Bearer CRON_SECRET`. Rantai abuse: insert anon langsung ke `content_requests` (tanpa limit DB) + trigger processor + retry tanpa batas. → butuh plan fix.
-- [ ] **P1 (audit):** `get_llm_key()` belum di-REVOKE dari PUBLIC; key plaintext di `api_key_encrypted` (re-seed Vault + drop kolom); KeyPool menghukum key karena error konten; retry request tanpa cap.
+- [ ] **Setup pasca-fix P0 (urutan wajib):** (1) jalankan `node --env-file=.env.local scripts/seed-cron-secret.mjs`, (2) set `CRON_SECRET` (nilai sama) di Vercel Production, (3) apply migration `20260831000001_processor_cron_bearer.sql` ke DB asharu. Sebelum lengkap, endpoint 401 untuk semua (fail-closed — processing berhenti sementara).
+- [ ] **P1 (audit):** INSERT anon tanpa limit DB; `get_llm_key()` belum di-REVOKE dari PUBLIC; key plaintext di `api_key_encrypted` (re-seed Vault + drop kolom); KeyPool menghukum key karena error konten; retry request tanpa cap. Plus P2/P3 (race claim, soft-delete guard, duplikasi email admin & getServiceClient, dll).
 - [ ] Verifikasi env produksi: `CRON_SECRET` & `NEXT_PUBLIC_*` sudah diset di Vercel? (domain sudah live — indikasi ya, tapi konfirmasi manual).
 - [ ] Verifikasi DB live via Dashboard asharu (MCP session ini tersambung ke project lain `albot-be`): mode penyimpanan key (Vault vs plaintext), distribusi status `content_requests`, error `llm_call_logs`.
 - [ ] Data placeholder (`src/data/*`, `public/images/*`) HARUS diganti data terverifikasi sebelum launch publik penuh; Tokopedia/TikTok Shop masih `hidden: true`.
 - [ ] Realtime review (`supabase.channel`) direncanakan tapi belum diimplementasi.
 - [ ] QA manual: Lighthouse ≥90/95/95/95, screen reader/keyboard di perangkat nyata.
-- [ ] Transisi dual-write → DB-only (rencana fase lanjut) + rapikan duplikasi `getServiceClient` (3 file) & email admin (4 tempat).
+- [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
 
+- [2026-08-31 080400-p0-processor-cron-auth-fix.md](2026-08-31/080400-p0-processor-cron-auth-fix.md) — fix P0: endpoint Bearer-only + pg_cron baca secret dari Vault.
 - [2026-08-30 214500-content-factory-audit.md](2026-08-30/214500-content-factory-audit.md) — audit keamanan/konsistensi: 2 P0, 5 P1, 5 P2, 7 P3.
 - [2026-08-30 214400-content-factory-hardening.md](2026-08-30/214400-content-factory-hardening.md) — vault RPC, cloudflare, model ids, magic-link exchange, pg_cron (29–30 Agu).
 - [2026-08-30 214300-content-factory-implementation.md](2026-08-30/214300-content-factory-implementation.md) — content factory fase 1–3 end-to-end (28–29 Agu).
