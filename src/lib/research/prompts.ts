@@ -1,0 +1,231 @@
+import type { SearchResult } from './search';
+
+export interface DiscoveryInput {
+  targetLocation: string;
+  secondaryLocation?: string | null;
+  audienceAge: string;
+  audienceInterests: string[];
+  platform: string;
+  tone: string;
+  accountGoal: string;
+  allowedCategories: string[];
+  excludedCategories: string[];
+  currentDatetime: string; // ISO; injected from server
+  freshnessHours: number;
+  minimumCandidates: number;
+  platformName?: string;
+  language?: string;
+}
+
+export interface VerificationInput {
+  topic: {
+    topic: string;
+    category?: string | null;
+    whyNow?: string | null;
+  };
+  candidates: Array<{
+    topic: string;
+    category?: string | null;
+    sources: Array<{ title: string; url: string; published_at?: string; publisher?: string }>;
+  }>;
+  language?: string;
+}
+
+export interface ScoringInput {
+  topic: {
+    topic: string;
+    category?: string | null;
+    whyNow?: string | null;
+    audienceRelevance?: string | null;
+    keyFacts: string[];
+    uniqueAngle?: string | null;
+    hooks: Array<{ type: string; text: string }>;
+  };
+  weights?: {
+    freshness: number;
+    localRelevance: number;
+    practicalValue: number;
+    curiosity: number;
+    emotionalResonance: number;
+    credibility: number;
+    conversationPotential: number;
+    brandRelevance: number;
+  };
+  language?: string;
+}
+
+export const DEFAULT_SCORING_WEIGHTS = {
+  freshness: 0.15,
+  localRelevance: 0.15,
+  practicalValue: 0.15,
+  curiosity: 0.15,
+  emotionalResonance: 0.1,
+  credibility: 0.15,
+  conversationPotential: 0.1,
+  brandRelevance: 0.05
+} as const;
+
+export function buildDiscoveryPrompt(input: DiscoveryInput, searchResults: SearchResult[]): { system: string; user: string } {
+  const lang = input.language ?? 'id';
+  const system = `Anda adalah Social Media Trend Researcher dan Content Strategist untuk audiens Indonesia.
+
+TUGAS UTAMA
+Temukan topik aktual, relevan, menarik, dan dapat dipercaya yang mempunyai potensi membuat target audiens:
+1. berhenti scrolling,
+2. membuka atau membaca postingan,
+3. menyimpan atau membagikan postingan,
+4. memberikan komentar yang bermakna.
+
+Anda tidak hanya mencari topik yang paling ramai. Anda mencari topik dengan kombinasi terbaik antara:
+- kebaruan,
+- relevansi terhadap audiens,
+- manfaat praktis,
+- daya tarik emosional,
+- unsur kejutan atau rasa ingin tahu,
+- kredibilitas sumber,
+- potensi dikembangkan menjadi konten orisinal.
+
+TARGET AUDIENS
+Lokasi utama: ${input.targetLocation}
+Cakupan alternatif: ${input.secondaryLocation ?? '-'}
+Rentang usia: ${input.audienceAge}
+Minat: ${input.audienceInterests.join(', ') || '-'}
+Platform: ${input.platformName ?? input.platform}
+Karakter bahasa: ${input.tone}
+Tujuan akun: ${input.accountGoal}
+Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || '(semua)'}
+Kategori yang harus dihindari: ${input.excludedCategories.join(', ') || '(tidak ada)'}
+
+WAKTU PENELITIAN
+Tanggal dan waktu saat ini: ${input.currentDatetime}
+Prioritaskan informasi yang diterbitkan dalam ${input.freshnessHours} jam terakhir.
+Jika topiknya bersifat evergreen, jelaskan mengapa topik tersebut tetap relevan saat ini.
+
+JENIS TOPIK YANG DICARI
+Cari kandidat dari beberapa kategori berikut:
+1. berita lokal di ${input.targetLocation},
+2. berita atau tren Indonesia,
+3. informasi yang bermanfaat,
+4. tips dan trik praktis,
+5. tutorial sederhana,
+6. kisah motivasi nyata,
+7. sejarah lokal atau Indonesia yang jarang diketahui,
+8. fakta unik yang dapat diverifikasi,
+9. perubahan kebijakan atau layanan yang berdampak langsung,
+10. masalah sehari-hari yang sedang banyak dibicarakan.
+
+PROSES PENELITIAN
+
+Tahap 1: Discovery (input dari hasil search di bawah)
+- Kumpulkan minimal ${input.minimumCandidates} kandidat topik dari hasil search.
+- Gunakan beberapa jenis sumber, seperti media kredibel, situs resmi pemerintah, institusi pendidikan, laporan organisasi, Google Trends, dan sumber primer lainnya.
+- Catat judul, URL, sumber, waktu publikasi, lokasi, dan ringkasan fakta utama.
+- Jangan menulis postingan pada tahap ini.
+
+Tahap 2: Deduplication
+- Gabungkan kandidat yang membahas peristiwa atau informasi yang sama.
+- Jangan menganggap dua artikel tentang peristiwa yang sama sebagai dua topik berbeda.
+- Pertahankan sumber yang paling dekat dengan sumber primer.
+
+Tahap 3: Verification (dasar saja; akan diverifikasi lebih detail di tahap terpisah)
+- Tolak kandidat yang jelas-jelas tidak relevan atau tidak dapat diverifikasi.
+- Jangan mengarang fakta, angka, kutipan, nama, atau URL.
+
+Tahap 4: Scoring (dasar)
+- Untuk setiap kandidat, isi semua sub-skor 0-10 + penalty + final_score.
+- Sub-skor: freshness, local_relevance, practical_value, curiosity, emotional_resonance, credibility, conversation_potential, brand_relevance.
+- Bobot: freshness 15%, local_relevance 15%, practical_value 15%, curiosity 15%, emotional_resonance 10%, credibility 15%, conversation_potential 10%, brand_relevance 5%.
+
+Tahap 5: Hooks
+Untuk setiap topik final, buat lima opsi hook:
+1. curiosity_gap
+2. direct_benefit
+3. surprising_fact
+4. relatable_question
+5. contrarian
+
+ATURAN HOOK
+- Spesifik, mudah dipahami, relevan dengan isi.
+- Tidak clickbait palsu, tidak melebih-lebihkan, tidak urgensi palsu.
+
+DIVERSITAS
+Daftar akhir harus mencakup kombinasi: aktual, bermanfaat, emosional, sejarah/evergreen, percakapan.
+
+FORMAT KELUARAN
+Kembalikan hasil sebagai JSON valid tanpa teks tambahan sesuai schema research_output_schema. Bahasa output utama: ${lang}.`.trim();
+
+  const searchContext = searchResults
+    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal tidak diketahui'}] ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 600)}`)
+    .join('\n\n');
+
+  const user = `Hasil pencarian web (gunakan sebagai basis fakta; jangan mengarang di luar ini):
+
+${searchContext}
+
+Pilih dan struktur topik sesuai FORMAT KELUARAN di atas. Kembalikan hanya JSON valid, tanpa markdown.`.trim();
+
+  return { system, user };
+}
+
+export function buildVerificationPrompt(input: VerificationInput): { system: string; user: string } {
+  const lang = input.language ?? 'id';
+  const system = `Anda adalah Fact-Checker untuk konten media sosial Indonesia. Tugas Anda: periksa kandidat topik dan nilai kelayakan verifikasinya.
+
+LANGKAH PER TOPIK
+1. Periksa apakah tanggal publikasi masih relevan.
+2. Bedakan tanggal artikel dengan tanggal terjadinya peristiwa.
+3. Pastikan lokasi peristiwa.
+4. Cari sumber pembanding jika klaimnya penting.
+5. Tandai informasi yang masih berupa dugaan.
+6. Tolak klaim yang tidak mempunyai sumber memadai.
+
+ATURAN
+- Jangan mengarang fakta, angka, kutipan, nama, atau URL.
+- Jika informasi tidak dapat diverifikasi, beri status "tidak lolos" (verification_status = "rejected").
+- Jika terverifikasi, set verification_status = "verified". Jika ragu, "unverified".
+
+FORMAT KELUARAN
+JSON valid tanpa teks tambahan. Bahasa utama: ${lang}.`.trim();
+
+  const user = JSON.stringify(input.candidates, null, 2);
+  return { system, user };
+}
+
+export function buildScoringPrompt(input: ScoringInput): { system: string; user: string } {
+  const lang = input.language ?? 'id';
+  const weights = input.weights ?? DEFAULT_SCORING_WEIGHTS;
+  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+  const system = `Anda adalah Content Scoring Specialist untuk audiens Indonesia. Beri skor 0-10 untuk setiap aspek topik, hitung final_score berbobot, dan tentukan apakah topik lolos ambang minimum.
+
+ASPEK SKORING
+A. Freshness — seberapa baru/aktual topik.
+B. Local relevance — kedekatan dengan kehidupan audiens target.
+C. Practical value — apakah audiens mendapat pengetahuan/solusi/langkah praktis.
+D. Curiosity — fakta mengejutkan, kontradiksi, information gap jujur.
+E. Emotional resonance — inspirasi, kepedulian, kebanggaan, kekhawatiran, pengalaman relatable.
+F. Credibility — kekuatan & kredibilitas sumber.
+G. Conversation potential — memicu opini/pengalaman pribadi/diskusi sehat.
+H. Brand relevance — kesesuaian dengan karakter & tujuan akun.
+
+BOBOT
+- Freshness: ${(weights.freshness * 100).toFixed(0)}%
+- Local relevance: ${(weights.localRelevance * 100).toFixed(0)}%
+- Practical value: ${(weights.practicalValue * 100).toFixed(0)}%
+- Curiosity: ${(weights.curiosity * 100).toFixed(0)}%
+- Emotional resonance: ${(weights.emotionalResonance * 100).toFixed(0)}%
+- Credibility: ${(weights.credibility * 100).toFixed(0)}%
+- Conversation potential: ${(weights.conversationPotential * 100).toFixed(0)}%
+- Brand relevance: ${(weights.brandRelevance * 100).toFixed(0)}%
+(Total bobot: ${(totalWeight * 100).toFixed(0)}%)
+
+PENALTI
+Kurangi skor jika: sudah terlalu banyak digunakan tanpa angle baru, gosip, judul sensasional, klaim belum terverifikasi, angle menyesatkan, tidak sesuai audiens, butuh konteks terlalu panjang.
+
+FINAL_SCORE = rata-rata terbobot dari 8 sub-skor (skala 0-10), dikurangi penalty (0-2).
+
+FORMAT KELUARAN
+JSON valid. Bahasa utama: ${lang}.`.trim();
+
+  const user = JSON.stringify(input.topic, null, 2);
+  return { system, user };
+}

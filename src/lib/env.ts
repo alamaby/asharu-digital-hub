@@ -74,6 +74,17 @@ const cronSecretSchema = z.preprocess(
   z.string().min(10, 'Cron secret looks too short').optional()
 );
 
+const tavilyApiKeySchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .min(20, 'Tavily API key looks too short')
+    .refine((value) => value.startsWith('tvly-'), {
+      message: 'Tavily API key must start with tvly-'
+    })
+    .optional()
+);
+
 const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: siteUrlSchema,
   NEXT_PUBLIC_GA_MEASUREMENT_ID: gaMeasurementIdSchema,
@@ -86,7 +97,8 @@ const envSchema = z.object({
   SUPABASE_SECRET_KEY: supabaseSecretKeySchema,
   // Deprecated alias — will be removed after 2025-12. Prefer SUPABASE_SECRET_KEY.
   SUPABASE_SERVICE_ROLE_KEY: supabaseSecretKeySchema,
-  CRON_SECRET: cronSecretSchema
+  CRON_SECRET: cronSecretSchema,
+  TAVILY_API_KEY: tavilyApiKeySchema
 });
 
 export interface ParsedEnv {
@@ -103,6 +115,7 @@ export interface ParsedEnv {
   /** @deprecated Use supabaseSecretKey — kept for backward compat */
   supabaseServiceRoleKey?: string;
   cronSecret?: string;
+  tavilyApiKey?: string;
   hasSupabase: boolean;
 }
 
@@ -138,6 +151,7 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     supabaseSecretKey: secretKey,
     supabaseServiceRoleKey: secretKey,
     cronSecret: result.data.CRON_SECRET,
+    tavilyApiKey: result.data.TAVILY_API_KEY,
     hasSupabase: Boolean(
       result.data.NEXT_PUBLIC_SUPABASE_URL && publishableKey
     )
