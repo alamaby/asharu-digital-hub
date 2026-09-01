@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { swapAffiliateProduct, removeAffiliateInjection } from '@/lib/content/actions';
+import { relevanceBand } from '@/lib/research/affiliate';
 import { AffiliateProductPicker } from './AffiliateProductPicker';
 
 interface Injection {
@@ -22,14 +23,12 @@ interface Props {
   hasPlaceholderWarning: boolean;
 }
 
-function relevanceBand(score: number | null): { label: string; className: string } {
-  if (score === null || score === undefined) {
-    return { label: '-', className: 'bg-surface text-ink-muted' };
-  }
-  if (score >= 50) return { label: 'high', className: 'bg-emerald-50 text-emerald-800' };
-  if (score >= 10) return { label: 'medium', className: 'bg-amber-50 text-amber-800' };
-  return { label: 'low', className: 'bg-red-50 text-red-800' };
-}
+const BAND_CLASS: Record<string, string> = {
+  high: 'bg-emerald-50 text-emerald-800',
+  medium: 'bg-amber-50 text-amber-800',
+  low: 'bg-red-50 text-red-800',
+  none: 'bg-surface text-ink-muted'
+};
 
 export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceholderWarning }: Props) {
   const t = useTranslations('content.review.affiliate');
@@ -40,7 +39,6 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
   const [error, setError] = useState<string | null>(null);
 
   const band = relevanceBand(matchScore);
-
   async function onSwap(productId: string) {
     setBusy('swap');
     setError(null);
@@ -65,8 +63,8 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{t('title')}</h2>
         {injection ? (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${band.className}`}>
-            {t(`relevance.${band.label}` as never)} · {matchScore ?? 0}
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BAND_CLASS[band]}`}>
+            {t(`relevance.${band}` as never)} · {matchScore ?? 0}
           </span>
         ) : null}
       </div>

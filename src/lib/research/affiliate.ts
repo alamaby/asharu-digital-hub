@@ -1,4 +1,3 @@
-import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface AffiliateProductRow {
@@ -70,7 +69,7 @@ export async function selectAffiliateProduct(
     .filter((w) => w.length >= KEYWORD_MIN_LENGTH);
   const uniqueKeywords = Array.from(new Set(topicKeywords));
 
-  let bestScore = 0;
+  let bestScore = -1;
   let best: AffiliateProductRow | null = null;
   let bestSignals: AffiliateMatchSignals | null = null;
   for (const product of products) {
@@ -89,7 +88,9 @@ export async function selectAffiliateProduct(
     const productText = `${product.name_id} ${product.name_en} ${product.category} ${product.merchant}`.toLowerCase();
     const overlap = uniqueKeywords.filter((w) => productText.includes(w)).length;
     score += overlap * KEYWORD_OVERLAP_BONUS;
-    if (score > bestScore || (score === bestScore && best && products.indexOf(product) < products.indexOf(best))) {
+    // Pool is ordered newest-first, so strict `>` keeps the most recent
+    // product on ties — including the all-zero case (first product wins).
+    if (score > bestScore) {
       bestScore = score;
       best = product;
       bestSignals = {
@@ -109,7 +110,8 @@ export async function selectAffiliateProduct(
   };
 }
 
-export function relevanceBand(score: number): 'high' | 'medium' | 'low' {
+export function relevanceBand(score: number | null): 'high' | 'medium' | 'low' | 'none' {
+  if (score === null || score === undefined) return 'none';
   if (score >= RELEVANCE_HIGH) return 'high';
   if (score >= RELEVANCE_MEDIUM) return 'medium';
   return 'low';

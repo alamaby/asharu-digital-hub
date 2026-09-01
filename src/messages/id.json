@@ -371,7 +371,8 @@
         "relevance": {
           "high": "Cocok",
           "medium": "Kurang Cocok",
-          "low": "Tidak Cocok"
+          "low": "Tidak Cocok",
+          "none": "Tanpa skor"
         },
         "swap": "Ganti Produk",
         "remove": "Hapus",

@@ -371,7 +371,8 @@
         "relevance": {
           "high": "Good match",
           "medium": "Partial match",
-          "low": "Poor match"
+          "low": "Poor match",
+          "none": "No score"
         },
         "swap": "Swap Product",
         "remove": "Remove",
