@@ -416,6 +416,7 @@
       "shortlistAction": "Shortlist",
       "rejectAction": "Reject",
       "advanceAction": "Advance to Development",
+      "retryAction": "Retry",
       "topicTitle": "Topic detail",
       "whyNow": "Why now",
       "audienceRelevance": "Audience relevance",

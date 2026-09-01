@@ -8,6 +8,7 @@ import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import { ResearchSessionActions } from '@/components/admin/ResearchSessionActions';
+import { RetrySessionButton } from '@/components/admin/RetrySessionButton';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -124,6 +125,10 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           </p>
         ) : null}
       </header>
+
+      {(s.status === 'failed' || s.status === 'completed' || s.status === 'awaiting_selection') ? (
+        <RetrySessionButton sessionId={sessionId} />
+      ) : null}
 
       {s.status === 'awaiting_selection' && draftList.length === 0 ? (
         <ResearchSessionActions

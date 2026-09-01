@@ -416,6 +416,7 @@
       "shortlistAction": "Shortlist",
       "rejectAction": "Tolak",
       "advanceAction": "Lanjut ke Development",
+      "retryAction": "Retry Proses Ulang",
       "topicTitle": "Detail Topik",
       "whyNow": "Mengapa sekarang",
       "audienceRelevance": "Relevansi audiens",

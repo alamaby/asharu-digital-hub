@@ -247,6 +247,48 @@ async function assertAdmin(): Promise<SupabaseClient> {
   return getServiceClient();
 }
 
+/**
+ * Retry a failed (or stuck) research session: delete its old (possibly junk)
+ * topics and reset it to `discovering` with a back-dated
+ * `current_stage_started_at` so the cron picks it up within the guard window.
+ * Only allows retry from `failed` or `awaiting_selection` to avoid
+ * disrupting sessions that are actively in-flight.
+ */
+export async function retrySession(sessionId: string): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    // Delete old topics (they were produced by buggy code and are junk).
+    await supabase
+      .from('content_research_topics')
+      .delete()
+      .eq('session_id', sessionId);
+    // Reset to discovering, back-date the timestamp past the cron guard.
+    const { data, error } = await supabase
+      .from('content_research_sessions')
+      .update({
+        status: 'discovering',
+        error_message: null,
+        current_stage_started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .in('status', ['failed', 'awaiting_selection', 'completed'])
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'session not in a retryable state (failed/awaiting/completed)' };
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'retry',
+      level: 'info',
+      message: 'admin triggered retry — topics cleared, status reset to discovering'
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function shortlistTopics(
   sessionId: string,
   topicIds: string[]
