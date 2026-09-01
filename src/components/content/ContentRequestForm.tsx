@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { createContentRequest } from '@/lib/content/actions';
+import { createResearchSession } from '@/lib/content/actions';
 
 interface ContentRequestFormProps {
   platforms: { slug: string; display_name: string }[];
@@ -15,19 +15,24 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
     setStatus('idle');
     setMessage('');
     setFieldErrors({});
+    setSessionId(null);
 
-    const result = await createContentRequest(formData);
+    const result = await createResearchSession(formData);
 
     if (result.success) {
       setStatus('success');
-      setMessage('Draf berhasil dibuat. Cek halaman review.');
+      setMessage('Riset berhasil dimulai. Cek halaman riset untuk progres.');
+      setSessionId(result.sessionId ?? null);
       (document.getElementById('content-form') as HTMLFormElement)?.reset();
+      setShowAdvanced(false);
     } else if (result.error === 'honeypot') {
       setStatus('error');
       setMessage(t('errorHoneypot'));
@@ -67,18 +72,28 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
         </div>
         <p className="mt-2 text-sm text-emerald-800">{t('successBody')}</p>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link
-            href={{ pathname: '/admin/konten', query: { type: 'requests', status: 'pending' } }}
-            className="btn-primary px-4 py-2 text-sm"
-          >
-            {t('successViewList')}
-          </Link>
+          {sessionId ? (
+            <Link
+              href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId } }}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              {t('successViewList')}
+            </Link>
+          ) : (
+            <Link
+              href={{ pathname: '/admin/riset' }}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              {t('successViewList')}
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => {
               setStatus('idle');
               setMessage('');
               setFieldErrors({});
+              setSessionId(null);
             }}
             className="rounded-lg border border-emerald-300 bg-surface px-4 py-2 text-sm font-medium text-emerald-900 transition-colors hover:border-emerald-500"
           >
@@ -264,6 +279,189 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           disabled={pending}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
+      </div>
+
+      <div className="rounded-xl border border-line bg-surface">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          aria-expanded={showAdvanced}
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-ink"
+        >
+          <span>{t('advancedTitle')}</span>
+          <span aria-hidden className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}>
+            ▾
+          </span>
+        </button>
+        {showAdvanced ? (
+          <div className="space-y-4 border-t border-line px-4 py-4">
+            <p className="text-xs text-ink-muted">{t('advancedIntro')}</p>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="targetLocation" className="block text-xs font-medium text-ink-muted">
+                  {t('targetLocation')}
+                </label>
+                <input
+                  id="targetLocation"
+                  name="targetLocation"
+                  type="text"
+                  placeholder="Cth: Indonesia, Bandung"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="secondaryLocation" className="block text-xs font-medium text-ink-muted">
+                  {t('secondaryLocation')}
+                </label>
+                <input
+                  id="secondaryLocation"
+                  name="secondaryLocation"
+                  type="text"
+                  placeholder="Cth: Jakarta, nasional"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="audienceAge" className="block text-xs font-medium text-ink-muted">
+                  {t('audienceAge')}
+                </label>
+                <input
+                  id="audienceAge"
+                  name="audienceAge"
+                  type="text"
+                  placeholder="Cth: 25-34 tahun"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="audienceInterests" className="block text-xs font-medium text-ink-muted">
+                  {t('audienceInterests')}
+                </label>
+                <input
+                  id="audienceInterests"
+                  name="audienceInterests"
+                  type="text"
+                  placeholder="Cth: parenting, keuangan keluarga"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="accountGoal" className="block text-xs font-medium text-ink-muted">
+                {t('accountGoal')}
+              </label>
+              <input
+                id="accountGoal"
+                name="accountGoal"
+                type="text"
+                placeholder="Cth: mengedukasi calon orang tua baru"
+                disabled={pending}
+                className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="allowedCategories" className="block text-xs font-medium text-ink-muted">
+                  {t('allowedCategories')}
+                </label>
+                <input
+                  id="allowedCategories"
+                  name="allowedCategories"
+                  type="text"
+                  placeholder={t('categoriesHint')}
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="excludedCategories" className="block text-xs font-medium text-ink-muted">
+                  {t('excludedCategories')}
+                </label>
+                <input
+                  id="excludedCategories"
+                  name="excludedCategories"
+                  type="text"
+                  placeholder={t('categoriesHint')}
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <label htmlFor="freshnessHours" className="block text-xs font-medium text-ink-muted">
+                  {t('freshnessHours')}
+                </label>
+                <input
+                  id="freshnessHours"
+                  name="freshnessHours"
+                  type="number"
+                  min={1}
+                  max={720}
+                  placeholder="24"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="minimumCandidates" className="block text-xs font-medium text-ink-muted">
+                  {t('minimumCandidates')}
+                </label>
+                <input
+                  id="minimumCandidates"
+                  name="minimumCandidates"
+                  type="number"
+                  min={3}
+                  max={50}
+                  placeholder="12"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="requiredWinners" className="block text-xs font-medium text-ink-muted">
+                  {t('requiredWinners')}
+                </label>
+                <input
+                  id="requiredWinners"
+                  name="requiredWinners"
+                  type="number"
+                  min={1}
+                  max={10}
+                  placeholder="3"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label htmlFor="maximumIterations" className="block text-xs font-medium text-ink-muted">
+                  {t('maximumIterations')}
+                </label>
+                <input
+                  id="maximumIterations"
+                  name="maximumIterations"
+                  type="number"
+                  min={1}
+                  max={10}
+                  placeholder="3"
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <button

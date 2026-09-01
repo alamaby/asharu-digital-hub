@@ -36,7 +36,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
       } else if (pathname === '/properties/[slug]') {
         router.replace('/properties', { locale: nextLocale });
       } else {
-        router.replace(pathname, { locale: nextLocale });
+        router.replace(pathname as never, { locale: nextLocale });
       }
     });
   }
