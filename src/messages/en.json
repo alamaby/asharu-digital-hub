@@ -425,7 +425,8 @@
       "sources": "Sources",
       "potentialRisk": "Potential risk",
       "scoreBreakdown": "Score breakdown",
-      "finalScore": "Final score"
+      "finalScore": "Final score",
+      "sessionLabel": "Session {id}"
     },
     "dashboard": {
       "title": "Admin Dashboard",
@@ -440,6 +441,7 @@
       "researchHeading": "Research & Topics",
       "researchSoon": "Coming soon",
       "researchHint": "Iterative topic discovery will appear here.",
+      "researchCTA": "Click to view research sessions and stage progress.",
       "recentHeading": "Recent Drafts",
       "recentEmpty": "No drafts yet.",
       "actionsHeading": "Quick Actions",
@@ -447,7 +449,8 @@
       "actionsReview": "Review Drafts",
       "actionsList": "View All Content",
       "actionsDiscovery": "Start New Discovery",
-      "actionsDiscoveryDisabledHint": "Coming soon"
+      "actionsDiscoveryDisabledHint": "Coming soon",
+      "actionsResearch": "View Research"
     },
     "konten": {
       "title": "Content List",

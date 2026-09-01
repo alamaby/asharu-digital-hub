@@ -91,11 +91,22 @@ export function DashboardCards({ pending, failed, needsReview, email, recentDraf
       </section>
 
       <section aria-labelledby="research-heading" className="space-y-3">
-        <h2 id="research-heading" className="text-lg font-semibold text-ink">{t('researchHeading')}</h2>
-        <div className="rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-ink-muted shadow-card">
-          <p className="font-medium text-ink">{t('researchSoon')}</p>
-          <p className="mt-1">{t('researchHint')}</p>
+        <div className="flex items-end justify-between">
+          <h2 id="research-heading" className="text-lg font-semibold text-ink">{t('researchHeading')}</h2>
+          <Link
+            href={{ pathname: '/admin/riset' }}
+            className="text-sm text-primary underline"
+          >
+            {t('actionsResearch')}
+          </Link>
         </div>
+        <Link
+          href={{ pathname: '/admin/riset' }}
+          className="block rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-ink-muted shadow-card transition-colors hover:border-primary"
+        >
+          <p className="font-medium text-ink">{t('researchHint')}</p>
+          <p className="mt-1">{t('researchCTA')}</p>
+        </Link>
       </section>
 
       <RecentDraftsList drafts={recentDrafts} />
@@ -118,14 +129,12 @@ export function DashboardCards({ pending, failed, needsReview, email, recentDraf
           >
             {t('actionsList')}
           </Link>
-          <button
-            type="button"
-            disabled
-            title={t('actionsDiscoveryDisabledHint')}
-            className="cursor-not-allowed rounded-lg border border-line bg-surface px-4 py-2 text-center text-sm font-medium text-ink-muted opacity-60"
+          <Link
+            href={{ pathname: '/admin/riset' }}
+            className="rounded-lg border border-line bg-surface px-4 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-primary"
           >
             {t('actionsDiscovery')}
-          </button>
+          </Link>
         </div>
       </section>
     </div>

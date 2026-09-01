@@ -18,7 +18,13 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  async function onSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    await processForm(formData);
+  }
+
+  async function processForm(formData: FormData) {
     setPending(true);
     setStatus('idle');
     setMessage('');
@@ -105,7 +111,7 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   }
 
   return (
-    <form id="content-form" action={onSubmit} noValidate className="space-y-5">
+    <form id="content-form" onSubmit={handleSubmit} noValidate className="space-y-5">
       {/* Honeypot */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
 

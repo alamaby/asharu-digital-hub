@@ -5,7 +5,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { isAdmin } from '@/lib/auth/is-admin';
-import { createSupabaseService } from '@/lib/supabase/server';
+import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 
 interface PageProps {
@@ -44,26 +44,35 @@ export default async function ResearchListPage({ params }: PageProps) {
     redirect({ href: '/masuk', locale });
   }
 
-  const supabase = createSupabaseService();
+  const supabase = await createSupabaseServer();
   const t = await getTranslations({ locale, namespace: 'admin.research' });
+
+  if (!supabase) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-ink-muted">
+        Service unavailable
+      </div>
+    );
+  }
 
   type SessionRow = {
     id: string;
     status: string;
-    topic: string;
+    target_location: string | null;
     platform_slug: string | null;
     created_at: string;
     error_message: string | null;
   };
 
-  const { data: sessions } = supabase
-    ? await supabase
-        .from('content_research_sessions')
-        .select('id, status, topic, platform_slug, created_at, error_message')
-        .order('created_at', { ascending: false })
-        .limit(50)
-    : { data: null as SessionRow[] | null };
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('content_research_sessions')
+    .select('id, status, target_location, platform_slug, created_at, error_message')
+    .order('created_at', { ascending: false })
+    .limit(50);
 
+  if (sessionsError) {
+    // (e.g. RLS, service not configured) — render empty rather than throw.
+  }
   const list = (sessions ?? []) as SessionRow[];
 
   return (
@@ -86,7 +95,9 @@ export default async function ResearchListPage({ params }: PageProps) {
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">{s.topic}</p>
+                  <p className="truncate text-sm font-medium text-ink">
+                    {s.target_location ?? s.platform_slug ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+                  </p>
                   <p className="text-xs text-ink-muted">
                     {s.platform_slug ?? '-'} · {new Date(s.created_at).toISOString().slice(0, 16).replace('T', ' ')}
                   </p>

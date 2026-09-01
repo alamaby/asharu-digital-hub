@@ -5,7 +5,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { isAdmin } from '@/lib/auth/is-admin';
-import { createSupabaseService } from '@/lib/supabase/server';
+import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import { ResearchSessionActions } from '@/components/admin/ResearchSessionActions';
 
@@ -53,7 +53,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     redirect({ href: '/masuk', locale });
   }
 
-  const supabase = createSupabaseService();
+  const supabase = await createSupabaseServer();
   const t = await getTranslations({ locale, namespace: 'admin.research' });
 
   if (!supabase) {
@@ -62,7 +62,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, topic, platform_slug, audience_age, target_location, account_goal, error_message, created_at')
+    .select('id, status, target_location, platform_slug, audience_age, account_goal, error_message, created_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -77,10 +77,9 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   const s = session as {
     id: string;
     status: string;
-    topic: string;
+    target_location: string | null;
     platform_slug: string | null;
     audience_age: string | null;
-    target_location: string | null;
     account_goal: string | null;
     error_message: string | null;
     created_at: string;
@@ -113,7 +112,9 @@ export default async function ResearchSessionPage({ params }: PageProps) {
       </div>
 
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{s.topic}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+          {s.target_location ?? s.platform_slug ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+        </h1>
         <p className="mt-2 text-sm text-ink-muted">
           {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug ?? '-'} · {t('createdLabel')}: {new Date(s.created_at).toISOString().slice(0, 16).replace('T', ' ')}
         </p>

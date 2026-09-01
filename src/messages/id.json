@@ -425,7 +425,8 @@
       "sources": "Sumber",
       "potentialRisk": "Risiko",
       "scoreBreakdown": "Skor detail",
-      "finalScore": "Skor akhir"
+      "finalScore": "Skor akhir",
+      "sessionLabel": "Sesi {id}"
     },
     "dashboard": {
       "title": "Dasbor Admin",
@@ -440,6 +441,7 @@
       "researchHeading": "Riset & Topik",
       "researchSoon": "Segera",
       "researchHint": "Penemuan topik bertahap akan tersedia di sini.",
+      "researchCTA": "Klik untuk melihat sesi riset dan progres tahap.",
       "recentHeading": "Draf Terbaru",
       "recentEmpty": "Belum ada draf.",
       "actionsHeading": "Aksi Cepat",
@@ -447,7 +449,8 @@
       "actionsReview": "Review Draft",
       "actionsList": "Lihat Semua Konten",
       "actionsDiscovery": "Mulai Discovery Baru",
-      "actionsDiscoveryDisabledHint": "Segera"
+      "actionsDiscoveryDisabledHint": "Segera",
+      "actionsResearch": "Lihat Riset"
     },
     "konten": {
       "title": "Daftar Konten",
