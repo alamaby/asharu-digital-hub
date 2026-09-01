@@ -4,6 +4,8 @@
  * Brave / Exa later without touching the stage handlers.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 export interface SearchResult {
   title: string;
   url: string;
@@ -106,14 +108,29 @@ let cached: SearchProvider | null = null;
 let cacheKey: string | null = null;
 
 /**
- * Returns the configured search provider (singleton per process).
- * Reads TAVILY_API_KEY from env. If absent, throws — callers should check
- * `env.tavilyApiKey` before scheduling a research session.
+ * Resolve the Tavily API key and return the configured search provider.
+ *
+ * Key resolution order:
+ *   1. Supabase Vault secret `tavily_api_key` (preferred — supports rotation
+ *      via Dashboard, consistent with the LLM-key pattern). Read via the
+ *      service_role-only `vault_decrypt_secret_by_name` RPC.
+ *   2. `process.env.TAVILY_API_KEY` (local dev / fallback).
+ *
+ * Pass the service-role `supabase` client from the caller so we don't spin up
+ * a second client here. Throws if neither source yields a key.
  */
-export function getSearchProvider(): SearchProvider {
-  const key = process.env.TAVILY_API_KEY;
+export async function getSearchProvider(supabase?: SupabaseClient): Promise<SearchProvider> {
+  let key = process.env.TAVILY_API_KEY;
+  if (!key && supabase) {
+    const { data } = await supabase.rpc('vault_decrypt_secret_by_name', {
+      p_name: 'tavily_api_key'
+    });
+    if (typeof data === 'string' && data.length > 0) key = data;
+  }
   if (!key) {
-    throw new Error('TAVILY_API_KEY is not configured');
+    throw new Error(
+      'Tavily API key not configured (Vault `tavily_api_key` or env TAVILY_API_KEY)'
+    );
   }
   if (cached && cacheKey === key) return cached;
   cached = new TavilyProvider(key);

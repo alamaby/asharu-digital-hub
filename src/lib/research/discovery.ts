@@ -93,7 +93,7 @@ export async function runDiscovery(
   sessionId: string,
   input: DiscoveryInput
 ): Promise<DiscoveryRunResult> {
-  const provider = getSearchProvider();
+  const provider = await getSearchProvider(supabase);
   const queries = buildQueries(input);
   const timeRange =
     input.freshnessHours <= 24 ? 'day' : input.freshnessHours <= 168 ? 'week' : 'month';

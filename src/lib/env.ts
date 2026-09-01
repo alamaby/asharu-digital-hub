@@ -74,6 +74,9 @@ const cronSecretSchema = z.preprocess(
   z.string().min(10, 'Cron secret looks too short').optional()
 );
 
+// Tavily search key — preferred source is Supabase Vault (`tavily_api_key`,
+// read via vault_decrypt_secret_by_name); this env var is the local-dev /
+// fallback path. Optional so builds succeed when neither is set yet.
 const tavilyApiKeySchema = z.preprocess(
   emptyToUndefined,
   z
