@@ -159,6 +159,12 @@ export async function runDiscovery(
   return { topics: parsed.topics, searchSummary: parsed.searchSummary };
 }
 
+const EMPTY_SCORE_BREAKDOWN = {
+  freshness: 0, local_relevance: 0, practical_value: 0, curiosity: 0,
+  emotional_resonance: 0, credibility: 0, conversation_potential: 0,
+  brand_relevance: 0, penalty: 0, final_score: 0
+} as const;
+
 function parseDiscoveryOutput(text: string): DiscoveryRunResult {
   const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
   let data: DiscoveryLLMOutput;
@@ -169,9 +175,23 @@ function parseDiscoveryOutput(text: string): DiscoveryRunResult {
     if (!m) throw new Error('Discovery LLM did not return valid JSON');
     data = JSON.parse(m[0]) as DiscoveryLLMOutput;
   }
-  const topics = (data.recommended_topics ?? []).map((t) => ({
-    ...t,
-    verification_status: t.verification_status ?? ('pending' as const)
-  }));
+  const topics = (data.recommended_topics ?? []).map((t): DiscoveryTopicRow => {
+    const rawScore = (t.score_breakdown ?? {}) as Partial<DiscoveryTopicRow['score_breakdown']>;
+    return {
+      topic: String(t.topic ?? ''),
+      category: String(t.category ?? ''),
+      why_now: String(t.why_now ?? ''),
+      audience_relevance: String(t.audience_relevance ?? ''),
+      key_facts: Array.isArray(t.key_facts) ? (t.key_facts as string[]) : [],
+      unique_angle: String(t.unique_angle ?? ''),
+      hooks: Array.isArray(t.hooks) ? (t.hooks as DiscoveryTopicRow['hooks']) : [],
+      recommended_format: String(t.recommended_format ?? ''),
+      recommended_platform: Array.isArray(t.recommended_platform) ? (t.recommended_platform as string[]) : [],
+      potential_risk: String(t.potential_risk ?? ''),
+      verification_status: (t.verification_status ?? 'pending') as DiscoveryTopicRow['verification_status'],
+      sources: Array.isArray(t.sources) ? (t.sources as DiscoveryTopicRow['sources']) : [],
+      score_breakdown: { ...EMPTY_SCORE_BREAKDOWN, ...rawScore },
+    };
+  });
   return { topics, searchSummary: data.search_summary };
 }
