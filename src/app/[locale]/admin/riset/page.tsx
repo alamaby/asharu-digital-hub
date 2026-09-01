@@ -70,9 +70,6 @@ export default async function ResearchListPage({ params }: PageProps) {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (sessionsError) {
-    // (e.g. RLS, service not configured) — render empty rather than throw.
-  }
   const list = (sessions ?? []) as SessionRow[];
 
   return (
@@ -83,7 +80,11 @@ export default async function ResearchListPage({ params }: PageProps) {
       </header>
 
       <ul className="mt-6 space-y-2">
-        {list.length === 0 ? (
+        {sessionsError ? (
+          <li className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            Query error: {sessionsError.message}
+          </li>
+        ) : list.length === 0 ? (
           <li className="rounded-xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-muted">
             {t('empty')}
           </li>

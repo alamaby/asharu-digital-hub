@@ -132,7 +132,22 @@ export async function runDiscovery(
     ],
     temperature: 0.5
   });
+
+  // Log raw LLM output (truncated) for debugging field-mapping issues.
+  await supabase.from('content_research_logs').insert({
+    session_id: sessionId,
+    stage: 'discovering',
+    level: 'info',
+    message: `LLM raw output (first 500 chars): ${result.output.text.slice(0, 500)}`
+  });
+
   const parsed = parseDiscoveryOutput(result.output.text);
+  await supabase.from('content_research_logs').insert({
+    session_id: sessionId,
+    stage: 'discovering',
+    level: 'info',
+    message: `parsed ${parsed.topics.length} topics; first topic field: "${parsed.topics[0]?.topic ?? '(none)'}"`
+  });
   if (parsed.topics.length > 0) {
     await supabase.from('content_research_topics').insert(
       parsed.topics.map((t, i) => ({
@@ -159,39 +174,96 @@ export async function runDiscovery(
   return { topics: parsed.topics, searchSummary: parsed.searchSummary };
 }
 
+/** Coerce a value to string, defaulting to '' for null/undefined. */
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v == null ? '' : String(v);
+}
+
+/** Pick the first non-empty string from a list of candidate field names. */
+function pickStr(obj: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim().length > 0) return v;
+  }
+  return '';
+}
+
+/** Coerce to string[], defaulting to []. */
+function strArr(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => str(x));
+  if (typeof v === 'string' && v.trim()) return [v.trim()];
+  return [];
+}
+
+/** Coerce to object array, defaulting to []. */
+function objArr(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  return [];
+}
+
 const EMPTY_SCORE_BREAKDOWN = {
   freshness: 0, local_relevance: 0, practical_value: 0, curiosity: 0,
   emotional_resonance: 0, credibility: 0, conversation_potential: 0,
   brand_relevance: 0, penalty: 0, final_score: 0
 } as const;
 
+function normalizeTopic(raw: unknown): DiscoveryTopicRow | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const t = raw as Record<string, unknown>;
+  const topicText = pickStr(t, 'topic', 'title', 'name', 'subject', 'headline', 'description');
+  if (!topicText) return null;
+  const rawScore = (t.score_breakdown ?? t.score ?? t.scores ?? {}) as Record<string, unknown>;
+  const hooksRaw = objArr(t.hooks).map((h) => {
+    if (typeof h === 'string') return { type: 'generic', text: h };
+    const ho = h as Record<string, unknown>;
+    return {
+      type: str(ho.type ?? ho.style ?? 'generic'),
+      text: pickStr(ho, 'text', 'hook', 'content', 'value')
+    };
+  }).filter((h) => h.text);
+  const sourcesRaw = objArr(t.sources ?? t.references ?? t.links ?? []).map((s) => {
+    const so = typeof s === 'string' ? { url: s } : (s as Record<string, unknown>);
+    return {
+      title: pickStr(so, 'title', 'name'),
+      publisher: pickStr(so, 'publisher', 'site', 'source'),
+      published_at: pickStr(so, 'published_at', 'date', 'publishedDate'),
+      url: pickStr(so, 'url', 'link', 'href')
+    };
+  }).filter((s) => s.url || s.title);
+  return {
+    topic: topicText,
+    category: pickStr(t, 'category', 'type', 'tag'),
+    why_now: pickStr(t, 'why_now', 'whyNow', 'relevance', 'rationale'),
+    audience_relevance: pickStr(t, 'audience_relevance', 'audienceRelevance', 'audience'),
+    key_facts: strArr(t.key_facts ?? t.facts ?? t.keyFacts),
+    unique_angle: pickStr(t, 'unique_angle', 'uniqueAngle', 'angle', 'perspective'),
+    hooks: hooksRaw,
+    recommended_format: pickStr(t, 'recommended_format', 'format', 'recommendedFormat'),
+    recommended_platform: strArr(t.recommended_platform ?? t.platforms ?? t.recommendedPlatform),
+    potential_risk: pickStr(t, 'potential_risk', 'risk', 'potentialRisk', 'warning'),
+    verification_status: (pickStr(t, 'verification_status', 'verificationStatus') || 'pending') as DiscoveryTopicRow['verification_status'],
+    sources: sourcesRaw,
+    score_breakdown: { ...EMPTY_SCORE_BREAKDOWN, ...rawScore } as DiscoveryTopicRow['score_breakdown'],
+  };
+}
+
 function parseDiscoveryOutput(text: string): DiscoveryRunResult {
   const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
-  let data: DiscoveryLLMOutput;
+  let data: Record<string, unknown>;
   try {
-    data = JSON.parse(trimmed) as DiscoveryLLMOutput;
+    data = JSON.parse(trimmed);
   } catch {
     const m = trimmed.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('Discovery LLM did not return valid JSON');
-    data = JSON.parse(m[0]) as DiscoveryLLMOutput;
+    data = JSON.parse(m[0]);
   }
-  const topics = (data.recommended_topics ?? []).map((t): DiscoveryTopicRow => {
-    const rawScore = (t.score_breakdown ?? {}) as Partial<DiscoveryTopicRow['score_breakdown']>;
-    return {
-      topic: String(t.topic ?? ''),
-      category: String(t.category ?? ''),
-      why_now: String(t.why_now ?? ''),
-      audience_relevance: String(t.audience_relevance ?? ''),
-      key_facts: Array.isArray(t.key_facts) ? (t.key_facts as string[]) : [],
-      unique_angle: String(t.unique_angle ?? ''),
-      hooks: Array.isArray(t.hooks) ? (t.hooks as DiscoveryTopicRow['hooks']) : [],
-      recommended_format: String(t.recommended_format ?? ''),
-      recommended_platform: Array.isArray(t.recommended_platform) ? (t.recommended_platform as string[]) : [],
-      potential_risk: String(t.potential_risk ?? ''),
-      verification_status: (t.verification_status ?? 'pending') as DiscoveryTopicRow['verification_status'],
-      sources: Array.isArray(t.sources) ? (t.sources as DiscoveryTopicRow['sources']) : [],
-      score_breakdown: { ...EMPTY_SCORE_BREAKDOWN, ...rawScore },
-    };
-  });
-  return { topics, searchSummary: data.search_summary };
+  // The LLM may nest topics under different keys; try the common ones.
+  const rawTopics = objArr(
+    data.recommended_topics ?? data.topics ?? data.results ?? data.candidates ?? []
+  );
+  const topics = rawTopics
+    .map(normalizeTopic)
+    .filter((t): t is DiscoveryTopicRow => t !== null);
+  const searchSummary = (data.search_summary ?? data.summary ?? undefined) as DiscoveryLLMOutput['search_summary'];
+  return { topics, searchSummary };
 }

@@ -48,12 +48,27 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
     temperature: 0.2
   });
   const parsed = parseVerificationOutput(result.output.text, candidates);
-  if (parsed.length === 0) return;
+  if (parsed.length === 0) {
+    // If the LLM returned nothing parseable, leave topics as 'unverified'
+    // rather than silently skipping (scoring will still process them).
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'verifying',
+      level: 'warn',
+      message: 'verification LLM returned 0 results; leaving topics as unverified'
+    });
+    return;
+  }
   for (const v of parsed) {
     if (!v.topic_id) continue;
+    // Only accept 'verified' or 'rejected'; anything else → 'unverified'
+    // so scoring still picks the topic up.
+    const status = v.verification_status === 'verified' || v.verification_status === 'rejected'
+      ? v.verification_status
+      : 'unverified';
     await supabase
       .from('content_research_topics')
-      .update({ verification_status: v.verification_status })
+      .update({ verification_status: status })
       .eq('id', v.topic_id);
   }
   await supabase.from('content_research_logs').insert({
