@@ -61,11 +61,10 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
   }
   for (const v of parsed) {
     if (!v.topic_id) continue;
-    // Only accept 'verified' or 'rejected'; anything else → 'unverified'
-    // so scoring still picks the topic up.
-    const status = v.verification_status === 'verified' || v.verification_status === 'rejected'
-      ? v.verification_status
-      : 'unverified';
+    // Never accept 'rejected' from the LLM — topics without sources can't be
+    // fact-checked, so default to 'unverified'. Admin can reject manually
+    // via the UI. Only accept 'verified' from the LLM.
+    const status = v.verification_status === 'verified' ? 'verified' : 'unverified';
     await supabase
       .from('content_research_topics')
       .update({ verification_status: status })

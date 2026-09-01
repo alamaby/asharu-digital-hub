@@ -138,7 +138,7 @@ export async function runDiscovery(
     session_id: sessionId,
     stage: 'discovering',
     level: 'info',
-    message: `LLM raw output (first 500 chars): ${result.output.text.slice(0, 500)}`
+    message: `LLM raw output (first 2000 chars): ${result.output.text.slice(0, 2000)}`
   });
 
   const parsed = parseDiscoveryOutput(result.output.text);

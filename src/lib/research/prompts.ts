@@ -116,58 +116,45 @@ Cari kandidat dari beberapa kategori berikut:
 
 PROSES PENELITIAN
 
-Tahap 1: Discovery (input dari hasil search di bawah)
-- Kumpulkan minimal ${input.minimumCandidates} kandidat topik dari hasil search.
-- Gunakan beberapa jenis sumber, seperti media kredibel, situs resmi pemerintah, institusi pendidikan, laporan organisasi, Google Trends, dan sumber primer lainnya.
-- Catat judul, URL, sumber, waktu publikasi, lokasi, dan ringkasan fakta utama.
-- Jangan menulis postingan pada tahap ini.
+Tahap 1: Discovery dari hasil search di bawah
+- Pilih topik terbaik dari hasil search. Minimal ${input.minimumCandidates} kandidat (atau sebanyak mungkin yang relevan).
+- Dedup: gabungkan yang membahas peristiwa sama.
 
-Tahap 2: Deduplication
-- Gabungkan kandidat yang membahas peristiwa atau informasi yang sama.
-- Jangan menganggap dua artikel tentang peristiwa yang sama sebagai dua topik berbeda.
-- Pertahankan sumber yang paling dekat dengan sumber primer.
-
-Tahap 3: Verification (dasar saja; akan diverifikasi lebih detail di tahap terpisah)
-- Tolak kandidat yang jelas-jelas tidak relevan atau tidak dapat diverifikasi.
-- Jangan mengarang fakta, angka, kutipan, nama, atau URL.
-
-Tahap 4: Scoring (dasar)
-- Untuk setiap kandidat, isi semua sub-skor 0-10 + penalty + final_score.
-- Sub-skor: freshness, local_relevance, practical_value, curiosity, emotional_resonance, credibility, conversation_potential, brand_relevance.
-- Bobot: freshness 15%, local_relevance 15%, practical_value 15%, curiosity 15%, emotional_resonance 10%, credibility 15%, conversation_potential 10%, brand_relevance 5%.
-
-Tahap 5: Hooks
-Untuk setiap topik final, buat lima opsi hook:
-1. curiosity_gap
-2. direct_benefit
-3. surprising_fact
-4. relatable_question
-5. contrarian
-
-ATURAN HOOK
-- Spesifik, mudah dipahami, relevan dengan isi.
-- Tidak clickbait palsu, tidak melebih-lebihkan, tidak urgensi palsu.
-
-DIVERSITAS
-Daftar akhir harus mencakup kombinasi: aktual, bermanfaat, emosional, sejarah/evergreen, percakapan.
+Tahap 2: Struktur setiap topik
+Untuk setiap topik, isi:
+- topic: judul singkat topik (1 kalimat).
+- category: salah satu dari [berita, tips, inspirasi, sejarah, fakta, kebijakan, diskusi].
+- why_now: mengapa topik ini relevan sekarang (1-2 kalimat).
+- angle: sudut pandang unik untuk konten (1 kalimat).
 
 WAJIB
-- Anda HARUS mengembalikan minimal 5 topik di recommended_topics.
-- JANGAN mengembalikan array kosong. Jika sumber terbatas, tetap buat topik dari apa yang tersedia.
-- Jika benar-benar tidak ada topik yang valid, kembalikan 1 topik terbaik dengan verification_status "unverified" + alasan di rejected_topics.
+- Anda HARUS mengembalikan minimal 5 topik.
+- JANGAN mengembalikan array kosong.
+- Jangan mengarang fakta, angka, atau URL di luar hasil search.
 
-FORMAT KELUARAN
-Kembalikan hasil sebagai JSON valid tanpa teks tambahan. Schema: { "research_time": "...", "target_audience": "...", "search_summary": {...}, "recommended_topics": [ {...} ], "rejected_topics": [...] }. Bahasa output utama: ${lang}.`.trim();
+FORMAT KELUARAN (WAJIB ikuti schema ini persis)
+Kembalikan JSON valid tanpa teks tambahan:
+{
+  "recommended_topics": [
+    {
+      "topic": "judul topik",
+      "category": "berita",
+      "why_now": "alasan relevansi",
+      "angle": "sudut pandang unik"
+    }
+  ]
+}
+Bahasa output: ${lang}.`.trim();
 
   const searchContext = searchResults
-    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal tidak diketahui'}] ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 400)}`)
+    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal?'}] ${r.title}\n   ${r.url}\n   ${r.content.slice(0, 300)}`)
     .join('\n\n');
 
   const user = `Hasil pencarian web (gunakan sebagai basis fakta; jangan mengarang di luar ini):
 
 ${searchContext}
 
-Pilih dan struktur topik sesuai FORMAT KELUARAN di atas. Kembalikan hanya JSON valid, tanpa markdown.`.trim();
+Pilih topik terbaik dari hasil di atas. Kembalikan JSON dengan minimal 5 topik sesuai FORMAT KELUARAN.`.trim();
 
   return { system, user };
 }
