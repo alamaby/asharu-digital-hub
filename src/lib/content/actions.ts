@@ -2,8 +2,9 @@
 
 import { z } from 'zod';
 import { headers } from 'next/headers';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
+import { isAdmin } from '@/lib/auth/is-admin';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -228,4 +229,257 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
 
   await incrementRateLimit(ip);
   return { success: true, sessionId: (inserted as { id: string }).id };
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin actions: research session management                         */
+/* ------------------------------------------------------------------ */
+
+export interface ResearchAdminResult {
+  success: boolean;
+  error?: string;
+}
+
+async function assertAdmin(): Promise<SupabaseClient> {
+  if (!(await isAdmin())) {
+    throw new Error('forbidden');
+  }
+  return getServiceClient();
+}
+
+export async function shortlistTopics(
+  sessionId: string,
+  topicIds: string[]
+): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    if (topicIds.length === 0) {
+      return { success: false, error: 'no topics selected' };
+    }
+    const { error } = await supabase
+      .from('content_research_topics')
+      .update({ status: 'shortlisted' })
+      .eq('session_id', sessionId)
+      .in('id', topicIds);
+    if (error) return { success: false, error: error.message };
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'awaiting_selection',
+      level: 'info',
+      message: `admin shortlisted ${topicIds.length} topic(s)`
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function rejectTopics(
+  sessionId: string,
+  topicIds: string[]
+): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    if (topicIds.length === 0) {
+      return { success: false, error: 'no topics selected' };
+    }
+    const { error } = await supabase
+      .from('content_research_topics')
+      .update({ status: 'rejected' })
+      .eq('session_id', sessionId)
+      .in('id', topicIds);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Move a research session from `awaiting_selection` to `developing` so the
+ * next cron tick will run the development stage. Idempotent.
+ */
+export async function advanceToDevelopment(
+  sessionId: string
+): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    // Verify at least one shortlisted topic exists.
+    const { count, error: countError } = await supabase
+      .from('content_research_topics')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('status', 'shortlisted');
+    if (countError) return { success: false, error: countError.message };
+    if (!count || count === 0) {
+      return { success: false, error: 'no shortlisted topics' };
+    }
+    // Conditional update so we don't accidentally advance a non-pending session.
+    const { data, error } = await supabase
+      .from('content_research_sessions')
+      .update({
+        status: 'developing',
+        current_stage_started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .eq('status', 'awaiting_selection')
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'session not in awaiting_selection' };
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin actions: affiliate swap / remove                             */
+/* ------------------------------------------------------------------ */
+
+export interface AffiliateAdminResult {
+  success: boolean;
+  error?: string;
+  draftId?: string;
+}
+
+export async function swapAffiliateProduct(
+  draftId: string,
+  newProductId: string
+): Promise<AffiliateAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    const { data: product, error: prodError } = await supabase
+      .from('affiliate_products')
+      .select('id, friendly_code, name_id, name_en, category, merchant, url, image')
+      .eq('id', newProductId)
+      .maybeSingle();
+    if (prodError || !product) {
+      return { success: false, error: prodError?.message ?? 'product not found' };
+    }
+    const { data: draft, error: draftError } = await supabase
+      .from('content_drafts')
+      .select('id, affiliate_injections, affiliate_swap_history')
+      .eq('id', draftId)
+      .maybeSingle();
+    if (draftError || !draft) {
+      return { success: false, error: draftError?.message ?? 'draft not found' };
+    }
+    // Compute a match signal against the draft's topic (best-effort scoring).
+    let matchScore = 0;
+    let matchSignals: {
+      category_match: boolean;
+      keyword_overlap: number;
+      scored_from_pool_size: number;
+    } = { category_match: false, keyword_overlap: 0, scored_from_pool_size: 0 };
+    const { data: draftTopic } = await supabase
+      .from('content_drafts')
+      .select('research_topic_id')
+      .eq('id', draftId)
+      .maybeSingle();
+    const researchTopicId = (draftTopic as { research_topic_id: string | null } | null)?.research_topic_id;
+    if (researchTopicId) {
+      const { data: rt } = await supabase
+        .from('content_research_topics')
+        .select('topic, category, key_facts, hooks')
+        .eq('id', researchTopicId)
+        .maybeSingle();
+      if (rt) {
+        const { selectAffiliateProduct } = await import('@/lib/research/affiliate');
+        const result = await selectAffiliateProduct(supabase, {
+          topic: (rt as { topic: string }).topic,
+          category: (rt as { category: string | null }).category,
+          key_facts: Array.isArray((rt as { key_facts: unknown }).key_facts)
+            ? ((rt as { key_facts: string[] }).key_facts)
+            : undefined,
+          hooks: Array.isArray((rt as { hooks: unknown }).hooks)
+            ? ((rt as { hooks: Array<{ type: string; text: string }> }).hooks)
+            : undefined
+        });
+        if (result && result.product.id === (product as { id: string }).id) {
+          matchScore = result.matchScore;
+          matchSignals = result.signals;
+        }
+      }
+    }
+    const currentId = (draft.affiliate_injections as Array<{ id?: string }>)[0]?.id;
+    const oldHistory = Array.isArray(draft.affiliate_swap_history)
+      ? (draft.affiliate_swap_history as Array<unknown>)
+      : [];
+    const history = [
+      ...oldHistory,
+      {
+        from_id: currentId ?? null,
+        to_id: (product as { id: string }).id,
+        to_friendly_code: (product as { friendly_code: string }).friendly_code,
+        to_match_score: matchScore,
+        swapped_at: new Date().toISOString()
+      }
+    ].slice(-10);
+    const { error: updateError } = await supabase
+      .from('content_drafts')
+      .update({
+        affiliate_injections: [
+          {
+            id: (product as { id: string }).id,
+            friendly_code: (product as { friendly_code: string }).friendly_code,
+            url: (product as { url: string }).url,
+            post_index: 0,
+            match_score: matchScore,
+            match_signals: matchSignals
+          }
+        ],
+        affiliate_match_score: matchScore,
+        affiliate_match_signals: matchSignals,
+        affiliate_swap_history: history
+      })
+      .eq('id', draftId);
+    if (updateError) return { success: false, error: updateError.message };
+    return { success: true, draftId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function removeAffiliateInjection(
+  draftId: string
+): Promise<AffiliateAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    const { data: draft, error: draftError } = await supabase
+      .from('content_drafts')
+      .select('id, affiliate_injections, affiliate_swap_history')
+      .eq('id', draftId)
+      .maybeSingle();
+    if (draftError || !draft) {
+      return { success: false, error: draftError?.message ?? 'draft not found' };
+    }
+    const oldHistory = Array.isArray(draft.affiliate_swap_history)
+      ? (draft.affiliate_swap_history as Array<unknown>)
+      : [];
+    const currentId = (draft.affiliate_injections as Array<{ id?: string }>)[0]?.id;
+    const history = [
+      ...oldHistory,
+      {
+        from_id: currentId ?? null,
+        to_id: null,
+        action: 'removed',
+        swapped_at: new Date().toISOString()
+      }
+    ].slice(-10);
+    const { error: updateError } = await supabase
+      .from('content_drafts')
+      .update({
+        affiliate_injections: [],
+        affiliate_match_score: null,
+        affiliate_match_signals: null,
+        affiliate_swap_history: history
+      })
+      .eq('id', draftId);
+    if (updateError) return { success: false, error: updateError.message };
+    return { success: true, draftId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }

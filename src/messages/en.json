@@ -365,7 +365,24 @@
       "edit": "Edit",
       "approve": "Approve",
       "reject": "Reject",
-      "realtime": "Auto-refreshing"
+      "realtime": "Auto-refreshing",
+      "affiliate": {
+        "title": "Affiliate Product",
+        "relevance": {
+          "high": "Good match",
+          "medium": "Partial match",
+          "low": "Poor match"
+        },
+        "swap": "Swap Product",
+        "remove": "Remove",
+        "viewProduct": "View product",
+        "noProduct": "No affiliate product attached.",
+        "placeholderWarning": "Thread still contains {{PRODUCT_URL}} placeholders. Edit manually or swap product.",
+        "pickerTitle": "Pick Affiliate Product",
+        "pickerSearch": "Search products...",
+        "pickerEmpty": "No matching products.",
+        "pickerCurrent": "Current"
+      }
     }
   },
   "admin": {
@@ -374,6 +391,40 @@
       "body": "The admin page could not be loaded. Try again, or return to the dashboard.",
       "retry": "Retry",
       "backToDashboard": "Back to Dashboard"
+    },
+    "research": {
+      "title": "Research",
+      "intro": "4-stage research sessions (Discovery → Verification → Scoring → Development). Track progress or shortlist topics for development.",
+      "detailTitle": "Research Session",
+      "detailIntro": "Discovered topics, scores, and development actions.",
+      "notFound": "Not found.",
+      "empty": "No research sessions yet.",
+      "backToList": "Back to research list",
+      "backToSession": "Back to session",
+      "statusLabel": "Status",
+      "platformLabel": "Platform",
+      "createdLabel": "Created",
+      "errorLabel": "Error",
+      "draftsHeading": "Generated drafts",
+      "productLabel": "Product",
+      "topicsHeading": "Topics",
+      "noTopics": "No topics yet.",
+      "shortlistHeading": "Pick topics to develop",
+      "shortlistIntro": "Select 1 or more topics, then click Shortlist. After that click \"Lanjut ke Development\". Prefer verified topics with the highest score.",
+      "shortlistCount": "{count} shortlisted",
+      "shortlistAction": "Shortlist",
+      "rejectAction": "Reject",
+      "advanceAction": "Advance to Development",
+      "topicTitle": "Topic detail",
+      "whyNow": "Why now",
+      "audienceRelevance": "Audience relevance",
+      "uniqueAngle": "Unique angle",
+      "keyFacts": "Key facts",
+      "hooks": "Hooks",
+      "sources": "Sources",
+      "potentialRisk": "Potential risk",
+      "scoreBreakdown": "Score breakdown",
+      "finalScore": "Final score"
     },
     "dashboard": {
       "title": "Admin Dashboard",

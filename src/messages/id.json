@@ -365,7 +365,24 @@
       "edit": "Sunting",
       "approve": "Setujui",
       "reject": "Tolak",
-      "realtime": "Memperbarui otomatis"
+      "realtime": "Memperbarui otomatis",
+      "affiliate": {
+        "title": "Produk Afiliasi",
+        "relevance": {
+          "high": "Cocok",
+          "medium": "Kurang Cocok",
+          "low": "Tidak Cocok"
+        },
+        "swap": "Ganti Produk",
+        "remove": "Hapus",
+        "viewProduct": "Lihat produk",
+        "noProduct": "Tidak ada produk afiliasi terpasang.",
+        "placeholderWarning": "Thread masih mengandung placeholder {{PRODUCT_URL}}. Edit manual atau ganti produk.",
+        "pickerTitle": "Pilih Produk Afiliasi",
+        "pickerSearch": "Cari produk...",
+        "pickerEmpty": "Tidak ada produk yang cocok.",
+        "pickerCurrent": "Saat ini"
+      }
     }
   },
   "admin": {
@@ -374,6 +391,40 @@
       "body": "Halaman admin tidak dapat dimuat. Coba lagi, atau kembali ke dasbor.",
       "retry": "Coba lagi",
       "backToDashboard": "Kembali ke Dasbor"
+    },
+    "research": {
+      "title": "Riset",
+      "intro": "Sesi riset 4-tahap (Discovery → Verification → Scoring → Development). Pantau progres atau shortlist topik untuk dikembangkan.",
+      "detailTitle": "Detail Sesi Riset",
+      "detailIntro": "Topik yang ditemukan, skor, dan aksi pengembangan.",
+      "notFound": "Tidak ditemukan.",
+      "empty": "Belum ada sesi riset.",
+      "backToList": "Kembali ke daftar riset",
+      "backToSession": "Kembali ke sesi",
+      "statusLabel": "Status",
+      "platformLabel": "Platform",
+      "createdLabel": "Dibuat",
+      "errorLabel": "Error",
+      "draftsHeading": "Draf yang dihasilkan",
+      "productLabel": "Produk",
+      "topicsHeading": "Topik",
+      "noTopics": "Belum ada topik.",
+      "shortlistHeading": "Pilih topik untuk dikembangkan",
+      "shortlistIntro": "Pilih 1 atau lebih topik, lalu klik \"Shortlist\". Setelah itu klik \"Lanjut ke Development\". Pilih topik yang diverifikasi & skor tertinggi.",
+      "shortlistCount": "{count} topik shortlisted",
+      "shortlistAction": "Shortlist",
+      "rejectAction": "Tolak",
+      "advanceAction": "Lanjut ke Development",
+      "topicTitle": "Detail Topik",
+      "whyNow": "Mengapa sekarang",
+      "audienceRelevance": "Relevansi audiens",
+      "uniqueAngle": "Sudut pandang unik",
+      "keyFacts": "Fakta kunci",
+      "hooks": "Hook",
+      "sources": "Sumber",
+      "potentialRisk": "Risiko",
+      "scoreBreakdown": "Skor detail",
+      "finalScore": "Skor akhir"
     },
     "dashboard": {
       "title": "Dasbor Admin",

@@ -3,15 +3,19 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CopyButton } from './CopyButton';
+import { AffiliateProductCard } from './AffiliateProductCard';
+import { countPlaceholdersInThread } from '@/lib/llm/prompt';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
 interface Draft {
   id: string;
   request_id: string;
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
-  affiliate_injections: { friendly_code: string; url: string; post_index: number }[];
+  affiliate_injections: { id?: string; friendly_code: string; url: string; post_index: number; match_score?: number; match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number } }[];
   status: string;
   llm_meta?: { provider: string; model: string };
+  affiliate_match_score?: number | null;
+  research_topic_id?: string | null;
 }
 
 export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
@@ -203,6 +207,13 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
       ) : null}
 
       {draft.status !== 'needs_review' ? <p className="mt-2 text-xs text-ink-muted">Status: {draft.status}</p> : null}
+
+      <AffiliateProductCard
+        draftId={draft.id}
+        injection={draft.affiliate_injections[0] ?? null}
+        matchScore={draft.affiliate_match_score ?? null}
+        hasPlaceholderWarning={countPlaceholdersInThread(draft.generated_thread) > 0 && draft.affiliate_injections.length === 0}
+      />
     </article>
   );
 }
