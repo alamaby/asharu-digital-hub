@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ProviderRegistry } from './registry';
 import { KeyPool } from './key-pool';
 import type { ChatInput, ChatOutput, ProviderRow, LLMProvider } from './types';
+import { LLMHttpError } from './types';
 import { OpenAICompatibleProvider } from './providers/openai-compatible';
 import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
@@ -17,14 +18,18 @@ export interface LLMCompletionInput {
   messages: ChatInput['messages'];
   temperature?: number;
   maxTokens?: number;
-  modelHint?: string; // optional partial match; falls back to provider default
+  modelHint?: string;
+  /** Optional request/session id for llm_call_logs auditing. */
+  requestId?: string;
+  /** Stage tag for llm_call_logs (e.g. 'discovering'). */
+  stage?: string;
 }
 
 /**
  * Run a single LLM completion with provider fallback.
  * Tries each active provider in priority order; on HTTP failure (4xx/5xx)
  * moves to the next provider; on content/parse error stops with the last
- * error so the caller can decide.
+ * error so the caller can decide. Logs each attempt to llm_call_logs.
  */
 export async function runLLMCompletion(
   supabase: SupabaseClient,
@@ -38,10 +43,10 @@ export async function runLLMCompletion(
   let lastError: unknown = null;
   for (const prov of providers) {
     const pool = new KeyPool(prov);
+    const model = input.modelHint ?? (await pickDefaultModel(supabase, prov.id));
     try {
       const { result, keyRow } = await pool.withFallback(async (apiKey) => {
         const provider = providerFromRow(prov);
-        const model = input.modelHint ?? (await pickDefaultModel(supabase, prov.id));
         return provider.chat(
           {
             model,
@@ -57,6 +62,18 @@ export async function runLLMCompletion(
         provider: prov.slug,
         keyId: keyRow.id
       };
+      // Audit log (best-effort; failures don't break the flow).
+      await supabase
+        .from('llm_call_logs')
+        .insert({
+          request_id: input.requestId ?? null,
+          provider_slug: prov.slug,
+          model_id: result.model,
+          key_hash: keyRow.key_hash,
+          latency_ms: result.latencyMs,
+          http_status: 200
+        })
+        .then(() => undefined, () => undefined);
       return {
         output,
         providerSlug: prov.slug,
@@ -66,6 +83,17 @@ export async function runLLMCompletion(
       };
     } catch (e) {
       lastError = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      await supabase
+        .from('llm_call_logs')
+        .insert({
+          request_id: input.requestId ?? null,
+          provider_slug: prov.slug,
+          model_id: model,
+          error: msg.slice(0, 500),
+          http_status: e instanceof LLMHttpError ? e.status : null
+        })
+        .then(() => undefined, () => undefined);
     }
   }
   throw lastError ?? new Error('All LLM providers failed');

@@ -151,11 +151,16 @@ ATURAN HOOK
 DIVERSITAS
 Daftar akhir harus mencakup kombinasi: aktual, bermanfaat, emosional, sejarah/evergreen, percakapan.
 
+WAJIB
+- Anda HARUS mengembalikan minimal 5 topik di recommended_topics.
+- JANGAN mengembalikan array kosong. Jika sumber terbatas, tetap buat topik dari apa yang tersedia.
+- Jika benar-benar tidak ada topik yang valid, kembalikan 1 topik terbaik dengan verification_status "unverified" + alasan di rejected_topics.
+
 FORMAT KELUARAN
-Kembalikan hasil sebagai JSON valid tanpa teks tambahan sesuai schema research_output_schema. Bahasa output utama: ${lang}.`.trim();
+Kembalikan hasil sebagai JSON valid tanpa teks tambahan. Schema: { "research_time": "...", "target_audience": "...", "search_summary": {...}, "recommended_topics": [ {...} ], "rejected_topics": [...] }. Bahasa output utama: ${lang}.`.trim();
 
   const searchContext = searchResults
-    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal tidak diketahui'}] ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 600)}`)
+    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal tidak diketahui'}] ${r.title}\n   URL: ${r.url}\n   ${r.content.slice(0, 400)}`)
     .join('\n\n');
 
   const user = `Hasil pencarian web (gunakan sebagai basis fakta; jangan mengarang di luar ini):

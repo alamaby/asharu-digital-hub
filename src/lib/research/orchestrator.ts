@@ -102,7 +102,12 @@ export async function advanceStage(
         return await runStage(supabase, sessionId, 'discovering', session);
       }
       case 'discovering': {
-        await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+        const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+        if (result.topics.length === 0) {
+          throw new Error(
+            'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Coba lagi setelah cek prompt/model.'
+          );
+        }
         await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
         return { status: 'verifying', advanced: true };
       }
@@ -158,7 +163,12 @@ async function runStage(
   session: ResearchSessionRow
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   if (stage === 'discovering') {
-    await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+    const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+    if (result.topics.length === 0) {
+      throw new Error(
+        'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Cek prompt/model/tavily.'
+      );
+    }
     await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
     return { status: 'verifying', advanced: true };
   }

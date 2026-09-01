@@ -80,7 +80,9 @@ function dedupResults(results: SearchResult[]): SearchResult[] {
 }
 
 function chunkSourcesForLLM(results: SearchResult[]): SearchResult[] {
-  return results.slice(0, 25);
+  // Cap at 10 results to keep the prompt manageable for smaller models
+  // (25 results × 600 chars overwhelmed nemotron-3-ultra → empty output).
+  return results.slice(0, 10);
 }
 
 export interface DiscoveryRunResult {
@@ -122,6 +124,8 @@ export async function runDiscovery(
 
   const { system, user } = buildDiscoveryPrompt(input, chunked);
   const result = await runLLMCompletion(supabase, {
+    requestId: sessionId,
+    stage: 'discovering',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }

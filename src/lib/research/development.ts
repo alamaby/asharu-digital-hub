@@ -124,6 +124,8 @@ async function generateAndInsertDraft(
   );
 
   const llmResult = await runLLMCompletion(supabase, {
+    requestId: sessionId,
+    stage: 'developing',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }

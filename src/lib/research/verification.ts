@@ -39,6 +39,8 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
 
   const { system, user } = buildVerificationPrompt({ topic: { topic: 'batch' }, candidates });
   const result = await runLLMCompletion(supabase, {
+    requestId: sessionId,
+    stage: 'verifying',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }
