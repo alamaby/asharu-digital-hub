@@ -60,11 +60,21 @@ export class TavilyProvider implements SearchProvider {
     };
     if (timeRange) body.days = daysFromRange(timeRange);
 
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    let res: Response;
+    try {
+      res = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (e) {
+      throw new Error(`Tavily search network error: ${(e as Error).message}`);
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!res.ok) {
       throw new Error(`Tavily search failed: ${res.status} ${await res.text().catch(() => '')}`);
     }

@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { canTransition, isTerminal, nextStage, type ResearchStatus } from './state-machine';
+import { canTransition, isTerminal, type ResearchStatus } from './state-machine';
 import { runDiscovery } from './discovery';
 import { runVerification } from './verification';
 import { runScoring } from './scoring';
@@ -43,8 +43,38 @@ function buildDiscoveryInput(row: ResearchSessionRow) {
 }
 
 /**
- * Advance a research session one stage. Idempotent: if the session is in
- * the target stage already (and not the next), the call is a no-op.
+ * Atomically transition a session's status. Returns true if the row was
+ * updated (caller owned the prior status), false otherwise. This is the
+ * only place status changes happen — the RPC `advance_research_stage` is
+ * no longer used; this UPDATE replaces both the timestamp stamp and the
+ * status change in a single statement with row-level locking via WHERE.
+ */
+async function atomicTransition(
+  supabase: SupabaseClient,
+  sessionId: string,
+  from: ResearchStatus,
+  to: ResearchStatus
+): Promise<boolean> {
+  if (from === to) return true;
+  if (!canTransition(from, to)) return false;
+  const { data } = await supabase
+    .from('content_research_sessions')
+    .update({
+      status: to,
+      current_stage_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', sessionId)
+    .eq('status', from)
+    .select('id')
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
+ * Advance a research session one stage. Idempotent: if the row's status is
+ * not in the expected from-state (e.g. another worker already advanced it),
+ * the stage is skipped without error.
  */
 export async function advanceStage(
   supabase: SupabaseClient,
@@ -66,32 +96,33 @@ export async function advanceStage(
   try {
     switch (session.status) {
       case 'pending': {
-        // Start with discovery
-        await transitionTo(supabase, sessionId, 'discovering');
-        return await advanceStage(supabase, sessionId);
+        // Inline: don't recurse (would lose error context + risk stack overflow).
+        const moved = await atomicTransition(supabase, sessionId, 'pending', 'discovering');
+        if (!moved) return { status: 'discovering', advanced: false };
+        return await runStage(supabase, sessionId, 'discovering', session);
       }
       case 'discovering': {
         await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
-        await transitionTo(supabase, sessionId, 'verifying');
+        await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
         return { status: 'verifying', advanced: true };
       }
       case 'verifying': {
         await runVerification(supabase, sessionId);
-        await transitionTo(supabase, sessionId, 'scoring');
+        await atomicTransition(supabase, sessionId, 'verifying', 'scoring');
         return { status: 'scoring', advanced: true };
       }
       case 'scoring': {
         await runScoring(supabase, sessionId);
-        await transitionTo(supabase, sessionId, 'awaiting_selection');
+        await atomicTransition(supabase, sessionId, 'scoring', 'awaiting_selection');
         return { status: 'awaiting_selection', advanced: true };
       }
       case 'awaiting_selection': {
-        // Wait for admin to shortlist + click "Lanjut ke Development"
+        // Wait for admin to shortlist + click "Lanjut ke Development".
         return { status: 'awaiting_selection', advanced: false };
       }
       case 'developing': {
         await runDevelopment(supabase, sessionId);
-        await transitionTo(supabase, sessionId, 'completed');
+        await atomicTransition(supabase, sessionId, 'developing', 'completed');
         return { status: 'completed', advanced: true };
       }
       default:
@@ -99,10 +130,13 @@ export async function advanceStage(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // Best-effort failure flag. The status predicate is also bounded so
+    // we don't accidentally mark a non-active session as failed.
     await supabase
       .from('content_research_sessions')
       .update({ status: 'failed', error_message: message })
-      .eq('id', sessionId);
+      .eq('id', sessionId)
+      .in('status', ['pending', 'discovering', 'verifying', 'scoring', 'developing']);
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: session.status,
@@ -113,54 +147,40 @@ export async function advanceStage(
   }
 }
 
-async function transitionTo(
+/**
+ * After atomicTransition to a new "in-flight" status, run the work for that
+ * stage. On exception, the outer catch in advanceStage flips to 'failed'.
+ */
+async function runStage(
   supabase: SupabaseClient,
   sessionId: string,
-  to: ResearchStatus
-): Promise<void> {
-  // RPC advance_research_stage returns the current (pre-update) status and
-  // stamps current_stage_started_at atomically.
-  await supabase.rpc('advance_research_stage', { p_session_id: sessionId });
-  // Then we set the new status (RPC doesn't accept a target status — it
-  // just stamps the timestamp; the state transition itself is owned by the
-  // orchestrator). The status update is a separate write; the timestamp stamp
-  // is sufficient for the cron job's "started > 60s ago" guard.
-  const { data: row } = await supabase
-    .from('content_research_sessions')
-    .select('status')
-    .eq('id', sessionId)
-    .single();
-  const current = (row as { status: ResearchStatus } | null)?.status;
-  if (!current) return;
-  if (current === to) return;
-  if (!canTransition(current, to)) {
-    throw new Error(`invalid transition: ${current} -> ${to}`);
+  stage: ResearchStatus,
+  session: ResearchSessionRow
+): Promise<{ status: ResearchStatus; advanced: boolean }> {
+  if (stage === 'discovering') {
+    await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+    await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
+    return { status: 'verifying', advanced: true };
   }
-  await supabase
-    .from('content_research_sessions')
-    .update({
-      status: to,
-      current_stage_started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', sessionId);
-  // Silence unused-import warning for `nextStage` — kept for future use.
-  void nextStage;
+  return { status: stage, advanced: false };
 }
 
 /**
  * Bulk advance: pick up to N sessions in active stages and advance one
- * stage each. Returns the number advanced.
+ * stage each. The cron guard window (default 5 min) protects against
+ * double-firing for long stages like discovery.
  */
 export async function advancePendingSessions(
   supabase: SupabaseClient,
-  limit: number
+  limit: number,
+  guardMs: number = 5 * 60 * 1000
 ): Promise<number> {
+  const cutoff = new Date(Date.now() - guardMs).toISOString();
   const { data: rows, error } = await supabase
     .from('content_research_sessions')
     .select('id, status, current_stage_started_at')
     .in('status', ['pending', 'discovering', 'verifying', 'scoring', 'developing'])
-    .lt('current_stage_started_at', new Date(Date.now() - 60_000).toISOString())
+    .lt('current_stage_started_at', cutoff)
     .order('current_stage_started_at', { ascending: true })
     .limit(limit);
   if (error) {

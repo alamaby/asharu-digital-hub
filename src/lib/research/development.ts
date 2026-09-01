@@ -13,23 +13,13 @@ const threadSchema = z.object({
     .max(5)
 });
 
-interface DevelopmentInput {
-  topic: {
-    id: string;
-    topic: string;
-    category: string | null;
-    key_facts: unknown;
-    hooks: unknown;
-    unique_angle: string | null;
-  };
-  platform: { slug: string; maxChars: number | null };
-  tone: string;
-  audience: string;
-  ctaStyle: string;
-  purpose: string;
-  language: string;
-  constraints?: string | null;
-  keywords?: string | null;
+interface ShortlistedTopic {
+  id: string;
+  topic: string;
+  category: string | null;
+  key_facts: unknown;
+  hooks: unknown;
+  unique_angle: string | null;
 }
 
 export async function runDevelopment(
@@ -38,9 +28,7 @@ export async function runDevelopment(
 ): Promise<void> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select(
-      'id, platform_slug, tone, account_goal, audience_age, audience_interests, target_location'
-    )
+    .select('id, platform_slug, tone, account_goal, audience_age, audience_interests, target_location')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
@@ -50,8 +38,6 @@ export async function runDevelopment(
     tone: string | null;
     account_goal: string | null;
     audience_age: string | null;
-    audience_interests: string[] | null;
-    target_location: string | null;
   };
 
   const { data: topics, error: topicError } = await supabase
@@ -69,16 +55,8 @@ export async function runDevelopment(
       .eq('id', sessionId);
     return;
   }
-  const topic = topics[0] as {
-    id: string;
-    topic: string;
-    category: string | null;
-    key_facts: unknown;
-    hooks: unknown;
-    unique_angle: string | null;
-  };
+  const topic = topics[0] as ShortlistedTopic;
 
-  // Platform info
   const platformSlug = sess.platform_slug ?? 'threads';
   const { data: platformRow } = await supabase
     .from('platforms')
@@ -90,19 +68,7 @@ export async function runDevelopment(
     maxChars: (platformRow as { max_chars: number | null } | null)?.max_chars ?? null
   };
 
-  // Build placeholder topic text (the LLM drafts around the topic)
-  const input: DevelopmentInput = {
-    topic,
-    platform,
-    tone: sess.tone ?? 'casual',
-    audience: sess.audience_age ?? 'umum',
-    ctaStyle: 'soft_sell',
-    purpose: sess.account_goal ?? 'membagikan informasi bermanfaat',
-    language: 'both'
-  };
-
-  // We need a real product for the LLM prompt. Select the affiliate first so
-  // the prompt has a concrete product to weave in.
+  // Select affiliate (may be null if pool is empty).
   const affiliate = await selectAffiliateProduct(supabase, {
     topic: topic.topic,
     category: topic.category,
@@ -113,101 +79,50 @@ export async function runDevelopment(
       : undefined
   });
 
-  if (!affiliate) {
-    // No recent products — create draft without injection + flag.
-    await generateAndInsertDraft(supabase, sessionId, topic.id, input, null);
-    return;
-  }
-
-  // Call LLM with product inlined
-  const { system, user } = buildThreadPrompt(
-    {
-      topic: input.topic.topic,
-      platform: { slug: input.platform.slug, maxChars: input.platform.maxChars },
-      tone: input.tone,
-      audience: input.audience,
-      ctaStyle: input.ctaStyle,
-      purpose: input.purpose,
-      language: input.language
-    },
-    {
-      friendlyCode: affiliate.product.friendly_code,
-      name: affiliate.product.name_id,
-      url: affiliate.product.url,
-      category: affiliate.product.category
-    }
-  );
-  const llmResult = await runLLMCompletion(supabase, {
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ],
-    temperature: 0.7
-  });
-  const parsed = parseThread(llmResult.output.text);
-  if (!parsed) {
-    throw new Error('thread parse failed');
-  }
-  // Inject product URL into placeholders
-  const replaced = replacePlaceholders(parsed, affiliate.product.url);
-
-  await supabase.from('content_drafts').insert({
-    request_id: sessionId,
-    provider_id: null,
-    model_id: llmResult.model,
-    research_topic_id: topic.id,
-    generated_thread: replaced as unknown as Record<string, unknown>,
-    affiliate_injections: [
-      {
-        friendly_code: affiliate.product.friendly_code,
-        url: affiliate.product.url,
-        post_index: 0,
-        match_score: affiliate.matchScore,
-        match_signals: affiliate.signals
-      }
-    ] as unknown as Record<string, unknown>[],
-    status: 'needs_review',
-    llm_meta: {
-      provider: llmResult.providerSlug,
-      model: llmResult.model,
-      latency_ms: llmResult.latencyMs,
-      key_hash: llmResult.keyHash
-    },
-    affiliate_match_score: affiliate.matchScore,
-    affiliate_match_signals: affiliate.signals as unknown as Record<string, unknown>
-  });
-  await supabase.from('content_research_logs').insert({
-    session_id: sessionId,
-    stage: 'developing',
-    level: 'info',
-    message: `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore})`
-  });
+  await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
 }
 
 async function generateAndInsertDraft(
   supabase: SupabaseClient,
   sessionId: string,
   topicId: string,
-  input: DevelopmentInput,
+  platform: { slug: string; maxChars: number | null },
+  sess: { tone: string | null; account_goal: string | null; audience_age: string | null },
+  topic: ShortlistedTopic,
   affiliate: SelectedAffiliate | null
 ): Promise<void> {
+  const tone = sess.tone ?? 'casual';
+  const audience = sess.audience_age ?? 'umum';
+  const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
+
+  // Synthesize a placeholder product for the LLM when no affiliate matched.
+  const promptProduct = affiliate
+    ? {
+        friendlyCode: affiliate.product.friendly_code,
+        name: affiliate.product.name_id,
+        url: affiliate.product.url,
+        category: affiliate.product.category
+      }
+    : {
+        friendlyCode: 'NONE',
+        name: 'tanpa afiliasi',
+        url: 'https://example.com',
+        category: '-'
+      };
+
   const { system, user } = buildThreadPrompt(
     {
-      topic: input.topic.topic,
-      platform: { slug: input.platform.slug, maxChars: input.platform.maxChars },
-      tone: input.tone,
-      audience: input.audience,
-      ctaStyle: input.ctaStyle,
-      purpose: input.purpose,
-      language: input.language
+      topic: topic.topic,
+      platform: { slug: platform.slug, maxChars: platform.maxChars },
+      tone,
+      audience,
+      ctaStyle: 'soft_sell',
+      purpose,
+      language: 'both'
     },
-    {
-      friendlyCode: 'NONE',
-      name: 'tanpa afiliasi',
-      url: 'https://example.com',
-      category: '-'
-    }
+    promptProduct
   );
+
   const llmResult = await runLLMCompletion(supabase, {
     messages: [
       { role: 'system', content: system },
@@ -215,12 +130,27 @@ async function generateAndInsertDraft(
     ],
     temperature: 0.7
   });
+
   const parsed = parseThread(llmResult.output.text);
   if (!parsed) {
-    throw new Error('thread parse failed (no-affiliate path)');
+    throw new Error('thread parse failed');
   }
+
+  // Replace placeholders only when an affiliate was selected.
+  const replaced = affiliate
+    ? replacePlaceholders(parsed, affiliate.product.url)
+    : parsed;
+
+  // Look up provider_id from slug (for the foreign key).
+  const { data: providerRow } = await supabase
+    .from('llm_providers')
+    .select('id')
+    .eq('slug', llmResult.providerSlug)
+    .maybeSingle();
+  const providerId = (providerRow as { id: string } | null)?.id ?? null;
+
   const injection = affiliate
-    ? ([
+    ? [
         {
           friendly_code: affiliate.product.friendly_code,
           url: affiliate.product.url,
@@ -228,15 +158,16 @@ async function generateAndInsertDraft(
           match_score: affiliate.matchScore,
           match_signals: affiliate.signals
         }
-      ] as unknown as Record<string, unknown>[])
-    : ([] as unknown as Record<string, unknown>[]);
+      ]
+    : [];
+
   await supabase.from('content_drafts').insert({
     request_id: sessionId,
-    provider_id: null,
+    provider_id: providerId,
     model_id: llmResult.model,
     research_topic_id: topicId,
-    generated_thread: parsed as unknown as Record<string, unknown>,
-    affiliate_injections: injection,
+    generated_thread: replaced as unknown as Record<string, unknown>,
+    affiliate_injections: injection as unknown as Record<string, unknown>[],
     status: 'needs_review',
     llm_meta: {
       provider: llmResult.providerSlug,
@@ -245,8 +176,18 @@ async function generateAndInsertDraft(
       key_hash: llmResult.keyHash
     },
     affiliate_match_score: affiliate?.matchScore ?? null,
-    affiliate_match_signals:
-      (affiliate?.signals as unknown as Record<string, unknown>) ?? null
+    affiliate_match_signals: affiliate
+      ? (affiliate.signals as unknown as Record<string, unknown>)
+      : null
+  });
+
+  await supabase.from('content_research_logs').insert({
+    session_id: sessionId,
+    stage: 'developing',
+    level: 'info',
+    message: affiliate
+      ? `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore})`
+      : 'draft generated without affiliate (empty pool)'
   });
 }
 
@@ -278,6 +219,6 @@ function replacePlaceholders(
   const repl = (s: string) => s.split('{{PRODUCT_URL}}').join(productUrl);
   return {
     main: { id: repl(thread.main.id), en: repl(thread.main.en) },
-    replies: thread.replies.map((r) => ({ id: repl(r.id), en: repl(r.en) }))
+    replies: thread.replies.map((r: { id: string; en: string }) => ({ id: repl(r.id), en: repl(r.en) }))
   };
 }
