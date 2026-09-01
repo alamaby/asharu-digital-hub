@@ -215,8 +215,28 @@ Kurangi skor jika: sudah terlalu banyak digunakan tanpa angle baru, gosip, judul
 
 FINAL_SCORE = rata-rata terbobot dari 8 sub-skor (skala 0-10), dikurangi penalty (0-2).
 
-FORMAT KELUARAN
-JSON valid. Bahasa utama: ${lang}.`.trim();
+FORMAT KELUARAN (WAJIB ikuti schema ini)
+Kembalikan JSON valid tanpa teks tambahan:
+{
+  "results": [
+    {
+      "topic_id": "id-topik-dari-input",
+      "score_breakdown": {
+        "freshness": 0-10,
+        "local_relevance": 0-10,
+        "practical_value": 0-10,
+        "curiosity": 0-10,
+        "emotional_resonance": 0-10,
+        "credibility": 0-10,
+        "conversation_potential": 0-10,
+        "brand_relevance": 0-10,
+        "penalty": 0-2,
+        "final_score": 0-10
+      }
+    }
+  ]
+}
+Bahasa utama: ${lang}.`.trim();
 
   const user = JSON.stringify(input.topic, null, 2);
   return { system, user };

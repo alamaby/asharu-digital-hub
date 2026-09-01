@@ -74,6 +74,12 @@ export async function runScoring(
     ],
     temperature: 0.2
   });
+  await supabase.from('content_research_logs').insert({
+    session_id: sessionId,
+    stage: 'scoring',
+    level: 'info',
+    message: `scoring LLM raw (first 2000 chars): ${result.output.text.slice(0, 2000)}`
+  });
   const parsed = parseScoringOutput(result.output.text, topics as TopicForScoring[]);
   for (const item of parsed) {
     if (!item.topic_id) continue;
@@ -103,22 +109,24 @@ function serializeTopics(topics: TopicForScoring[]): {
   uniqueAngle: string | null;
   hooks: Array<{ type: string; text: string }>;
 } {
-  // Flatten all topics into a single prompt payload (the LLM iterates and
-  // returns a results array).
+  // Pass topics as a JSON array (in the `topic` field) so small models can
+  // clearly see the per-topic fields they need to score. Other fields are
+  // blank placeholders (unused by the scoring prompt).
   return {
-    topic: topics
-      .map(
-        (t, i) =>
-          `### Topic #${i + 1} (id=${t.id})\n` +
-          `topic: ${t.topic}\n` +
-          `category: ${t.category ?? '-'}\n` +
-          `why_now: ${t.why_now ?? '-'}\n` +
-          `audience_relevance: ${t.audience_relevance ?? '-'}\n` +
-          `key_facts: ${Array.isArray(t.key_facts) ? JSON.stringify(t.key_facts) : '[]'}\n` +
-          `unique_angle: ${t.unique_angle ?? '-'}\n` +
-          `hooks: ${Array.isArray(t.hooks) ? JSON.stringify(t.hooks) : '[]'}`
-      )
-      .join('\n\n'),
+    topic: JSON.stringify(
+      topics.map((t) => ({
+        id: t.id,
+        topic: t.topic,
+        category: t.category ?? null,
+        why_now: t.why_now ?? null,
+        audience_relevance: t.audience_relevance ?? null,
+        key_facts: Array.isArray(t.key_facts) ? t.key_facts : [],
+        unique_angle: t.unique_angle ?? null,
+        hooks: Array.isArray(t.hooks) ? t.hooks : []
+      })),
+      null,
+      2
+    ),
     category: null,
     whyNow: null,
     audienceRelevance: null,
