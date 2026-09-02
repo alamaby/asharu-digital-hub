@@ -38,8 +38,7 @@ export async function runDevelopment(
     .select('id, topic, category, key_facts, hooks, unique_angle')
     .eq('session_id', sessionId)
     .eq('status', 'shortlisted')
-    .order('rank', { ascending: true })
-    .limit(1);
+    .order('rank', { ascending: true });
   if (topicError) throw new Error('topic fetch failed');
   if (!topics || topics.length === 0) {
     await supabase
@@ -48,7 +47,7 @@ export async function runDevelopment(
       .eq('id', sessionId);
     return;
   }
-  const topic = topics[0] as ShortlistedTopic;
+  const allTopics = topics as ShortlistedTopic[];
 
   const platformSlug = sess.platform_slug ?? 'all';
   let maxChars: number | null = null;
@@ -77,18 +76,44 @@ export async function runDevelopment(
     maxChars
   };
 
-  // Select affiliate (may be null if pool is empty).
-  const affiliate = await selectAffiliateProduct(supabase, {
-    topic: topic.topic,
-    category: topic.category,
-    unique_angle: topic.unique_angle,
-    key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
-    hooks: Array.isArray(topic.hooks)
-      ? (topic.hooks as Array<{ type: string; text: string }>)
-      : undefined
-  });
+  // Idempotency: skip topics that already have a draft so cron re-picks and
+  // inline retries don't produce duplicates.
+  const topicIds = allTopics.map((t) => t.id);
+  const { data: existingDrafts } = await supabase
+    .from('content_drafts')
+    .select('research_topic_id')
+    .in('research_topic_id', topicIds);
+  const doneTopicIds = new Set(
+    ((existingDrafts ?? []) as { research_topic_id: string | null }[])
+      .map((d) => d.research_topic_id)
+      .filter((v): v is string => Boolean(v))
+  );
+  const pendingTopics = allTopics.filter((t) => !doneTopicIds.has(t.id));
 
-  await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
+  if (pendingTopics.length === 0) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'info',
+      message: `all ${allTopics.length} shortlisted topics already have drafts; nothing to do`
+    });
+    return;
+  }
+
+  for (const topic of pendingTopics) {
+    // Select affiliate per-topic (may be null if pool is empty).
+    const affiliate = await selectAffiliateProduct(supabase, {
+      topic: topic.topic,
+      category: topic.category,
+      unique_angle: topic.unique_angle,
+      key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
+      hooks: Array.isArray(topic.hooks)
+        ? (topic.hooks as Array<{ type: string; text: string }>)
+        : undefined
+    });
+
+    await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
+  }
 }
 
 async function generateAndInsertDraft(
@@ -196,7 +221,12 @@ async function generateAndInsertDraft(
           url: affiliate.product.url,
           post_index: resolvedPostIndex,
           match_score: affiliate.matchScore,
-          match_signals: affiliate.signals
+          match_signals: affiliate.signals,
+          product_name_id: affiliate.product.name_id,
+          product_name_en: affiliate.product.name_en,
+          product_image: affiliate.product.image,
+          product_category: affiliate.product.category,
+          product_merchant: affiliate.product.merchant
         }
       ]
     : [];

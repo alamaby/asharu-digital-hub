@@ -356,7 +356,9 @@
     "review": {
       "title": "Review Content Drafts",
       "empty": "No drafts to review yet.",
-      "loading": "Loading drafts…",
+      "loading": "Loading drafts...",
+      "backToList": "Back to draft list",
+      "notFound": "Draft not found.",
       "productChip": "Product ASH-{code}",
       "postMain": "Main Post",
       "reply": "Reply {n}",

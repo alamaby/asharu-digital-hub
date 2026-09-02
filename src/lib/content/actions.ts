@@ -5,7 +5,6 @@ import { headers } from 'next/headers';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
-import { advanceStage } from '@/lib/research/orchestrator';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -297,7 +296,7 @@ export async function retrySession(sessionId: string): Promise<ResearchAdminResu
     // the back-dated current_stage_started_at lets pg_cron re-pick. Errors
     // are surfaced but do not roll back the reset.
     try {
-      await advanceStage(supabase, sessionId);
+      const { advanceStage } = await import('@/lib/research/orchestrator'); await advanceStage(supabase, sessionId);
     } catch (e) {
       return { success: true, error: `retry started but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
     }
@@ -374,7 +373,7 @@ export async function resumeSession(sessionId: string): Promise<ResearchAdminRes
     // instead of waiting up to 10 minutes for the pg_cron tick. The back-dated
     // current_stage_started_at lets cron re-pick if this inline call fails.
     try {
-      await advanceStage(supabase, sessionId);
+      const { advanceStage } = await import('@/lib/research/orchestrator'); await advanceStage(supabase, sessionId);
     } catch (e) {
       return { success: true, error: `resumed but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
     }
@@ -473,7 +472,7 @@ export async function advanceToDevelopment(
     // call times out or throws. Errors here are surfaced but do not roll back
     // the transition — cron will retry.
     try {
-      await advanceStage(supabase, sessionId);
+      const { advanceStage } = await import('@/lib/research/orchestrator'); await advanceStage(supabase, sessionId);
     } catch (e) {
       return { success: true, error: `stage transitioned but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
     }
@@ -507,6 +506,7 @@ export async function swapAffiliateProduct(
     if (prodError || !product) {
       return { success: false, error: prodError?.message ?? 'product not found' };
     }
+    const prod = product as { id: string; friendly_code: string; url: string; name_id: string; name_en: string; image: string; category: string; merchant: string };
     const { data: draft, error: draftError } = await supabase
       .from('content_drafts')
       .select('id, affiliate_injections, affiliate_swap_history')
@@ -546,7 +546,7 @@ export async function swapAffiliateProduct(
             ? ((rt as { hooks: Array<{ type: string; text: string }> }).hooks)
             : undefined
         });
-        if (result && result.product.id === (product as { id: string }).id) {
+        if (result && result.product.id === prod.id) {
           matchScore = result.matchScore;
           matchSignals = result.signals;
         }
@@ -560,8 +560,8 @@ export async function swapAffiliateProduct(
       ...oldHistory,
       {
         from_id: currentId ?? null,
-        to_id: (product as { id: string }).id,
-        to_friendly_code: (product as { friendly_code: string }).friendly_code,
+        to_id: prod.id,
+        to_friendly_code: prod.friendly_code,
         to_match_score: matchScore,
         swapped_at: new Date().toISOString()
       }
@@ -571,12 +571,17 @@ export async function swapAffiliateProduct(
       .update({
         affiliate_injections: [
           {
-            id: (product as { id: string }).id,
-            friendly_code: (product as { friendly_code: string }).friendly_code,
-            url: (product as { url: string }).url,
+            id: prod.id,
+            friendly_code: prod.friendly_code,
+            url: prod.url,
             post_index: 0,
             match_score: matchScore,
-            match_signals: matchSignals
+            match_signals: matchSignals,
+            product_name_id: prod.name_id,
+            product_name_en: prod.name_en,
+            product_image: prod.image,
+            product_category: prod.category,
+            product_merchant: prod.merchant
           }
         ],
         affiliate_match_score: matchScore,

@@ -43,7 +43,9 @@ export function buildThreadPrompt(
     '- Tone, audience, CTA style, purpose, and constraints must be respected.',
     '- AFFILIATE PLACEMENT: tempatkan {{PRODUCT_URL}} di reply TENGAH (atau kedua terakhir jika genap). DILARANG menempatkan {{PRODUCT_URL}} di main post.',
     '- AFFILIATE STYLE: reply yang berisi {{PRODUCT_URL}} wajib dibungkus 1-2 kalimat basa-basi konversasional yang menjelaskan kenapa produk ini relevan dengan topik (natural soft-sell). DILARANG menaruh bare link tanpa konteks/kalimat pengantar.',
-    '- Inject EXACTLY 1 occurrence of {{PRODUCT_URL}}.'
+    '- Inject EXACTLY 1 occurrence of {{PRODUCT_URL}}.',
+    '- BAHASA: Output HANYA huruf Latin, angka, tanda baca standar, dan emoji relevan. DILARANG karakter CJK/Chinese/Kanji/Hangul/Katakana/Hiragana. Tulis ID & EN dalam bahasa yang benar.',
+    '- Jangan tinggalkan slot kata/nama kosong di kalimat (mis. "produk dari ___"). Nama produk diwakili link {{PRODUCT_URL}}; jangan buat kalimat dengan placeholder kosong.'
   ].join('\n');
 
   const maxCharsNote = input.platform.maxChars

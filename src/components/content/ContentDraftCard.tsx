@@ -11,7 +11,7 @@ interface Draft {
   id: string;
   request_id: string;
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
-  affiliate_injections: { id?: string; friendly_code: string; url: string; post_index: number; match_score?: number; match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number } }[];
+  affiliate_injections: { id?: string; friendly_code: string; url: string; post_index: number; match_score?: number; match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number }; product_name_id?: string; product_name_en?: string; product_image?: string; product_category?: string; product_merchant?: string }[];
   status: string;
   llm_meta?: { provider: string; model: string };
   affiliate_match_score?: number | null;
@@ -126,7 +126,16 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
               ) : (
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">{text}</p>
               )}
-              {injections && isInjected ? <p className="mt-1 text-xs text-primary">{injections.url}</p> : null}
+              {injections && isInjected ? (
+                <a
+                  href={injections.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-1 block break-words text-xs text-primary underline"
+                >
+                  {injections.url} ↗
+                </a>
+              ) : null}
             </div>
           );
         })}

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { useRouter } from '@/i18n/navigation';
 import { swapAffiliateProduct, removeAffiliateInjection } from '@/lib/content/actions';
 import { relevanceBand } from '@/lib/research/affiliate';
@@ -14,6 +15,11 @@ interface Injection {
   post_index: number;
   match_score?: number;
   match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number };
+  product_name_id?: string;
+  product_name_en?: string;
+  product_image?: string;
+  product_category?: string;
+  product_merchant?: string;
 }
 
 interface Props {
@@ -77,10 +83,24 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
 
       {injection ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          {injection.product_image ? (
+            <Image
+              src={injection.product_image}
+              alt={injection.product_name_id ?? injection.friendly_code}
+              width={64}
+              height={64}
+              className="size-16 shrink-0 rounded-lg border border-line object-cover"
+              loading="lazy"
+            />
+          ) : null}
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-ink">
-              ASH-{injection.friendly_code.replace('ASH-', '')}
-            </p>
+            {injection.product_name_id ? (
+              <p className="text-sm font-medium text-ink">{injection.product_name_id}</p>
+            ) : null}
+            {injection.product_merchant ? (
+              <p className="text-xs text-ink-muted">{injection.product_merchant}</p>
+            ) : null}
+            <p className="text-xs text-ink-muted">ASH-{injection.friendly_code.replace('ASH-', '')}{injection.product_category ? ` · ${injection.product_category}` : ''}</p>
             <a
               href={injection.url}
               target="_blank"

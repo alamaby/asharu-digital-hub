@@ -9,6 +9,22 @@ export const threadSchema = z.object({
     .max(10)
 });
 
+const CJK_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g;
+
+export function sanitizeThreadText(s: string): string {
+  return s.replace(CJK_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+function sanitizeThread(thread: ThreadGeneration): ThreadGeneration {
+  return {
+    main: { id: sanitizeThreadText(thread.main.id), en: sanitizeThreadText(thread.main.en) },
+    replies: thread.replies.map((r) => ({
+      id: sanitizeThreadText(r.id),
+      en: sanitizeThreadText(r.en)
+    }))
+  };
+}
+
 const PLACEHOLDER = '{{PRODUCT_URL}}';
 const BASA_BASI_TEMPLATE = `Btw, kalau ini relevan buat kamu, cek rekomendasinya di sini ya ${PLACEHOLDER}`;
 
@@ -139,7 +155,7 @@ export function parseThread(text: string): ThreadGeneration | null {
   const t = parsed.data;
   const normalized = normalizePlaceholder(t);
   if (countPlaceholdersInThread(normalized) !== 1) return null;
-  return normalized;
+  return sanitizeThread(normalized);
 }
 
 export function replacePlaceholders(thread: ThreadGeneration, productUrl: string): ThreadGeneration {

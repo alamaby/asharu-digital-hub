@@ -5,7 +5,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { ContentDraftCard } from '@/components/content/ContentDraftCard';
+import { DraftListCard } from '@/components/content/DraftListCard';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -63,20 +63,26 @@ export default async function ReviewPage({ params }: PageProps) {
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-2 text-sm text-ink-muted">{t('realtime')}</p>
 
-      <div className="mt-8 space-y-6">
+      <div className="mt-8 space-y-3">
         {!drafts || drafts.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-sm text-ink-muted">
             {t('empty')}
           </p>
         ) : (
-          drafts.map((d) => (
-            <ContentDraftCard
-              key={(d as { id: string }).id}
-              draft={d as unknown as { id: string; request_id: string; generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] }; affiliate_injections: { friendly_code: string; url: string; post_index: number }[]; status: string; llm_meta?: { provider: string; model: string } }}
-            />
+          (drafts as unknown as DraftListCardImport[]).map((d) => (
+            <DraftListCard key={d.id} draft={d} locale={locale} />
           ))
         )}
       </div>
     </div>
   );
+}
+
+interface DraftListCardImport {
+  id: string;
+  status: string;
+  created_at: string;
+  generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+  affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[];
+  llm_meta?: { provider: string; model: string };
 }

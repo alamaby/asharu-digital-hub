@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePlaceholder, parseThread, repositionPlaceholder } from './thread';
+import { normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
 
 const P = '{{PRODUCT_URL}}';
 
@@ -79,7 +79,7 @@ describe('parseThread', () => {
     const out = parseThread(raw);
     expect(out).not.toBeNull();
     expect(out!.main.id).toBe(`halo ${P}`);
-    expect(out!.main.en).toBe('hi ');
+    expect(out!.main.en).toBe('hi');
   });
 
   it('parses JSON wrapped in ```json fences', () => {
@@ -145,7 +145,7 @@ describe('parseThread', () => {
     const out = parseThread(raw);
     expect(out).not.toBeNull();
     expect(out!.main.id).toBe(`cek di sini ya ${P}`);
-    expect(out!.main.en).toBe('tap here ');
+    expect(out!.main.en).toBe('tap here');
   });
 });
 
@@ -219,5 +219,32 @@ describe('repositionPlaceholder', () => {
     const { thread: out } = repositionPlaceholder(t, 'middle');
     const match = [out.main.id, out.main.en, ...out.replies.flatMap((r) => [r.id, r.en])].join(' ').match(/\{\{PRODUCT_URL\}\}/g);
     expect(match).toHaveLength(1);
+  });
+});
+
+describe('sanitizeThreadText', () => {
+  it('strips CJK ideographs (regression for session b01339ae "巡航")', () => {
+    expect(sanitizeThreadText('Lanjut, biasain巡航 di kecepatan konstan')).toBe('Lanjut, biasain di kecepatan konstan');
+  });
+
+  it('strips Hiragana, Katakana, and Hangul', () => {
+    expect(sanitizeThreadText('helloこんにちは worldカタカナ 안녕하세요')).toBe('hello world');
+  });
+
+  it('preserves Latin, digits, punctuation, and emoji', () => {
+    const s = 'BBM naik 10%! 🚀 Rp 19.150/liter — cf. tip #2.';
+    expect(sanitizeThreadText(s)).toBe(s);
+  });
+
+  it('preserves the {{PRODUCT_URL}} placeholder', () => {
+    expect(sanitizeThreadText(`cek ${P} sekarang`)).toBe(`cek ${P} sekarang`);
+  });
+
+  it('collapses double spaces left by CJK removal', () => {
+    expect(sanitizeThreadText('text巡航  more')).toBe('text more');
+  });
+
+  it('handles empty string', () => {
+    expect(sanitizeThreadText('')).toBe('');
   });
 });

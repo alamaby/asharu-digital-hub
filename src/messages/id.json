@@ -356,7 +356,9 @@
     "review": {
       "title": "Tinjau Draf Konten",
       "empty": "Belum ada draf yang perlu ditinjau.",
-      "loading": "Memuat draf…",
+      "loading": "Memuat draf...",
+      "backToList": "Kembali ke daftar draf",
+      "notFound": "Draf tidak ditemukan.",
       "productChip": "Produk ASH-{code}",
       "postMain": "Post Utama",
       "reply": "Balasan {n}",

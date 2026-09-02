@@ -88,17 +88,20 @@ async function handle(request: NextRequest) {
 
       let productQuery = supabase
         .from('affiliate_products')
-        .select('friendly_code, name_id, name_en, url, category, external_id')
+        .select('id, friendly_code, name_id, name_en, url, category, merchant, image, external_id')
         .eq('is_active', true);
       if (req.target_category) productQuery = productQuery.eq('category', req.target_category);
       const { data: products } = await productQuery.limit(20);
       if (!products || products.length === 0) throw new Error('No affiliate products found');
       const product = (products as Array<{
+        id: string;
         friendly_code: string;
         name_id: string;
         name_en: string;
         url: string;
         category: string;
+        merchant: string;
+        image: string;
         external_id: string;
       }>)[Math.floor(Math.random() * products.length)]!;
 
@@ -235,7 +238,17 @@ async function handle(request: NextRequest) {
           model_id: success.model,
           generated_thread: replaced as unknown as Record<string, unknown>,
           affiliate_injections: [
-            { friendly_code: product.friendly_code, url: product.url, post_index: postIndex }
+            {
+              id: product.id,
+              friendly_code: product.friendly_code,
+              url: product.url,
+              post_index: postIndex,
+              product_name_id: product.name_id,
+              product_name_en: product.name_en,
+              product_image: product.image,
+              product_category: product.category,
+              product_merchant: product.merchant
+            }
           ] as unknown as string,
           status: 'needs_review',
           llm_meta: {
