@@ -9,6 +9,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import { ResearchSessionActions } from '@/components/admin/ResearchSessionActions';
 import { RetrySessionButton } from '@/components/admin/RetrySessionButton';
+import { ResumeSessionButton } from '@/components/admin/ResumeSessionButton';
 import { ResearchStepper } from '@/components/admin/ResearchStepper';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
@@ -173,7 +174,12 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         }}
       />
 
-      {(s.status === 'failed' || s.status === 'completed' || s.status === 'awaiting_selection') ? (
+      {s.status === 'failed' ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <ResumeSessionButton sessionId={sessionId} />
+          <RetrySessionButton sessionId={sessionId} />
+        </div>
+      ) : (s.status === 'completed' || s.status === 'awaiting_selection') ? (
         <RetrySessionButton sessionId={sessionId} />
       ) : null}
 

@@ -295,6 +295,74 @@ export async function retrySession(sessionId: string): Promise<ResearchAdminResu
   }
 }
 
+/**
+ * Resume a failed research session from the stage that failed, WITHOUT
+ * discarding prior stage outputs (topics, scores, admin shortlist). Only the
+ * failed stage is retried. Falls back to `developing` when the failed stage
+ * cannot be determined from logs.
+ *
+ * Contrast with retrySession(): a full reset to `discovering` that deletes
+ * all topics. Prefer resumeSession() for failures in verifying/scoring/
+ * developing where upstream data is still valid; use retrySession() when the
+ * failure is in `discovering` or upstream data is suspected junk.
+ */
+export async function resumeSession(sessionId: string): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+
+    // Determine the failed stage from the most recent error log.
+    const { data: errLog } = await supabase
+      .from('content_research_logs')
+      .select('stage')
+      .eq('session_id', sessionId)
+      .eq('level', 'error')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const guessed = (errLog as { stage: string } | null)?.stage ?? 'developing';
+
+    // Resumable stages: every active stage except `pending` (pending has no
+    // work yet — just wait for cron). `discovering` is resumable but requires
+    // topic cleanup first since partial discovery produces junk.
+    const resumable = ['discovering', 'verifying', 'scoring', 'awaiting_selection', 'developing'];
+    const targetStage = resumable.includes(guessed) ? guessed : 'developing';
+
+    // If the failure was in discovering, prior topics are likely junk —
+    // delete them so discovery starts clean. For other stages, keep topics.
+    if (targetStage === 'discovering') {
+      await supabase
+        .from('content_research_topics')
+        .delete()
+        .eq('session_id', sessionId);
+    }
+
+    const { data, error } = await supabase
+      .from('content_research_sessions')
+      .update({
+        status: targetStage,
+        error_message: null,
+        current_stage_started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .eq('status', 'failed')
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'session not failed (resume only applies to failed sessions)' };
+
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: targetStage,
+      level: 'info',
+      message: `admin triggered resume — status reset to ${targetStage} (prior data preserved)`
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function shortlistTopics(
   sessionId: string,
   topicIds: string[]

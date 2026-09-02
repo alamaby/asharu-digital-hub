@@ -442,6 +442,7 @@
       "rejectAction": "Reject",
       "advanceAction": "Advance to Development",
       "retryAction": "Retry",
+      "resumeAction": "Resume from Failed Stage",
       "topicTitle": "Topic detail",
       "whyNow": "Why now",
       "audienceRelevance": "Audience relevance",

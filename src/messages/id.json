@@ -442,6 +442,7 @@
       "rejectAction": "Tolak",
       "advanceAction": "Lanjut ke Development",
       "retryAction": "Retry Proses Ulang",
+      "resumeAction": "Lanjut dari Titik Gagal",
       "topicTitle": "Detail Topik",
       "whyNow": "Mengapa sekarang",
       "audienceRelevance": "Relevansi audiens",
