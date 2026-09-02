@@ -13,6 +13,7 @@ import { ResumeSessionButton } from '@/components/admin/ResumeSessionButton';
 import { ResearchStepper } from '@/components/admin/ResearchStepper';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
+import { previewAffiliateMatches } from '@/lib/research/affiliate';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -38,6 +39,9 @@ type TopicRow = {
   final_score: number | null;
   verification_status: string;
   status: string;
+  unique_angle: string | null;
+  key_facts: string[] | null;
+  hooks: Array<{ type: string; text: string }> | null;
 };
 
 type DraftRow = {
@@ -106,7 +110,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: topics } = await supabase
     .from('content_research_topics')
-    .select('id, rank, topic, category, final_score, verification_status, status')
+    .select('id, rank, topic, category, final_score, verification_status, status, unique_angle, key_facts, hooks')
     .eq('session_id', sessionId)
     .order('rank', { ascending: true });
 
@@ -134,6 +138,26 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   }
 
   const list = (topics ?? []) as TopicRow[];
+
+  // At awaiting_selection, preview affiliate match per topic so the admin
+  // sees which topics will generate a draft without an affiliate (pool
+  // mismatch) before shortlisting — and can add a relevant product or pick a
+  // more matchable topic.
+  let affiliatePreviews: Map<string, { matched: boolean; bestScore: number; band: 'high' | 'medium' | 'low' | 'none' }> | null = null;
+  if (s.status === 'awaiting_selection' && draftList.length === 0 && list.length > 0) {
+    try {
+      affiliatePreviews = await previewAffiliateMatches(supabase, list.map((tp) => ({
+        id: tp.id,
+        topic: tp.topic,
+        category: tp.category,
+        unique_angle: tp.unique_angle,
+        key_facts: Array.isArray(tp.key_facts) ? tp.key_facts : undefined,
+        hooks: Array.isArray(tp.hooks) ? tp.hooks : undefined
+      })));
+    } catch {
+      affiliatePreviews = null;
+    }
+  }
 
   const { data: logs } = await supabase
     .from('content_research_logs')
@@ -264,6 +288,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
             verification_status: t.verification_status,
             status: t.status
           }))}
+          affiliatePreviews={affiliatePreviews ? Object.fromEntries(affiliatePreviews) : null}
         />
       ) : draftList.length > 0 ? (
         <section className="mt-8 space-y-3">

@@ -8,6 +8,7 @@ import {
   rejectTopics,
   advanceToDevelopment
 } from '@/lib/content/actions';
+import { Link } from '@/i18n/navigation';
 
 interface TopicItem {
   id: string;
@@ -19,12 +20,34 @@ interface TopicItem {
   status: string;
 }
 
+type AffiliateBand = 'high' | 'medium' | 'low' | 'none';
+
+interface AffiliatePreview {
+  matched: boolean;
+  bestScore: number;
+  band: AffiliateBand;
+}
+
 interface Props {
   sessionId: string;
   topics: TopicItem[];
+  affiliatePreviews?: Record<string, AffiliatePreview> | null;
 }
 
-export function ResearchSessionActions({ sessionId, topics }: Props) {
+const BAND_LABEL: Record<AffiliateBand, { id: string; en: string }> = {
+  high: { id: 'Produk cocok', en: 'Product matches' },
+  medium: { id: 'Produk kurang cocok', en: 'Product weak match' },
+  low: { id: 'Produk tidak cocok', en: 'Product mismatch' },
+  none: { id: 'Tanpa produk', en: 'No product' }
+};
+const BAND_CLASS: Record<AffiliateBand, string> = {
+  high: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  medium: 'bg-amber-50 text-amber-800 border-amber-200',
+  low: 'bg-red-50 text-red-800 border-red-200',
+  none: 'bg-red-50 text-red-800 border-red-200'
+};
+
+export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }: Props) {
   const t = useTranslations('admin.research');
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -82,6 +105,34 @@ export function ResearchSessionActions({ sessionId, topics }: Props) {
       </div>
       <p className="text-sm text-ink-muted">{t('shortlistIntro')}</p>
 
+      {(() => {
+        const unmatched = affiliatePreviews
+          ? topics.filter((tp) => {
+              const pv = affiliatePreviews[tp.id];
+              return pv && !pv.matched;
+            })
+          : [];
+        if (unmatched.length === 0) return null;
+        const productCategories = new Set<string>();
+        for (const tp of unmatched) {
+          if (tp.category) productCategories.add(tp.category);
+        }
+        return (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
+            <p className="font-medium">{t('affiliateMismatchHeading', { count: unmatched.length })}</p>
+            <p className="mt-1 text-amber-700">{t('affiliateMismatchBody')}</p>
+            {productCategories.size > 0 ? (
+              <p className="mt-1 text-amber-700">
+                {t('affiliateMismatchCategories')}: {Array.from(productCategories).join(', ')}
+              </p>
+            ) : null}
+            <Link href="/admin" className="mt-1 inline-block font-medium text-amber-900 underline">
+              {t('affiliateMismatchAction')} →
+            </Link>
+          </div>
+        );
+      })()}
+
       {error ? (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -89,26 +140,35 @@ export function ResearchSessionActions({ sessionId, topics }: Props) {
       ) : null}
 
       <ul className="space-y-2">
-        {topics.map((tp) => (
-          <li key={tp.id} className="flex items-center gap-2 rounded-xl border border-line bg-surface p-3">
-            <input
-              id={`topic-${tp.id}`}
-              type="checkbox"
-              checked={selected.has(tp.id) || tp.status === 'shortlisted'}
-              onChange={() => toggle(tp.id)}
-              disabled={busy !== null}
-              className="size-4 rounded border-line text-primary focus:ring-2 focus:ring-primary/20"
-            />
-            <label htmlFor={`topic-${tp.id}`} className="flex-1 cursor-pointer">
-              <p className="text-sm font-medium text-ink">
-                #{tp.rank ?? '-'} · {tp.topic}
-              </p>
-              <p className="text-xs text-ink-muted">
-                {tp.category ?? '-'} · score {tp.final_score?.toFixed(1) ?? '-'} · {tp.status}
-              </p>
-            </label>
-          </li>
-        ))}
+        {topics.map((tp) => {
+          const pv = affiliatePreviews?.[tp.id];
+          const band: AffiliateBand | null = pv ? pv.band : null;
+          return (
+            <li key={tp.id} className="flex items-center gap-2 rounded-xl border border-line bg-surface p-3">
+              <input
+                id={`topic-${tp.id}`}
+                type="checkbox"
+                checked={selected.has(tp.id) || tp.status === 'shortlisted'}
+                onChange={() => toggle(tp.id)}
+                disabled={busy !== null}
+                className="size-4 rounded border-line text-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <label htmlFor={`topic-${tp.id}`} className="flex-1 cursor-pointer">
+                <p className="text-sm font-medium text-ink">
+                  #{tp.rank ?? '-'} · {tp.topic}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  {tp.category ?? '-'} · score {tp.final_score?.toFixed(1) ?? '-'} · {tp.status}
+                </p>
+              </label>
+              {band ? (
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${BAND_CLASS[band]}`} title={`match score ${pv?.bestScore ?? 0}`}>
+                  {BAND_LABEL[band].id}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="flex flex-wrap gap-2">

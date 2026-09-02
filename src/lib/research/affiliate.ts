@@ -51,6 +51,37 @@ export async function selectAffiliateProduct(
   supabase: SupabaseClient,
   topic: TopicForMatching
 ): Promise<SelectedAffiliate | null> {
+  const products = await fetchActivePool(supabase);
+  if (products.length === 0) return null;
+  return scoreBestProduct(topic, products);
+}
+
+/**
+ * Batch preview affiliate matches for multiple topics in a single pool fetch.
+ * Returns a map of topic id -> { matched: boolean; bestScore: number; band }.
+ * Used at awaiting_selection to warn admin BEFORE shortlisting which topics
+ * will generate a draft with no affiliate match, so they can add relevant
+ * products (e.g. scrape a new category) or pick more matchable topics.
+ */
+export async function previewAffiliateMatches(
+  supabase: SupabaseClient,
+  topics: Array<{ id: string } & TopicForMatching>
+): Promise<Map<string, { matched: boolean; bestScore: number; band: 'high' | 'medium' | 'low' | 'none' }>> {
+  const products = await fetchActivePool(supabase);
+  const out = new Map<string, { matched: boolean; bestScore: number; band: 'high' | 'medium' | 'low' | 'none' }>();
+  for (const tp of topics) {
+    const result = scoreBestProduct(tp, products);
+    if (result) {
+      out.set(tp.id, { matched: true, bestScore: result.matchScore, band: relevanceBand(result.matchScore) });
+    } else {
+      const bestScore = products.length === 0 ? -1 : computeTopScore(tp, products);
+      out.set(tp.id, { matched: false, bestScore: Math.max(0, bestScore), band: 'none' });
+    }
+  }
+  return out;
+}
+
+async function fetchActivePool(supabase: SupabaseClient): Promise<AffiliateProductRow[]> {
   const { data: pool, error } = await supabase
     .from('affiliate_products')
     .select('id, friendly_code, external_id, name_id, name_en, category, merchant, url, image')
@@ -58,11 +89,30 @@ export async function selectAffiliateProduct(
     .order('created_at', { ascending: false })
     .limit(POOL_SIZE);
   if (error) throw new Error(`affiliate pool query: ${error.message}`);
-  if (!pool || pool.length === 0) {
-    return null;
-  }
-  const products = pool as AffiliateProductRow[];
+  return (pool ?? []) as AffiliateProductRow[];
+}
 
+function computeTopScore(topic: TopicForMatching, products: AffiliateProductRow[]): number {
+  const topicCategory = (topic.category ?? '').toLowerCase().trim();
+  const topicText = buildTopicText(topic).toLowerCase();
+  const uniqueKeywords = Array.from(new Set(topicText.split(/\W+/).filter((w) => w.length >= KEYWORD_MIN_LENGTH)));
+  let top = -1;
+  for (const product of products) {
+    const productCategory = (product.category ?? '').toLowerCase().trim();
+    let score = 0;
+    if (topicCategory) {
+      if (productCategory === topicCategory) score += CATEGORY_MATCH_BONUS;
+      else if (productCategory && productCategory.includes(topicCategory)) score += CATEGORY_PARTIAL_BONUS;
+    }
+    const productText = `${product.name_id} ${product.name_en} ${product.category} ${product.merchant}`.toLowerCase();
+    score += uniqueKeywords.filter((w) => productText.includes(w)).length * KEYWORD_OVERLAP_BONUS;
+    if (score > top) top = score;
+  }
+  return top;
+}
+
+function scoreBestProduct(topic: TopicForMatching, products: AffiliateProductRow[]): SelectedAffiliate | null {
+  if (products.length === 0) return null;
   const topicCategory = (topic.category ?? '').toLowerCase().trim();
   const topicText = buildTopicText(topic).toLowerCase();
   const topicKeywords = topicText
@@ -89,8 +139,6 @@ export async function selectAffiliateProduct(
     const productText = `${product.name_id} ${product.name_en} ${product.category} ${product.merchant}`.toLowerCase();
     const overlap = uniqueKeywords.filter((w) => productText.includes(w)).length;
     score += overlap * KEYWORD_OVERLAP_BONUS;
-    // Pool is ordered newest-first, so strict `>` keeps the most recent
-    // product on ties — including the all-zero case (first product wins).
     if (score > bestScore) {
       bestScore = score;
       best = product;
@@ -104,11 +152,7 @@ export async function selectAffiliateProduct(
   if (!best || !bestSignals || bestScore < MIN_ACCEPTABLE_SCORE) {
     return null;
   }
-  return {
-    product: best,
-    matchScore: bestScore,
-    signals: bestSignals
-  };
+  return { product: best, matchScore: bestScore, signals: bestSignals };
 }
 
 export function relevanceBand(score: number | null): 'high' | 'medium' | 'low' | 'none' {
