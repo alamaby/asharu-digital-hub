@@ -23,6 +23,7 @@ interface ResearchSessionRow {
   minimum_score: number | null;
   required_winners: number;
   maximum_iterations: number;
+  target_reply_count: number | null;
 }
 
 function buildDiscoveryInput(row: ResearchSessionRow) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePlaceholder, parseThread } from './thread';
+import { normalizePlaceholder, parseThread, repositionPlaceholder } from './thread';
 
 const P = '{{PRODUCT_URL}}';
 
@@ -118,14 +118,23 @@ describe('parseThread', () => {
     expect(parseThread(raw)).toBeNull();
   });
 
-  it('returns null when replies exceed max 5', () => {
-    const replies = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, en: `r${i} en` }));
+  it('returns null when replies exceed max 10', () => {
+    const replies = Array.from({ length: 11 }, (_, i) => ({ id: `r${i}`, en: `r${i} en` }));
     replies[0]!.id = `r0 ${P}`;
     const raw = JSON.stringify({
       main: { id: 'm', en: 'm en' },
       replies
     });
     expect(parseThread(raw)).toBeNull();
+  });
+
+  it('accepts up to 10 replies (schema bumped for target reply count)', () => {
+    const replies = Array.from({ length: 10 }, (_, i) => ({ id: `r${i} ${i === 0 ? P : ''}`, en: `r${i} en` }));
+    const raw = JSON.stringify({
+      main: { id: 'm', en: 'm en' },
+      replies
+    });
+    expect(parseThread(raw)).not.toBeNull();
   });
 
   it('regression: 2 placeholders split across main.id + main.en now parses (previously failed)', () => {
@@ -137,5 +146,78 @@ describe('parseThread', () => {
     expect(out).not.toBeNull();
     expect(out!.main.id).toBe(`cek di sini ya ${P}`);
     expect(out!.main.en).toBe('tap here ');
+  });
+});
+
+describe('repositionPlaceholder', () => {
+  function mk(n: number, phAt: number) {
+    const replies = Array.from({ length: n }, (_, i) => ({ id: `reply ${i} text yang lumayan panjang`, en: `reply ${i} en` }));
+    if (phAt === -1) return { main: { id: `main with ${P}`, en: 'main en' }, replies };
+    replies[phAt]!.id = `reply ${phAt} text dengan link ${P} di tengah`;
+    return { main: { id: 'main id', en: 'main en' }, replies };
+  }
+
+  it('moves placeholder from main to middle reply (6 replies -> idx 3)', () => {
+    const t = mk(6, -1);
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.main.id).toBe('main with');
+    expect(out.replies[3]!.id).toContain(P);
+    expect(postIndex).toBe(4);
+  });
+
+  it('moves placeholder from reply 0 to middle reply (4 replies -> idx 2)', () => {
+    const t = mk(4, 0);
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    const old = t.replies[0]!.id.replace(P, '').trim();
+    const stripped = out.replies[0]!.id.replace(/\s+/g, ' ').trim();
+    expect(stripped.length).toBeLessThanOrEqual(old.length + 5);
+    expect(out.replies[2]!.id).toContain(P);
+    expect(postIndex).toBe(3);
+  });
+
+  it('uses second_to_last strategy (6 replies -> idx 4)', () => {
+    const t = mk(6, -1);
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'second_to_last');
+    expect(out.replies[4]!.id).toContain(P);
+    expect(postIndex).toBe(5);
+  });
+
+  it('returns postIndex 0 and keeps placeholder in main when no replies', () => {
+    const t = { main: { id: `main ${P}`, en: 'main en' }, replies: [] as { id: string; en: string }[] };
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.main.id).toContain(P);
+    expect(postIndex).toBe(0);
+  });
+
+  it('no-op when placeholder already in target reply', () => {
+    const t = mk(4, 2);
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.replies[2]!.id).toContain(P);
+    expect(postIndex).toBe(3);
+  });
+
+  it('wraps bare-link reply with basa-basi template', () => {
+    const t = {
+      main: { id: 'main id', en: 'main en' },
+      replies: [
+        { id: `short ${P}`, en: 'r0 en' },
+        { id: 'reply one with enough context text here', en: 'r1 en' },
+        { id: 'reply two with enough context text here', en: 'r2 en' },
+        { id: 'reply three text', en: 'r3 en' }
+      ]
+    };
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.replies[2]!.id).toContain(P);
+    expect(out.replies[2]!.id.length).toBeGreaterThan(40);
+    expect(out.replies[2]!.id).not.toBe(P);
+    expect(out.replies[0]!.id).not.toContain(P);
+    expect(postIndex).toBe(3);
+  });
+
+  it('exact placeholder count stays 1 after reposition', () => {
+    const t = mk(6, -1);
+    const { thread: out } = repositionPlaceholder(t, 'middle');
+    const match = [out.main.id, out.main.en, ...out.replies.flatMap((r) => [r.id, r.en])].join(' ').match(/\{\{PRODUCT_URL\}\}/g);
+    expect(match).toHaveLength(1);
   });
 });

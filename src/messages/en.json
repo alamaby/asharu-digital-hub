@@ -349,7 +349,9 @@
       "freshnessHours": "Freshness (hours)",
       "minimumCandidates": "Minimum candidates",
       "requiredWinners": "Required winners",
-      "maximumIterations": "Maximum iterations"
+      "maximumIterations": "Maximum iterations",
+      "targetReplyCount": "Target Reply Count",
+      "targetReplyCountHint": "(Threads/Twitter only — topic detail spread across N replies)"
     },
     "review": {
       "title": "Review Content Drafts",
@@ -453,7 +455,21 @@
       "potentialRisk": "Potential risk",
       "scoreBreakdown": "Score breakdown",
       "finalScore": "Final score",
-      "sessionLabel": "Session {id}"
+      "sessionLabel": "Session {id}",
+      "paramsHeading": "Research Parameters",
+      "toneLabel": "Tone",
+      "audienceAgeLabel": "Audience (age)",
+      "audienceInterestsLabel": "Audience interests",
+      "secondaryLocationLabel": "Secondary location",
+      "accountGoalLabel": "Account goal",
+      "allowedCategoriesLabel": "Allowed categories",
+      "excludedCategoriesLabel": "Excluded categories",
+      "freshnessHoursLabel": "Freshness (hours)",
+      "minimumCandidatesLabel": "Minimum candidates",
+      "minimumScoreLabel": "Minimum score",
+      "requiredWinnersLabel": "Required winners",
+      "maximumIterationsLabel": "Maximum iterations",
+      "targetReplyCountLabel": "Target reply count"
     },
     "dashboard": {
       "title": "Admin Dashboard",

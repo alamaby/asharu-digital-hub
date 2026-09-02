@@ -121,6 +121,7 @@ const researchSchema = z.object({
   minimumScore: z.coerce.number().min(0).max(10).optional(),
   requiredWinners: z.coerce.number().int().min(1).max(10).optional(),
   maximumIterations: z.coerce.number().int().min(1).max(10).optional(),
+  targetReplyCount: z.coerce.number().int().min(1).max(10).optional(),
   website: z.string().optional() // honeypot
 });
 
@@ -224,6 +225,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       minimum_score: data.minimumScore ?? 6.0,
       required_winners: data.requiredWinners ?? 3,
       maximum_iterations: data.maximumIterations ?? 3,
+      target_reply_count: data.targetReplyCount ?? null,
       created_by: user?.id ?? null
     })
     .select('id')

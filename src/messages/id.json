@@ -349,7 +349,9 @@
       "freshnessHours": "Freshness (jam)",
       "minimumCandidates": "Kandidat minimum",
       "requiredWinners": "Pemenang minimum",
-      "maximumIterations": "Iterasi maksimum"
+      "maximumIterations": "Iterasi maksimum",
+      "targetReplyCount": "Jumlah Reply Target",
+      "targetReplyCountHint": "(hanya Threads/Twitter — detail topik disebarkan ke N reply)"
     },
     "review": {
       "title": "Tinjau Draf Konten",
@@ -453,7 +455,21 @@
       "potentialRisk": "Risiko",
       "scoreBreakdown": "Skor detail",
       "finalScore": "Skor akhir",
-      "sessionLabel": "Sesi {id}"
+      "sessionLabel": "Sesi {id}",
+      "paramsHeading": "Parameter Riset",
+      "toneLabel": "Nada",
+      "audienceAgeLabel": "Audiens (usia)",
+      "audienceInterestsLabel": "Minat audiens",
+      "secondaryLocationLabel": "Lokasi sekunder",
+      "accountGoalLabel": "Tujuan akun",
+      "allowedCategoriesLabel": "Kategori diizinkan",
+      "excludedCategoriesLabel": "Kategori dikecualikan",
+      "freshnessHoursLabel": "Freshness (jam)",
+      "minimumCandidatesLabel": "Kandidat minimum",
+      "minimumScoreLabel": "Skor minimum",
+      "requiredWinnersLabel": "Pemenang minimum",
+      "maximumIterationsLabel": "Iterasi maksimum",
+      "targetReplyCountLabel": "Jumlah reply target"
     },
     "dashboard": {
       "title": "Dasbor Admin",

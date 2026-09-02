@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateProduct, type SelectedAffiliate } from './affiliate';
-import { parseThread, replacePlaceholders } from './thread';
+import { parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -20,7 +20,7 @@ export async function runDevelopment(
 ): Promise<void> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select('id, platform_slug, tone, account_goal, audience_age, audience_interests, target_location')
+    .select('id, platform_slug, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
@@ -30,6 +30,7 @@ export async function runDevelopment(
     tone: string | null;
     account_goal: string | null;
     audience_age: string | null;
+    target_reply_count: number | null;
   };
 
   const { data: topics, error: topicError } = await supabase
@@ -95,7 +96,7 @@ async function generateAndInsertDraft(
   sessionId: string,
   topicId: string,
   platform: { slug: string; maxChars: number | null },
-  sess: { tone: string | null; account_goal: string | null; audience_age: string | null },
+  sess: { tone: string | null; account_goal: string | null; audience_age: string | null; target_reply_count: number | null },
   topic: ShortlistedTopic,
   affiliate: SelectedAffiliate | null
 ): Promise<void> {
@@ -103,7 +104,14 @@ async function generateAndInsertDraft(
   const audience = sess.audience_age ?? 'umum';
   const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
 
-  // Synthesize a placeholder product for the LLM when no affiliate matched.
+  const isMultiReplyPlatform = platform.slug === 'threads' || platform.slug === 'twitter';
+  const targetReplyCount = sess.target_reply_count ?? (isMultiReplyPlatform ? 6 : null);
+
+  const topicHooks = Array.isArray(topic.hooks)
+    ? (topic.hooks as Array<{ text?: string; type?: string }>).map((h) => h.text ?? '').filter(Boolean)
+    : null;
+  const topicKeyFacts = Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : null;
+
   const promptProduct = affiliate
     ? {
         friendlyCode: affiliate.product.friendly_code,
@@ -126,7 +134,11 @@ async function generateAndInsertDraft(
       audience,
       ctaStyle: 'soft_sell',
       purpose,
-      language: 'both'
+      language: 'both',
+      targetReplyCount,
+      hooks: topicHooks,
+      keyFacts: topicKeyFacts,
+      uniqueAngle: topic.unique_angle
     },
     promptProduct
   );
@@ -152,10 +164,22 @@ async function generateAndInsertDraft(
     throw new Error('thread parse failed');
   }
 
+  // Reposition affiliate placeholder into a middle reply (code-level backstop;
+  // the prompt also instructs the LLM to place it there). Resolved postIndex
+  // is recorded so ContentDraftCard highlights the correct reply (0 = main,
+  // k+1 = reply[k]). If no affiliate matched, skip repositioning.
+  let resolvedPostIndex = 0;
+  let working = parsed;
+  if (affiliate) {
+    const repositioned = repositionPlaceholder(parsed, 'middle');
+    working = repositioned.thread;
+    resolvedPostIndex = repositioned.postIndex;
+  }
+
   // Replace placeholders only when an affiliate was selected.
   const replaced = affiliate
-    ? replacePlaceholders(parsed, affiliate.product.url)
-    : parsed;
+    ? replacePlaceholders(working, affiliate.product.url)
+    : working;
 
   // Look up provider_id from slug (for the foreign key).
   const { data: providerRow } = await supabase
@@ -170,7 +194,7 @@ async function generateAndInsertDraft(
         {
           friendly_code: affiliate.product.friendly_code,
           url: affiliate.product.url,
-          post_index: 0,
+          post_index: resolvedPostIndex,
           match_score: affiliate.matchScore,
           match_signals: affiliate.signals
         }

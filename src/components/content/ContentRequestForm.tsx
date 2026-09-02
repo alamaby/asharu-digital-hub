@@ -17,6 +17,8 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [platform, setPlatform] = useState('all');
+  const [targetReplyCount, setTargetReplyCount] = useState('6');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -140,8 +142,11 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             name="platform"
             required
             disabled={pending}
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <option value="all">{t('platformAll')}</option>
             {platforms.map((p) => (
               <option key={p.slug} value={p.slug}>
                 {p.display_name}
@@ -302,6 +307,25 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
         {showAdvanced ? (
           <div className="space-y-4 border-t border-line px-4 py-4">
             <p className="text-xs text-ink-muted">{t('advancedIntro')}</p>
+
+            {(platform === 'threads' || platform === 'twitter') ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3">
+                <label htmlFor="targetReplyCount" className="block text-xs font-medium text-primary">
+                  {t('targetReplyCount')} <span className="text-ink-muted">{t('targetReplyCountHint')}</span>
+                </label>
+                <input
+                  id="targetReplyCount"
+                  name="targetReplyCount"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={targetReplyCount}
+                  onChange={(e) => setTargetReplyCount(e.target.value)}
+                  disabled={pending}
+                  className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
+                />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>

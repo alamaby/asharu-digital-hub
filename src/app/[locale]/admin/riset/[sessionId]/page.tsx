@@ -68,7 +68,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, target_location, platform_slug, audience_age, account_goal, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, target_location, secondary_location, platform_slug, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -84,9 +84,20 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     id: string;
     status: string;
     target_location: string | null;
+    secondary_location: string | null;
     platform_slug: string | null;
     audience_age: string | null;
+    audience_interests: string[] | null;
     account_goal: string | null;
+    tone: string | null;
+    allowed_categories: string[] | null;
+    excluded_categories: string[] | null;
+    freshness_hours: number | null;
+    minimum_candidates: number | null;
+    minimum_score: number | null;
+    required_winners: number | null;
+    maximum_iterations: number | null;
+    target_reply_count: number | null;
     error_message: string | null;
     created_at: string;
     current_stage_started_at: string | null;
@@ -156,6 +167,64 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           </p>
         ) : null}
       </header>
+
+      <section className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-card">
+        <h2 className="text-sm font-semibold text-ink">{t('paramsHeading')}</h2>
+        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('toneLabel')}:</dt>
+            <dd className="text-ink">{s.tone ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('audienceAgeLabel')}:</dt>
+            <dd className="text-ink">{s.audience_age ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('audienceInterestsLabel')}:</dt>
+            <dd className="text-ink">{s.audience_interests && s.audience_interests.length > 0 ? s.audience_interests.join(', ') : '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('secondaryLocationLabel')}:</dt>
+            <dd className="text-ink">{s.secondary_location ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('accountGoalLabel')}:</dt>
+            <dd className="text-ink">{s.account_goal ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('allowedCategoriesLabel')}:</dt>
+            <dd className="text-ink">{s.allowed_categories && s.allowed_categories.length > 0 ? s.allowed_categories.join(', ') : '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('excludedCategoriesLabel')}:</dt>
+            <dd className="text-ink">{s.excluded_categories && s.excluded_categories.length > 0 ? s.excluded_categories.join(', ') : '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('freshnessHoursLabel')}:</dt>
+            <dd className="text-ink">{s.freshness_hours ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('minimumCandidatesLabel')}:</dt>
+            <dd className="text-ink">{s.minimum_candidates ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('minimumScoreLabel')}:</dt>
+            <dd className="text-ink">{s.minimum_score ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('requiredWinnersLabel')}:</dt>
+            <dd className="text-ink">{s.required_winners ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('maximumIterationsLabel')}:</dt>
+            <dd className="text-ink">{s.maximum_iterations ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">{t('targetReplyCountLabel')}:</dt>
+            <dd className="text-ink">{s.target_reply_count ?? '—'}</dd>
+          </div>
+        </dl>
+      </section>
 
       <ResearchStepper
         status={s.status}
