@@ -7,6 +7,116 @@ import type { AffiliateProduct } from './schemas';
 
 export const affiliateProducts: AffiliateProduct[] = [
   {
+    id: 'affiliate-41707092',
+    name: { id: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion', en: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion' },
+    category: 'electronics',
+    description: { id: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion', en: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4VcTULlODf',
+    image: '/images/products/affiliate/41707092-e54e772028eb.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41706978',
+    name: { id: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY', en: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY' },
+    category: 'fashion',
+    description: { id: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY', en: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/7VG53VUtt1',
+    image: '/images/products/affiliate/41706978-8c0f37f52c7d.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41706973',
+    name: { id: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof', en: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof' },
+    category: 'fashion',
+    description: { id: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof', en: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/8fS2Rd0wiP',
+    image: '/images/products/affiliate/41706973-0aef1d79ec74.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41706967',
+    name: { id: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01', en: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01' },
+    category: 'fashion',
+    description: { id: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01', en: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/8KpC2zyDec',
+    image: '/images/products/affiliate/41706967-b75e6146f8b7.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41706960',
+    name: { id: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten', en: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten' },
+    category: 'fashion',
+    description: { id: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten', en: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/gPkusjGJu',
+    image: '/images/products/affiliate/41706960-cee3baf74347.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41552911',
+    name: { id: 'Sandal Wanita MIMIM Sol Tebal 5cm - Sandal Baim Karakter Lucu, Empuk Anti Licin, Cocok Rumah & Jalan', en: 'Sandal Wanita MIMIM Sol Tebal 5cm - Sandal Baim Karakter Lucu, Empuk Anti Licin, Cocok Rumah & Jalan' },
+    category: 'fashion',
+    description: { id: 'Sandal Wanita MIMIM Sol Tebal 5cm - Sandal Baim Karakter Lucu, Empuk Anti Licin, Cocok Rumah & Jalan', en: 'Sandal Wanita MIMIM Sol Tebal 5cm - Sandal Baim Karakter Lucu, Empuk Anti Licin, Cocok Rumah & Jalan' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4LIzxxLEn6',
+    image: '/images/products/affiliate/41552911-9c6b9385b9e4.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41552903',
+    name: { id: 'TAS NOVI GROSIR IMPORT SELEMPANG 2', en: 'TAS NOVI GROSIR IMPORT SELEMPANG 2' },
+    category: 'fashion',
+    description: { id: 'TAS NOVI GROSIR IMPORT SELEMPANG 2', en: 'TAS NOVI GROSIR IMPORT SELEMPANG 2' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/3B72ZnHQA6',
+    image: '/images/products/affiliate/41552903-611bd5e72aee.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41552895',
+    name: { id: 'GRENEY-Gbras-Bra (2pcs) One Piece Warna Kombinasi Tanpa Kawat Warna Sport Push Up -89616', en: 'GRENEY-Gbras-Bra (2pcs) One Piece Warna Kombinasi Tanpa Kawat Warna Sport Push Up -89616' },
+    category: 'fashion',
+    description: { id: 'GRENEY-Gbras-Bra (2pcs) One Piece Warna Kombinasi Tanpa Kawat Warna Sport Push Up -89616', en: 'GRENEY-Gbras-Bra (2pcs) One Piece Warna Kombinasi Tanpa Kawat Warna Sport Push Up -89616' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/9Khfv64Ai5',
+    image: '/images/products/affiliate/41552895-965cf8054a55.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41552866',
+    name: { id: 'Storage Bag Tas Penyimpanan TWS Kabel Travel Pouch Charger Kantong Multi Fungsi Kotak Penyimpanan Ka', en: 'Storage Bag Tas Penyimpanan TWS Kabel Travel Pouch Charger Kantong Multi Fungsi Kotak Penyimpanan Ka' },
+    category: 'electronics',
+    description: { id: 'Storage Bag Tas Penyimpanan TWS Kabel Travel Pouch Charger Kantong Multi Fungsi Kotak Penyimpanan Ka', en: 'Storage Bag Tas Penyimpanan TWS Kabel Travel Pouch Charger Kantong Multi Fungsi Kotak Penyimpanan Ka' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/AUtdJAFZED',
+    image: '/images/products/affiliate/41552866-a14c3a2b9387.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41552859',
+    name: { id: 'koko setelan anak laki-laki 100rb 3pcs,baju anak laki laki,koko anak usia 1-12 Tahun,koko lebaran', en: 'koko setelan anak laki-laki 100rb 3pcs,baju anak laki laki,koko anak usia 1-12 Tahun,koko lebaran' },
+    category: 'fashion',
+    description: { id: 'koko setelan anak laki-laki 100rb 3pcs,baju anak laki laki,koko anak usia 1-12 Tahun,koko lebaran', en: 'koko setelan anak laki-laki 100rb 3pcs,baju anak laki laki,koko anak usia 1-12 Tahun,koko lebaran' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/6Ake9BMucN',
+    image: '/images/products/affiliate/41552859-e8024f47cf7f.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41358703',
+    name: { id: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series', en: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series' },
+    category: 'fashion',
+    description: { id: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series', en: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/80CDtKw3D7',
+    image: '/images/products/affiliate/41358703-ab1418015834.webp',
+    featured: false
+  },
+  {
     id: 'affiliate-41084744',
     name: { id: 'Mainan jadul 90an Tamagotchi hewan peliharaan 168pet in 1 Tamagotchi import', en: 'Mainan jadul 90an Tamagotchi hewan peliharaan 168pet in 1 Tamagotchi import' },
     category: 'sports-hobby',
@@ -14,7 +124,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9KhWG2LWzB',
     image: '/images/products/affiliate/41084744-de35027078f5.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40631272',
@@ -24,7 +134,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/BT853num9',
     image: '/images/products/affiliate/40631272-b14a91864df0.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40455095',
@@ -34,7 +144,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/5q7RAPBdYi',
     image: '/images/products/affiliate/40455095-139b5b0c29b8.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40403885',
@@ -44,7 +154,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/AKZpAF1m5j',
     image: '/images/products/affiliate/40403885-c3c55b198bd9.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40360098',
@@ -54,7 +164,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/W5sIWkmHG',
     image: '/images/products/affiliate/40360098-b14a91864df0.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40351587',
@@ -64,7 +174,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9fK6wLyUBv',
     image: '/images/products/affiliate/40351587-fd9169d1f137.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-40340126',
@@ -293,7 +403,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'AMILY - 199K Get 2 Nata Hijab Segiempat Instan Premium French Square Bandana', en: 'AMILY - 199K Get 2 Nata Hijab Segiempat Instan Premium French Square Bandana' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/3qJjEdaWHJ',
-    image: '/images/products/affiliate/33190981-67885176e2e2.webp',
+    image: '/images/products/affiliate/33190981-e3519d0fe45f.webp',
     featured: false
   },
   {
@@ -313,7 +423,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml', en: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4AwY2VECCy',
-    image: '/images/products/affiliate/33115204-a8bb1f0b926a.webp',
+    image: '/images/products/affiliate/33115204-3b50ff952c64.webp',
     featured: false
   },
   {
@@ -323,7 +433,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)', en: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8Km704eDY6',
-    image: '/images/products/affiliate/33115101-89718f2f0fe2.webp',
+    image: '/images/products/affiliate/33115101-7e1511a0166c.webp',
     featured: false
   },
   {
@@ -403,7 +513,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Makarizo Asters Mova Hair Straightening Brush', en: 'Makarizo Asters Mova Hair Straightening Brush' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fOhMuds4C',
-    image: '/images/products/affiliate/32433430-1fc77edb9645.webp',
+    image: '/images/products/affiliate/32433430-a01ef4c7bb71.webp',
     featured: false
   },
   {
@@ -573,7 +683,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Katakita Alexa Flatshoes Wanita', en: 'Katakita Alexa Flatshoes Wanita' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/1Vv8bLvQMK',
-    image: '/images/products/affiliate/31405267-0937949270a5.webp',
+    image: '/images/products/affiliate/31405267-efeb2b2ad20c.webp',
     featured: false
   },
   {
@@ -643,7 +753,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Kanky Story Suiko - Sepatu Sneakers Casual Sport Sekolah Wanita Dewasa', en: 'Kanky Story Suiko - Sepatu Sneakers Casual Sport Sekolah Wanita Dewasa' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/6Agw9KshxS',
-    image: '/images/products/affiliate/31315001-77681863c15b.webp',
+    image: '/images/products/affiliate/31315001-ba7e1adfd45f.webp',
     featured: false
   },
   {
@@ -653,7 +763,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Kiaka - Khiban French Square Syar\'i Khimar Bandana Segi Empat Tali Ceruty Ultimate', en: 'Kiaka - Khiban French Square Syar\'i Khimar Bandana Segi Empat Tali Ceruty Ultimate' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/5AoO53W4q6',
-    image: '/images/products/affiliate/31276113-1816329b90ce.webp',
+    image: '/images/products/affiliate/31276113-01d375e4b367.webp',
     featured: false
   },
   {
@@ -833,7 +943,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate', en: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8V2s9IXLDH',
-    image: '/images/products/affiliate/26120479-1816329b90ce.webp',
+    image: '/images/products/affiliate/26120479-01d375e4b367.webp',
     featured: false
   },
   {
@@ -873,7 +983,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'ARDENLEON Hijab Anak Perempuan Raya Instant Hijab', en: 'ARDENLEON Hijab Anak Perempuan Raya Instant Hijab' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8KioTbGIrw',
-    image: '/images/products/affiliate/24513247-45e28fcf204e.webp',
+    image: '/images/products/affiliate/24513247-09ec8a52f660.webp',
     featured: false
   },
   {
@@ -1113,7 +1223,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Bee Flower Import Cendana 125 gr (4pcs) - Sabun Tawon Cendana (Sandalwood) Original 125gr', en: 'Bee Flower Import Cendana 125 gr (4pcs) - Sabun Tawon Cendana (Sandalwood) Original 125gr' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/2Vg3t5Tqam',
-    image: '/images/products/affiliate/16602825-ed83b93bfeaf.webp',
+    image: '/images/products/affiliate/16602825-f0c1bd40082b.webp',
     featured: false
   },
   {
@@ -1623,7 +1733,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Decathlon NABAIJI Topi Renang Kain Polos Uk. S - Hitam - 8861682', en: 'Decathlon NABAIJI Topi Renang Kain Polos Uk. S - Hitam - 8861682' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/Lb7cwXoHL',
-    image: '/images/products/affiliate/16260063-0b862d0cca3a.webp',
+    image: '/images/products/affiliate/16260063-4f49d2cfb42c.webp',
     featured: false
   },
   {
@@ -1963,7 +2073,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Keola Polo Space Shirt (Kaos Polo Koko Anak) Usia 1 – 6 Tahun / Premium Polo Tee Kekinian terbaru', en: 'Keola Polo Space Shirt (Kaos Polo Koko Anak) Usia 1 – 6 Tahun / Premium Polo Tee Kekinian terbaru' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/VuXnvGjXX',
-    image: '/images/products/affiliate/16259756-06060d777675.webp',
+    image: '/images/products/affiliate/16259756-441bbbd0516a.webp',
     featured: false
   },
   {
@@ -1983,7 +2093,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9UpMWEFxaC',
-    image: '/images/products/affiliate/16259726-2cfbc92f57aa.webp',
+    image: '/images/products/affiliate/16259726-f1f6bb11a61d.webp',
     featured: false
   },
   {
