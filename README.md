@@ -148,7 +148,7 @@ Proses:
 4. `featured: true` hanya untuk 6 produk pertama (batas homepage); sisanya `false`.
 5. Ditulis ulang ke `src/data/affiliate-products.ts`, lalu validasi `typecheck` + `test`.
 
-**Penjadwalan otomatis:** `.github/workflows/scrape-affiliate.yml` menjalankan `npm run scrape:affiliate` setiap hari 03:00 UTC (atau via *workflow_dispatch*), memvalidasi gate, lalu commit-perubahan bila ada. Nama kategori tidak tersedia pada data GraphQL item harus dipetakan dari judul — verifikasi hasil klasifikasi ukuran dataset penuh sebelum dipublikasikan.
+**Penjadwalan otomatis:** `.github/workflows/scrape-affiliate.yml` menjalankan `npm run scrape:affiliate` setiap hari 03:00 UTC (`0 3 * * *`, strict `npm ci`) atau via *workflow_dispatch*, memvalidasi gate, lalu commit-perubahan bila ada. Nama kategori tidak tersedia pada data GraphQL item harus dipetakan dari judul — verifikasi hasil klasifikasi ukuran dataset penuh sebelum dipublikasikan.
 4. **Properti** — `properties.ts`: tiga listing riil (owner-verified) sudah aktif — Kamarasan Residence (dijual), Buah Batu Park (dijual), Sukaraja Jatiwangi (disewakan, *occupied*). Entri contoh lama ditandai `hidden: true`; hapus flag + isi data untuk mempublikasikan. Harga & alamat lengkap hanya diisi dari data pemilik.
    - Media: foto dioptimasi ke WebP via `node scripts/optimize-property-images.mjs --src <dir> --dest public/images/properties/<slug> [--copy]` — manifest dimensi yang dicetak dipakai mengisi `gallery`.
    - **EN copy pada listing migrated adalah hasil terjemahan asisten** — review owner sebelum launch.

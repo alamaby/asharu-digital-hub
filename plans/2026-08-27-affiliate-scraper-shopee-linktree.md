@@ -21,7 +21,7 @@ Halaman bukan butuh browser automation. Ini Shopee Affiliate **Linktree H5** (Vu
 - Category mapper heuristic (keyword `linkName` + `groupName`) → enum schema
 - Image pipeline: download `cf.shopee.sg` → resize max 800px → WebP → `public/images/products/affiliate/`
 - Data writer: transform ke `AffiliateProduct[]`, parse/write `src/data/affiliate-products.ts`
-- Penjadwalan: GitHub Actions cron (manual/daily)
+- Penjadwalan: GitHub Actions cron (manual/daily 03:00 UTC, strict npm ci)
 
 ## Milestones
 1. Scraper core (GraphQL fetch + pagination) — ✅ endpoint terverifikasi
@@ -39,7 +39,7 @@ Halaman bukan butuh browser automation. Ini Shopee Affiliate **Linktree H5** (Vu
 - [x] Buat `scripts/lib/http.mjs`: shared `postJson`/`getBuffer`, opsi `--insecure` utk jaringan MITM korporat
 - [x] Buat `scripts/lib/data-writer.mjs`: transform → `AffiliateProduct[]` → tulis TS valid
 - [x] Wire npm scripts `scrape:affiliate`, `scrape:affiliate:dry-run`
-- [x] GitHub Actions `.github/workflows/scrape-affiliate.yml` (cron daily 03:00 UTC + workflow_dispatch, commit otomatis)
+- [x] GitHub Actions `.github/workflows/scrape-affiliate.yml` (cron daily 03:00 UTC `0 3 * * *` strict npm ci + workflow_dispatch, commit otomatis) — sync 2026-09-02
 - [x] Jalankan scrape 12 produk terbaru (keputusan user), images WebP ter-download & data file ter-regenerate
 - [x] Gates: lint ✓ typecheck ✓ test 129/129 ✓ build ✓ (dengan dataset 12 produk, 6 featured + 6 non-featured)
 
