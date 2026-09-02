@@ -31,6 +31,11 @@ export default async function KontenBaruPage({ params }: PageProps) {
   const t = await getTranslations({ locale, namespace: 'content.form' });
   const tNav = await getTranslations({ locale, namespace: 'content.form' });
 
+  // Synthesize an "all platforms" option (slug='all') so users can request a
+  // platform-agnostic draft. The form sends 'all' and the server stores NULL
+  // in content_research_sessions.platform_slug (already nullable).
+  const allPlatformsOption = { slug: 'all', display_name: t('platformAll') };
+
   // Fetch platforms for select — fallback to hardcoded if Supabase not configured
   let platforms: { slug: string; display_name: string }[] = [
     { slug: 'threads', display_name: 'Threads' },
@@ -51,6 +56,9 @@ export default async function KontenBaruPage({ params }: PageProps) {
       // fallback to hardcoded
     }
   }
+
+  // Prepend the synthetic "all" option.
+  platforms = [allPlatformsOption, ...platforms];
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">

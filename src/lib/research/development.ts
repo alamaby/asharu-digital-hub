@@ -57,15 +57,31 @@ export async function runDevelopment(
   }
   const topic = topics[0] as ShortlistedTopic;
 
-  const platformSlug = sess.platform_slug ?? 'threads';
-  const { data: platformRow } = await supabase
-    .from('platforms')
-    .select('max_chars')
-    .eq('slug', platformSlug)
-    .maybeSingle();
+  const platformSlug = sess.platform_slug ?? 'all';
+  let maxChars: number | null = null;
+  if (platformSlug === 'all') {
+    // Platform-agnostic: use the strictest limit across active platforms so the
+    // generated draft is safe to repost on any platform (e.g. Twitter 280).
+    const { data: minRow } = await supabase
+      .from('platforms')
+      .select('max_chars')
+      .eq('is_active', true)
+      .not('max_chars', 'is', null)
+      .order('max_chars', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    maxChars = (minRow as { max_chars: number | null } | null)?.max_chars ?? 280;
+  } else {
+    const { data: platformRow } = await supabase
+      .from('platforms')
+      .select('max_chars')
+      .eq('slug', platformSlug)
+      .maybeSingle();
+    maxChars = (platformRow as { max_chars: number | null } | null)?.max_chars ?? null;
+  }
   const platform = {
     slug: platformSlug,
-    maxChars: (platformRow as { max_chars: number | null } | null)?.max_chars ?? null
+    maxChars
   };
 
   // Select affiliate (may be null if pool is empty).

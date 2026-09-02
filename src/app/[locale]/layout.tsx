@@ -7,6 +7,7 @@ import { routing } from '@/i18n/routing';
 import { env } from '@/lib/env';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { pickClientMessages } from '@/lib/i18n/client-messages';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
 import type { Metadata } from 'next';
 import '../globals.css';
 import { JsonLd } from '@/components/ui/JsonLd';
@@ -14,6 +15,7 @@ import { organizationSchema, websiteSchema } from '@/lib/seo/jsonld';
 import { SkipLink } from '@/components/layout/SkipLink';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { TimezoneSync } from '@/components/layout/TimezoneSync';
 import { ConsentBanner } from '@/components/analytics/ConsentBanner';
 import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { PageViewTracker } from '@/components/analytics/PageViewTracker';
@@ -55,10 +57,14 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   const messages = pickClientMessages(await getMessages());
 
+  // Resolve display timezone: user pref (profiles.timezone) -> device cookie -> Asia/Jakarta.
+  const timeZone = await getDisplayTimezone();
+
   return (
     <html lang={locale} className={inter.variable}>
       <body className="flex min-h-dvh flex-col bg-background text-ink">
-        <NextIntlClientProvider messages={messages}>
+        <NextIntlClientProvider messages={messages} timeZone={timeZone}>
+          <TimezoneSync />
           <SkipLink />
           <Header />
           <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">

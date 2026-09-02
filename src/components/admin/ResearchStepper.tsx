@@ -9,6 +9,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import type { ResearchStatus } from '@/lib/research/state-machine';
+import { formatDateTime } from '@/lib/utils/format';
 
 export const STEP_ORDER: ResearchStatus[] = [
   'pending',
@@ -33,18 +34,8 @@ const STEP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export type StepperLog = { stage: string; created_at: string; level?: string };
 
-function formatTime(iso: string, locale: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return iso.slice(0, 16).replace('T', ' ');
-  }
+function formatTime(iso: string, locale: string, timeZone: string): string {
+  return formatDateTime(iso, locale as 'id' | 'en', timeZone);
 }
 
 function getStepperTexts(t: (k: string, p?: Record<string, string | number>) => string) {
@@ -65,6 +56,7 @@ export function ResearchStepper({
   createdAt,
   logs,
   locale,
+  timeZone,
   t
 }: {
   status: string;
@@ -72,6 +64,7 @@ export function ResearchStepper({
   createdAt: string;
   logs: StepperLog[];
   locale: string;
+  timeZone: string;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const { label } = getStepperTexts(t);
@@ -188,7 +181,7 @@ export function ResearchStepper({
               </p>
               {timeIso ? (
                 <p className="mt-0.5 text-center text-[10px] leading-tight text-ink-muted">
-                  {t('stepper.executedAt', { time: formatTime(timeIso, locale) })}
+                  {t('stepper.executedAt', { time: formatTime(timeIso, locale, timeZone) })}
                 </p>
               ) : isFuture ? (
                 <p className="mt-0.5 text-center text-[10px] leading-tight text-ink-muted">—</p>

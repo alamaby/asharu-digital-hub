@@ -90,7 +90,7 @@ Lokasi utama: ${input.targetLocation}
 Cakupan alternatif: ${input.secondaryLocation ?? '-'}
 Rentang usia: ${input.audienceAge}
 Minat: ${input.audienceInterests.join(', ') || '-'}
-Platform: ${input.platformName ?? input.platform}
+Platform: ${input.platform === 'all' ? 'Semua Platform (platform-agnostik, patuhi batas terketat 280 karakter per post)' : (input.platformName ?? input.platform)}
 Karakter bahasa: ${input.tone}
 Tujuan akun: ${input.accountGoal}
 Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || '(semua)'}

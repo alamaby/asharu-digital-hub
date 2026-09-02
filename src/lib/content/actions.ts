@@ -186,13 +186,19 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   const supabase = getServiceClient();
   const data = parsed.data;
 
-  const { data: platform } = await supabase
-    .from('platforms')
-    .select('slug')
-    .eq('slug', data.platform)
-    .maybeSingle();
-  if (!platform) {
-    return { success: false, fieldErrors: { platform: 'Platform tidak valid' }, error: 'validation' };
+  // 'all' means platform-agnostic — skip FK check and store NULL.
+  // content_research_sessions.platform_slug is nullable; downstream pipeline
+  // branches on platform === 'all' (or null) to use platform-agnostic prompts.
+  const isAllPlatforms = data.platform === 'all';
+  if (!isAllPlatforms) {
+    const { data: platform } = await supabase
+      .from('platforms')
+      .select('slug')
+      .eq('slug', data.platform)
+      .maybeSingle();
+    if (!platform) {
+      return { success: false, fieldErrors: { platform: 'Platform tidak valid' }, error: 'validation' };
+    }
   }
 
   // created_by is the signed-in user if any; null for anonymous submit.
@@ -208,7 +214,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       secondary_location: data.secondaryLocation ?? null,
       audience_age: data.audienceAge ?? data.audience,
       audience_interests: splitCsv(data.audienceInterests),
-      platform_slug: data.platform,
+      platform_slug: isAllPlatforms ? null : data.platform,
       tone: data.tone,
       account_goal: data.accountGoal ?? data.purpose,
       allowed_categories: splitCsv(data.allowedCategories),

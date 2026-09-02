@@ -5,6 +5,8 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { isAdmin } from '@/lib/auth/is-admin';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
+import { formatDateTime } from '@/lib/utils/format';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 
@@ -46,6 +48,7 @@ export default async function ResearchListPage({ params }: PageProps) {
 
   const supabase = await createSupabaseServer();
   const t = await getTranslations({ locale, namespace: 'admin.research' });
+  const timeZone = await getDisplayTimezone();
 
   if (!supabase) {
     return (
@@ -97,10 +100,10 @@ export default async function ResearchListPage({ params }: PageProps) {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink">
-                    {s.target_location ?? s.platform_slug ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+                    {s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
                   </p>
                   <p className="text-xs text-ink-muted">
-                    {s.platform_slug ?? '-'} · {new Date(s.created_at).toISOString().slice(0, 16).replace('T', ' ')}
+                    {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {formatDateTime(s.created_at, locale, timeZone)}
                   </p>
                 </div>
                 <span

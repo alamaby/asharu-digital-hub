@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 
 interface Platform {
@@ -77,11 +77,16 @@ function shortTopic(topic: string, max = 60): string {
   return topic.slice(0, max - 1) + '…';
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, format: ReturnType<typeof useFormatter>): string {
   try {
-    return new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
+    return format.dateTime(new Date(iso), {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   } catch {
-    return iso;
+    return new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
   }
 }
 
@@ -96,6 +101,7 @@ export function KontenList({
   pageSize
 }: KontenListProps) {
   const t = useTranslations('admin.konten');
+  const format = useFormatter();
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -198,7 +204,7 @@ export function KontenList({
                 <td className="px-4 py-2"><StatusBadge status={r.status} /></td>
                 <td className="px-4 py-2 text-ink-muted">{r.target_category ?? '—'}</td>
                 <td className="px-4 py-2 text-ink-muted">—</td>
-                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(r.created_at)}</td>
+                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(r.created_at, format)}</td>
                 <td className="px-4 py-2">
                   <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary underline">
                     {t('viewDraft')}
@@ -217,7 +223,7 @@ export function KontenList({
                 <td className="px-4 py-2 text-ink-muted">
                   {d.llm_meta?.provider ?? '—'} {d.llm_meta?.model ? `· ${d.llm_meta.model}` : ''}
                 </td>
-                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(d.created_at)}</td>
+                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(d.created_at, format)}</td>
                 <td className="px-4 py-2">
                   <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary underline">
                     {t('viewDraft')}
@@ -247,7 +253,7 @@ export function KontenList({
                   <p className="text-sm font-medium text-ink">{shortTopic(r.topic, 100)}</p>
                   <StatusBadge status={r.status} />
                 </div>
-                <p className="mt-1 text-xs text-ink-muted">{r.platform_slug} · {formatDate(r.created_at)}</p>
+                <p className="mt-1 text-xs text-ink-muted">{r.platform_slug} · {formatDate(r.created_at, format)}</p>
                 <p className="mt-1 text-xs text-ink-muted">Kategori: {r.target_category ?? '—'} · attempts: {r.attempts}</p>
               </li>
             );
@@ -260,7 +266,7 @@ export function KontenList({
                 <StatusBadge status={d.status} />
               </div>
               <p className="mt-1 text-xs text-ink-muted">
-                {d.request?.platform_slug ?? '—'} · {formatDate(d.created_at)}
+                {d.request?.platform_slug ?? '—'} · {formatDate(d.created_at, format)}
               </p>
               <p className="mt-1 text-xs text-ink-muted">
                 {d.llm_meta?.provider ?? '—'} {d.llm_meta?.model ? `· ${d.llm_meta.model}` : ''}

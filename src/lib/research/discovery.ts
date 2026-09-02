@@ -53,7 +53,10 @@ function buildQueries(input: DiscoveryInput): string[] {
   if (input.audienceInterests.length > 0) {
     queries.push(`${input.audienceInterests.slice(0, 2).join(' ')} viral ${target}`);
   }
-  queries.push(`tips praktis ${input.platform} ${target}`);
+  // 'all' = platform-agnostic; skip platform-specific tips query.
+  if (input.platform && input.platform !== 'all') {
+    queries.push(`tips praktis ${input.platform} ${target}`);
+  }
   queries.push(`cerita inspiratif ${target}`);
   for (const cat of input.allowedCategories.slice(0, 2)) {
     queries.push(`${cat} terbaru ${target}`);

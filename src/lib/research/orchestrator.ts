@@ -31,7 +31,7 @@ function buildDiscoveryInput(row: ResearchSessionRow) {
     secondaryLocation: row.secondary_location,
     audienceAge: row.audience_age ?? 'umum',
     audienceInterests: row.audience_interests ?? [],
-    platform: row.platform_slug ?? 'threads',
+    platform: row.platform_slug ?? 'all',
     tone: row.tone ?? 'casual',
     accountGoal: row.account_goal ?? 'membagikan informasi bermanfaat',
     allowedCategories: row.allowed_categories ?? [],

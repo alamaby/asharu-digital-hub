@@ -10,6 +10,8 @@ import { Link } from '@/i18n/navigation';
 import { ResearchSessionActions } from '@/components/admin/ResearchSessionActions';
 import { RetrySessionButton } from '@/components/admin/RetrySessionButton';
 import { ResearchStepper } from '@/components/admin/ResearchStepper';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
+import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -57,6 +59,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const supabase = await createSupabaseServer();
   const t = await getTranslations({ locale, namespace: 'admin.research' });
+  const timeZone = await getDisplayTimezone();
 
   if (!supabase) {
     return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-ink-muted">Service unavailable</div>;
@@ -141,10 +144,10 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {s.target_location ?? s.platform_slug ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+          {s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug ?? '-'} · {t('createdLabel')}: {new Date(s.created_at).toISOString().slice(0, 16).replace('T', ' ')}
+          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}
         </p>
         {s.error_message ? (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -159,6 +162,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         createdAt={s.created_at}
         logs={(logs ?? []) as Array<{ stage: string; level: string; created_at: string }>}
         locale={locale}
+        timeZone={timeZone}
         t={(key, params) => {
           try {
             // next-intl t supports params as second arg
@@ -268,7 +272,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
                 className={`rounded-xl border p-3 text-xs ${lg.level === 'error' ? 'border-red-200 bg-red-50 text-red-800' : lg.level === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-line bg-surface text-ink-muted'}`}
               >
                 <p className="font-medium">
-                  [{lg.stage}] {lg.level} · {new Date(lg.created_at).toISOString().slice(0, 19).replace('T', ' ')}
+                  [{lg.stage}] {lg.level} · {formatDateTimeSeconds(lg.created_at, locale, timeZone)}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap break-words text-xs">{lg.message.slice(0, 600)}</p>
               </li>
