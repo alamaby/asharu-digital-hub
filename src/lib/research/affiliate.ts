@@ -37,9 +37,10 @@ const CATEGORY_MATCH_BONUS = 50;
 const CATEGORY_PARTIAL_BONUS = 25;
 const KEYWORD_OVERLAP_BONUS = 3;
 const KEYWORD_MIN_LENGTH = 4;
-const POOL_SIZE = 20;
+const POOL_SIZE = 50;
 const RELEVANCE_HIGH = 50;
 const RELEVANCE_MEDIUM = 10;
+const MIN_ACCEPTABLE_SCORE = 6;
 
 /**
  * Select the most relevant active affiliate product for a topic, from the
@@ -100,7 +101,7 @@ export async function selectAffiliateProduct(
       };
     }
   }
-  if (!best || !bestSignals) {
+  if (!best || !bestSignals || bestScore < MIN_ACCEPTABLE_SCORE) {
     return null;
   }
   return {

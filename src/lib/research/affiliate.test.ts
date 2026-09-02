@@ -78,16 +78,23 @@ describe('selectAffiliateProduct', () => {
     expect(result!.signals.keyword_overlap).toBeGreaterThan(0);
   });
 
-  it('picks first (most recent) when all scores are 0', async () => {
+  it('returns null when all scores are below threshold (better no affiliate than wrong affiliate)', async () => {
     const products: Product[] = [
       { id: 'p1', friendly_code: 'ASH-001', external_id: 'x1', name_id: 'Barang Satu', name_en: 'Item One', category: 'fashion', merchant: 'Toko A', url: 'https://a.com', image: '' },
       { id: 'p2', friendly_code: 'ASH-002', external_id: 'x2', name_id: 'Barang Dua', name_en: 'Item Two', category: 'electronics', merchant: 'Toko B', url: 'https://b.com', image: '' }
     ];
     const { client } = makeClient(products);
     const result = await selectAffiliateProduct(client, { topic: 'katak ungu neon' });
-    expect(result).not.toBeNull();
-    expect(result!.product.id).toBe('p1');
-    expect(result!.matchScore).toBe(0);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when best score is 3 (single keyword overlap, below threshold)', async () => {
+    const products: Product[] = [
+      { id: 'p1', friendly_code: 'ASH-001', external_id: 'x1', name_id: 'Piyama Anak', name_en: 'Kids Pajamas', category: 'fashion', merchant: 'Toko A', url: 'https://a.com', image: '' }
+    ];
+    const { client } = makeClient(products);
+    const result = await selectAffiliateProduct(client, { topic: 'berita bbm naik untuk keluarga muda' });
+    expect(result).toBeNull();
   });
 
   it('records scored_from_pool_size', async () => {
@@ -96,7 +103,7 @@ describe('selectAffiliateProduct', () => {
       name_id: `Produk ${i}`, name_en: `Product ${i}`, category: 'misc', merchant: 'Toko', url: `https://${i}.com`, image: ''
     }));
     const { client } = makeClient(products);
-    const result = await selectAffiliateProduct(client, { topic: 'test' });
+    const result = await selectAffiliateProduct(client, { topic: 'produk toko rekomendasi' });
     expect(result).not.toBeNull();
     expect(result!.signals.scored_from_pool_size).toBe(5);
   });
