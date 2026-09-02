@@ -138,7 +138,7 @@ export function ResearchStepper({
         className="flex items-start gap-0 overflow-x-auto pb-2 snap-x snap-mandatory"
       >
         {STEP_ORDER.map((step, idx) => {
-          const isDone = !isFailed && idx < activeIndex;
+          const isDone = idx < activeIndex;
           const isActive = idx === activeIndex;
           const isErrorNode = isFailed && isActive;
           const isAwaiting = step === 'awaiting_selection';
@@ -163,7 +163,7 @@ export function ResearchStepper({
               <div className="flex w-full items-center">
                 {/* konektor kiri */}
                 <div
-                  className={`hidden h-0.5 flex-1 sm:block ${idx === 0 ? 'invisible' : idx <= activeIndex && !isFailed ? 'bg-primary' : isDone ? 'bg-primary' : 'bg-line'}`}
+                  className={`hidden h-0.5 flex-1 sm:block ${idx === 0 ? 'invisible' : idx <= activeIndex ? 'bg-primary' : 'bg-line'}`}
                   aria-hidden
                 />
                 <div
@@ -172,7 +172,7 @@ export function ResearchStepper({
                   <Icon className="size-4" aria-hidden />
                 </div>
                 <div
-                  className={`hidden h-0.5 flex-1 sm:block ${idx === STEP_ORDER.length - 1 ? 'invisible' : idx < activeIndex && !isFailed ? 'bg-primary' : 'bg-line'}`}
+                  className={`hidden h-0.5 flex-1 sm:block ${idx === STEP_ORDER.length - 1 ? 'invisible' : idx < activeIndex ? 'bg-primary' : 'bg-line'}`}
                   aria-hidden
                 />
               </div>

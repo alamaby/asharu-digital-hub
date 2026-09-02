@@ -1,17 +1,9 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { z } from 'zod';
-import { buildThreadPrompt, countPlaceholdersInThread } from '@/lib/llm/prompt';
-import type { ThreadGeneration } from '@/lib/llm/types';
+import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateProduct, type SelectedAffiliate } from './affiliate';
-
-const threadSchema = z.object({
-  main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
-  replies: z
-    .array(z.object({ id: z.string().min(1), en: z.string().min(1) }))
-    .max(5)
-});
+import { parseThread, replacePlaceholders } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -222,66 +214,4 @@ async function generateAndInsertDraft(
       ? `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore})`
       : 'draft generated without affiliate (empty pool)'
   });
-}
-
-function normalizePlaceholder(thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] }): { main: { id: string; en: string }; replies: { id: string; en: string }[] } {
-  // Collect all text and count placeholders.
-  const all = [thread.main.id, thread.main.en, ...thread.replies.flatMap((r) => [r.id, r.en])];
-  const total = all.reduce((sum, s) => sum + (s.match(/\{\{PRODUCT_URL\}\}/g)?.length ?? 0), 0);
-  if (total === 1) return thread;
-  if (total === 0) {
-    // Inject one placeholder into the main post (natural location).
-    return {
-      main: { id: `${thread.main.id} {{PRODUCT_URL}}`.trim(), en: thread.main.en },
-      replies: thread.replies
-    };
-  }
-  // > 1: keep first, strip the rest.
-  const strip = (s: string): string => {
-    let count = (s.match(/\{\{PRODUCT_URL\}\}/g) ?? []).length;
-    if (count <= 1) return s;
-    let out = s;
-    while (count > 1) {
-      out = out.replace('{{PRODUCT_URL}}', '');
-      count -= 1;
-    }
-    return out;
-  };
-  return {
-    main: { id: strip(thread.main.id), en: strip(thread.main.en) },
-    replies: thread.replies.map((r) => ({ id: strip(r.id), en: strip(r.en) }))
-  };
-}
-
-function parseThread(text: string): ThreadGeneration | null {
-  const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
-  let raw: unknown;
-  try {
-    raw = JSON.parse(trimmed);
-  } catch {
-    const m = trimmed.match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    try {
-      raw = JSON.parse(m[0]);
-    } catch {
-      return null;
-    }
-  }
-  const parsed = threadSchema.safeParse(raw);
-  if (!parsed.success) return null;
-  const t = parsed.data;
-  const normalized = normalizePlaceholder(t);
-  if (countPlaceholdersInThread(normalized) !== 1) return null;
-  return normalized;
-}
-
-function replacePlaceholders(
-  thread: ThreadGeneration,
-  productUrl: string
-): ThreadGeneration {
-  const repl = (s: string) => s.split('{{PRODUCT_URL}}').join(productUrl);
-  return {
-    main: { id: repl(thread.main.id), en: repl(thread.main.en) },
-    replies: thread.replies.map((r: { id: string; en: string }) => ({ id: repl(r.id), en: repl(r.en) }))
-  };
 }
