@@ -169,7 +169,7 @@ async function generateAndInsertDraft(
       ]
     : [];
 
-  await supabase.from('content_drafts').insert({
+  const { error: draftError } = await supabase.from('content_drafts').insert({
     request_id: sessionId,
     provider_id: providerId,
     model_id: llmResult.model,
@@ -188,6 +188,15 @@ async function generateAndInsertDraft(
       ? (affiliate.signals as unknown as Record<string, unknown>)
       : null
   });
+  if (draftError) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'error',
+      message: `draft insert failed: ${draftError.message}`
+    });
+    throw new Error(`draft insert failed: ${draftError.message}`);
+  }
 
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,

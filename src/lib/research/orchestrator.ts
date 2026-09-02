@@ -127,7 +127,25 @@ export async function advanceStage(
       }
       case 'developing': {
         await runDevelopment(supabase, sessionId);
-        await atomicTransition(supabase, sessionId, 'developing', 'completed');
+        // runDevelopment may have set status='failed' when no shortlisted topics;
+        // in that case don't claim completed — re-read current status.
+        const { data: afterDev } = await supabase
+          .from('content_research_sessions')
+          .select('status')
+          .eq('id', sessionId)
+          .single();
+        const cur = (afterDev as { status: ResearchStatus } | null)?.status;
+        if (cur === 'failed') return { status: 'failed', advanced: false };
+        const moved = await atomicTransition(supabase, sessionId, 'developing', 'completed');
+        if (!moved) {
+          // If transition didn't apply, status already changed (e.g. to failed) — surface it.
+          const { data: recheck } = await supabase
+            .from('content_research_sessions')
+            .select('status')
+            .eq('id', sessionId)
+            .single();
+          return { status: (recheck as { status: ResearchStatus } | null)?.status ?? 'failed', advanced: false };
+        }
         return { status: 'completed', advanced: true };
       }
       default:

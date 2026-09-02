@@ -9,6 +9,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import { ResearchSessionActions } from '@/components/admin/ResearchSessionActions';
 import { RetrySessionButton } from '@/components/admin/RetrySessionButton';
+import { ResearchStepper } from '@/components/admin/ResearchStepper';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -63,7 +64,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, target_location, platform_slug, audience_age, account_goal, error_message, created_at')
+    .select('id, status, target_location, platform_slug, audience_age, account_goal, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -84,6 +85,8 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     account_goal: string | null;
     error_message: string | null;
     created_at: string;
+    current_stage_started_at: string | null;
+    updated_at: string | null;
   };
 
   const { data: topics } = await supabase
@@ -92,13 +95,37 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     .eq('session_id', sessionId)
     .order('rank', { ascending: true });
 
-  const { data: drafts } = await supabase
-    .from('content_drafts')
-    .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
-    .eq('request_id', sessionId);
+  // Query drafts by both request_id (legacy research path = sessionId) and research_topic_id
+  const topicIds = ((topics ?? []) as TopicRow[]).map((t) => t.id);
+  let draftList: DraftRow[] = [];
+  if (topicIds.length > 0) {
+    const { data: byTopic } = await supabase
+      .from('content_drafts')
+      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .in('research_topic_id', topicIds);
+    const { data: byRequest } = await supabase
+      .from('content_drafts')
+      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .eq('request_id', sessionId);
+    const merged = new Map<string, DraftRow>();
+    for (const d of [...((byTopic ?? []) as DraftRow[]), ...((byRequest ?? []) as DraftRow[])]) merged.set(d.id, d);
+    draftList = [...merged.values()];
+  } else {
+    const { data: drafts } = await supabase
+      .from('content_drafts')
+      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .eq('request_id', sessionId);
+    draftList = (drafts ?? []) as DraftRow[];
+  }
 
   const list = (topics ?? []) as TopicRow[];
-  const draftList = (drafts ?? []) as DraftRow[];
+
+  const { data: logs } = await supabase
+    .from('content_research_logs')
+    .select('id, stage, level, message, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(100);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -125,6 +152,22 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           </p>
         ) : null}
       </header>
+
+      <ResearchStepper
+        status={s.status}
+        currentStageStartedAt={s.current_stage_started_at}
+        createdAt={s.created_at}
+        logs={(logs ?? []) as Array<{ stage: string; level: string; created_at: string }>}
+        locale={locale}
+        t={(key, params) => {
+          try {
+            // next-intl t supports params as second arg
+            return (t as unknown as (k: string, p?: Record<string, string | number>) => string)(key, params);
+          } catch {
+            return key;
+          }
+        }}
+      />
 
       {(s.status === 'failed' || s.status === 'completed' || s.status === 'awaiting_selection') ? (
         <RetrySessionButton sessionId={sessionId} />
@@ -165,9 +208,19 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           })}
         </section>
       ) : (
-        <p className="mt-8 rounded-xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-muted">
-          {t('empty')}
-        </p>
+        <div className="mt-8 rounded-xl border border-dashed border-line bg-surface p-6 text-center">
+          <p className="text-sm text-ink-muted">
+            {s.status === 'completed' ? t('draftsEmptyForCompleted') : t('noDrafts')}
+          </p>
+          <p className="mt-2 text-xs text-ink-muted">{t('noDraftsHint')}</p>
+          {s.status === 'completed' ? (
+            <p className="mt-2 text-xs">
+              <Link href={{ pathname: '/konten/review' }} className="text-primary hover:underline">
+                Lihat Review →
+              </Link>
+            </p>
+          ) : null}
+        </div>
       )}
 
       <section className="mt-8 space-y-3">
@@ -197,6 +250,27 @@ export default async function ResearchSessionPage({ params }: PageProps) {
                     {tp.final_score !== null ? tp.final_score.toFixed(1) : '-'}
                   </span>
                 </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-lg font-semibold text-ink">{t('logsHeading')}</h2>
+        {!logs || logs.length === 0 ? (
+          <p className="text-sm text-ink-muted">{t('logsEmpty')}</p>
+        ) : (
+          <ol className="space-y-2">
+            {(logs as Array<{ id: string; stage: string; level: string; message: string; created_at: string }>).map((lg) => (
+              <li
+                key={lg.id}
+                className={`rounded-xl border p-3 text-xs ${lg.level === 'error' ? 'border-red-200 bg-red-50 text-red-800' : lg.level === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-line bg-surface text-ink-muted'}`}
+              >
+                <p className="font-medium">
+                  [{lg.stage}] {lg.level} · {new Date(lg.created_at).toISOString().slice(0, 19).replace('T', ' ')}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-xs">{lg.message.slice(0, 600)}</p>
               </li>
             ))}
           </ol>
