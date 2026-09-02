@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
+import { advanceStage } from '@/lib/research/orchestrator';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -291,6 +292,15 @@ export async function retrySession(sessionId: string): Promise<ResearchAdminResu
       level: 'info',
       message: 'admin triggered retry — topics cleared, status reset to discovering'
     });
+    // Inline-run discovery so the admin sees progress sooner. Discovery can
+    // take ~60-90s (Tavily + LLM); if this exceeds the server-action timeout,
+    // the back-dated current_stage_started_at lets pg_cron re-pick. Errors
+    // are surfaced but do not roll back the reset.
+    try {
+      await advanceStage(supabase, sessionId);
+    } catch (e) {
+      return { success: true, error: `retry started but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
@@ -359,6 +369,15 @@ export async function resumeSession(sessionId: string): Promise<ResearchAdminRes
       level: 'info',
       message: `admin triggered resume — status reset to ${targetStage} (prior data preserved)`
     });
+
+    // Inline-run the resumed stage so the admin sees progress within ~30-60s
+    // instead of waiting up to 10 minutes for the pg_cron tick. The back-dated
+    // current_stage_started_at lets cron re-pick if this inline call fails.
+    try {
+      await advanceStage(supabase, sessionId);
+    } catch (e) {
+      return { success: true, error: `resumed but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
@@ -446,6 +465,18 @@ export async function advanceToDevelopment(
       .maybeSingle();
     if (error) return { success: false, error: error.message };
     if (!data) return { success: false, error: 'session not in awaiting_selection' };
+
+    // Inline-run the development stage so the admin sees the draft within
+    // ~30-60s instead of waiting up to 10 minutes for the pg_cron tick. The
+    // cron stays as a safety net for stuck sessions; the back-dated
+    // current_stage_started_at above already lets cron re-pick if this inline
+    // call times out or throws. Errors here are surfaced but do not roll back
+    // the transition — cron will retry.
+    try {
+      await advanceStage(supabase, sessionId);
+    } catch (e) {
+      return { success: true, error: `stage transitioned but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
