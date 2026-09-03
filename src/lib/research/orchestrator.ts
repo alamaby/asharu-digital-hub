@@ -24,22 +24,45 @@ interface ResearchSessionRow {
   required_winners: number;
   maximum_iterations: number;
   target_reply_count: number | null;
+  // New detail fields (20260904000002)
+  topic: string | null;
+  language: string | null;
+  target_category: string | null;
+  audience: string | null;
+  cta_style: string | null;
+  purpose: string | null;
+  constraints: string | null;
+  keywords: string | null;
 }
 
 function buildDiscoveryInput(row: ResearchSessionRow) {
+  // Derive allowed categories dynamically from target_category + keywords when empty
+  let allowed = row.allowed_categories ?? [];
+  if (allowed.length === 0 && row.target_category) {
+    allowed = [row.target_category];
+  }
+  // If still empty and keywords contains category-like words, keep empty (LLM will handle)
   return {
     targetLocation: row.target_location ?? 'Indonesia',
     secondaryLocation: row.secondary_location,
-    audienceAge: row.audience_age ?? 'umum',
+    audienceAge: row.audience_age ?? row.audience ?? 'umum',
     audienceInterests: row.audience_interests ?? [],
+    audience: row.audience ?? null,
     platform: row.platform_slug ?? 'all',
     tone: row.tone ?? 'casual',
-    accountGoal: row.account_goal ?? 'membagikan informasi bermanfaat',
-    allowedCategories: row.allowed_categories ?? [],
+    accountGoal: row.account_goal ?? row.purpose ?? 'membagikan informasi bermanfaat',
+    allowedCategories: allowed,
     excludedCategories: row.excluded_categories ?? [],
     currentDatetime: new Date().toISOString(),
     freshnessHours: row.freshness_hours,
-    minimumCandidates: row.minimum_candidates
+    minimumCandidates: row.minimum_candidates,
+    targetCategory: row.target_category ?? null,
+    keywords: row.keywords ?? null,
+    language: row.language ?? 'id',
+    topicHint: row.topic ?? null,
+    purpose: row.purpose ?? null,
+    ctaStyle: row.cta_style ?? null,
+    constraints: row.constraints ?? null
   };
 }
 

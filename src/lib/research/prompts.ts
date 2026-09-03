@@ -15,6 +15,14 @@ export interface DiscoveryInput {
   minimumCandidates: number;
   platformName?: string;
   language?: string;
+  // Extended from user input (dynamic, not hardcoded)
+  audience?: string | null;
+  targetCategory?: string | null;
+  keywords?: string | null;
+  topicHint?: string | null;
+  purpose?: string | null;
+  ctaStyle?: string | null;
+  constraints?: string | null;
 }
 
 export interface VerificationInput {
@@ -67,6 +75,13 @@ export const DEFAULT_SCORING_WEIGHTS = {
 
 export function buildDiscoveryPrompt(input: DiscoveryInput, searchResults: SearchResult[]): { system: string; user: string } {
   const lang = input.language ?? 'id';
+  const audienceLine = input.audience ? `Deskripsi audiens: ${input.audience}` : null;
+  const topicHintLine = input.topicHint ? `Hint topik user: ${input.topicHint}` : null;
+  const targetCatLine = input.targetCategory ? `Kategori target user: ${input.targetCategory}` : null;
+  const keywordsLine = input.keywords ? `Keywords user: ${input.keywords}` : null;
+  const purposeLine = input.purpose ? `Purpose: ${input.purpose}` : null;
+  const ctaLine = input.ctaStyle ? `CTA style: ${input.ctaStyle}` : null;
+  const constraintsLine = input.constraints ? `Batasan: ${input.constraints}` : null;
   const system = `Anda adalah Social Media Trend Researcher dan Content Strategist untuk audiens Indonesia.
 
 TUGAS UTAMA
@@ -78,22 +93,29 @@ Temukan topik aktual, relevan, menarik, dan dapat dipercaya yang mempunyai poten
 
 Anda tidak hanya mencari topik yang paling ramai. Anda mencari topik dengan kombinasi terbaik antara:
 - kebaruan,
-- relevansi terhadap audiens,
+- relevansi terhadap audiens (WAJIB prioritas #1),
 - manfaat praktis,
 - daya tarik emosional,
 - unsur kejutan atau rasa ingin tahu,
 - kredibilitas sumber,
 - potensi dikembangkan menjadi konten orisinal.
 
-TARGET AUDIENS
+TARGET AUDIENS (WAJIB filter keras — tolak topik yang tidak relevan dengan ini meski kredibel)
 Lokasi utama: ${input.targetLocation}
 Cakupan alternatif: ${input.secondaryLocation ?? '-'}
 Rentang usia: ${input.audienceAge}
+${audienceLine ?? 'Deskripsi audiens: -'}
 Minat: ${input.audienceInterests.join(', ') || '-'}
 Platform: ${input.platform === 'all' ? 'Semua Platform (platform-agnostik, patuhi batas terketat 280 karakter per post)' : (input.platformName ?? input.platform)}
 Karakter bahasa: ${input.tone}
 Tujuan akun: ${input.accountGoal}
-Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || '(semua)'}
+${topicHintLine ?? ''}
+${targetCatLine ?? ''}
+${keywordsLine ?? ''}
+${purposeLine ?? ''}
+${ctaLine ?? ''}
+${constraintsLine ?? ''}
+Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || (input.targetCategory ? input.targetCategory : '(semua — derivasi dari targetCategory/keywords)')}
 Kategori yang harus dihindari: ${input.excludedCategories.join(', ') || '(tidak ada)'}
 
 WAKTU PENELITIAN
@@ -117,19 +139,20 @@ Cari kandidat dari beberapa kategori berikut:
 PROSES PENELITIAN
 
 Tahap 1: Discovery dari hasil search di bawah
-- Pilih topik terbaik dari hasil search. Minimal ${input.minimumCandidates} kandidat (atau sebanyak mungkin yang relevan).
+- Pilih topik terbaik dari hasil search yang RELEVAN dengan TARGET AUDIENS di atas. Prioritaskan Minat, Deskripsi audiens, Kategori diperbolehkan/target, dan Hint topik user.
+- Jika hasil search tidak relevan dengan audiens (mis. audiens minta elektronik/home-living tapi search mengembalikan finance murni), TOLAK topik tersebut — lebih baik kembalikan <${input.minimumCandidates} daripada memaksa filler tidak relevan. Sebutkan penolakan di mind set Anda.
 - Dedup: gabungkan yang membahas peristiwa sama.
 
 Tahap 2: Struktur setiap topik
 Untuk setiap topik, isi:
 - topic: judul singkat topik (1 kalimat).
 - category: salah satu dari [berita, tips, inspirasi, sejarah, fakta, kebijakan, diskusi].
-- why_now: mengapa topik ini relevan sekarang (1-2 kalimat).
+- why_now: mengapa topik ini relevan sekarang (1-2 kalimat) + kaitkan dengan audiens.
 - angle: sudut pandang unik untuk konten (1 kalimat).
 
 WAJIB
-- Anda HARUS mengembalikan minimal 5 topik.
-- JANGAN mengembalikan array kosong.
+- Usahakan ${input.minimumCandidates} kandidat, tetapi JANGAN memaksa topik tidak relevan hanya demi kuota — jika search tidak relevan, kembalikan apa adanya yang relevan (boleh <5) dengan catatan jujur.
+- JANGAN mengembalikan array kosong jika ada setidaknya 1 yang relevan.
 - Jangan mengarang fakta, angka, atau URL di luar hasil search.
 
 FORMAT KELUARAN (WAJIB ikuti schema ini persis)
@@ -147,14 +170,14 @@ Kembalikan JSON valid tanpa teks tambahan:
 Bahasa output: ${lang}.`.trim();
 
   const searchContext = searchResults
-    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal?'}] ${r.title}\n   ${r.url}\n   ${r.content.slice(0, 300)}`)
+    .map((r, i) => `${i + 1}. [${r.publishedDate ?? 'tanggal?'}] ${r.title}\n   ${r.url}\n   ${r.content.slice(0, 500)}`)
     .join('\n\n');
 
   const user = `Hasil pencarian web (gunakan sebagai basis fakta; jangan mengarang di luar ini):
 
 ${searchContext}
 
-Pilih topik terbaik dari hasil di atas. Kembalikan JSON dengan minimal 5 topik sesuai FORMAT KELUARAN.`.trim();
+Pilih topik terbaik yang RELEVAN dengan TARGET AUDIENS dari hasil di atas. Tolak yang tidak relevan meski kredibel. Kembalikan JSON sesuai FORMAT KELUARAN (usahakan ${input.minimumCandidates}, boleh kurang jika tidak relevan).`.trim();
 
   return { system, user };
 }

@@ -48,20 +48,55 @@ interface DiscoveryLLMOutput {
 function buildQueries(input: DiscoveryInput): string[] {
   const queries: string[] = [];
   const target = input.targetLocation || 'Indonesia';
-  queries.push(`berita terbaru ${target} ${new Date().toISOString().slice(0, 10)}`);
-  queries.push(`tren ${target} hari ini`);
-  if (input.audienceInterests.length > 0) {
-    queries.push(`${input.audienceInterests.slice(0, 2).join(' ')} viral ${target}`);
+  const audience = (input as unknown as { audience?: string | null }).audience ?? input.audienceAge;
+  const keywords = (input as unknown as { keywords?: string | null }).keywords ?? null;
+  const targetCategory = (input as unknown as { targetCategory?: string | null }).targetCategory ?? null;
+  const topicHint = (input as unknown as { topicHint?: string | null }).topicHint ?? null;
+
+  // Audience-first queries (dynamic from user input, not hardcoded Gen Z)
+  if (topicHint) {
+    queries.push(`${topicHint} ${target}`);
   }
-  // 'all' = platform-agnostic; skip platform-specific tips query.
+  if (targetCategory) {
+    queries.push(`${targetCategory} tren ${target} untuk ${audience}`);
+  }
+  if (keywords) {
+    queries.push(`${keywords} tips untuk ${audience} di ${target}`);
+  }
+  // Use all interests, not just 2
+  for (const interest of input.audienceInterests.slice(0, 3)) {
+    queries.push(`${interest} untuk ${audience} di ${target}`);
+    if (targetCategory) queries.push(`${interest} ${targetCategory} terbaru`);
+  }
+  if (input.allowedCategories.length > 0) {
+    for (const cat of input.allowedCategories.slice(0, 3)) {
+      queries.push(`${cat} untuk ${audience} ${target}`);
+    }
+  } else if (!targetCategory) {
+    // Fallback to account goal keywords when no category given
+    queries.push(`${input.accountGoal} ${target}`);
+  }
+  // Platform-specific
   if (input.platform && input.platform !== 'all') {
-    queries.push(`tips praktis ${input.platform} ${target}`);
+    queries.push(`tips praktis ${input.platform} untuk ${audience} ${target}`);
+  } else {
+    queries.push(`tips praktis untuk ${audience} ${target}`);
   }
-  queries.push(`cerita inspiratif ${target}`);
-  for (const cat of input.allowedCategories.slice(0, 2)) {
-    queries.push(`${cat} terbaru ${target}`);
+  // Generic fallbacks last (low priority)
+  queries.push(`tren ${target} hari ini`);
+  queries.push(`berita terbaru ${target} ${new Date().toISOString().slice(0, 10)}`);
+  // Deduplicate preserve audience-first order, cap 8 queries
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const q of queries) {
+    const k = q.toLowerCase().trim();
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      deduped.push(q);
+    }
+    if (deduped.length >= 8) break;
   }
-  return queries;
+  return deduped;
 }
 
 function dedupResults(results: SearchResult[]): SearchResult[] {
@@ -83,9 +118,9 @@ function dedupResults(results: SearchResult[]): SearchResult[] {
 }
 
 function chunkSourcesForLLM(results: SearchResult[]): SearchResult[] {
-  // Cap at 10 results to keep the prompt manageable for smaller models
-  // (25 results × 600 chars overwhelmed nemotron-3-ultra → empty output).
-  return results.slice(0, 10);
+  // Cap at 15 results with richer content (500 chars) — audience-first queries already filtered
+  // Keep manageable for bynara 9 models with max reasoning; prior 10×300 was too lossy for niche.
+  return results.slice(0, 15);
 }
 
 export interface DiscoveryRunResult {
