@@ -25,6 +25,8 @@ export interface ChatInput {
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** Max reasoning effort — set to "max" when model supports it. Forwarded as reasoning_effort. */
+  reasoningEffort?: 'max' | 'high' | 'medium' | 'low';
 }
 
 export interface ChatOutput {
@@ -67,4 +69,18 @@ export interface KeyRow {
   failure_count: number;
   last_used_at: string | null;
   is_active: boolean;
+}
+
+export interface ModelRow {
+  id: string;
+  provider_id: string;
+  model_id: string;
+  display_name: string;
+  is_default: boolean;
+  priority: number;
+  is_active: boolean;
+  last_used_at: string | null;
+  config: Record<string, unknown> | null;
+  usage_count: number;
+  failure_count: number;
 }

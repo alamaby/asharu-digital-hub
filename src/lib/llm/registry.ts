@@ -1,4 +1,4 @@
-import type { ProviderRow } from './types';
+import type { ModelRow, ProviderRow } from './types';
 import { getServiceClient } from '@/lib/supabase/service';
 
 /**
@@ -27,5 +27,18 @@ export class ProviderRegistry {
       .maybeSingle();
     if (error) throw new Error(`getBySlug ${slug}: ${error.message}`);
     return data as unknown as ProviderRow | null;
+  }
+
+  async listModels(providerId: string): Promise<ModelRow[]> {
+    const supabase = getServiceClient();
+    const { data, error } = await supabase
+      .from('llm_models')
+      .select('*')
+      .eq('provider_id', providerId)
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true });
+    if (error) throw new Error(`listModels: ${error.message}`);
+    return (data ?? []) as unknown as ModelRow[];
   }
 }

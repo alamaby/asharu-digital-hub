@@ -38,10 +38,12 @@ export default async function middleware(request: NextRequest) {
     supabaseResponse = response;
   }
 
-  // Guard /konten/review — only admin; anon or non-admin → /masuk
+  // Guard admin + /konten/review — only admin; anon or non-admin → /masuk
   const pathname = request.nextUrl.pathname;
-  const isReview = /^\/(id|en)\/konten\/review(\/|$)/.test(pathname);
-  if (isReview) {
+  const isProtected =
+    /^\/(id|en)\/konten\/review(\/|$)/.test(pathname) ||
+    /^\/(id|en)\/admin\/llm(\/|$)/.test(pathname);
+  if (isProtected) {
     if (!supabase) {
       // Supabase not configured — treat as not authenticated
       const locale = pathname.startsWith('/en/') ? 'en' : 'id';

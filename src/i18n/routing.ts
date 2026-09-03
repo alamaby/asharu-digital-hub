@@ -66,6 +66,18 @@ export const routing = defineRouting({
       id: '/admin/riset/[sessionId]/topics/[topicId]',
       en: '/admin/research/[sessionId]/topics/[topicId]'
     },
+    '/admin/llm': {
+      id: '/admin/llm',
+      en: '/admin/llm'
+    },
+    '/admin/llm/logs': {
+      id: '/admin/llm/logs',
+      en: '/admin/llm/logs'
+    },
+    '/admin/llm/[providerId]': {
+      id: '/admin/llm/[providerId]',
+      en: '/admin/llm/[providerId]'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

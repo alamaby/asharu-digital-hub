@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isCronAuthorized } from '@/lib/content/cron-auth';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { ProviderRegistry } from '@/lib/llm/registry';
-import { KeyPool } from '@/lib/llm/key-pool';
-import { OpenAICompatibleProvider } from '@/lib/llm/providers/openai-compatible';
-import { GeminiProvider } from '@/lib/llm/providers/gemini';
-import { CloudflareProvider } from '@/lib/llm/providers/cloudflare';
-import {
-  buildThreadPrompt,
-  countPlaceholdersInThread
-} from '@/lib/llm/prompt';
+import { runLLMCompletion } from '@/lib/llm/completion';
+import { buildThreadPrompt, countPlaceholdersInThread } from '@/lib/llm/prompt';
+import { parseThread } from '@/lib/research/thread';
 import type { ThreadGeneration } from '@/lib/llm/types';
 import { z } from 'zod';
 
@@ -19,12 +13,6 @@ const threadSchema = z.object({
   main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
   replies: z.array(z.object({ id: z.string().min(1), en: z.string().min(1) })).max(5)
 });
-
-function providerFactory(slug: string, baseUrl: string, config?: Record<string, string>) {
-  if (slug === 'gemini') return new GeminiProvider(baseUrl);
-  if (slug === 'cloudflare') return new CloudflareProvider(baseUrl, config?.account_id ?? '');
-  return new OpenAICompatibleProvider(slug as never, baseUrl);
-}
 
 export async function POST(request: NextRequest) {
   return handle(request);
@@ -43,7 +31,6 @@ async function handle(request: NextRequest) {
   if (!supabase) {
     return NextResponse.json({ error: 'service not configured' }, { status: 500 });
   }
-  const registry = new ProviderRegistry();
 
   const { data: requests, error: reqError } = await supabase
     .from('content_requests')
@@ -136,81 +123,48 @@ async function handle(request: NextRequest) {
         }
       );
 
-      const providers = await registry.listActive();
-      const providerErrors: string[] = [];
       let success:
         | {
-            thread: ThreadGeneration;
             providerSlug: string;
             model: string;
             keyHash: string;
             latency: number;
+            text: string;
           }
         | null = null;
-
-      for (const prov of providers) {
-        const pool = new KeyPool(prov);
-        try {
-          const { result, keyRow } = await pool.withFallback(async (apiKey) => {
-            const provider = providerFactory(prov.slug, prov.base_url, prov.config);
-            const { data: models } = await supabase
-              .from('llm_models')
-              .select('model_id')
-              .eq('provider_id', prov.id)
-              .eq('is_default', true)
-              .limit(1);
-            const model =
-              (models?.[0] as { model_id: string } | undefined)?.model_id ??
-              (prov.slug === 'naraya' ? 'nemotron-3-ultra' : 'openai/gpt-4o-mini');
-            return provider.chat(
-              {
-                model,
-                messages: [
-                  { role: 'system', content: system },
-                  { role: 'user', content: user }
-                ],
-                temperature: 0.7
-              },
-              apiKey
-            );
-          });
-          success = {
-            thread: result as unknown as ThreadGeneration,
-            providerSlug: prov.slug,
-            model: result.model,
-            keyHash: keyRow.key_hash,
-            latency: result.latencyMs
-          };
-          break;
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          providerErrors.push(`${prov.slug}: ${msg.slice(0, 300)}`);
-        }
+      try {
+        const llmResult = await runLLMCompletion(supabase, {
+          requestId: req.id,
+          stage: 'legacy',
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          temperature: 0.7
+        });
+        success = {
+          providerSlug: llmResult.providerSlug,
+          model: llmResult.model,
+          keyHash: llmResult.keyHash,
+          latency: llmResult.latencyMs,
+          text: llmResult.output.text
+        };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`All providers failed — ${msg.slice(0, 500)}`);
       }
 
-      if (!success) throw new Error(`All providers failed — ${providerErrors.join(' | ') || 'no providers'}`);
-
-      // Parse thread (validate)
-      const parsedJson = (() => {
-        try {
-          return JSON.parse(success.thread.main.id); // placeholder; real parse below
-        } catch {
-          return null;
-        }
-      })();
-      void parsedJson;
-      const raw = success.thread as unknown as Record<string, unknown>;
+      // Parse thread (validate) — use shared parser for consistency with development flow
       let thread: ThreadGeneration;
-      try {
-        thread = (raw as { main: { id: string; en: string }; replies: Array<{ id: string; en: string }> });
-        const validated = threadSchema.safeParse(thread);
+      {
+        const parsed = parseThread(success.text);
+        if (!parsed) throw new Error(`Thread parse failed. Raw: ${success.text.slice(0, 1000)}`);
+        const validated = threadSchema.safeParse(parsed);
         if (!validated.success) throw new Error(`Thread shape invalid: ${validated.error.message}`);
         if (countPlaceholdersInThread(validated.data) !== 1) {
           throw new Error(`Expected exactly 1 {{PRODUCT_URL}}, got ${countPlaceholdersInThread(validated.data)}`);
         }
         thread = validated.data;
-      } catch (e) {
-        throw e instanceof Error ? e : new Error(String(e));
       }
 
       // Replace placeholder

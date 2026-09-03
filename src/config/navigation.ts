@@ -13,7 +13,8 @@ export interface NavItem {
     | 'adminKonten'
     | 'adminBaru'
     | 'adminReview'
-    | 'adminRiset';
+    | 'adminRiset'
+    | 'adminLlm';
   pathname:
     | '/'
     | '/products'
@@ -22,6 +23,8 @@ export interface NavItem {
     | '/admin'
     | '/admin/konten'
     | '/admin/riset'
+    | '/admin/llm'
+    | '/admin/llm/logs'
     | '/konten/baru'
     | '/konten/review';
   /** In-page anchor (homepage sections). */
@@ -46,6 +49,7 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminDashboard', pathname: '/admin' },
   { key: 'adminKonten', pathname: '/admin/konten' },
   { key: 'adminRiset', pathname: '/admin/riset' },
+  { key: 'adminLlm', pathname: '/admin/llm' },
   { key: 'adminBaru', pathname: '/konten/baru' },
   { key: 'adminReview', pathname: '/konten/review' }
 ];

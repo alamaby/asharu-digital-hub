@@ -9,19 +9,27 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   async chat(input: ChatInput, apiKey: string): Promise<Omit<ChatOutput, 'keyId' | 'provider'>> {
     const started = Date.now();
+    const body: Record<string, unknown> = {
+      model: input.model,
+      messages: input.messages,
+      temperature: input.temperature ?? 0.7,
+      max_tokens: input.maxTokens,
+      response_format: { type: 'json_object' }
+    };
+    if (input.reasoningEffort) {
+      (body as Record<string, unknown>).reasoning_effort = input.reasoningEffort;
+      // Compat: some routers use `reasoning: { effort: "max" }`
+      (body as Record<string, unknown>).reasoning = { effort: input.reasoningEffort };
+      // Also include `extra_body` style for OpenRouter-compatible gateways
+      (body as Record<string, unknown>).extra_body = { reasoning: { effort: input.reasoningEffort } };
+    }
     const res = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model: input.model,
-        messages: input.messages,
-        temperature: input.temperature ?? 0.7,
-        max_tokens: input.maxTokens,
-        response_format: { type: 'json_object' }
-      })
+      body: JSON.stringify(body)
     });
 
     if (!res.ok) {

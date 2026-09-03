@@ -1,4 +1,4 @@
-import type { KeyRow } from '@/lib/llm/types';
+import type { KeyRow, ModelRow } from '@/lib/llm/types';
 import { getServiceClient } from './service';
 
 /**
@@ -87,4 +87,43 @@ export async function markKeyFailure(keyId: string): Promise<void> {
   const patch: Record<string, unknown> = { failure_count: next };
   if (next > 5) patch.is_active = false;
   await supabase.from('llm_provider_keys').update(patch).eq('id', keyId);
+}
+
+export async function fetchOrderedModels(providerId: string): Promise<ModelRow[]> {
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from('llm_models')
+    .select('*')
+    .eq('provider_id', providerId)
+    .eq('is_active', true)
+    .order('priority', { ascending: true })
+    .order('last_used_at', { ascending: true, nullsFirst: true })
+    .order('usage_count', { ascending: true })
+    .order('failure_count', { ascending: true });
+  if (error) throw new Error(`fetchOrderedModels: ${error.message}`);
+  return (data ?? []) as unknown as ModelRow[];
+}
+
+export async function markModelUsage(modelId: string): Promise<void> {
+  const supabase = getServiceClient();
+  const { data, error } = await supabase.from('llm_models').select('usage_count').eq('id', modelId).single();
+  if (error) throw new Error(`markModelUsage select: ${error.message}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const current = (data as any)?.usage_count ?? 0;
+  const { error: updError } = await supabase
+    .from('llm_models')
+    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() } as unknown as Record<string, unknown>)
+    .eq('id', modelId);
+  if (updError) throw new Error(`markModelUsage update: ${updError.message}`);
+}
+
+export async function markModelFailure(modelId: string): Promise<void> {
+  const supabase = getServiceClient();
+  const { data } = await supabase.from('llm_models').select('failure_count').eq('id', modelId).single();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const current = (data as any)?.failure_count ?? 0;
+  const next = current + 1;
+  const patch: Record<string, unknown> = { failure_count: next };
+  if (next > 5) patch.is_active = false;
+  await supabase.from('llm_models').update(patch).eq('id', modelId);
 }
