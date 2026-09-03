@@ -72,7 +72,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, target_location, secondary_location, platform_slug, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, target_location, secondary_location, platform_slug, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -87,6 +87,14 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   const s = session as {
     id: string;
     status: string;
+    topic: string | null;
+    language: string | null;
+    target_category: string | null;
+    audience: string | null;
+    cta_style: string | null;
+    purpose: string | null;
+    constraints: string | null;
+    keywords: string | null;
     target_location: string | null;
     secondary_location: string | null;
     platform_slug: string | null;
@@ -180,11 +188,12 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+          {s.topic ?? s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}
+          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {t('languageLabel')}: {s.language ?? '—'} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}
         </p>
+        {s.topic ? <p className="mt-2 text-sm text-ink">Topik: {s.topic}</p> : null}
         {s.error_message ? (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
             {t('errorLabel')}: {s.error_message}
@@ -195,6 +204,38 @@ export default async function ResearchSessionPage({ params }: PageProps) {
       <section className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-card">
         <h2 className="text-sm font-semibold text-ink">{t('paramsHeading')}</h2>
         <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">Topic:</dt>
+            <dd className="text-ink">{s.topic ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">Bahasa:</dt>
+            <dd className="text-ink">{s.language ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">Kategori target:</dt>
+            <dd className="text-ink">{s.target_category ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">Audiens:</dt>
+            <dd className="text-ink">{s.audience ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">CTA:</dt>
+            <dd className="text-ink">{s.cta_style ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="font-medium text-ink-muted">Tujuan:</dt>
+            <dd className="text-ink">{s.purpose ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2 sm:col-span-2">
+            <dt className="font-medium text-ink-muted">Batasan:</dt>
+            <dd className="text-ink">{s.constraints ?? '—'}</dd>
+          </div>
+          <div className="flex gap-2 sm:col-span-2">
+            <dt className="font-medium text-ink-muted">Keywords:</dt>
+            <dd className="text-ink">{s.keywords ?? '—'}</dd>
+          </div>
           <div className="flex gap-2">
             <dt className="font-medium text-ink-muted">{t('toneLabel')}:</dt>
             <dd className="text-ink">{s.tone ?? '—'}</dd>

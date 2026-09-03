@@ -8,7 +8,7 @@ import { Link } from '@/i18n/navigation';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ provider?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ provider?: string; status?: string; sort?: string; dir?: string; page?: string }>;
 }
 
 const PAGE_SIZE = 20;
@@ -23,6 +23,8 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const sp = await searchParams;
   const providerFilter = sp.provider ?? 'all';
   const statusFilter = sp.status ?? 'all';
+  const sortBy = sp.sort === 'latency' ? 'latency_ms' : sp.sort === 'provider' ? 'provider_slug' : 'created_at';
+  const dir = sp.dir === 'asc' ? true : false;
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -30,10 +32,10 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const supabase = createSupabaseService();
   if (!supabase) return <div className="p-10">Supabase not configured</div>;
 
-  let query = supabase.from('llm_call_logs').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+  let query = supabase.from('llm_call_logs').select('*', { count: 'exact' }).order(sortBy, { ascending: dir }).order('id', { ascending: false }).range(from, to);
   if (providerFilter !== 'all') query = query.eq('provider_slug', providerFilter);
   if (statusFilter === 'success') query = query.eq('http_status', 200);
-  if (statusFilter === 'error') query = query.not('http_status', 'eq', 200 as never);
+  if (statusFilter === 'error') query = query.or('http_status.is.null,http_status.neq.200');
 
   const { data: logs, count } = await query;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
@@ -41,23 +43,27 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const { data: providers } = await supabase.from('llm_providers').select('slug').order('priority');
   const slugs = ((providers ?? []) as { slug: string }[]).map((p) => p.slug);
 
-  function jsonPreview(v: unknown): string {
+  function pretty(v: unknown): string {
     try {
-      const s = typeof v === 'string' ? v : JSON.stringify(v);
-      return s.slice(0, 2000);
+      if (typeof v === 'string') {
+        try { return JSON.stringify(JSON.parse(v), null, 2); } catch { return v; }
+      }
+      return JSON.stringify(v, null, 2);
     } catch {
-      return String(v).slice(0, 2000);
+      return String(v);
     }
   }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="space-y-3">
+        <Link href={{ pathname: '/admin/llm' }} className="inline-flex items-center gap-1 text-sm text-primary underline">
+          ← Providers
+        </Link>
         <div>
           <h1 className="text-2xl font-bold text-ink">LLM Logs Lengkap</h1>
-          <p className="text-sm text-ink-muted">Request & response per provider/model/key. Filter & pagination DB-driven.</p>
+          <p className="text-sm text-ink-muted">Request & response per provider/model/key. Filter, sorting & pagination DB-driven.</p>
         </div>
-        <Link href={{ pathname: '/admin/llm' }} className="text-sm text-primary underline">← Providers</Link>
       </header>
 
       <form className="mt-6 flex flex-wrap gap-2">
@@ -71,6 +77,15 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
           <option value="all">Semua status</option>
           <option value="success">Sukses (200)</option>
           <option value="error">Error</option>
+        </select>
+        <select name="sort" defaultValue={sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at'} className="rounded border border-line px-2 py-1 text-sm">
+          <option value="created_at">Sort: Waktu</option>
+          <option value="latency">Sort: Latency</option>
+          <option value="provider">Sort: Provider</option>
+        </select>
+        <select name="dir" defaultValue={dir ? 'asc' : 'desc'} className="rounded border border-line px-2 py-1 text-sm">
+          <option value="desc">Desc</option>
+          <option value="asc">Asc</option>
         </select>
         <button type="submit" className="rounded bg-primary px-3 py-1 text-sm text-white">Filter</button>
       </form>
@@ -101,10 +116,14 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
                   <td className="px-3 py-2 text-xs">{r.stage ?? '-'}</td>
                   <td className="px-3 py-2 text-xs">{r.latency_ms ?? '-'}ms / {r.http_status ?? '-'}</td>
                   <td className="px-3 py-2">
-                    {r.error ? <span className="text-xs text-red-600">{r.error.slice(0, 200)}</span> : <span className="text-xs text-emerald-600">OK</span>}
+                    {r.error ? <span className="text-xs text-red-600">{r.error.slice(0, 400)}</span> : <span className="text-xs text-emerald-600">OK</span>}
                     <details className="mt-1">
-                      <summary className="cursor-pointer text-xs text-primary">Request/Response</summary>
-                      <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">{jsonPreview(r.request_messages ?? '—')}{'\n---\n'}{jsonPreview(r.response_text ?? '—')}</pre>
+                      <summary className="cursor-pointer text-xs text-primary">Request</summary>
+                      <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">{pretty(r.request_messages ?? '—')}</pre>
+                    </details>
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-xs text-primary">Response</summary>
+                      <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">{pretty(r.response_text ?? r.error ?? '—')}</pre>
                     </details>
                   </td>
                 </tr>
@@ -120,8 +139,8 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
       <div className="mt-4 flex items-center justify-between text-sm">
         <span className="text-ink-muted">Halaman {page} / {totalPages} · {count ?? 0} total</span>
         <div className="flex gap-2">
-          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
-          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
+          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
+          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
         </div>
       </div>
     </div>

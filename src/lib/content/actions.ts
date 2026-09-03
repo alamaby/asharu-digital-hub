@@ -166,6 +166,10 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   ]) {
     if (raw[k] === '') raw[k] = undefined as unknown as string;
   }
+  // Numeric optional fields: empty string must become undefined, otherwise z.coerce.number("") -> 0 fails min()
+  for (const k of ['freshnessHours', 'minimumCandidates', 'minimumScore', 'requiredWinners', 'maximumIterations', 'targetReplyCount']) {
+    if (raw[k] === '') raw[k] = undefined as unknown as string;
+  }
 
   const parsed = researchSchema.safeParse(raw);
   if (!parsed.success) {
@@ -211,6 +215,14 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     .from('content_research_sessions')
     .insert({
       status: 'pending',
+      topic: data.topic,
+      language: data.language,
+      target_category: data.targetCategory ?? null,
+      audience: data.audience,
+      cta_style: data.ctaStyle,
+      purpose: data.purpose,
+      constraints: data.constraints ?? null,
+      keywords: data.keywords ?? null,
       target_location: data.targetLocation ?? null,
       secondary_location: data.secondaryLocation ?? null,
       audience_age: data.audienceAge ?? data.audience,
@@ -227,7 +239,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       maximum_iterations: data.maximumIterations ?? 3,
       target_reply_count: data.targetReplyCount ?? null,
       created_by: user?.id ?? null
-    })
+    } as unknown as Record<string, unknown>)
     .select('id')
     .single();
 

@@ -6,24 +6,19 @@ import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
-import { formatDateTime } from '@/lib/utils/format';
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { Link } from '@/i18n/navigation';
+import { ResearchListClient } from '@/components/admin/ResearchListClient';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ status?: string; platform?: string; date?: string; sort?: string; page?: string }>;
 }
 
-const STATUS_BG: Record<string, string> = {
-  pending: 'bg-surface text-ink-muted',
-  discovering: 'bg-blue-50 text-blue-800',
-  verifying: 'bg-blue-50 text-blue-800',
-  scoring: 'bg-blue-50 text-blue-800',
-  awaiting_selection: 'bg-amber-50 text-amber-800',
-  developing: 'bg-blue-50 text-blue-800',
-  completed: 'bg-emerald-50 text-emerald-800',
-  failed: 'bg-red-50 text-red-800'
-};
+const PAGE_SIZE = 20;
+
+const ALLOWED_STATUS = new Set(['pending', 'discovering', 'verifying', 'scoring', 'awaiting_selection', 'developing', 'completed', 'failed']);
+const ALLOWED_DATE = new Set(['all', '7d', '30d']);
+const ALLOWED_SORT = new Set(['newest', 'oldest']);
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -37,7 +32,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
-export default async function ResearchListPage({ params }: PageProps) {
+function normalizeParams(p: Awaited<PageProps['searchParams']>) {
+  const status = p.status && ALLOWED_STATUS.has(p.status) ? p.status : 'all';
+  const platform = p.platform ?? 'all';
+  const date = p.date && ALLOWED_DATE.has(p.date) ? p.date : 'all';
+  const sort = p.sort && ALLOWED_SORT.has(p.sort) ? p.sort : 'newest';
+  const page = Math.max(1, Number.parseInt(p.page ?? '1', 10) || 1);
+  return { status, platform, date, sort, page };
+}
+
+function dateFromNow(period: string): string | null {
+  if (period === 'all') return null;
+  const days = period === '7d' ? 7 : 30;
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+export default async function ResearchListPage({ params, searchParams }: PageProps) {
   const rawLocale = (await params).locale;
   const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
   setRequestLocale(locale);
@@ -58,22 +68,30 @@ export default async function ResearchListPage({ params }: PageProps) {
     );
   }
 
-  type SessionRow = {
-    id: string;
-    status: string;
-    target_location: string | null;
-    platform_slug: string | null;
-    created_at: string;
-    error_message: string | null;
-  };
+  const sp = normalizeParams(await searchParams);
+  const since = dateFromNow(sp.date);
+  const ascending = sp.sort === 'oldest';
+  const fromRow = (sp.page - 1) * PAGE_SIZE;
+  const toRow = fromRow + PAGE_SIZE - 1;
 
-  const { data: sessions, error: sessionsError } = await supabase
-    .from('content_research_sessions')
-    .select('id, status, target_location, platform_slug, created_at, error_message')
-    .order('created_at', { ascending: false })
-    .limit(50);
+  // platforms for filter
+  const { data: platData } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
+  const platformOptions = (platData ?? []) as { slug: string; display_name: string }[];
+  const allowedPlatforms = new Set(platformOptions.map((p) => p.slug));
+  const platform = sp.platform !== 'all' && allowedPlatforms.has(sp.platform) ? sp.platform : 'all';
 
-  const list = (sessions ?? []) as SessionRow[];
+  let query = supabase.from('content_research_sessions').select('id, status, topic, target_location, platform_slug, created_at, error_message', { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
+  if (sp.status !== 'all') query = query.eq('status', sp.status);
+  if (platform !== 'all') {
+    if (platform === 'all_null') query = query.is('platform_slug', null);
+    else query = query.eq('platform_slug', platform);
+  }
+  if (since) query = query.gte('created_at', since);
+
+  const { data: sessions, error: sessionsError, count } = await query;
+  const list = (sessions ?? []) as Array<{ id: string; status: string; topic: string | null; target_location: string | null; platform_slug: string | null; created_at: string; error_message: string | null }>;
+  const totalCount = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -82,42 +100,7 @@ export default async function ResearchListPage({ params }: PageProps) {
         <p className="mt-2 text-sm text-ink-muted">{t('intro')}</p>
       </header>
 
-      <ul className="mt-6 space-y-2">
-        {sessionsError ? (
-          <li className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            Query error: {sessionsError.message}
-          </li>
-        ) : list.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-muted">
-            {t('empty')}
-          </li>
-        ) : (
-          list.map((s) => (
-            <li key={s.id}>
-              <Link
-                href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId: s.id } }}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">
-                    {s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
-                  </p>
-                  <p className="text-xs text-ink-muted">
-                    {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {formatDateTime(s.created_at, locale, timeZone)}
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    STATUS_BG[s.status] ?? 'bg-surface text-ink-muted'
-                  }`}
-                >
-                  {s.status}
-                </span>
-              </Link>
-            </li>
-          ))
-        )}
-      </ul>
+      <ResearchListClient sessions={list} sessionsError={sessionsError?.message ?? null} platforms={platformOptions} filters={sp} page={sp.page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} locale={locale} timeZone={timeZone} />
     </div>
   );
 }

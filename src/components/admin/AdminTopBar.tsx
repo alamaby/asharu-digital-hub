@@ -11,7 +11,8 @@ export function AdminTopBar() {
   const pathname = usePathname();
 
   const renderItem = (item: NavItem) => {
-    const active = pathname === item.pathname || pathname.startsWith(item.pathname + '/');
+    const isDashboard = item.pathname === '/admin';
+    const active = isDashboard ? pathname === item.pathname : pathname === item.pathname || pathname.startsWith(item.pathname + '/');
     return (
       <Link
         key={item.key}
