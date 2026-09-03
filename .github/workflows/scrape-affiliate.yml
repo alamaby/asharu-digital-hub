@@ -12,6 +12,7 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    environment: Production
     permissions:
       contents: write
     steps:
