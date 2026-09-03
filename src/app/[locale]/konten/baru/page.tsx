@@ -46,12 +46,36 @@ export default async function KontenBaruPage({ params }: PageProps) {
     { slug: 'facebook', display_name: 'Facebook' }
   ];
 
+  let categories: { slug: string; display_name: string }[] = [
+    { slug: 'automotive', display_name: 'Otomotif' },
+    { slug: 'electronics', display_name: 'Elektronik' },
+    { slug: 'home-living', display_name: 'Rumah & Living' },
+    { slug: 'fashion', display_name: 'Fashion' },
+    { slug: 'sports-hobby', display_name: 'Olahraga & Hobi' },
+    { slug: 'others', display_name: 'Lainnya' }
+  ];
+
   if (env.hasSupabase) {
     try {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(env.supabaseUrl!, env.supabaseAnonKey!, { auth: { persistSession: false } });
       const { data } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
       if (data && data.length > 0) platforms = data as typeof platforms;
+      const { data: catData } = await supabase.from('affiliate_products').select('category').eq('is_active', true);
+      if (catData && catData.length > 0) {
+        const distinct = Array.from(new Set((catData as { category: string }[]).map((r) => r.category).filter(Boolean))).sort();
+        if (distinct.length > 0) {
+          const labelMap: Record<string, string> = {
+            automotive: 'Otomotif',
+            electronics: 'Elektronik',
+            'home-living': 'Rumah & Living',
+            fashion: 'Fashion',
+            'sports-hobby': 'Olahraga & Hobi',
+            others: 'Lainnya'
+          };
+          categories = distinct.map((slug) => ({ slug, display_name: labelMap[slug] ?? slug }));
+        }
+      }
     } catch {
       // fallback to hardcoded
     }
@@ -80,7 +104,7 @@ export default async function KontenBaruPage({ params }: PageProps) {
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-3 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
       <div className="mt-8">
-        <ContentRequestForm platforms={platforms} />
+        <ContentRequestForm platforms={platforms} categories={categories} />
       </div>
     </div>
   );

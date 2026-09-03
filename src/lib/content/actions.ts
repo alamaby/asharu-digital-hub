@@ -10,7 +10,7 @@ const requestSchema = z.object({
   topic: z.string().min(10).max(500),
   platform: z.string().min(1),
   tone: z.enum(['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif']),
-  targetCategory: z.string().optional(),
+  targetCategory: z.enum(['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others']).optional(),
   audience: z.string().min(3).max(200),
   ctaStyle: z.string().min(1),
   purpose: z.string().min(3).max(200),
@@ -101,7 +101,7 @@ const researchSchema = z.object({
   topic: z.string().min(10).max(500),
   platform: z.string().min(1),
   tone: z.enum(['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif']),
-  targetCategory: z.string().optional(),
+  targetCategory: z.enum(['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others']).optional(),
   audience: z.string().min(3).max(200),
   ctaStyle: z.string().min(1),
   purpose: z.string().min(3).max(200),
@@ -242,6 +242,141 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
 /* ------------------------------------------------------------------ */
 /* Admin actions: research session management                         */
 /* ------------------------------------------------------------------ */
+
+export interface GenerateIdeaResult {
+  success: boolean;
+  idea?: {
+    topic: string;
+    platform?: string;
+    tone?: string;
+    language?: string;
+    targetCategory?: string;
+    audience?: string;
+    ctaStyle?: string;
+    purpose?: string;
+    constraints?: string;
+    keywords?: string;
+    targetLocation?: string;
+    secondaryLocation?: string;
+    audienceAge?: string;
+    audienceInterests?: string;
+    accountGoal?: string;
+    allowedCategories?: string;
+    excludedCategories?: string;
+  };
+  error?: string;
+  fieldErrors?: Record<string, string>;
+}
+
+/**
+ * Generate content idea via LLM — fills all form fields.
+ * Lightweight, no Tavily, no DB insert. Rate limit 30/hour per IP.
+ * Uses the shared LLM provider pool (DB-driven, round-robin).
+ */
+export async function generateIdea(formData: FormData): Promise<GenerateIdeaResult> {
+  const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const hdrs = await headers();
+  const ip = getClientIp(hdrs);
+  const { allowed, count } = await checkRateLimit(ip, 'generate_idea', 30);
+  if (!allowed) {
+    return { success: false, error: `rate_limit:${count}` };
+  }
+
+  const platformHint = (raw.platform ?? 'all').trim() || 'all';
+  const toneHint = (raw.tone ?? '').trim();
+  const languageHint = (raw.language ?? 'both').trim() || 'both';
+  const targetLocationHint = (raw.targetLocation ?? '').trim();
+  const currentHints = [platformHint, toneHint, languageHint, targetLocationHint].filter(Boolean).join(', ');
+
+  // Build prompt — lightweight idea generator
+  const system = `Anda adalah Content Idea Generator untuk Asharu (asharu.id). Tugas: buat 1 ide konten afiliasi yang siap isi form.
+WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
+{
+  "topic": "judul topik 10-500 karakter, hook kuat",
+  "platform": "threads|twitter|instagram|tiktok|linkedin|facebook|all",
+  "tone": "casual|formal|witty|professional|friendly|edukatif",
+  "language": "id|en|both",
+  "targetCategory": "automotive|electronics|home-living|fashion|sports-hobby|others",
+  "audience": "deskripsi audiens 3-200 karakter",
+  "ctaStyle": "soft_sell|hard_sell|question|urgency|storytelling",
+  "purpose": "tujuan konten 3-200 karakter",
+  "constraints": "batasan opsional max 500",
+  "keywords": "kata kunci pisah koma max 200",
+  "targetLocation": "lokasi utama",
+  "secondaryLocation": "lokasi sekunder opsional",
+  "audienceAge": "rentang usia",
+  "audienceInterests": "minat pisah koma",
+  "accountGoal": "tujuan akun",
+  "allowedCategories": "kategori diperbolehkan pisah koma",
+  "excludedCategories": "kategori dihindari pisah koma"
+}
+Aturan: topic harus 10-500 char, jangan asal; sesuaikan dengan hint platform/tone jika diberikan. Bahasa output ${languageHint}.`;
+  const user = `Hint saat ini: platform=${platformHint}, tone=${toneHint || '-'}, language=${languageHint}, lokasi=${targetLocationHint || 'Indonesia'}${currentHints ? ` (${currentHints})` : ''}.
+Berikan 1 ide terbaik sesuai schema. Pastikan semua field terisi natural, jangan kosongkan topic/audience/purpose. Keywords relevan dengan topic.`;
+
+  // Use service client for LLM pool (bypasses RLS)
+  const supabaseService = getServiceClient();
+  const { runLLMCompletion } = await import('@/lib/llm/completion');
+  let text = '';
+  try {
+    const result = await runLLMCompletion(supabaseService, {
+      requestId: `idea-${Date.now()}`,
+      stage: 'idea_generation',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      temperature: 0.85,
+      maxTokens: 900
+    });
+    text = result.output.text;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg.slice(0, 500) };
+  }
+
+  // Parse JSON with fallbacks (strip markdown fences, extract object)
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        parsed = JSON.parse(m[0]) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
+    }
+  }
+  if (!parsed || typeof parsed.topic !== 'string' || (parsed.topic as string).length < 10) {
+    return { success: false, error: `Gagal parse ide. Raw: ${text.slice(0, 600)}` };
+  }
+
+  const idea = {
+    topic: String(parsed.topic ?? '').slice(0, 500),
+    platform: typeof parsed.platform === 'string' ? String(parsed.platform) : undefined,
+    tone: typeof parsed.tone === 'string' ? String(parsed.tone) : undefined,
+    language: typeof parsed.language === 'string' ? String(parsed.language) : undefined,
+    targetCategory: typeof parsed.targetCategory === 'string' ? String(parsed.targetCategory) : undefined,
+    audience: typeof parsed.audience === 'string' ? String(parsed.audience) : undefined,
+    ctaStyle: typeof parsed.ctaStyle === 'string' ? String(parsed.ctaStyle) : undefined,
+    purpose: typeof parsed.purpose === 'string' ? String(parsed.purpose) : undefined,
+    constraints: typeof parsed.constraints === 'string' ? String(parsed.constraints) : undefined,
+    keywords: typeof parsed.keywords === 'string' ? String(parsed.keywords) : undefined,
+    targetLocation: typeof parsed.targetLocation === 'string' ? String(parsed.targetLocation) : undefined,
+    secondaryLocation: typeof parsed.secondaryLocation === 'string' ? String(parsed.secondaryLocation) : undefined,
+    audienceAge: typeof parsed.audienceAge === 'string' ? String(parsed.audienceAge) : undefined,
+    audienceInterests: typeof parsed.audienceInterests === 'string' ? String(parsed.audienceInterests) : Array.isArray(parsed.audienceInterests) ? (parsed.audienceInterests as string[]).join(', ') : undefined,
+    accountGoal: typeof parsed.accountGoal === 'string' ? String(parsed.accountGoal) : undefined,
+    allowedCategories: typeof parsed.allowedCategories === 'string' ? String(parsed.allowedCategories) : Array.isArray(parsed.allowedCategories) ? (parsed.allowedCategories as string[]).join(', ') : undefined,
+    excludedCategories: typeof parsed.excludedCategories === 'string' ? String(parsed.excludedCategories) : Array.isArray(parsed.excludedCategories) ? (parsed.excludedCategories as string[]).join(', ') : undefined
+  };
+
+  await incrementRateLimit(ip, 'generate_idea').catch(() => {});
+  return { success: true, idea };
+}
 
 export interface ResearchAdminResult {
   success: boolean;

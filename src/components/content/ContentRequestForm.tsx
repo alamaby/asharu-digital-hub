@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { createResearchSession } from '@/lib/content/actions';
+import { createResearchSession, generateIdea } from '@/lib/content/actions';
 
 interface ContentRequestFormProps {
   platforms: { slug: string; display_name: string }[];
+  categories: { slug: string; display_name: string }[];
 }
 
-export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
+export function ContentRequestForm({ platforms, categories }: ContentRequestFormProps) {
   const t = useTranslations('content.form');
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -17,8 +18,79 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [ideaGenerating, setIdeaGenerating] = useState(false);
+  const [ideaApplied, setIdeaApplied] = useState(false);
+  const [ideaError, setIdeaError] = useState<string | null>(null);
+  const [, startIdeaTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Controlled fields so generateIdea can fill them
+  const [topic, setTopic] = useState('');
   const [platform, setPlatform] = useState('all');
+  const [tone, setTone] = useState('casual');
+  const [language, setLanguage] = useState('both');
+  const [targetCategory, setTargetCategory] = useState('');
+  const [audience, setAudience] = useState('');
+  const [ctaStyle, setCtaStyle] = useState('soft_sell');
+  const [purpose, setPurpose] = useState('');
+  const [constraints, setConstraints] = useState('');
+  const [keywords, setKeywords] = useState('');
+  const [targetLocation, setTargetLocation] = useState('');
+  const [secondaryLocation, setSecondaryLocation] = useState('');
+  const [audienceAge, setAudienceAge] = useState('');
+  const [audienceInterests, setAudienceInterests] = useState('');
+  const [accountGoal, setAccountGoal] = useState('');
+  const [allowedCategories, setAllowedCategories] = useState('');
+  const [excludedCategories, setExcludedCategories] = useState('');
   const [targetReplyCount, setTargetReplyCount] = useState('6');
+
+  function handleGenerateIdea() {
+    setIdeaError(null);
+    setIdeaApplied(false);
+    setIdeaGenerating(true);
+    startIdeaTransition(async () => {
+      // Collect current partial state as hints
+      const fd = new FormData();
+      fd.set('platform', platform);
+      fd.set('tone', tone);
+      fd.set('language', language);
+      if (targetLocation) fd.set('targetLocation', targetLocation);
+      if (audience) fd.set('audience', audience);
+      // call server action
+      const res = await generateIdea(fd);
+      setIdeaGenerating(false);
+      if (!res.success || !res.idea) {
+        const err = res.error ?? 'Gagal generate idea';
+        if (err.startsWith('rate_limit')) {
+          setIdeaError(`Batas 30/jam tercapai. Coba lagi nanti.`);
+        } else {
+          setIdeaError(err);
+        }
+        return;
+      }
+      const i = res.idea;
+      if (i.topic) setTopic(i.topic);
+      if (i.platform && platforms.some((p) => p.slug === i.platform)) setPlatform(i.platform!);
+      if (i.tone) setTone(i.tone!);
+      if (i.language) setLanguage(i.language!);
+      if (i.targetCategory) setTargetCategory(i.targetCategory!);
+      if (i.audience) setAudience(i.audience!);
+      if (i.ctaStyle) setCtaStyle(i.ctaStyle!);
+      if (i.purpose) setPurpose(i.purpose!);
+      if (i.constraints !== undefined) setConstraints(i.constraints!);
+      if (i.keywords !== undefined) setKeywords(i.keywords!);
+      if (i.targetLocation !== undefined) setTargetLocation(i.targetLocation!);
+      if (i.secondaryLocation !== undefined) setSecondaryLocation(i.secondaryLocation!);
+      if (i.audienceAge !== undefined) setAudienceAge(i.audienceAge!);
+      if (i.audienceInterests !== undefined) setAudienceInterests(i.audienceInterests!);
+      if (i.accountGoal !== undefined) setAccountGoal(i.accountGoal!);
+      if (i.allowedCategories !== undefined) setAllowedCategories(i.allowedCategories!);
+      if (i.excludedCategories !== undefined) setExcludedCategories(i.excludedCategories!);
+      setShowAdvanced(true);
+      setIdeaApplied(true);
+      setFieldErrors({});
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,8 +111,23 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
       setStatus('success');
       setMessage('Riset berhasil dimulai. Cek halaman riset untuk progres.');
       setSessionId(result.sessionId ?? null);
-      (document.getElementById('content-form') as HTMLFormElement)?.reset();
+      formRef.current?.reset();
+      // reset controlled states
+      setTopic('');
+      setAudience('');
+      setPurpose('');
+      setKeywords('');
+      setConstraints('');
+      setTargetCategory('');
+      setTargetLocation('');
+      setSecondaryLocation('');
+      setAudienceAge('');
+      setAudienceInterests('');
+      setAccountGoal('');
+      setAllowedCategories('');
+      setExcludedCategories('');
       setShowAdvanced(false);
+      setIdeaApplied(false);
     } else if (result.error === 'honeypot') {
       setStatus('error');
       setMessage(t('errorHoneypot'));
@@ -113,23 +200,61 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
   }
 
   return (
-    <form id="content-form" onSubmit={handleSubmit} noValidate className="space-y-5">
+    <form ref={formRef} id="content-form" onSubmit={handleSubmit} noValidate className="space-y-5">
       {/* Honeypot */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
 
       <div>
-        <label htmlFor="topic" className="block text-sm font-medium text-ink">
-          {t('topic')} <span className="text-red-600">*</span>
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="topic" className="block text-sm font-medium text-ink">
+            {t('topic')} <span className="text-red-600">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={handleGenerateIdea}
+            disabled={ideaGenerating || pending}
+            aria-busy={ideaGenerating}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {ideaGenerating ? (
+              <>
+                <svg viewBox="0 0 20 20" fill="none" className="size-3.5 animate-spin" aria-hidden>
+                  <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+                  <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                <span>{t('generating')}</span>
+              </>
+            ) : (
+              <>
+                <span aria-hidden>✦</span>
+                <span>{t('generateIdea')}</span>
+              </>
+            )}
+          </button>
+        </div>
         <textarea
           id="topic"
           name="topic"
           required
           rows={3}
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
           placeholder={t('topicPlaceholder')}
-          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          disabled={pending}
+          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
         />
         {fieldErrors.topic ? <p className="mt-1 text-xs text-red-600">{fieldErrors.topic}</p> : null}
+        {ideaApplied ? (
+          <p role="status" aria-live="polite" className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            {t('ideaApplied')}
+          </p>
+        ) : null}
+        {ideaError ? (
+          <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+            {ideaError}
+          </p>
+        ) : null}
+        <p className="mt-1 text-xs text-ink-muted">{t('generateIdeaHint')}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -141,7 +266,7 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="platform"
             name="platform"
             required
-            disabled={pending}
+            disabled={pending || ideaGenerating}
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
@@ -163,7 +288,9 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="tone"
             name="tone"
             required
-            disabled={pending}
+            disabled={pending || ideaGenerating}
+            value={tone}
+            onChange={(e) => setTone(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="casual">casual</option>
@@ -185,8 +312,9 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="language"
             name="language"
             required
-            defaultValue="both"
-            disabled={pending}
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            disabled={pending || ideaGenerating}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="id">{t('languageOptions.id')}</option>
@@ -202,14 +330,17 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           <select
             id="targetCategory"
             name="targetCategory"
-            disabled={pending}
+            value={targetCategory}
+            onChange={(e) => setTargetCategory(e.target.value)}
+            disabled={pending || ideaGenerating}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">{t('targetCategoryPlaceholder')}</option>
-            <option value="fashion">Fashion</option>
-            <option value="electronics">Elektronik</option>
-            <option value="home-living">Rumah Tangga</option>
-            <option value="sports-hobby">Olahraga & Hobi</option>
+            {categories.map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.display_name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -222,8 +353,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           id="audience"
           name="audience"
           required
+          value={audience}
+          onChange={(e) => setAudience(e.target.value)}
           placeholder={t('audiencePlaceholder')}
-          disabled={pending}
+          disabled={pending || ideaGenerating}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {fieldErrors.audience ? <p className="mt-1 text-xs text-red-600">{fieldErrors.audience}</p> : null}
@@ -238,7 +371,9 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="ctaStyle"
             name="ctaStyle"
             required
-            disabled={pending}
+            value={ctaStyle}
+            onChange={(e) => setCtaStyle(e.target.value)}
+            disabled={pending || ideaGenerating}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="soft_sell">{t('ctaStyleOptions.soft_sell')}</option>
@@ -257,8 +392,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
             id="purpose"
             name="purpose"
             required
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value)}
             placeholder={t('purposePlaceholder')}
-            disabled={pending}
+            disabled={pending || ideaGenerating}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           {fieldErrors.purpose ? <p className="mt-1 text-xs text-red-600">{fieldErrors.purpose}</p> : null}
@@ -273,8 +410,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
           id="constraints"
           name="constraints"
           rows={2}
+          value={constraints}
+          onChange={(e) => setConstraints(e.target.value)}
           placeholder={t('constraintsPlaceholder')}
-          disabled={pending}
+          disabled={pending || ideaGenerating}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
@@ -286,8 +425,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
         <input
           id="keywords"
           name="keywords"
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
           placeholder={t('keywordsPlaceholder')}
-          disabled={pending}
+          disabled={pending || ideaGenerating}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
@@ -336,8 +477,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="targetLocation"
                   name="targetLocation"
                   type="text"
+                  value={targetLocation}
+                  onChange={(e) => setTargetLocation(e.target.value)}
                   placeholder="Cth: Indonesia, Bandung"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -349,8 +492,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="secondaryLocation"
                   name="secondaryLocation"
                   type="text"
+                  value={secondaryLocation}
+                  onChange={(e) => setSecondaryLocation(e.target.value)}
                   placeholder="Cth: Jakarta, nasional"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -365,8 +510,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="audienceAge"
                   name="audienceAge"
                   type="text"
+                  value={audienceAge}
+                  onChange={(e) => setAudienceAge(e.target.value)}
                   placeholder="Cth: 25-34 tahun"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -378,8 +525,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="audienceInterests"
                   name="audienceInterests"
                   type="text"
+                  value={audienceInterests}
+                  onChange={(e) => setAudienceInterests(e.target.value)}
                   placeholder="Cth: parenting, keuangan keluarga"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -393,8 +542,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                 id="accountGoal"
                 name="accountGoal"
                 type="text"
+                value={accountGoal}
+                onChange={(e) => setAccountGoal(e.target.value)}
                 placeholder="Cth: mengedukasi calon orang tua baru"
-                disabled={pending}
+                disabled={pending || ideaGenerating}
                 className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
               />
             </div>
@@ -408,8 +559,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="allowedCategories"
                   name="allowedCategories"
                   type="text"
+                  value={allowedCategories}
+                  onChange={(e) => setAllowedCategories(e.target.value)}
                   placeholder={t('categoriesHint')}
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -421,8 +574,10 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
                   id="excludedCategories"
                   name="excludedCategories"
                   type="text"
+                  value={excludedCategories}
+                  onChange={(e) => setExcludedCategories(e.target.value)}
                   placeholder={t('categoriesHint')}
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -496,7 +651,7 @@ export function ContentRequestForm({ platforms }: ContentRequestFormProps) {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || ideaGenerating}
         aria-busy={pending}
         className="btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
       >

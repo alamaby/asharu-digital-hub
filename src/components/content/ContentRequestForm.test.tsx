@@ -3,9 +3,11 @@ import { screen } from '@testing-library/react';
 import { ContentRequestForm } from './ContentRequestForm';
 import { renderWithMessages } from '@/test/utils';
 
+const mockCategories = [{ slug: 'fashion', display_name: 'Fashion' }];
+
 describe('ContentRequestForm', () => {
   it('renders all required fields and honeypot', () => {
-    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} />);
+    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} categories={mockCategories} />);
     expect(screen.getByLabelText(/Topik/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Platform/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Nada/)).toBeInTheDocument();
@@ -16,7 +18,7 @@ describe('ContentRequestForm', () => {
   });
 
   it('has accessible required markers', () => {
-    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'twitter', display_name: 'Twitter' }]} />);
+    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'twitter', display_name: 'Twitter' }]} categories={mockCategories} />);
     expect(screen.getAllByText('*').length).toBeGreaterThanOrEqual(5);
   });
 });
