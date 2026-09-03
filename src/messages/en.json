@@ -394,7 +394,14 @@
         "pickerTitle": "Pick Affiliate Product",
         "pickerSearch": "Search products...",
         "pickerEmpty": "No matching products.",
-        "pickerCurrent": "Current"
+        "pickerCurrent": "Current",
+        "randomBadge": "Random",
+        "randomBridgeNotice": "Picked randomly from 20 newest products — bridging sentence keeps insertion natural. If not quite right, click Reselect & Rethink to pick again.",
+        "reselectRethink": "Reselect & Rethink",
+        "reselectRethinkHint": "Pick another product → LLM rewrites 1 insertion reply naturally (loop until satisfied)",
+        "swapHint": "Swap product without changing text (quick swap)",
+        "pickAndGenerate": "Pick Product & Generate",
+        "randomBridgeTitle": "Random from 20 newest (bridging)"
       }
     }
   },
@@ -449,8 +456,9 @@
       "shortlistHeading": "Pick topics to develop",
       "shortlistIntro": "Select 1 or more topics, then click Shortlist. After that click \"Lanjut ke Development\". Prefer verified topics with the highest score.",
       "shortlistCount": "{count} shortlisted",
-      "affiliateMismatchHeading": "{count} topics have no matching affiliate product",
-      "affiliateMismatchBody": "Drafts for these topics will be generated without an affiliate link. Add a relevant affiliate product, or pick a more matchable topic.",
+      "affiliateMismatchHeading": "{count} topics not 100% matched",
+      "affiliateMismatchBody": "Drafts will still include 1 link from 20 newest products (random fallback + natural bridging). After generation, use Reselect & Rethink to swap & rewrite the insertion.",
+      "affiliateMismatchFallbackNote": "Best score {score} — will use random fallback.",
       "affiliateMismatchCategories": "Topic categories",
       "affiliateMismatchAction": "Manage affiliate products",
       "shortlistAction": "Shortlist",

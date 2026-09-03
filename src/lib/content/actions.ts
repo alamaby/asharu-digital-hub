@@ -823,58 +823,94 @@ export async function regenerateAffiliateInsertion(
       return { success: false, error: 'invalid thread shape' };
     }
 
+    // Resolve sessionId + topic context correctly (P0-1 fix)
+    let resolvedSessionId: string | null = null;
     let topicText = prod.name_id;
     let language: string = 'both';
     let tone: string | null = null;
+    let maxChars: number | null = null;
     if (d.research_topic_id) {
       const { data: rt } = await supabase
         .from('content_research_topics')
-        .select('topic, category, key_facts, hooks')
+        .select('topic, session_id')
         .eq('id', d.research_topic_id)
         .maybeSingle();
-      if (rt) topicText = (rt as { topic: string }).topic;
-      const { data: sess } = await supabase
-        .from('content_research_sessions')
-        .select('language, tone')
-        .eq('id', (d as unknown as { request_id: string }).request_id ?? d.research_topic_id)
-        .maybeSingle();
-      // Fallback: try session by research_topic_id -> session_id
-      if (!sess && d.research_topic_id) {
-        const { data: rt2 } = await supabase
-          .from('content_research_topics')
-          .select('session_id')
-          .eq('id', d.research_topic_id)
+      if (rt) {
+        topicText = (rt as { topic: string }).topic;
+        resolvedSessionId = (rt as { session_id: string | null }).session_id ?? null;
+      }
+      if (resolvedSessionId) {
+        const { data: sess } = await supabase
+          .from('content_research_sessions')
+          .select('language, tone, platform_slug')
+          .eq('id', resolvedSessionId)
           .maybeSingle();
-        const sid = (rt2 as { session_id: string } | null)?.session_id;
-        if (sid) {
-          const { data: s2 } = await supabase.from('content_research_sessions').select('language, tone').eq('id', sid).maybeSingle();
-          if (s2) {
-            language = (s2 as { language: string | null }).language ?? language;
-            tone = (s2 as { tone: string | null }).tone ?? null;
+        if (sess) {
+          language = (sess as { language: string | null }).language ?? language;
+          tone = (sess as { tone: string | null }).tone ?? null;
+          const slug = (sess as { platform_slug: string | null }).platform_slug ?? 'all';
+          if (slug === 'all') {
+            const { data: minRow } = await supabase
+              .from('platforms')
+              .select('max_chars')
+              .eq('is_active', true)
+              .not('max_chars', 'is', null)
+              .order('max_chars', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            maxChars = (minRow as { max_chars: number | null } | null)?.max_chars ?? 280;
+          } else {
+            const { data: prow } = await supabase.from('platforms').select('max_chars').eq('slug', slug).maybeSingle();
+            maxChars = (prow as { max_chars: number | null } | null)?.max_chars ?? null;
           }
         }
-      } else if (sess) {
-        language = (sess as { language: string | null }).language ?? language;
-        tone = (sess as { tone: string | null }).tone ?? null;
+      }
+    } else if (d.request_id) {
+      // Legacy content_requests draft: request_id may be research session id
+      resolvedSessionId = d.request_id;
+      const { data: sess2 } = await supabase
+        .from('content_research_sessions')
+        .select('language, tone, platform_slug')
+        .eq('id', resolvedSessionId)
+        .maybeSingle();
+      if (sess2) {
+        language = (sess2 as { language: string | null }).language ?? language;
+        tone = (sess2 as { tone: string | null }).tone ?? null;
+        const slug = (sess2 as { platform_slug: string | null }).platform_slug ?? 'all';
+        if (slug === 'all') {
+          const { data: minRow } = await supabase
+            .from('platforms')
+            .select('max_chars')
+            .eq('is_active', true)
+            .not('max_chars', 'is', null)
+            .order('max_chars', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          maxChars = (minRow as { max_chars: number | null } | null)?.max_chars ?? 280;
+        } else {
+          const { data: prow } = await supabase.from('platforms').select('max_chars').eq('slug', slug).maybeSingle();
+          maxChars = (prow as { max_chars: number | null } | null)?.max_chars ?? null;
+        }
       }
     }
 
     const currentInj = (d.affiliate_injections as Array<{ post_index?: number }>)[0];
-    const targetIndex = typeof currentInj?.post_index === 'number' ? currentInj.post_index : Math.floor(thread.replies.length / 2) + 1;
-    const boundedTarget = Math.max(0, Math.min(targetIndex, thread.replies.length));
+    // Clamp to valid range: 0 = main, 1..n = replies. Fallback to middle if missing.
+    const rawTarget = typeof currentInj?.post_index === 'number' ? currentInj.post_index : Math.floor(thread.replies.length / 2) + 1;
+    const boundedTarget = Math.max(0, Math.min(rawTarget, thread.replies.length));
 
     const { buildSingleReplyRewritePrompt } = await import('@/lib/llm/prompt');
     const { runLLMCompletion } = await import('@/lib/llm/completion');
-    const { replacePlaceholders } = await import('@/lib/research/thread');
+    const { replacePlaceholders, sanitizeThreadText } = await import('@/lib/research/thread');
 
     const promptProduct = { friendlyCode: prod.friendly_code, name: prod.name_id, url: prod.url, category: prod.category };
     const { system, user } = buildSingleReplyRewritePrompt(
-      { topic: topicText, language, tone, targetIndex: boundedTarget, threadJson: thread },
+      { topic: topicText, language, tone, targetIndex: boundedTarget, threadJson: thread, maxChars },
       promptProduct
     );
 
     const llmResult = await runLLMCompletion(supabase, {
-      requestId: d.request_id ?? draftId,
+      requestId: resolvedSessionId ?? d.request_id ?? draftId,
       stage: 'regen_affiliate',
       messages: [
         { role: 'system', content: system },
@@ -906,9 +942,14 @@ export async function regenerateAffiliateInsertion(
       return { success: false, error: `LLM rewrite parse failed. Raw: ${llmResult.output.text.slice(0, 400)}` };
     }
 
+    // P0-3: sanitize CJK + preserve LLM bridging text
+    rewritten = { id: sanitizeThreadText(rewritten.id), en: sanitizeThreadText(rewritten.en) };
+
     const PLACEHOLDER = '{{PRODUCT_URL}}';
-    const hasPlaceholder = rewritten.id.includes(PLACEHOLDER) || rewritten.en.includes(PLACEHOLDER);
-    if (!hasPlaceholder) {
+    // Preserve field: detect which field LLM used; if none, inject into primary field (id)
+    const hasPlaceholderId = rewritten.id.includes(PLACEHOLDER);
+    const hasPlaceholderEn = rewritten.en.includes(PLACEHOLDER);
+    if (!hasPlaceholderId && !hasPlaceholderEn) {
       rewritten = { ...rewritten, id: `${rewritten.id} ${PLACEHOLDER}`.trim() };
     }
 
@@ -919,28 +960,30 @@ export async function regenerateAffiliateInsertion(
     if (boundedTarget === 0) newThread.main = rewritten;
     else newThread.replies[boundedTarget - 1] = rewritten;
 
-    // Strip any stray placeholder outside target (force exactly 1)
+    // P1-1: enforce exactly 1 placeholder preserving target field; strip others
     const allTexts = [newThread.main.id, newThread.main.en, ...newThread.replies.flatMap((r) => [r.id, r.en])].join(' ');
     const placeholderCount = (allTexts.match(/\{\{PRODUCT_URL\}\}/g) ?? []).length;
     if (placeholderCount !== 1) {
       let kept = false;
-      const strip = (s: string) => s.replace(/\{\{PRODUCT_URL\}\}/g, () => (kept ? '' : (kept = true, '{{PRODUCT_URL}}')));
-      // Ensure target has placeholder, then strip others
+      const keepFirst = (s: string) => s.replace(/\{\{PRODUCT_URL\}\}/g, () => (kept ? '' : (kept = true, '{{PRODUCT_URL}}')));
+      const removeAll = (s: string) => s.split(PLACEHOLDER).join('').replace(/\s{2,}/g, ' ').trim();
       if (boundedTarget === 0) {
+        // Ensure target (main) keeps placeholder
         if (!newThread.main.id.includes(PLACEHOLDER) && !newThread.main.en.includes(PLACEHOLDER)) {
           newThread.main.id = `${newThread.main.id} ${PLACEHOLDER}`.trim();
         }
-        newThread.main.id = strip(newThread.main.id);
-        newThread.main.en = strip(newThread.main.en);
-        newThread.replies = newThread.replies.map((r) => ({ id: strip(r.id), en: strip(r.en) }));
+        newThread.main.id = keepFirst(newThread.main.id);
+        newThread.main.en = keepFirst(newThread.main.en);
+        newThread.replies = newThread.replies.map((r) => ({ id: removeAll(r.id), en: removeAll(r.en) }));
       } else {
         const tr = newThread.replies[boundedTarget - 1]!;
         if (!tr.id.includes(PLACEHOLDER) && !tr.en.includes(PLACEHOLDER)) tr.id = `${tr.id} ${PLACEHOLDER}`.trim();
-        newThread.main.id = strip(newThread.main.id);
-        newThread.main.en = strip(newThread.main.en);
+        // Keep exactly one in target, remove all elsewhere
+        newThread.main.id = removeAll(newThread.main.id);
+        newThread.main.en = removeAll(newThread.main.en);
         newThread.replies = newThread.replies.map((r, i) => {
-          if (i === boundedTarget - 1) return { id: strip(r.id), en: strip(r.en) };
-          return { id: r.id.split(PLACEHOLDER).join('').replace(/\s{2,}/g, ' ').trim(), en: r.en.split(PLACEHOLDER).join('').replace(/\s{2,}/g, ' ').trim() };
+          if (i === boundedTarget - 1) return { id: keepFirst(r.id), en: keepFirst(r.en) };
+          return { id: removeAll(r.id), en: removeAll(r.en) };
         });
       }
     }
@@ -994,12 +1037,15 @@ export async function regenerateAffiliateInsertion(
     if (updateError) return { success: false, error: updateError.message };
 
     await incrementRateLimit(ip, 'regen_affiliate').catch(() => undefined);
-    await supabase.from('content_research_logs').insert({
-      session_id: d.request_id ?? d.research_topic_id ?? draftId,
-      stage: 'regen_affiliate',
-      level: 'info',
-      message: `regen_affiliate draft ${draftId} -> ${prod.friendly_code} target ${boundedTarget} (${llmResult.providerSlug}/${llmResult.model})`
-    } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+    // P0-2: use resolved session id for log; skip if null to avoid FK violation
+    if (resolvedSessionId) {
+      await supabase.from('content_research_logs').insert({
+        session_id: resolvedSessionId,
+        stage: 'regen_affiliate',
+        level: 'info',
+        message: `regen_affiliate draft ${draftId} -> ${prod.friendly_code} target ${boundedTarget} (${llmResult.providerSlug}/${llmResult.model})`
+      } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+    }
 
     return { success: true, draftId };
   } catch (e) {

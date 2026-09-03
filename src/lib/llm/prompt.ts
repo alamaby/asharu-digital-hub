@@ -101,6 +101,7 @@ export interface SingleReplyRewriteInput {
   tone?: string | null;
   targetIndex: number; // 0=main, 1..n = reply[targetIndex-1]
   threadJson: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+  maxChars?: number | null;
 }
 
 export function buildSingleReplyRewritePrompt(
@@ -124,6 +125,7 @@ export function buildSingleReplyRewritePrompt(
     '- BAHASA: HANYA huruf Latin, angka, tanda baca standar, emoji relevan. DILARANG CJK.',
     '- Language: follow input language (id/en/both — fill id and en accordingly).',
     ...(input.tone ? [`- Tone: ${input.tone}`] : []),
+    ...(input.maxChars ? [`- Max chars per post for rewrite: ${input.maxChars} (HARUS patuh).`] : []),
     '- Jangan tinggalkan placeholder kosong (mis. "produk dari ___"). Link diwakili {{PRODUCT_URL}}.'
   ].join('\n');
 

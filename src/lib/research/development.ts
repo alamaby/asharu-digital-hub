@@ -268,7 +268,7 @@ async function generateAndInsertDraft(
     stage: 'developing',
     level: 'info',
     message: affiliate
-      ? `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore})`
+      ? `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})`
       : 'draft generated without affiliate (empty pool)'
   });
 }

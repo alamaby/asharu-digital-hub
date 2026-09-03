@@ -47,8 +47,8 @@ const MIN_ACCEPTABLE_SCORE = 6;
 
 /**
  * Select the most relevant active affiliate product for a topic, from the
- * most recently added 20 products. Returns null + signals.no_recent_products
- * if the pool is empty.
+ * most recently added POOL_SIZE products. Returns null if the pool is empty
+ * or no product reaches MIN_ACCEPTABLE_SCORE. Strict scoring only.
  */
 export async function selectAffiliateProduct(
   supabase: SupabaseClient,
@@ -59,26 +59,6 @@ export async function selectAffiliateProduct(
   return scoreBestProduct(topic, products);
 }
 
-export async function selectRandomAffiliateProduct(
-  supabase: SupabaseClient
-): Promise<SelectedAffiliate | null> {
-  const products = await fetchRandomPool(supabase);
-  if (products.length === 0) return null;
-  const idx = Math.floor(Math.random() * products.length);
-  const product = products[idx]!;
-  return {
-    product,
-    matchScore: 0,
-    signals: {
-      category_match: false,
-      keyword_overlap: 0,
-      scored_from_pool_size: products.length,
-      fallback_random: true,
-      original_best_score: 0
-    }
-  };
-}
-
 export async function selectAffiliateWithRandomFallback(
   supabase: SupabaseClient,
   topic: TopicForMatching
@@ -87,7 +67,7 @@ export async function selectAffiliateWithRandomFallback(
   if (products.length === 0) return null;
   const strict = scoreBestProduct(topic, products);
   if (strict) return strict;
-  // Fallback: random dari 20 terbaru
+  // Fallback: random dari 20 terbaru (indeks 0..19 pool yang sudah ORDER BY created_at DESC)
   const pool20 = products.slice(0, RANDOM_FALLBACK_POOL_SIZE);
   const source = pool20.length > 0 ? pool20 : products;
   const idx = Math.floor(Math.random() * source.length);
@@ -139,17 +119,6 @@ async function fetchActivePool(supabase: SupabaseClient): Promise<AffiliateProdu
     .order('created_at', { ascending: false })
     .limit(POOL_SIZE);
   if (error) throw new Error(`affiliate pool query: ${error.message}`);
-  return (pool ?? []) as AffiliateProductRow[];
-}
-
-async function fetchRandomPool(supabase: SupabaseClient): Promise<AffiliateProductRow[]> {
-  const { data: pool, error } = await supabase
-    .from('affiliate_products')
-    .select('id, friendly_code, external_id, name_id, name_en, category, merchant, url, image')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(RANDOM_FALLBACK_POOL_SIZE);
-  if (error) throw new Error(`affiliate random pool query: ${error.message}`);
   return (pool ?? []) as AffiliateProductRow[];
 }
 

@@ -394,7 +394,14 @@
         "pickerTitle": "Pilih Produk Afiliasi",
         "pickerSearch": "Cari produk...",
         "pickerEmpty": "Tidak ada produk yang cocok.",
-        "pickerCurrent": "Saat ini"
+        "pickerCurrent": "Saat ini",
+        "randomBadge": "Random",
+        "randomBridgeNotice": "Dipilih random dari 20 produk terbaru — kalimat jembatan dibuat agar sisipan tetap natural. Jika kurang cocok, klik Reselect & Rethink untuk pilih lagi.",
+        "reselectRethink": "Reselect & Rethink",
+        "reselectRethinkHint": "Pilih produk lain → LLM tulis ulang 1 reply sisipan secara natural (loop sampai cocok)",
+        "swapHint": "Ganti produk tanpa ubah teks (swap cepat)",
+        "pickAndGenerate": "Pilih Produk & Generate",
+        "randomBridgeTitle": "Dipilih random dari 20 terbaru (bridging)"
       }
     }
   },
@@ -449,8 +456,9 @@
       "shortlistHeading": "Pilih topik untuk dikembangkan",
       "shortlistIntro": "Pilih 1 atau lebih topik, lalu klik \"Shortlist\". Setelah itu klik \"Lanjut ke Development\". Pilih topik yang diverifikasi & skor tertinggi.",
       "shortlistCount": "{count} topik shortlisted",
-      "affiliateMismatchHeading": "{count} topik tidak punya produk afiliasi yang cocok",
-      "affiliateMismatchBody": "Draft untuk topik ini akan dibuat tanpa link afiliasi. Tambah produk afiliasi dengan kategori relevan, atau pilih topik lain yang lebih cocok.",
+      "affiliateMismatchHeading": "{count} topik belum punya produk yang 100% cocok",
+      "affiliateMismatchBody": "Draft akan tetap dibuat dengan 1 link dari 20 produk terbaru (fallback random + kalimat jembatan natural). Jika kurang relevan, setelah draft jadi klik Reselect & Rethink untuk ganti produk & tulis ulang sisipan.",
+      "affiliateMismatchFallbackNote": "Skor terbaik {score} — diproses via fallback random.",
       "affiliateMismatchCategories": "Kategori topik",
       "affiliateMismatchAction": "Kelola produk afiliasi",
       "shortlistAction": "Shortlist",

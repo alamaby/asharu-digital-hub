@@ -126,6 +126,7 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
                 {t('affiliateMismatchCategories')}: {Array.from(productCategories).join(', ')}
               </p>
             ) : null}
+            <p className="mt-1 text-[11px] text-amber-600">{t('affiliateMismatchFallbackNote', { score: Math.max(...unmatched.map((tp) => affiliatePreviews?.[tp.id]?.bestScore ?? 0)) })}</p>
             <Link href="/admin" className="mt-1 inline-block font-medium text-amber-900 underline">
               {t('affiliateMismatchAction')} →
             </Link>

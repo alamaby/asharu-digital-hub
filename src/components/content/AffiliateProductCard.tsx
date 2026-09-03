@@ -87,8 +87,8 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{t('title')}</h2>
         <div className="flex items-center gap-2">
           {isFallback ? (
-            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Dipilih random dari 20 terbaru (bridging)">
-              Random
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={t('randomBridgeTitle')}>
+              {t('randomBadge')}
             </span>
           ) : null}
           {injection ? (
@@ -140,17 +140,17 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
               onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
               disabled={busy !== null}
               aria-busy={busy === 'regen'}
-              title="Pilih produk lain → LLM tulis ulang 1 reply sisipan secara natural (loop sampai cocok)"
+              title={t('reselectRethinkHint')}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {busy === 'regen' ? '...' : 'Reselect & Rethink'}
+              {busy === 'regen' ? '...' : t('reselectRethink')}
             </button>
             <button
               type="button"
               onClick={() => { setPickerMode('swap'); setPickerOpen(true); }}
               disabled={busy !== null}
               aria-busy={busy === 'swap'}
-              title="Ganti produk tanpa ubah teks (swap cepat)"
+              title={t('swapHint')}
               className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy === 'swap' ? '...' : t('swap')}
@@ -176,14 +176,14 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
             aria-busy={busy === 'regen'}
             className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy === 'regen' ? '...' : 'Pilih Produk & Generate'}
+            {busy === 'regen' ? '...' : t('pickAndGenerate')}
           </button>
         </div>
       )}
 
       {isFallback ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
-          Dipilih random dari 20 produk terbaru — kalimat jembatan dibuat agar sisipan tetap natural. Jika kurang cocok, klik Reselect &amp; Rethink untuk pilih lagi.
+          {t('randomBridgeNotice')}
         </p>
       ) : null}
 
