@@ -2,7 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
-import { selectAffiliateProduct, type SelectedAffiliate } from './affiliate';
+import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
 import { parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
 interface ShortlistedTopic {
@@ -101,8 +101,8 @@ export async function runDevelopment(
   }
 
   for (const topic of pendingTopics) {
-    // Select affiliate per-topic (may be null if pool is empty).
-    const affiliate = await selectAffiliateProduct(supabase, {
+    // Select affiliate per-topic: strict scoring first, fallback random dari 20 terbaru jika tidak cocok.
+    const affiliate = await selectAffiliateWithRandomFallback(supabase, {
       topic: topic.topic,
       category: topic.category,
       unique_angle: topic.unique_angle,
@@ -151,6 +151,8 @@ async function generateAndInsertDraft(
         category: '-'
       };
 
+  const isFallbackRandom = Boolean(affiliate?.signals.fallback_random);
+
   const { system, user } = buildThreadPrompt(
     {
       topic: topic.topic,
@@ -163,7 +165,8 @@ async function generateAndInsertDraft(
       targetReplyCount,
       hooks: topicHooks,
       keyFacts: topicKeyFacts,
-      uniqueAngle: topic.unique_angle
+      uniqueAngle: topic.unique_angle,
+      isFallbackRandom
     },
     promptProduct
   );

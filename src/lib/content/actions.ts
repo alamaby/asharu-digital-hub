@@ -784,3 +784,225 @@ export async function removeAffiliateInjection(
     return { success: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function regenerateAffiliateInsertion(
+  draftId: string,
+  newProductId: string
+): Promise<AffiliateAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+    const hdrs = await headers();
+    const ip = getClientIp(hdrs);
+    const { allowed, count } = await checkRateLimit(ip, 'regen_affiliate', 20);
+    if (!allowed) return { success: false, error: `rate_limit:${count}` };
+
+    const { data: product, error: prodError } = await supabase
+      .from('affiliate_products')
+      .select('id, friendly_code, name_id, name_en, category, merchant, url, image')
+      .eq('id', newProductId)
+      .maybeSingle();
+    if (prodError || !product) return { success: false, error: prodError?.message ?? 'product not found' };
+    const prod = product as { id: string; friendly_code: string; url: string; name_id: string; name_en: string; image: string; category: string; merchant: string };
+
+    const { data: draft, error: draftError } = await supabase
+      .from('content_drafts')
+      .select('id, generated_thread, affiliate_injections, affiliate_swap_history, research_topic_id, request_id, affiliate_match_score')
+      .eq('id', draftId)
+      .maybeSingle();
+    if (draftError || !draft) return { success: false, error: draftError?.message ?? 'draft not found' };
+    const d = draft as {
+      id: string;
+      generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+      affiliate_injections: Array<{ id?: string; friendly_code: string; url: string; post_index: number }>;
+      affiliate_swap_history: unknown;
+      research_topic_id: string | null;
+      request_id: string | null;
+    };
+    const thread = d.generated_thread as { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+    if (!thread || !thread.main || !Array.isArray(thread.replies)) {
+      return { success: false, error: 'invalid thread shape' };
+    }
+
+    let topicText = prod.name_id;
+    let language: string = 'both';
+    let tone: string | null = null;
+    if (d.research_topic_id) {
+      const { data: rt } = await supabase
+        .from('content_research_topics')
+        .select('topic, category, key_facts, hooks')
+        .eq('id', d.research_topic_id)
+        .maybeSingle();
+      if (rt) topicText = (rt as { topic: string }).topic;
+      const { data: sess } = await supabase
+        .from('content_research_sessions')
+        .select('language, tone')
+        .eq('id', (d as unknown as { request_id: string }).request_id ?? d.research_topic_id)
+        .maybeSingle();
+      // Fallback: try session by research_topic_id -> session_id
+      if (!sess && d.research_topic_id) {
+        const { data: rt2 } = await supabase
+          .from('content_research_topics')
+          .select('session_id')
+          .eq('id', d.research_topic_id)
+          .maybeSingle();
+        const sid = (rt2 as { session_id: string } | null)?.session_id;
+        if (sid) {
+          const { data: s2 } = await supabase.from('content_research_sessions').select('language, tone').eq('id', sid).maybeSingle();
+          if (s2) {
+            language = (s2 as { language: string | null }).language ?? language;
+            tone = (s2 as { tone: string | null }).tone ?? null;
+          }
+        }
+      } else if (sess) {
+        language = (sess as { language: string | null }).language ?? language;
+        tone = (sess as { tone: string | null }).tone ?? null;
+      }
+    }
+
+    const currentInj = (d.affiliate_injections as Array<{ post_index?: number }>)[0];
+    const targetIndex = typeof currentInj?.post_index === 'number' ? currentInj.post_index : Math.floor(thread.replies.length / 2) + 1;
+    const boundedTarget = Math.max(0, Math.min(targetIndex, thread.replies.length));
+
+    const { buildSingleReplyRewritePrompt } = await import('@/lib/llm/prompt');
+    const { runLLMCompletion } = await import('@/lib/llm/completion');
+    const { replacePlaceholders } = await import('@/lib/research/thread');
+
+    const promptProduct = { friendlyCode: prod.friendly_code, name: prod.name_id, url: prod.url, category: prod.category };
+    const { system, user } = buildSingleReplyRewritePrompt(
+      { topic: topicText, language, tone, targetIndex: boundedTarget, threadJson: thread },
+      promptProduct
+    );
+
+    const llmResult = await runLLMCompletion(supabase, {
+      requestId: d.request_id ?? draftId,
+      stage: 'regen_affiliate',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      temperature: 0.7,
+      maxTokens: 400
+    });
+
+    const raw = llmResult.output.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    let rewritten: { id: string; en: string } | null = null;
+    try {
+      const parsed = JSON.parse(raw) as { id?: string; en?: string };
+      if (typeof parsed.id === 'string' && typeof parsed.en === 'string' && parsed.id.trim() && parsed.en.trim()) {
+        rewritten = { id: parsed.id.trim(), en: parsed.en.trim() };
+      }
+    } catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        try {
+          const parsed2 = JSON.parse(m[0]) as { id?: string; en?: string };
+          if (typeof parsed2.id === 'string' && typeof parsed2.en === 'string' && parsed2.id.trim() && parsed2.en.trim()) {
+            rewritten = { id: parsed2.id.trim(), en: parsed2.en.trim() };
+          }
+        } catch { /* fallback below */ }
+      }
+    }
+    if (!rewritten) {
+      return { success: false, error: `LLM rewrite parse failed. Raw: ${llmResult.output.text.slice(0, 400)}` };
+    }
+
+    const PLACEHOLDER = '{{PRODUCT_URL}}';
+    const hasPlaceholder = rewritten.id.includes(PLACEHOLDER) || rewritten.en.includes(PLACEHOLDER);
+    if (!hasPlaceholder) {
+      rewritten = { ...rewritten, id: `${rewritten.id} ${PLACEHOLDER}`.trim() };
+    }
+
+    const newThread: { main: { id: string; en: string }; replies: { id: string; en: string }[] } = {
+      main: { ...thread.main },
+      replies: thread.replies.map((r) => ({ ...r }))
+    };
+    if (boundedTarget === 0) newThread.main = rewritten;
+    else newThread.replies[boundedTarget - 1] = rewritten;
+
+    // Strip any stray placeholder outside target (force exactly 1)
+    const allTexts = [newThread.main.id, newThread.main.en, ...newThread.replies.flatMap((r) => [r.id, r.en])].join(' ');
+    const placeholderCount = (allTexts.match(/\{\{PRODUCT_URL\}\}/g) ?? []).length;
+    if (placeholderCount !== 1) {
+      let kept = false;
+      const strip = (s: string) => s.replace(/\{\{PRODUCT_URL\}\}/g, () => (kept ? '' : (kept = true, '{{PRODUCT_URL}}')));
+      // Ensure target has placeholder, then strip others
+      if (boundedTarget === 0) {
+        if (!newThread.main.id.includes(PLACEHOLDER) && !newThread.main.en.includes(PLACEHOLDER)) {
+          newThread.main.id = `${newThread.main.id} ${PLACEHOLDER}`.trim();
+        }
+        newThread.main.id = strip(newThread.main.id);
+        newThread.main.en = strip(newThread.main.en);
+        newThread.replies = newThread.replies.map((r) => ({ id: strip(r.id), en: strip(r.en) }));
+      } else {
+        const tr = newThread.replies[boundedTarget - 1]!;
+        if (!tr.id.includes(PLACEHOLDER) && !tr.en.includes(PLACEHOLDER)) tr.id = `${tr.id} ${PLACEHOLDER}`.trim();
+        newThread.main.id = strip(newThread.main.id);
+        newThread.main.en = strip(newThread.main.en);
+        newThread.replies = newThread.replies.map((r, i) => {
+          if (i === boundedTarget - 1) return { id: strip(r.id), en: strip(r.en) };
+          return { id: r.id.split(PLACEHOLDER).join('').replace(/\s{2,}/g, ' ').trim(), en: r.en.split(PLACEHOLDER).join('').replace(/\s{2,}/g, ' ').trim() };
+        });
+      }
+    }
+
+    const replaced = replacePlaceholders(newThread as unknown as { main: { id: string; en: string }; replies: { id: string; en: string }[] } & Record<string, unknown>, prod.url) as unknown as { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+
+    let matchScore = 0;
+    let matchSignals: Record<string, unknown> = { category_match: false, keyword_overlap: 0, scored_from_pool_size: 0, fallback_random: true };
+    if (d.research_topic_id) {
+      const { data: rt } = await supabase.from('content_research_topics').select('topic, category, key_facts, hooks').eq('id', d.research_topic_id).maybeSingle();
+      if (rt) {
+        const { selectAffiliateProduct } = await import('@/lib/research/affiliate');
+        const scored = await selectAffiliateProduct(supabase, {
+          topic: (rt as { topic: string }).topic,
+          category: (rt as { category: string | null }).category,
+          key_facts: Array.isArray((rt as { key_facts: unknown }).key_facts) ? ((rt as { key_facts: string[] }).key_facts) : undefined,
+          hooks: Array.isArray((rt as { hooks: unknown }).hooks) ? ((rt as { hooks: Array<{ type: string; text: string }> }).hooks) : undefined
+        });
+        if (scored && scored.product.id === prod.id) {
+          matchScore = scored.matchScore;
+          matchSignals = scored.signals as unknown as Record<string, unknown>;
+        }
+      }
+    }
+
+    const currentId = (d.affiliate_injections as Array<{ id?: string }>)[0]?.id;
+    const oldHistory = Array.isArray(d.affiliate_swap_history) ? (d.affiliate_swap_history as Array<unknown>) : [];
+    const history = [
+      ...oldHistory,
+      { from_id: currentId ?? null, to_id: prod.id, to_friendly_code: prod.friendly_code, to_match_score: matchScore, swapped_at: new Date().toISOString(), regen: true, target_index: boundedTarget }
+    ].slice(-10);
+
+    const { data: providerRow } = await supabase.from('llm_providers').select('id').eq('slug', llmResult.providerSlug).maybeSingle();
+    const providerId = (providerRow as { id: string } | null)?.id ?? null;
+
+    const { error: updateError } = await supabase
+      .from('content_drafts')
+      .update({
+        generated_thread: replaced as unknown as Record<string, unknown>,
+        affiliate_injections: [
+          { id: prod.id, friendly_code: prod.friendly_code, url: prod.url, post_index: boundedTarget, match_score: matchScore, match_signals: matchSignals, product_name_id: prod.name_id, product_name_en: prod.name_en, product_image: prod.image, product_category: prod.category, product_merchant: prod.merchant }
+        ],
+        affiliate_match_score: matchScore,
+        affiliate_match_signals: matchSignals,
+        affiliate_swap_history: history,
+        provider_id: providerId,
+        model_id: llmResult.model,
+        llm_meta: { provider: llmResult.providerSlug, model: llmResult.model, latency_ms: llmResult.latencyMs, key_hash: llmResult.keyHash, stage: 'regen_affiliate', target_index: boundedTarget }
+      } as unknown as Record<string, unknown>)
+      .eq('id', draftId);
+    if (updateError) return { success: false, error: updateError.message };
+
+    await incrementRateLimit(ip, 'regen_affiliate').catch(() => undefined);
+    await supabase.from('content_research_logs').insert({
+      session_id: d.request_id ?? d.research_topic_id ?? draftId,
+      stage: 'regen_affiliate',
+      level: 'info',
+      message: `regen_affiliate draft ${draftId} -> ${prod.friendly_code} target ${boundedTarget} (${llmResult.providerSlug}/${llmResult.model})`
+    } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+
+    return { success: true, draftId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}

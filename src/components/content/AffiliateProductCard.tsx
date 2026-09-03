@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { useRouter } from '@/i18n/navigation';
-import { swapAffiliateProduct, removeAffiliateInjection } from '@/lib/content/actions';
+import { swapAffiliateProduct, removeAffiliateInjection, regenerateAffiliateInsertion } from '@/lib/content/actions';
 import { relevanceBand } from '@/lib/research/affiliate';
 import { AffiliateProductPicker } from './AffiliateProductPicker';
 
@@ -14,7 +14,7 @@ interface Injection {
   url: string;
   post_index: number;
   match_score?: number;
-  match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number };
+  match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number; fallback_random?: boolean; original_best_score?: number };
   product_name_id?: string;
   product_name_en?: string;
   product_image?: string;
@@ -41,10 +41,12 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [busy, setBusy] = useState<'swap' | 'remove' | null>(null);
+  const [pickerMode, setPickerMode] = useState<'regen' | 'swap'>('regen');
+  const [busy, setBusy] = useState<'swap' | 'remove' | 'regen' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const band = relevanceBand(matchScore);
+  const isFallback = Boolean((injection?.match_signals as Record<string, unknown> | undefined)?.fallback_random);
   async function onSwap(productId: string) {
     setBusy('swap');
     setError(null);
@@ -53,6 +55,21 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
     setBusy(null);
     if (!result.success) setError(result.error ?? 'failed');
     else startTransition(() => router.refresh());
+  }
+
+  async function onRegen(productId: string) {
+    setBusy('regen');
+    setError(null);
+    setPickerOpen(false);
+    const result = await regenerateAffiliateInsertion(draftId, productId);
+    setBusy(null);
+    if (!result.success) setError(result.error ?? 'failed');
+    else startTransition(() => router.refresh());
+  }
+
+  function handleSelect(productId: string) {
+    if (pickerMode === 'swap') onSwap(productId);
+    else onRegen(productId);
   }
 
   async function onRemove() {
@@ -68,11 +85,18 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
     <section className="mt-4 rounded-xl border border-line bg-background p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{t('title')}</h2>
-        {injection ? (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BAND_CLASS[band]}`}>
-            {t(`relevance.${band}` as never)} · {matchScore ?? 0}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {isFallback ? (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Dipilih random dari 20 terbaru (bridging)">
+              Random
+            </span>
+          ) : null}
+          {injection ? (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BAND_CLASS[band]}`}>
+              {t(`relevance.${band}` as never)} · {matchScore ?? 0}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -113,9 +137,20 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setPickerOpen(true)}
+              onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
+              disabled={busy !== null}
+              aria-busy={busy === 'regen'}
+              title="Pilih produk lain → LLM tulis ulang 1 reply sisipan secara natural (loop sampai cocok)"
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy === 'regen' ? '...' : 'Reselect & Rethink'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPickerMode('swap'); setPickerOpen(true); }}
               disabled={busy !== null}
               aria-busy={busy === 'swap'}
+              title="Ganti produk tanpa ubah teks (swap cepat)"
               className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy === 'swap' ? '...' : t('swap')}
@@ -136,14 +171,21 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
           <p className="text-sm text-ink-muted">{t('noProduct')}</p>
           <button
             type="button"
-            onClick={() => setPickerOpen(true)}
+            onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
             disabled={busy !== null}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+            aria-busy={busy === 'regen'}
+            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t('swap')}
+            {busy === 'regen' ? '...' : 'Pilih Produk & Generate'}
           </button>
         </div>
       )}
+
+      {isFallback ? (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
+          Dipilih random dari 20 produk terbaru — kalimat jembatan dibuat agar sisipan tetap natural. Jika kurang cocok, klik Reselect &amp; Rethink untuk pilih lagi.
+        </p>
+      ) : null}
 
       {hasPlaceholderWarning ? (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
@@ -155,7 +197,7 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
         <AffiliateProductPicker
           draftId={draftId}
           currentProductId={injection?.id}
-          onSelect={onSwap}
+          onSelect={handleSelect}
           onClose={() => setPickerOpen(false)}
         />
       ) : null}
