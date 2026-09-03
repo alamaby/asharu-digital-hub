@@ -191,6 +191,8 @@ async function main() {
       console.error(`Supabase sync failed (file still written): ${e.message}`);
     }
   } else {
+    // Surface as a visible annotation so the stale-DB issue is no longer silent.
+    console.log('::warning::Supabase env (SUPABASE_URL, SUPABASE_SECRET_KEY) not set — skipped DB sync (file-only). affiliate_products table will go stale until secrets are added.');
     console.error('Supabase env not set — skipping DB sync (file-only).');
   }
 }

@@ -17,13 +17,16 @@ const keywords = JSON.parse(
 );
 
 /** @type {Array<keyof typeof keywords>} */
-const order = ['electronics', 'home-living', 'fashion', 'sports-hobby'];
+// Automotive first so vehicle items that also mention gadget words (e.g.
+// "Holder Hp ... Handphone" on a motorcycle phone stand) classify as
+// automotive instead of electronics.
+const order = ['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby'];
 
 /**
  * @param {string} text
  * @returns {keyof typeof keywords}
  */
-export function mapCategory(text, fallback = 'fashion') {
+export function mapCategory(text, fallback = 'others') {
   const haystack = String(text ?? '').toLowerCase();
   if (!haystack) return fallback;
 

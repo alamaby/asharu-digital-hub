@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type ProductCategory = 'electronics' | 'home-living' | 'fashion' | 'sports-hobby';
+export type ProductCategory = 'automotive' | 'electronics' | 'home-living' | 'fashion' | 'sports-hobby' | 'others';
 
-const ORDER: ProductCategory[] = ['electronics', 'home-living', 'fashion', 'sports-hobby'];
+// Automotive first so vehicle items that also mention gadget words (e.g.
+// "Holder Hp ... Handphone" on a motorcycle phone stand) classify as
+// automotive instead of electronics.
+const ORDER: ProductCategory[] = ['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby'];
 
 /**
  * Category keyword map. Single source of truth lives in
@@ -20,12 +23,13 @@ const keywords = JSON.parse(
 /**
  * Map a Shopee product title (mixed ID/EN text) to a `ProductCategory`.
  * First matching keyword wins, favouring earlier categories; falls back to
- * `fashion` (Asharu's store is an outfit/lifestyle shop).
+ * `others` so unclassifiable items stay visible and auditable instead of
+ * silently becoming fashion.
  *
  * Keywords use whole-word matching (word boundaries) so, e.g., `meja` does not
  * falsely match the "meja" inside "kemeja".
  */
-export function mapCategory(text: string, fallback: ProductCategory = 'fashion'): ProductCategory {
+export function mapCategory(text: string, fallback: ProductCategory = 'others'): ProductCategory {
   const haystack = text.toLowerCase();
   if (!haystack) return fallback;
 

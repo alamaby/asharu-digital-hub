@@ -7,7 +7,7 @@ import { renderWithMessages } from '@/test/utils';
 // Choose a deterministic product for assertions from the (scraped) dataset.
 const product = affiliateProducts[0]!;
 // Expected category label in the id locale.
-const categoryLabel = { electronics: 'Elektronik', 'home-living': 'Rumah Tangga', fashion: 'Fashion', 'sports-hobby': 'Olahraga & Hobi' }[product.category];
+const categoryLabel = { automotive: 'Otomotif', electronics: 'Elektronik', 'home-living': 'Rumah Tangga', fashion: 'Fashion', 'sports-hobby': 'Olahraga & Hobi', others: 'Lainnya' }[product.category];
 
 describe('ProductCard', () => {
   it('renders localized name, category and merchant', () => {

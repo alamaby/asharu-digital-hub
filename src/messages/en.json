@@ -117,10 +117,12 @@
   },
   "socials": {},
   "categories": {
+    "automotive": "Automotive",
     "electronics": "Electronics",
     "home-living": "Home & Living",
     "fashion": "Fashion",
-    "sports-hobby": "Sports & Hobbies"
+    "sports-hobby": "Sports & Hobbies",
+    "others": "Others"
   },
   "product": {
     "badge": "Affiliate link",

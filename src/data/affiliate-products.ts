@@ -9,7 +9,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41707092',
     name: { id: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion', en: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion' },
-    category: 'electronics',
+    category: 'automotive',
     description: { id: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion', en: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4VcTULlODf',
@@ -19,7 +19,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41706978',
     name: { id: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY', en: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY' },
-    category: 'fashion',
+    category: 'automotive',
     description: { id: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY', en: 'COVER JOK MOTOR CAFERACER (PAKAI TALI) BISA PASANG SENDIRI #NMAX#PCX #SCOOPY' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7VG53VUtt1',
@@ -29,7 +29,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41706973',
     name: { id: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof', en: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof' },
-    category: 'fashion',
+    category: 'automotive',
     description: { id: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof', en: '[FASHIONABLE] - TaffSPORT BOLLFO Kacamata Goggles Mask Motor Retro Anti Glare Windproof' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fS2Rd0wiP',
@@ -39,7 +39,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41706967',
     name: { id: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01', en: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01' },
-    category: 'fashion',
+    category: 'automotive',
     description: { id: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01', en: 'APEN Tali Pengikat Helm Motor 2 Hook 60 CM Aksesoris Pengendara Motor Otomotif Barang Unik - WP01' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8KpC2zyDec',
@@ -49,7 +49,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41706960',
     name: { id: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten', en: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten' },
-    category: 'fashion',
+    category: 'automotive',
     description: { id: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten', en: 'Polytron Fox 350 - Battery as Service - Electric Sepeda Motor Listrik - OTR Jadetabek - Banten' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/gPkusjGJu',
@@ -109,7 +109,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-41358703',
     name: { id: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series', en: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series' },
-    category: 'fashion',
+    category: 'home-living',
     description: { id: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series', en: 'SUPRA Panci Wajan Penggorengan Stainless Steel SUS 304 Stir Wok 28 Cm Professional Series' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/80CDtKw3D7',
@@ -169,7 +169,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-40351587',
     name: { id: 'Handuk Mandi Microfiber Handuk Mandi Dewasa 70×140cm / Salur Microfiber Bulu Halus Super Serap Air /', en: 'Handuk Mandi Microfiber Handuk Mandi Dewasa 70×140cm / Salur Microfiber Bulu Halus Super Serap Air /' },
-    category: 'fashion',
+    category: 'home-living',
     description: { id: 'Handuk Mandi Microfiber Handuk Mandi Dewasa 70×140cm / Salur Microfiber Bulu Halus Super Serap Air /', en: 'Handuk Mandi Microfiber Handuk Mandi Dewasa 70×140cm / Salur Microfiber Bulu Halus Super Serap Air /' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9fK6wLyUBv',
@@ -199,7 +199,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-40142024',
     name: { id: 'THUMB GRIP ANALOG NINTENDO SWITCH OLED V2 V1 LITE KARAKTER SILICONE SILICON SILIKON CAP COVER ANALOG', en: 'THUMB GRIP ANALOG NINTENDO SWITCH OLED V2 V1 LITE KARAKTER SILICONE SILICON SILIKON CAP COVER ANALOG' },
-    category: 'fashion',
+    category: 'electronics',
     description: { id: 'THUMB GRIP ANALOG NINTENDO SWITCH OLED V2 V1 LITE KARAKTER SILICONE SILICON SILIKON CAP COVER ANALOG', en: 'THUMB GRIP ANALOG NINTENDO SWITCH OLED V2 V1 LITE KARAKTER SILICONE SILICON SILIKON CAP COVER ANALOG' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/5VUTOBVTuF',
@@ -329,7 +329,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-39365812',
     name: { id: 'Diecast Mobil Mitsubishi Pajero Miniatur Die-cast Mobil Mobilan Skala 1:32', en: 'Diecast Mobil Mitsubishi Pajero Miniatur Die-cast Mobil Mobilan Skala 1:32' },
-    category: 'fashion',
+    category: 'sports-hobby',
     description: { id: 'Diecast Mobil Mitsubishi Pajero Miniatur Die-cast Mobil Mobilan Skala 1:32', en: 'Diecast Mobil Mitsubishi Pajero Miniatur Die-cast Mobil Mobilan Skala 1:32' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/Lm6g6Lwbp',
@@ -419,7 +419,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-33115204',
     name: { id: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml', en: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml', en: 'SKIN1004 Madagascar Centella Tone Brightening Boosting Toner 210ml' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4AwY2VECCy',
@@ -429,7 +429,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-33115101',
     name: { id: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)', en: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)', en: 'Best Seller Set (First Spray Serum 100ml + Tone Up Sun Cream 50ml)' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8Km704eDY6',
@@ -499,7 +499,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-32433867',
     name: { id: 'SERATIN - Hairdryer Airstyler Airtractive | Ceramic Tourmaline', en: 'SERATIN - Hairdryer Airstyler Airtractive | Ceramic Tourmaline' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'SERATIN - Hairdryer Airstyler Airtractive | Ceramic Tourmaline', en: 'SERATIN - Hairdryer Airstyler Airtractive | Ceramic Tourmaline' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/2LUdpsT2TR',
@@ -509,7 +509,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-32433430',
     name: { id: 'Makarizo Asters Mova Hair Straightening Brush', en: 'Makarizo Asters Mova Hair Straightening Brush' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Makarizo Asters Mova Hair Straightening Brush', en: 'Makarizo Asters Mova Hair Straightening Brush' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fOhMuds4C',
@@ -589,7 +589,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31896051',
     name: { id: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya', en: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya', en: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8Kle7fqmZw',
@@ -599,7 +599,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31666813',
     name: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
-    category: 'fashion',
+    category: 'electronics',
     description: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9UxWiRGOti',
@@ -649,7 +649,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31460952',
     name: { id: '[Twin Pack Gel] Azarine Hydrasoothe Sunscreen Gel SPF45 PA++++ [2x50ml] [LOLOS UJI INVIVO INVITRO] B', en: '[Twin Pack Gel] Azarine Hydrasoothe Sunscreen Gel SPF45 PA++++ [2x50ml] [LOLOS UJI INVIVO INVITRO] B' },
-    category: 'fashion',
+    category: 'others',
     description: { id: '[Twin Pack Gel] Azarine Hydrasoothe Sunscreen Gel SPF45 PA++++ [2x50ml] [LOLOS UJI INVIVO INVITRO] B', en: '[Twin Pack Gel] Azarine Hydrasoothe Sunscreen Gel SPF45 PA++++ [2x50ml] [LOLOS UJI INVIVO INVITRO] B' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/BPmHZbkak',
@@ -659,7 +659,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31458740',
     name: { id: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya', en: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya', en: 'NPURE Cica Hydrating Acne Toner 150 ml / Hydrating Toner / Acne Toner / Toner Kulit Jerawat Berminya' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/60NZBiHcHs',
@@ -669,7 +669,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31458561',
     name: { id: 'NPURE Glowing Cleanser Licorice 100gr / Brightening / Kulit Kusam / Noda Hitam Bekas Jerawat / Low p', en: 'NPURE Glowing Cleanser Licorice 100gr / Brightening / Kulit Kusam / Noda Hitam Bekas Jerawat / Low p' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'NPURE Glowing Cleanser Licorice 100gr / Brightening / Kulit Kusam / Noda Hitam Bekas Jerawat / Low p', en: 'NPURE Glowing Cleanser Licorice 100gr / Brightening / Kulit Kusam / Noda Hitam Bekas Jerawat / Low p' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9paHkcL1iU',
@@ -769,7 +769,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31270690',
     name: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
-    category: 'fashion',
+    category: 'electronics',
     description: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7fViuwK5Qa',
@@ -819,7 +819,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31065601',
     name: { id: '131 BETADINE MOUTHWASH & GARGLE Obat Kumur Antiseptik 190ml', en: '131 BETADINE MOUTHWASH & GARGLE Obat Kumur Antiseptik 190ml' },
-    category: 'fashion',
+    category: 'others',
     description: { id: '131 BETADINE MOUTHWASH & GARGLE Obat Kumur Antiseptik 190ml', en: '131 BETADINE MOUTHWASH & GARGLE Obat Kumur Antiseptik 190ml' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7AZMyCCKT2',
@@ -829,7 +829,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31040135',
     name: { id: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa', en: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa', en: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/BPbxG6MQu',
@@ -839,7 +839,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-31040056',
     name: { id: 'Expert Boost - Gummy Vitamin D 600 IU | Vitamin D Anak dan Dewasa | Paket 30 Hari | Paket 7 Hari', en: 'Expert Boost - Gummy Vitamin D 600 IU | Vitamin D Anak dan Dewasa | Paket 30 Hari | Paket 7 Hari' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Expert Boost - Gummy Vitamin D 600 IU | Vitamin D Anak dan Dewasa | Paket 30 Hari | Paket 7 Hari', en: 'Expert Boost - Gummy Vitamin D 600 IU | Vitamin D Anak dan Dewasa | Paket 30 Hari | Paket 7 Hari' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/6VJfUmOfPh',
@@ -849,7 +849,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-30957591',
     name: { id: 'TIXX Mesin Kopi Espresso 20 Bar Mesin Kopi Rumahan Low Watt Uap Susu Berbusa Coffee Machine 850W', en: 'TIXX Mesin Kopi Espresso 20 Bar Mesin Kopi Rumahan Low Watt Uap Susu Berbusa Coffee Machine 850W' },
-    category: 'fashion',
+    category: 'home-living',
     description: { id: 'TIXX Mesin Kopi Espresso 20 Bar Mesin Kopi Rumahan Low Watt Uap Susu Berbusa Coffee Machine 850W', en: 'TIXX Mesin Kopi Espresso 20 Bar Mesin Kopi Rumahan Low Watt Uap Susu Berbusa Coffee Machine 850W' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/6pwTyUmsjg',
@@ -929,7 +929,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-26488965',
     name: { id: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa', en: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa', en: 'Expert Boost - Bundling 3 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/806jPUdtVC',
@@ -939,7 +939,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-26120479',
     name: { id: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate', en: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate', en: 'Kiaka - French Square Syar\'i Khiban Segi Empat Tali Ceruty Ultimate' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8V2s9IXLDH',
@@ -1009,7 +1009,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-24404714',
     name: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
-    category: 'fashion',
+    category: 'electronics',
     description: { id: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu', en: 'Paddy Premium Case Design Aesthetic - Casing Custom Semua Tipe HP Bebas Gambar Lucu' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/3LK5B8ipwj',
@@ -1159,7 +1159,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-21678696',
     name: { id: 'CHAKO LAB Milk Pod Insulated Two-Ways Bottle 520ml', en: 'CHAKO LAB Milk Pod Insulated Two-Ways Bottle 520ml' },
-    category: 'fashion',
+    category: 'home-living',
     description: { id: 'CHAKO LAB Milk Pod Insulated Two-Ways Bottle 520ml', en: 'CHAKO LAB Milk Pod Insulated Two-Ways Bottle 520ml' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/10uxa1d0Wg',
@@ -1179,7 +1179,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-17958672',
     name: { id: 'Expert Boost - Bundling 2 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa | Paket 30 Hari', en: 'Expert Boost - Bundling 2 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa | Paket 30 Hari' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Expert Boost - Bundling 2 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa | Paket 30 Hari', en: 'Expert Boost - Bundling 2 Pouch Gummy Vitamin D 600 IU Anak dan Dewasa | Paket 30 Hari' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/10t1ugwgz2',
@@ -1689,7 +1689,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-16260099',
     name: { id: 'Lasya top', en: 'Lasya top' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Lasya top', en: 'Lasya top' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7fNiMWu3jJ',
@@ -1749,7 +1749,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-16260051',
     name: { id: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Pink Tua - 8589233', en: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Pink Tua - 8589233' },
-    category: 'fashion',
+    category: 'sports-hobby',
     description: { id: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Pink Tua - 8589233', en: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Pink Tua - 8589233' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/30bsno6rp7',
@@ -1769,7 +1769,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-16260040',
     name: { id: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Biru/Kuning - 8589234', en: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Biru/Kuning - 8589234' },
-    category: 'fashion',
+    category: 'sports-hobby',
     description: { id: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Biru/Kuning - 8589234', en: 'Decathlon NABAIJI Kacamata Renang Anak XBase 100 - Lensa Bening - Ukuran S Biru/Kuning - 8589234' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9UpMXhEoL8',
@@ -1909,7 +1909,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-16259926',
     name: { id: 'Holyscent - Romantic Wish Eau De Parfum / Parfum Wanita', en: 'Holyscent - Romantic Wish Eau De Parfum / Parfum Wanita' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Holyscent - Romantic Wish Eau De Parfum / Parfum Wanita', en: 'Holyscent - Romantic Wish Eau De Parfum / Parfum Wanita' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/6KsKlPS8Cg',
@@ -2049,7 +2049,7 @@ export const affiliateProducts: AffiliateProduct[] = [
   {
     id: 'affiliate-16259769',
     name: { id: 'Inner Ninja Antem Resleting Premium KYZ2', en: 'Inner Ninja Antem Resleting Premium KYZ2' },
-    category: 'fashion',
+    category: 'others',
     description: { id: 'Inner Ninja Antem Resleting Premium KYZ2', en: 'Inner Ninja Antem Resleting Premium KYZ2' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/2VfcBevTPe',

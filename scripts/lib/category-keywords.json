@@ -1,4 +1,25 @@
 {
+  "automotive": [
+    "motor",
+    "sepeda motor",
+    "motor listrik",
+    "motorcycle",
+    "helm",
+    "jok motor",
+    "cover jok",
+    "cover motor",
+    "spion",
+    "knalpot",
+    "aki",
+    "otomotif",
+    "pengendara",
+    "nmax",
+    "pcx",
+    "scoopy",
+    "vario",
+    "mio",
+    "vespa"
+  ],
   "electronics": [
     "smartwatch",
     "speaker",
@@ -25,17 +46,19 @@
     "modem",
     "tv",
     "monitor",
-    "speaker",
     "lampu led",
     "wireless",
     "usb",
     "audio",
     "soundbar",
-    "charger",
     "flashdisk",
     "smart watch",
     "ipad",
-    "iphone"
+    "iphone",
+    "casing",
+    "nintendo",
+    "switch",
+    "thumb grip"
   ],
   "home-living": [
     "lampu",
@@ -79,7 +102,14 @@
     "wallpaper",
     "jam dinding",
     "kulkas",
-    "kipas"
+    "kipas",
+    "panci",
+    "wajan",
+    "handuk",
+    "mesin kopi",
+    "espresso",
+    "kopi",
+    "bottle"
   ],
   "fashion": [
     "kemeja",
@@ -123,7 +153,6 @@
     "setelan",
     "piyama",
     "rajut",
-    "tersedia",
     "flatshoes",
     "polo",
     "topi",
@@ -131,7 +160,29 @@
     "souvenir",
     "umroh",
     "haji",
-    "pantai"
+    "pantai",
+    "bra",
+    "abaya",
+    "bandana",
+    "babydoll",
+    "bergo",
+    "jubah",
+    "koko",
+    "denim",
+    "raincoat",
+    "jas hujan",
+    "blazer",
+    "khimar",
+    "pashmina",
+    "pasmina",
+    "jilbab",
+    "kerudung",
+    "scarf",
+    "tunic",
+    "bikini",
+    "dasi",
+    "singlet",
+    "shirt"
   ],
   "sports-hobby": [
     "yoga",
@@ -159,6 +210,10 @@
     "peliharaan",
     "boneka",
     "puzzle",
-    "lego"
+    "lego",
+    "diecast",
+    "miniatur",
+    "mobilan",
+    "renang"
   ]
 }

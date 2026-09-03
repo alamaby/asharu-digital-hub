@@ -117,10 +117,12 @@
   },
   "socials": {},
   "categories": {
+    "automotive": "Otomotif",
     "electronics": "Elektronik",
     "home-living": "Rumah Tangga",
     "fashion": "Fashion",
-    "sports-hobby": "Olahraga & Hobi"
+    "sports-hobby": "Olahraga & Hobi",
+    "others": "Lainnya"
   },
   "product": {
     "badge": "Tautan afiliasi",

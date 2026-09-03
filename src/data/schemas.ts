@@ -74,10 +74,12 @@ export type SocialLink = z.infer<typeof socialLinkSchema>;
 /* --------------------------------------------------------------- products */
 
 export const productCategorySchema = z.enum([
+  'automotive',
   'electronics',
   'home-living',
   'fashion',
-  'sports-hobby'
+  'sports-hobby',
+  'others'
 ]);
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 
