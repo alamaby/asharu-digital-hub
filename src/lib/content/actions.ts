@@ -332,6 +332,10 @@ export interface GenerateIdeaResult {
  */
 export async function generateIdea(formData: FormData): Promise<GenerateIdeaResult> {
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
+  // Honeypot (P1-07) — before rate limit / LLM
+  if (raw.website && raw.website.trim() !== '') {
+    return { success: false, error: 'honeypot' };
+  }
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
   const { allowed, count } = await checkRateLimit(ip, 'generate_idea', 30);
@@ -446,13 +450,17 @@ Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"
   try {
     const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
     ideaModel = await resolveStageModel('idea_generation', null);
-  } catch { /* fallback to global */ }
-  // If admin passed pinned model via FormData, prefer it (validate)
+  } catch { void 0; /* fallback to global */ }
+  // If admin passed pinned model via FormData, prefer it — admin only (P0-04)
   const ideaModelHint = pick(raw.ideaGenerationModelId);
   if (ideaModelHint) {
-    const { data: m } = await supabaseService.from('llm_models').select('id, provider_id, is_active').eq('id', ideaModelHint).maybeSingle();
+    if (!(await isAdmin())) {
+      return { success: false, error: 'Pemilihan model hanya untuk admin' };
+    }
+    const { data: m } = await supabaseService.from('llm_models').select('id, provider_id, is_active').eq('id', ideaModelHint).eq('is_active', true).maybeSingle();
     const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
-    if (mr?.is_active) ideaModel = { providerId: mr.provider_id, modelUuid: mr.id };
+    if (!mr) return { success: false, error: 'Model tidak valid atau nonaktif' };
+    ideaModel = { providerId: mr.provider_id, modelUuid: mr.id };
   }
   let text = '';
   try {
@@ -1035,10 +1043,10 @@ export async function regenerateAffiliateInsertion(
     let regenModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
     const pinnedModelId = opts?.modelId?.trim() || null;
     if (pinnedModelId) {
-      const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).maybeSingle();
+      const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).eq('is_active', true).maybeSingle();
       const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
-      if (mr?.is_active) regenModel = { providerId: mr.provider_id, modelUuid: mr.id };
-      else return { success: false, error: 'Model tidak valid atau nonaktif' };
+      if (!mr) return { success: false, error: 'Model tidak valid atau nonaktif' };
+      regenModel = { providerId: mr.provider_id, modelUuid: mr.id };
     } else {
       try {
         const { resolveStageModel } = await import('@/lib/llm/stage-defaults');

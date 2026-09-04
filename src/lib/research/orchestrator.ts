@@ -112,7 +112,7 @@ export async function advanceStage(
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   const { data: row, error } = await supabase
     .from('content_research_sessions')
-    .select('*')
+    .select('id, status, target_location, secondary_location, audience_age, audience_interests, platform_slug, tone, account_goal, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, idea_generation_model_id, discovering_model_id, verifying_model_id, scoring_model_id, developing_model_id, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .single();
   if (error || !row) {

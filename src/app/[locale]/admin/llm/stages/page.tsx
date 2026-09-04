@@ -19,7 +19,7 @@ export default async function StageDefaultsPage({ params }: { params: Promise<{ 
   setRequestLocale(locale);
   if (!(await isAdmin())) redirect({ href: '/masuk', locale });
   const supabase = createSupabaseService();
-  if (!supabase) return <div className="mx-auto max-w-4xl px-4 py-10 text-sm">Supabase not configured</div>;
+  if (!supabase) throw new Error('Supabase not configured — set SUPABASE_SECRET_KEY');
   const { data: defaults } = await supabase.from('llm_stage_defaults').select('stage, provider_id, model_id').order('stage');
   const { data: providers } = await supabase.from('llm_providers').select('id, slug, display_name').order('priority');
   const { data: models } = await supabase.from('llm_models').select('id, provider_id, model_id, display_name, priority, config').eq('is_active', true).order('priority');
@@ -55,7 +55,8 @@ export default async function StageDefaultsPage({ params }: { params: Promise<{ 
               </div>
               <input type="hidden" name="stage" value={row.stage} />
               <div className="mt-3 flex flex-wrap gap-2">
-                <select name="model_id" defaultValue={row.model_id ?? ''} className="min-w-[280px] rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink">
+                <label htmlFor={`stage-model-${row.stage}`} className="sr-only">Model</label>
+                <select id={`stage-model-${row.stage}`} name="model_id" defaultValue={row.model_id ?? ''} className="min-w-[280px] rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink">
                   <option value="">Default global (waterfall)</option>
                   {(models ?? []).map((m: { id: string; provider_id: string; model_id: string; display_name: string }) => {
                     const prov = providerById.get(m.provider_id) as { display_name: string; slug: string } | undefined;

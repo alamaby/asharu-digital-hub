@@ -69,7 +69,11 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
     const result = await regenerateAffiliateInsertion(draftId, productId, regenModelId ? { modelId: regenModelId } : undefined);
     setBusy(null);
     if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
+    else {
+      setRegenProviderId('');
+      setRegenModelId('');
+      startTransition(() => router.refresh());
+    }
   }
 
   function handleSelect(productId: string) {
@@ -189,15 +193,15 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
       {regenProviders.length > 0 ? (
         <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-dashed border-line bg-surface p-3 sm:grid-cols-2">
           <div>
-            <label className="block text-[11px] font-medium text-ink-muted">Provider (regen)</label>
-            <select value={regenProviderId} onChange={(e) => { setRegenProviderId(e.target.value); setRegenModelId(''); }} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink">
+            <label htmlFor="regen-provider" className="block text-[11px] font-medium text-ink-muted">Provider (regen)</label>
+            <select id="regen-provider" value={regenProviderId} onChange={(e) => { setRegenProviderId(e.target.value); setRegenModelId(''); }} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink">
               <option value="">Default global</option>
               {regenProviders.map((p) => <option key={p.id} value={p.id}>{p.display_name} ({p.slug})</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-ink-muted">Model (regen)</label>
-            <select value={regenModelId} onChange={(e) => setRegenModelId(e.target.value)} disabled={!regenProviderId} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink disabled:opacity-60">
+            <label htmlFor="regen-model" className="block text-[11px] font-medium text-ink-muted">Model (regen)</label>
+            <select id="regen-model" value={regenModelId} onChange={(e) => setRegenModelId(e.target.value)} disabled={!regenProviderId} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink disabled:opacity-60">
               <option value="">Default global</option>
               {filteredRegenModels.map((m) => <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{m.config?.reasoning ? ' · reasoning' : ''}</option>)}
             </select>

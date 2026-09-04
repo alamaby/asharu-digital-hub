@@ -15,16 +15,19 @@ interface Props {
   disabled?: boolean;
 }
 
-export function StageModelPicker({ label, providers, models, providerId, modelId, onProviderChange, onModelChange, disabled }: Props) {
+export function StageModelPicker({ stage, label, providers, models, providerId, modelId, onProviderChange, onModelChange, disabled }: Props) {
   const filteredModels = providerId ? models.filter((m) => m.provider_id === providerId) : [];
+  const providerSelectId = `stage-${stage}-provider`;
+  const modelSelectId = `stage-${stage}-model`;
 
   return (
     <div className="rounded-lg border border-line bg-background px-3 py-3">
       <p className="text-xs font-semibold text-ink-muted">{label}</p>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
-          <label className="block text-[11px] font-medium text-ink-muted">Provider</label>
+          <label htmlFor={providerSelectId} className="block text-[11px] font-medium text-ink-muted">Provider</label>
           <select
+            id={providerSelectId}
             value={providerId}
             onChange={(e) => { onProviderChange(e.target.value); onModelChange(''); }}
             disabled={disabled}
@@ -37,8 +40,9 @@ export function StageModelPicker({ label, providers, models, providerId, modelId
           </select>
         </div>
         <div>
-          <label className="block text-[11px] font-medium text-ink-muted">Model</label>
+          <label htmlFor={modelSelectId} className="block text-[11px] font-medium text-ink-muted">Model</label>
           <select
+            id={modelSelectId}
             value={modelId}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={disabled || !providerId}

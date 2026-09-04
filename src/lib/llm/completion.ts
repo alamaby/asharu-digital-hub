@@ -58,30 +58,38 @@ export async function runLLMCompletion(
   if (input.modelUuid) {
     const pinned = await tryPinnedModel(supabase, input);
     if (pinned) return pinned;
-    // Pinned failed → log warn + fall through to global waterfall
-    await supabase
-      .from('content_research_logs')
-      .insert({
-        session_id: input.sessionId ?? null,
-        stage: input.stage ?? 'unknown',
-        level: 'warn',
-        message: `Model pilihan gagal, fallback ke urutan global${input.stage ? ` (stage: ${input.stage})` : ''}`
-      } as unknown as Record<string, unknown>)
-      .then(() => undefined, () => undefined);
+    // Pinned failed → log warn only if sessionId present (P0-01: content_research_logs.session_id is FK NOT NULL)
+    if (input.sessionId) {
+      await supabase
+        .from('content_research_logs')
+        .insert({
+          session_id: input.sessionId,
+          stage: input.stage ?? 'unknown',
+          level: 'warn',
+          message: `Model pilihan gagal, fallback ke urutan global${input.stage ? ` (stage: ${input.stage})` : ''}`
+        } as unknown as Record<string, unknown>)
+        .then(() => undefined, () => undefined);
+    } else {
+      console.warn(`[llm] pinned model ${input.modelUuid} failed, no session — fallback to global waterfall (${input.stage ?? '-'})`);
+    }
   }
   // Also support legacy modelHint as pinned string model_id
   if (input.modelHint && !input.modelUuid) {
-    const pinnedHint = await tryPinnedModelHint(supabase, providers, input);
+    const pinnedHint = await tryPinnedModelHint(supabase, input);
     if (pinnedHint) return pinnedHint;
-    await supabase
-      .from('content_research_logs')
-      .insert({
-        session_id: input.sessionId ?? null,
-        stage: input.stage ?? 'unknown',
-        level: 'warn',
-        message: `Model hint "${input.modelHint}" gagal, fallback ke urutan global${input.stage ? ` (stage: ${input.stage})` : ''}`
-      } as unknown as Record<string, unknown>)
-      .then(() => undefined, () => undefined);
+    if (input.sessionId) {
+      await supabase
+        .from('content_research_logs')
+        .insert({
+          session_id: input.sessionId,
+          stage: input.stage ?? 'unknown',
+          level: 'warn',
+          message: `Model hint "${input.modelHint}" gagal, fallback ke urutan global${input.stage ? ` (stage: ${input.stage})` : ''}`
+        } as unknown as Record<string, unknown>)
+        .then(() => undefined, () => undefined);
+    } else {
+      console.warn(`[llm] modelHint "${input.modelHint}" failed, no session — fallback to global (${input.stage ?? '-'})`);
+    }
   }
   let lastError: unknown = null;
   for (const prov of providers) {
@@ -200,13 +208,23 @@ async function tryPinnedModel(
   input: LLMCompletionInput
 ): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number } | null> {
   const registry = new ProviderRegistry();
-  // Resolve model row for model_id + config + correct provider
-  const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config').eq('id', input.modelUuid!).maybeSingle();
-  const model = modelRow as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null } | null;
+  // Resolve model row for model_id + config + correct provider — only active models (P0-02)
+  const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config, is_active').eq('id', input.modelUuid!).eq('is_active', true).maybeSingle();
+  const model = modelRow as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null; is_active: boolean } | null;
   if (!model) return null;
-  // If providerId pinned, ensure it matches model's provider_id
+  // If providerId pinned, ensure it matches model's provider_id — log distinct mismatch (P1-05)
   const targetProviderId = input.providerId ?? model.provider_id;
-  if (input.providerId && input.providerId !== model.provider_id) return null;
+  if (input.providerId && input.providerId !== model.provider_id) {
+    if (input.sessionId) {
+      await supabase.from('content_research_logs').insert({
+        session_id: input.sessionId,
+        stage: input.stage ?? 'unknown',
+        level: 'warn',
+        message: `provider/model mismatch (provider ${input.providerId} != model provider ${model.provider_id}), fallback ke global`
+      } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+    }
+    return null;
+  }
   const providers = await registry.listActive();
   const prov = providers.find((p) => p.id === targetProviderId);
   if (!prov) return null;
@@ -254,16 +272,31 @@ async function tryPinnedModel(
 
 async function tryPinnedModelHint(
   supabase: SupabaseClient,
-  providers: ProviderRow[],
   input: LLMCompletionInput
 ): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number } | null> {
-  for (const prov of providers) {
+  // Single-provider resolve from model_id string — avoid looping all providers (P1-04)
+  const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config, is_active').eq('model_id', input.modelHint!).eq('is_active', true).maybeSingle();
+  const model = modelRow as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null; is_active: boolean } | null;
+  let targetProviderId: string | null = null;
+  let reasoningEffort: 'max' | 'high' | undefined = undefined;
+  let resolvedModelId = input.modelHint!;
+  if (model) {
+    targetProviderId = model.provider_id;
+    reasoningEffort = resolveReasoningEffort(model.config);
+    resolvedModelId = model.model_id;
+  }
+  const registry = new ProviderRegistry();
+  const providers = await registry.listActive();
+  const providersToTry = targetProviderId ? providers.filter((p) => p.id === targetProviderId) : providers;
+  if (providersToTry.length === 0) return null;
+  for (const prov of providersToTry) {
     const pool = new KeyPool(prov);
     try {
       const { result, keyRow } = await pool.withFallback(async (apiKey) => {
         const provider = providerFromRow(prov);
-        return provider.chat({ model: input.modelHint!, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort: undefined }, apiKey);
+        return provider.chat({ model: resolvedModelId, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort }, apiKey);
       });
+      if (model) await markModelUsage(model.id).catch(() => undefined);
       await supabase.from('llm_call_logs').insert({
         request_id: input.requestId ?? null,
         session_id: input.sessionId ?? null,

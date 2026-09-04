@@ -180,14 +180,15 @@ export async function upsertStageDefault(formData: FormData) {
   const modelId = String(formData.get('model_id') ?? '').trim();
   const valid = ['idea_generation', 'discovering', 'verifying', 'scoring', 'developing', 'regen_affiliate'];
   if (!valid.includes(stage)) throw new Error('stage tidak valid');
+  const { data: { user } } = await supabase.auth.getUser();
   if (!modelId) {
-    const { error } = await supabase.from('llm_stage_defaults').update({ provider_id: null, model_id: null, updated_at: new Date().toISOString() }).eq('stage', stage);
+    const { error } = await supabase.from('llm_stage_defaults').update({ provider_id: null, model_id: null, updated_by: user?.id ?? null, updated_at: new Date().toISOString() }).eq('stage', stage);
     if (error) throw new Error(error.message);
   } else {
     const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', modelId).maybeSingle();
     const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
     if (!mr || !mr.is_active) throw new Error('Model tidak valid atau nonaktif');
-    const { error } = await supabase.from('llm_stage_defaults').update({ provider_id: mr.provider_id, model_id: mr.id, updated_at: new Date().toISOString() }).eq('stage', stage);
+    const { error } = await supabase.from('llm_stage_defaults').update({ provider_id: mr.provider_id, model_id: mr.id, updated_by: user?.id ?? null, updated_at: new Date().toISOString() }).eq('stage', stage);
     if (error) throw new Error(error.message);
   }
   revalidatePath('/admin/llm');

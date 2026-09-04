@@ -8,6 +8,7 @@ import { getServiceClient } from '@/lib/supabase/service';
 export class ProviderRegistry {
   async listActive(): Promise<ProviderRow[]> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('llm_providers')
       .select('*')
@@ -19,6 +20,7 @@ export class ProviderRegistry {
 
   async getBySlug(slug: string): Promise<ProviderRow | null> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('llm_providers')
       .select('*')
@@ -31,6 +33,7 @@ export class ProviderRegistry {
 
   async listModels(providerId: string): Promise<ModelRow[]> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('llm_models')
       .select('*')
@@ -44,6 +47,7 @@ export class ProviderRegistry {
 
   async getModelById(modelId: string): Promise<ModelRow | null> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase.from('llm_models').select('*').eq('id', modelId).maybeSingle();
     if (error) throw new Error(`getModelById ${modelId}: ${error.message}`);
     return data as unknown as ModelRow | null;
@@ -51,6 +55,7 @@ export class ProviderRegistry {
 
   async getProviderById(providerId: string): Promise<ProviderRow | null> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase.from('llm_providers').select('*').eq('id', providerId).maybeSingle();
     if (error) throw new Error(`getProviderById ${providerId}: ${error.message}`);
     return data as unknown as ProviderRow | null;
@@ -58,6 +63,7 @@ export class ProviderRegistry {
 
   async listAllActiveModels(): Promise<ModelRow[]> {
     const supabase = getServiceClient();
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('llm_models')
       .select('*')

@@ -192,8 +192,8 @@ export async function runDiscovery(
   const { system, user } = buildDiscoveryPrompt(input, chunked);
   let discoveryModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
   if (pinnedModelId) {
-    const { data: m } = await supabase.from('llm_models').select('id, provider_id').eq('id', pinnedModelId).maybeSingle();
-    const mr = m as { id: string; provider_id: string } | null;
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).eq('is_active', true).maybeSingle();
+    const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
     if (mr) discoveryModel = { providerId: mr.provider_id, modelUuid: mr.id };
   } else {
     try {
