@@ -20,7 +20,7 @@ Sinkronkan `supabase/migrations` lokal dengan `schema_migrations` remote asharu 
 - [x] T3 — Restore drift jika objek DB masih dipakai: restore file `20260902041349`/`20260902055944` lalu `repair --status applied`; jika sudah tergantikan, repair tanpa file / dokumentasikan superseded — DONE: file restore, sudah `applied` di remote sejak 2026-09-02
 - [x] T4 — Push per-stage LLM: `supabase link` + `supabase db push` (push `20260905000001` lalu `02` berurutan), re-run safe (`IF NOT EXISTS`) — DONE via `apply_migration`: `stage_llm_defaults` (`20260904133453`) + `stage_llm_review_fixes` (`20260904133505`)
 - [x] T5 — Verifikasi DB: `to_regclass('public.llm_stage_defaults')`, `information_schema.columns` untuk `*_model_id` & `last_regen_model_id`, `\d llm_stage_defaults`, `cron.job`, `get_advisors` — DONE: `llm_stage_defaults` 6 rows + 5 `*_model_id` + `last_regen_model_id` + FK `ON DELETE SET NULL` + trigger `trg_llm_stage_defaults_updated_at` + cron `asharu-content-research`/`legacy` OK; advisors = pre-existing lints (search_path, anon SECURITY DEFINER — expected)
-- [ ] T6 — Memory & commit: entry `.memory/YYYY-MM-DD/HHmmss-supabase-migration-sync.md` + update `.memory/README.md`, commit submodule + root bila ada file restore
+- [x] T6 — Memory & commit: entry `.memory/YYYY-MM-DD/HHmmss-supabase-migration-sync.md` + update `.memory/README.md`, commit submodule + root bila ada file restore — DONE: `.memory/2026-09-04/204000-supabase-migration-sync.md` + README updated, commits `eaabc78` (submodule) + `edfa3d9` (parent plan+pointer), next commit for memory
 
 ## Risks
 - Push tanpa sync drift → `supabase migration list` tetap drift, push berikutnya gagal. Mitigasi: T1 sebelum T4.
@@ -35,6 +35,8 @@ Sinkronkan `supabase/migrations` lokal dengan `schema_migrations` remote asharu 
 - 2026-09-05 03:10 — T2-T4: `apply_migration` 3 batch → `processor_cron_bearer` (`20260904133359`, unschedule old job), `stage_llm_defaults` (`20260904133453`, 6 rows + RLS + 5 columns + last_regen), `stage_llm_review_fixes` (`20260904133505`, FK SET NULL + trigger + indexes). File `2026090500000*` tetap lokal sebagai future source; versi remote follow `applied_at` timestamp.
 - 2026-09-05 03:15 — T5: `to_regclass` = `llm_stage_defaults`, 5 `*_model_id`, `last_regen_model_id`, trigger, policies, cron OK. Advisors: search_path + anon SECURITY DEFINER pre-existing (service_role-only wrappers sudah benar), unused_index expected fresh table.
 - 2026-09-05 03:15 — T6 pending: memory + README + commit.
+- 2026-09-04 20:40 — T6: memory `2026-09-04/204000-supabase-migration-sync.md` + README updated (cron */5, per-stage LLM live, drift restored). Commits `eaabc78`+`edfa3d9` done. Memory entry + README committed `docs+plan-sync` pending final commit includes plan update + reset T6.
+- 2026-09-04 20:50 — README finalized (Current State + Open Items + Recent Entries), plan T6 marked done. Ready for final `docs: record migration sync` commit.
 
 ## Notes
 - Telecom C2M/TM Forum ODA & TOGAF tidak relevan (skope infra kecil, bukan rating/billing).
