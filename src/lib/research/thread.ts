@@ -5,7 +5,11 @@ import type { ThreadGeneration } from '@/lib/llm/types';
 export const threadSchema = z.object({
   main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
   replies: z
-    .array(z.object({ id: z.string().min(1), en: z.string().min(1) }))
+    .array(z.union([
+      z.object({ id: z.string().min(1), en: z.string().min(1) }),
+      // Toleransi: LLM kadang return string polos — coerce jadi {id,en} sama
+      z.string().min(1).transform((s) => ({ id: s, en: s }))
+    ]))
     .max(10)
 });
 
@@ -26,7 +30,9 @@ function sanitizeThread(thread: ThreadGeneration): ThreadGeneration {
 }
 
 const PLACEHOLDER = '{{PRODUCT_URL}}';
+// Backstop opener mengikuti rule wajib (pilih varian natural; default "Btw,").
 const BASA_BASI_TEMPLATE = `Btw, kalau ini relevan buat kamu, cek rekomendasinya di sini ya ${PLACEHOLDER}`;
+const BASA_BASI_TEMPLATE_EN = `By the way, if this is relevant for you, check the pick here ${PLACEHOLDER}`;
 
 function findPlaceholderLocation(thread: {
   main: { id: string; en: string };
@@ -90,7 +96,7 @@ export function repositionPlaceholder(
 
   const textAround = (s: string) => s.replace(PLACEHOLDER, '').trim();
   if (textAround(newTargetText).length < 20) {
-    newTargetText = BASA_BASI_TEMPLATE;
+    newTargetText = field === 'en' ? BASA_BASI_TEMPLATE_EN : BASA_BASI_TEMPLATE;
   }
 
   const newThread: ThreadGeneration = {

@@ -112,7 +112,38 @@ export async function runDevelopment(
         : undefined
     });
 
-    await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
+    // Per-topic guard: 1 topik gagal (mis. thread parse failed) tidak boleh
+    // menggagalkan seluruh sesi — kumpulkan error, lanjut ke topik berikut.
+    try {
+      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'warn',
+        message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) skipped: ${message} — lanjut ke topik berikut`
+      });
+    }
+  }
+
+  // Jika SEMUA topik pending gagal, tandai failed agar admin tahu.
+  const { data: afterDrafts } = await supabase
+    .from('content_drafts')
+    .select('research_topic_id')
+    .in('research_topic_id', topicIds);
+  const afterDone = new Set(
+    ((afterDrafts ?? []) as { research_topic_id: string | null }[])
+      .map((d) => d.research_topic_id)
+      .filter((v): v is string => Boolean(v))
+  );
+  const newDraftCount = allTopics.filter((t) => afterDone.has(t.id)).length - doneTopicIds.size;
+  if (newDraftCount <= 0) {
+    const stillPending = pendingTopics.filter((t) => !afterDone.has(t.id));
+    await supabase
+      .from('content_research_sessions')
+      .update({ status: 'failed', error_message: `developing: ${stillPending.length} topik gagal (lihat log warn per-topik)` })
+      .eq('id', sessionId);
   }
 }
 
@@ -130,7 +161,11 @@ async function generateAndInsertDraft(
   const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
 
   const isMultiReplyPlatform = platform.slug === 'threads' || platform.slug === 'twitter';
-  const targetReplyCount = sess.target_reply_count ?? (isMultiReplyPlatform ? 6 : null);
+  // 6 reply konten + 1 reply affiliate di tengah = total EXACTLY 7 untuk Threads/Twitter.
+  // Reply affiliate dihitung terpisah agar percakapan konten tetap detail (min 6) di luar sisipan produk.
+  const CONTENT_REPLIES = 6;
+  const TOTAL_REPLIES = CONTENT_REPLIES + 1;
+  const targetReplyCount = sess.target_reply_count ?? (isMultiReplyPlatform ? TOTAL_REPLIES : null);
 
   const topicHooks = Array.isArray(topic.hooks)
     ? (topic.hooks as Array<{ text?: string; type?: string }>).map((h) => h.text ?? '').filter(Boolean)
@@ -178,18 +213,40 @@ async function generateAndInsertDraft(
       { role: 'system', content: system },
       { role: 'user', content: user }
     ],
-    temperature: 0.7
+    temperature: 0.7,
+    // Bilingual 7-reply thread ≈ besar; tanpa maxTokens eksplisit output bisa terpotong → parse fail.
+    maxTokens: 2200
   });
 
-  const parsed = parseThread(llmResult.output.text);
+  let parsed = parseThread(llmResult.output.text);
   if (!parsed) {
+    // 1x retry suhu lebih rendah untuk format JSON yang lebih disiplin.
+    const retry = await runLLMCompletion(supabase, {
+      requestId: sessionId,
+      stage: 'developing',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `${user}\n\nPENTING: output sebelumnya gagal diparse. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan.` }
+      ],
+      temperature: 0.3,
+      maxTokens: 2200
+    });
+    parsed = parseThread(retry.output.text);
+    if (!parsed) {
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'error',
+        message: `development LLM raw topic ${topicId} (first 2000 chars, attempt 2): ${retry.output.text.slice(0, 2000)}`
+      });
+      throw new Error('thread parse failed');
+    }
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'developing',
-      level: 'error',
-      message: `development LLM raw (first 2000 chars): ${llmResult.output.text.slice(0, 2000)}`
+      level: 'info',
+      message: `topic ${topicId} parsed on retry`
     });
-    throw new Error('thread parse failed');
   }
 
   // Reposition affiliate placeholder into a middle reply (code-level backstop;

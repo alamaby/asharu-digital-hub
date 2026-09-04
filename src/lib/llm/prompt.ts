@@ -23,12 +23,32 @@ export interface AffiliateProductForPrompt {
   category: string;
 }
 
+// Opener wajib sisipan afiliasi: natural interjection ID + padanan EN.
+// LLM wajib pilih salah satu yang paling natural (jangan selalu "Btw").
+export const AFFILIATE_OPENERS_ID = [
+  'Btw,',
+  'Intermezzo dulu ya,',
+  'Ngomong-ngomong,',
+  'Oiya,',
+  'Eh iya,'
+] as const;
+
+export const AFFILIATE_OPENERS_EN = [
+  'By the way,',
+  'Quick intermezzo,',
+  'Speaking of which,',
+  'Oh, and'
+] as const;
+
+const AFFILIATE_OPENER_RULE =
+  `- AFFILIATE OPENER: reply yang berisi {{PRODUCT_URL}} WAJIB diawali salah satu opener natural ID ${AFFILIATE_OPENERS_ID.map((o) => `"${o}"`).join(' / ')} (pilih yang paling natural, jangan selalu "Btw"). Untuk field EN padanannya: ${AFFILIATE_OPENERS_EN.map((o) => `"${o}"`).join(' / ')}. Contoh: "Btw, kalau setup kamu ... ${'{{PRODUCT_URL}}'}" / "Intermezzo dulu ya, ...".`;
+
 export function buildThreadPrompt(
   input: ThreadPromptInput,
   product: AffiliateProductForPrompt
 ): { system: string; user: string } {
   const replyRule = input.targetReplyCount
-    ? `- Produce EXACTLY ${input.targetReplyCount} replies. Spread the topic detail/angle across all ${input.targetReplyCount} replies — each reply must add NEW information (a fact, a tip, a sub-angle), jangan repetisi.`
+    ? `- Produce EXACTLY ${input.targetReplyCount} replies total: ${input.targetReplyCount - 1} CONTENT replies (each adds NEW information — fact, tip, sub-angle, jangan repetisi) + 1 AFFILIATE reply (the {{PRODUCT_URL}} reply in the middle). The affiliate reply is EXTRA, not one of the content replies.`
     : '- Replies: 0-2 for twitter, 0-3 for threads, 0-1 for others. Empty replies array if not needed.';
 
   const fallbackBridge = input.isFallbackRandom
@@ -48,6 +68,7 @@ export function buildThreadPrompt(
     '- Tone, audience, CTA style, purpose, and constraints must be respected.',
     '- AFFILIATE PLACEMENT: tempatkan {{PRODUCT_URL}} di reply TENGAH (atau kedua terakhir jika genap). DILARANG menempatkan {{PRODUCT_URL}} di main post.',
     '- AFFILIATE STYLE: reply yang berisi {{PRODUCT_URL}} wajib dibungkus 1-2 kalimat basa-basi konversasional yang menjelaskan kenapa produk ini relevan dengan topik (natural soft-sell). DILARANG menaruh bare link tanpa konteks/kalimat pengantar.',
+    AFFILIATE_OPENER_RULE,
     ...(fallbackBridge ? [fallbackBridge] : []),
     '- Inject EXACTLY 1 occurrence of {{PRODUCT_URL}}.',
     '- BAHASA: Output HANYA huruf Latin, angka, tanda baca standar, dan emoji relevan. DILARANG karakter CJK/Chinese/Kanji/Hangul/Katakana/Hiragana. Tulis ID & EN dalam bahasa yang benar.',
@@ -121,6 +142,7 @@ export function buildSingleReplyRewritePrompt(
     '- Text murni tanpa markdown, tanpa bullet.',
     '- WAJIB sisipkan {{PRODUCT_URL}} tepat 1 kali di dalam reply ini.',
     '- WAJIB 1-2 kalimat jembatan natural yang menghubungkan topik ke produk (analogi, use-case WFH/lifestyle, transisi kebutuhan). Jangan bare link tanpa konteks.',
+    AFFILIATE_OPENER_RULE,
     '- Jika produk tampak tidak 1:1 dengan topik (random fallback), tetap buat jembatan soft-sell yang natural — jangan klaim fitur tidak ada di nama produk, jangan hard-sell.',
     '- BAHASA: HANYA huruf Latin, angka, tanda baca standar, emoji relevan. DILARANG CJK.',
     '- Language: follow input language (id/en/both — fill id and en accordingly).',

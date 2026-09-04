@@ -333,17 +333,22 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         />
       ) : draftList.length > 0 ? (
         <section className="mt-8 space-y-3">
-          <h2 className="text-lg font-semibold text-ink">{t('draftsHeading')}</h2>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-lg font-semibold text-ink">{t('draftsHeading')}</h2>
+            <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary hover:underline">
+              Lihat semua →
+            </Link>
+          </div>
           {draftList.map((d) => {
             const injection = d.affiliate_injections[0];
             return (
               <Link
                 key={d.id}
-                href={{ pathname: '/konten/review' }}
+                href={{ pathname: '/konten/review/[draftId]', params: { draftId: d.id } }}
                 className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
               >
                 <p className="text-sm font-medium text-ink">
-                  {d.generated_thread.main.id.slice(0, 120)}…
+                  {d.generated_thread.main.id.slice(0, 120)}...
                 </p>
                 <p className="mt-1 text-xs text-ink-muted">
                   {t('productLabel')}: {injection?.friendly_code ?? '-'} · match {d.affiliate_match_score ?? '-'} · status {d.status}

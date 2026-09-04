@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
 
@@ -220,6 +221,17 @@ describe('repositionPlaceholder', () => {
     const match = [out.main.id, out.main.en, ...out.replies.flatMap((r) => [r.id, r.en])].join(' ').match(/\{\{PRODUCT_URL\}\}/g);
     expect(match).toHaveLength(1);
   });
+
+  it('regression 2aa5be7d: parses thread with replies as plain strings (LLM shape drift)', () => {
+    const raw = JSON.stringify({
+      main: { id: 'main id', en: 'main en' },
+      replies: ['reply satu', 'reply dua dengan link {{PRODUCT_URL}} di tengah']
+    });
+    const out = parseThread(raw);
+    expect(out).not.toBeNull();
+    expect(out!.replies[0]).toEqual({ id: 'reply satu', en: 'reply satu' });
+    expect(out!.replies[1]!.id).toContain(P);
+  });
 });
 
 describe('sanitizeThreadText', () => {
@@ -246,5 +258,47 @@ describe('sanitizeThreadText', () => {
 
   it('handles empty string', () => {
     expect(sanitizeThreadText('')).toBe('');
+  });
+});
+
+describe('affiliate opener rule', () => {
+  const product = { friendlyCode: 'ASH-001', name: 'Produk X', url: 'https://x.com', category: 'electronics' };
+  const threadJson = {
+    main: { id: 'main id', en: 'main en' },
+    replies: [{ id: 'r1', en: 'r1 en' }, { id: 'r2', en: 'r2 en' }, { id: 'r3', en: 'r3 en' }]
+  };
+
+  it('thread prompt contains opener rule with btw/intermezzo variants', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('AFFILIATE OPENER');
+    expect(system).toContain('Btw,');
+    expect(system).toContain('Intermezzo dulu ya,');
+  });
+
+  it('single-reply rewrite prompt contains opener rule + maxChars', () => {
+    const { system } = buildSingleReplyRewritePrompt(
+      { topic: 't', language: 'both', targetIndex: 2, threadJson, maxChars: 280 },
+      product
+    );
+    expect(system).toContain('AFFILIATE OPENER');
+    expect(system).toContain('280');
+  });
+
+  it('opener constants include ID + EN variants', () => {
+    expect(AFFILIATE_OPENERS_ID).toContain('Btw,');
+    expect(AFFILIATE_OPENERS_ID).toContain('Intermezzo dulu ya,');
+    expect(AFFILIATE_OPENERS_EN).toContain('By the way,');
+  });
+
+  it('reply rule states 6 content + 1 affiliate for total 7', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('EXACTLY 7 replies');
+    expect(system).toContain('6 CONTENT');
   });
 });
