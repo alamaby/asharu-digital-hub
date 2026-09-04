@@ -21,7 +21,7 @@ interface TopicCandidate {
   sources: Array<{ title: string; url: string; published_at?: string; publisher?: string }>;
 }
 
-export async function runVerification(supabase: SupabaseClient, sessionId: string): Promise<void> {
+export async function runVerification(supabase: SupabaseClient, sessionId: string, pinnedModelId?: string | null): Promise<void> {
   const { data: topics, error } = await supabase
     .from('content_research_topics')
     .select('id, topic, category, sources')
@@ -38,10 +38,23 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
   if (candidates.length === 0) return;
 
   const { system, user } = buildVerificationPrompt({ topic: { topic: 'batch' }, candidates });
+  let verifyModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+  if (pinnedModelId) {
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id').eq('id', pinnedModelId).maybeSingle();
+    const mr = m as { id: string; provider_id: string } | null;
+    if (mr) verifyModel = { providerId: mr.provider_id, modelUuid: mr.id };
+  } else {
+    try {
+      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+      verifyModel = await resolveStageModel('verifying', null);
+    } catch { void 0; }
+  }
   const result = await runLLMCompletion(supabase, {
     requestId: null,
     sessionId,
     stage: 'verifying',
+    providerId: verifyModel.providerId,
+    modelUuid: verifyModel.modelUuid,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }

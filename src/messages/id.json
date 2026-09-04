@@ -358,7 +358,18 @@
       "requiredWinners": "Pemenang minimum",
       "maximumIterations": "Iterasi maksimum",
       "targetReplyCount": "Jumlah Reply Target",
-      "targetReplyCountHint": "(hanya Threads/Twitter — 6 konten + 1 affiliate = 7)"
+      "targetReplyCountHint": "(hanya Threads/Twitter — 6 konten + 1 affiliate = 7)",
+      "stageModelSectionTitle": "Model LLM per Tahap (Admin only)",
+      "stageModelSectionHint": "Pilih provider → model untuk tiap tahap. Kosongkan untuk pakai default di Admin → LLM → Stage Defaults atau urutan global. Jika model pilihan gagal, otomatis fallback ke global dan tercatat di log.",
+      "stageLabel": {
+        "idea_generation": "Idea Generation",
+        "discovering": "Discovery",
+        "verifying": "Verification",
+        "scoring": "Scoring",
+        "developing": "Development",
+        "regen_affiliate": "Regen Affiliate (di Review, default Admin → LLM)",
+        "regen_affiliate_hint": "Atur default regen di Admin → LLM → Stage Defaults. Saat regen di Review, pilih provider → model di sana."
+      }
     },
     "review": {
       "title": "Tinjau Draf Konten",

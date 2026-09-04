@@ -51,7 +51,8 @@ interface TopicForScoring {
 
 export async function runScoring(
   supabase: SupabaseClient,
-  sessionId: string
+  sessionId: string,
+  pinnedModelId?: string | null
 ): Promise<void> {
   const { data: topics, error } = await supabase
     .from('content_research_topics')
@@ -65,10 +66,23 @@ export async function runScoring(
     topic: serializeTopics(topics as TopicForScoring[]),
     weights: DEFAULT_SCORING_WEIGHTS
   });
+  let scoringModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+  if (pinnedModelId) {
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id').eq('id', pinnedModelId).maybeSingle();
+    const mr = m as { id: string; provider_id: string } | null;
+    if (mr) scoringModel = { providerId: mr.provider_id, modelUuid: mr.id };
+  } else {
+    try {
+      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+      scoringModel = await resolveStageModel('scoring', null);
+    } catch { void 0; }
+  }
   const result = await runLLMCompletion(supabase, {
     requestId: null,
     sessionId,
     stage: 'scoring',
+    providerId: scoringModel.providerId,
+    modelUuid: scoringModel.modelUuid,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }

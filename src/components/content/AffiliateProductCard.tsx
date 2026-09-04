@@ -27,6 +27,8 @@ interface Props {
   injection: Injection | null;
   matchScore: number | null;
   hasPlaceholderWarning: boolean;
+  regenProviders?: { id: string; slug: string; display_name: string }[];
+  regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
 }
 
 const BAND_CLASS: Record<string, string> = {
@@ -36,7 +38,7 @@ const BAND_CLASS: Record<string, string> = {
   none: 'bg-surface text-ink-muted'
 };
 
-export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceholderWarning }: Props) {
+export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceholderWarning, regenProviders = [], regenModels = [] }: Props) {
   const t = useTranslations('content.review.affiliate');
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -47,6 +49,9 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
 
   const band = relevanceBand(matchScore);
   const isFallback = Boolean((injection?.match_signals as Record<string, unknown> | undefined)?.fallback_random);
+  const [regenProviderId, setRegenProviderId] = useState('');
+  const [regenModelId, setRegenModelId] = useState('');
+  const filteredRegenModels = regenProviderId ? regenModels.filter((m) => m.provider_id === regenProviderId) : [];
   async function onSwap(productId: string) {
     setBusy('swap');
     setError(null);
@@ -61,7 +66,7 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
     setBusy('regen');
     setError(null);
     setPickerOpen(false);
-    const result = await regenerateAffiliateInsertion(draftId, productId);
+    const result = await regenerateAffiliateInsertion(draftId, productId, regenModelId ? { modelId: regenModelId } : undefined);
     setBusy(null);
     if (!result.success) setError(result.error ?? 'failed');
     else startTransition(() => router.refresh());
@@ -180,6 +185,26 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
           </button>
         </div>
       )}
+
+      {regenProviders.length > 0 ? (
+        <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-dashed border-line bg-surface p-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted">Provider (regen)</label>
+            <select value={regenProviderId} onChange={(e) => { setRegenProviderId(e.target.value); setRegenModelId(''); }} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink">
+              <option value="">Default global</option>
+              {regenProviders.map((p) => <option key={p.id} value={p.id}>{p.display_name} ({p.slug})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted">Model (regen)</label>
+            <select value={regenModelId} onChange={(e) => setRegenModelId(e.target.value)} disabled={!regenProviderId} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink disabled:opacity-60">
+              <option value="">Default global</option>
+              {filteredRegenModels.map((m) => <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{m.config?.reasoning ? ' · reasoning' : ''}</option>)}
+            </select>
+          </div>
+          <p className="col-span-full text-[11px] text-ink-muted">Kosongkan untuk pakai default Admin → LLM. Jika model pilihan gagal, otomatis fallback ke urutan global dan tercatat di log.</p>
+        </div>
+      ) : null}
 
       {isFallback ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">

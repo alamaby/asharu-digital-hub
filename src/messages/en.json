@@ -358,7 +358,18 @@
       "requiredWinners": "Required winners",
       "maximumIterations": "Maximum iterations",
       "targetReplyCount": "Target Reply Count",
-      "targetReplyCountHint": "(Threads/Twitter only — 6 content + 1 affiliate = 7)"
+      "targetReplyCountHint": "(Threads/Twitter only — 6 content + 1 affiliate = 7)",
+      "stageModelSectionTitle": "LLM Model per Stage (Admin only)",
+      "stageModelSectionHint": "Pick provider → model per stage. Leave blank to use defaults at Admin → LLM → Stage Defaults or global order. If the pinned model fails, fallback to global and logged.",
+      "stageLabel": {
+        "idea_generation": "Idea Generation",
+        "discovering": "Discovery",
+        "verifying": "Verification",
+        "scoring": "Scoring",
+        "developing": "Development",
+        "regen_affiliate": "Regen Affiliate (in Review, default Admin → LLM)",
+        "regen_affiliate_hint": "Set regen default at Admin → LLM → Stage Defaults. When regenerating in Review, pick provider → model there."
+      }
     },
     "review": {
       "title": "Review Content Drafts",

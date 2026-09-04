@@ -21,7 +21,8 @@ export const TOTAL_REPLIES = CONTENT_REPLIES + 1;
 
 export async function runDevelopment(
   supabase: SupabaseClient,
-  sessionId: string
+  sessionId: string,
+  pinnedModelId?: string | null
 ): Promise<void> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
@@ -120,7 +121,7 @@ export async function runDevelopment(
     // Per-topic guard: 1 topik gagal (mis. thread parse failed) tidak boleh
     // menggagalkan seluruh sesi — kumpulkan error, lanjut ke topik berikut.
     try {
-      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate);
+      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await supabase.from('content_research_logs').insert({
@@ -159,7 +160,8 @@ async function generateAndInsertDraft(
   platform: { slug: string; maxChars: number | null },
   sess: { tone: string | null; account_goal: string | null; audience_age: string | null; target_reply_count: number | null },
   topic: ShortlistedTopic,
-  affiliate: SelectedAffiliate | null
+  affiliate: SelectedAffiliate | null,
+  pinnedModelId?: string | null
 ): Promise<void> {
   const tone = sess.tone ?? 'casual';
   const audience = sess.audience_age ?? 'umum';
@@ -210,10 +212,25 @@ async function generateAndInsertDraft(
     promptProduct
   );
 
+  // Resolve developing model: pinnedModelId > stage default > global
+  let devModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+  if (pinnedModelId) {
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id').eq('id', pinnedModelId).maybeSingle();
+    const mr = m as { id: string; provider_id: string } | null;
+    if (mr) devModel = { providerId: mr.provider_id, modelUuid: mr.id };
+  } else {
+    try {
+      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+      devModel = await resolveStageModel('developing', null);
+    } catch { void 0; }
+  }
+
   const llmResult = await runLLMCompletion(supabase, {
     requestId: null,
     sessionId,
     stage: 'developing',
+    providerId: devModel.providerId,
+    modelUuid: devModel.modelUuid,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }
@@ -234,6 +251,8 @@ async function generateAndInsertDraft(
       requestId: null,
       sessionId,
       stage: 'developing',
+      providerId: devModel.providerId,
+      modelUuid: devModel.modelUuid,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: `${user}\n\nPENTING: output sebelumnya gagal diparse. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan.` }

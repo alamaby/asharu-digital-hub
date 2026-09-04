@@ -6,6 +6,7 @@ import { routing } from '@/i18n/routing';
 import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { createSupabaseService } from '@/lib/supabase/server';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
@@ -118,6 +119,17 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
   const tz = await getDisplayTimezone();
 
+  // For regen_affiliate picker: fetch active providers/models (admin only, service client)
+  let regenProviders: { id: string; slug: string; display_name: string }[] = [];
+  let regenModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
+  const svc = createSupabaseService();
+  if (svc) {
+    const { data: provs } = await svc.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
+    const { data: mods } = await svc.from('llm_models').select('id, provider_id, model_id, display_name, priority, config').eq('is_active', true).order('priority');
+    if (provs) regenProviders = provs as typeof regenProviders;
+    if (mods) regenModels = mods as typeof regenModels;
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between gap-2">
@@ -128,7 +140,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       </div>
 
       <div className="mt-4">
-        <ContentDraftCard draft={{ ...d, affiliate_injections: enrichedInjections }} />
+        <ContentDraftCard draft={{ ...d, affiliate_injections: enrichedInjections }} regenProviders={regenProviders} regenModels={regenModels} />
       </div>
     </div>
   );

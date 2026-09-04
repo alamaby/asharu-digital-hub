@@ -6,6 +6,8 @@ import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { ContentRequestForm } from '@/components/content/ContentRequestForm';
 import { env } from '@/lib/env';
+import { isAdmin } from '@/lib/auth/is-admin';
+import { createSupabaseService } from '@/lib/supabase/server';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -84,6 +86,21 @@ export default async function KontenBaruPage({ params }: PageProps) {
   // Prepend the synthetic "all" option.
   platforms = [allPlatformsOption, ...platforms];
 
+  // Admin-only: fetch llm providers/models for per-stage overrides
+  let llmProviders: { id: string; slug: string; display_name: string }[] = [];
+  let llmModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
+  let isAdminUser = false;
+  try { isAdminUser = await isAdmin(); } catch { isAdminUser = false; }
+  if (isAdminUser && env.hasSupabase) {
+    const svc = createSupabaseService();
+    if (svc) {
+      const { data: provs } = await svc.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
+      const { data: mods } = await svc.from('llm_models').select('id, provider_id, model_id, display_name, priority, config').eq('is_active', true).order('priority');
+      if (provs) llmProviders = provs as typeof llmProviders;
+      if (mods) llmModels = mods as typeof llmModels;
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div className="mb-4 flex items-center justify-between gap-3 text-sm">
@@ -104,7 +121,7 @@ export default async function KontenBaruPage({ params }: PageProps) {
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-3 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
       <div className="mt-8">
-        <ContentRequestForm platforms={platforms} categories={categories} />
+        <ContentRequestForm platforms={platforms} categories={categories} llmProviders={llmProviders} llmModels={llmModels} isAdmin={isAdminUser} />
       </div>
     </div>
   );

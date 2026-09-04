@@ -78,6 +78,10 @@ export const routing = defineRouting({
       id: '/admin/llm/logs',
       en: '/admin/llm/logs'
     },
+    '/admin/llm/stages': {
+      id: '/admin/llm/stages',
+      en: '/admin/llm/stages'
+    },
     '/admin/llm/[providerId]': {
       id: '/admin/llm/[providerId]',
       en: '/admin/llm/[providerId]'

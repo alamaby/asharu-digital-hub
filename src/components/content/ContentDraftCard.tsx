@@ -18,7 +18,7 @@ interface Draft {
   research_topic_id?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [] }: { draft: Draft; regenProviders?: { id: string; slug: string; display_name: string }[]; regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] }) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
   const [lang, setLang] = useState<'id' | 'en'>('id');
@@ -222,6 +222,8 @@ export function ContentDraftCard({ draft: initial }: { draft: Draft }) {
         injection={draft.affiliate_injections[0] ?? null}
         matchScore={draft.affiliate_match_score ?? null}
         hasPlaceholderWarning={countPlaceholdersInThread(draft.generated_thread) > 0 && draft.affiliate_injections.length === 0}
+        regenProviders={regenProviders}
+        regenModels={regenModels}
       />
     </article>
   );

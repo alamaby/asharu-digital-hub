@@ -123,6 +123,12 @@ const researchSchema = z.object({
   requiredWinners: z.coerce.number().int().min(1).max(10).optional(),
   maximumIterations: z.coerce.number().int().min(1).max(10).optional(),
   targetReplyCount: z.coerce.number().int().min(1).max(10).optional(),
+  // Per-stage provider→model overrides (admin only, optional UUIDs)
+  ideaGenerationModelId: z.string().uuid().optional(),
+  discoveringModelId: z.string().uuid().optional(),
+  verifyingModelId: z.string().uuid().optional(),
+  scoringModelId: z.string().uuid().optional(),
+  developingModelId: z.string().uuid().optional(),
   website: z.string().optional() // honeypot
 });
 
@@ -171,6 +177,9 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   for (const k of ['freshnessHours', 'minimumCandidates', 'minimumScore', 'requiredWinners', 'maximumIterations', 'targetReplyCount']) {
     if (raw[k] === '') raw[k] = undefined as unknown as string;
   }
+  for (const k of ['ideaGenerationModelId', 'discoveringModelId', 'verifyingModelId', 'scoringModelId', 'developingModelId']) {
+    if (raw[k] === '') raw[k] = undefined as unknown as string;
+  }
 
   const parsed = researchSchema.safeParse(raw);
   if (!parsed.success) {
@@ -191,6 +200,36 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
 
   const supabase = getServiceClient();
   const data = parsed.data;
+
+  // Validate per-stage model overrides: must be active and exist (admin-only feature)
+  const isAdminUser = await isAdmin();
+  const stageModelIds: Record<string, string | null> = {
+    idea_generation_model_id: null,
+    discovering_model_id: null,
+    verifying_model_id: null,
+    scoring_model_id: null,
+    developing_model_id: null
+  };
+  const modelFieldMap: Record<string, keyof typeof parsed.data> = {
+    idea_generation_model_id: 'ideaGenerationModelId',
+    discovering_model_id: 'discoveringModelId',
+    verifying_model_id: 'verifyingModelId',
+    scoring_model_id: 'scoringModelId',
+    developing_model_id: 'developingModelId'
+  };
+  for (const [col, field] of Object.entries(modelFieldMap)) {
+    const uuid = (parsed.data as unknown as Record<string, string | undefined>)[field as string];
+    if (!uuid) continue;
+    if (!isAdminUser) {
+      return { success: false, error: 'Pemilihan model hanya untuk admin' };
+    }
+    const { data: m } = await supabase.from('llm_models').select('id, is_active, provider_id').eq('id', uuid).maybeSingle();
+    const model = m as { id: string; is_active: boolean; provider_id: string } | null;
+    if (!model || !model.is_active) {
+      return { success: false, fieldErrors: { [field as string]: 'Model tidak valid atau nonaktif' }, error: 'validation' };
+    }
+    stageModelIds[col] = model.id;
+  }
 
   // 'all' means platform-agnostic — skip FK check and store NULL.
   // content_research_sessions.platform_slug is nullable; downstream pipeline
@@ -239,6 +278,11 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       required_winners: data.requiredWinners ?? 3,
       maximum_iterations: data.maximumIterations ?? 3,
       target_reply_count: data.targetReplyCount ?? null,
+      idea_generation_model_id: stageModelIds.idea_generation_model_id,
+      discovering_model_id: stageModelIds.discovering_model_id,
+      verifying_model_id: stageModelIds.verifying_model_id,
+      scoring_model_id: stageModelIds.scoring_model_id,
+      developing_model_id: stageModelIds.developing_model_id,
       created_by: user?.id ?? null
     } as unknown as Record<string, unknown>)
     .select('id')
@@ -397,11 +441,26 @@ Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"
   // Use service client for LLM pool (bypasses RLS)
   const supabaseService = getServiceClient();
   const { runLLMCompletion } = await import('@/lib/llm/completion');
+  // Idea generation model: session-agnostic, use stage default if set
+  let ideaModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+  try {
+    const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+    ideaModel = await resolveStageModel('idea_generation', null);
+  } catch { /* fallback to global */ }
+  // If admin passed pinned model via FormData, prefer it (validate)
+  const ideaModelHint = pick(raw.ideaGenerationModelId);
+  if (ideaModelHint) {
+    const { data: m } = await supabaseService.from('llm_models').select('id, provider_id, is_active').eq('id', ideaModelHint).maybeSingle();
+    const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
+    if (mr?.is_active) ideaModel = { providerId: mr.provider_id, modelUuid: mr.id };
+  }
   let text = '';
   try {
     const result = await runLLMCompletion(supabaseService, {
       requestId: null,
       stage: 'idea_generation',
+      providerId: ideaModel.providerId,
+      modelUuid: ideaModel.modelUuid,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user }
@@ -855,7 +914,8 @@ export async function removeAffiliateInjection(
 
 export async function regenerateAffiliateInsertion(
   draftId: string,
-  newProductId: string
+  newProductId: string,
+  opts?: { modelId?: string }
 ): Promise<AffiliateAdminResult> {
   try {
     const supabase = await assertAdmin();
@@ -971,6 +1031,22 @@ export async function regenerateAffiliateInsertion(
     const { runLLMCompletion } = await import('@/lib/llm/completion');
     const { replacePlaceholders, sanitizeThreadText } = await import('@/lib/research/thread');
 
+    // Resolve regen model: opts.modelId > session fallback > stage default > global
+    let regenModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+    const pinnedModelId = opts?.modelId?.trim() || null;
+    if (pinnedModelId) {
+      const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).maybeSingle();
+      const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
+      if (mr?.is_active) regenModel = { providerId: mr.provider_id, modelUuid: mr.id };
+      else return { success: false, error: 'Model tidak valid atau nonaktif' };
+    } else {
+      try {
+        const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+        // Per-session regen not stored; use global default
+        regenModel = await resolveStageModel('regen_affiliate', null);
+      } catch { void 0; }
+    }
+
     const promptProduct = { friendlyCode: prod.friendly_code, name: prod.name_id, url: prod.url, category: prod.category };
     const { system, user } = buildSingleReplyRewritePrompt(
       { topic: topicText, language, tone, targetIndex: boundedTarget, threadJson: thread, maxChars },
@@ -981,6 +1057,8 @@ export async function regenerateAffiliateInsertion(
       requestId: null,
       sessionId: resolvedSessionId,
       stage: 'regen_affiliate',
+      providerId: regenModel.providerId,
+      modelUuid: regenModel.modelUuid,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user }
@@ -1100,19 +1178,21 @@ export async function regenerateAffiliateInsertion(
         affiliate_swap_history: history,
         provider_id: providerId,
         model_id: llmResult.model,
-        llm_meta: { provider: llmResult.providerSlug, model: llmResult.model, latency_ms: llmResult.latencyMs, key_hash: llmResult.keyHash, stage: 'regen_affiliate', target_index: boundedTarget }
+        last_regen_model_id: regenModel.modelUuid,
+        llm_meta: { provider: llmResult.providerSlug, model: llmResult.model, latency_ms: llmResult.latencyMs, key_hash: llmResult.keyHash, stage: 'regen_affiliate', target_index: boundedTarget, fallback: (llmResult as { fallback?: boolean }).fallback ?? false }
       } as unknown as Record<string, unknown>)
       .eq('id', draftId);
     if (updateError) return { success: false, error: updateError.message };
 
     await incrementRateLimit(ip, 'regen_affiliate').catch(() => undefined);
+    const didFallback = Boolean((llmResult as { fallback?: boolean }).fallback);
     // P0-2: use resolved session id for log; skip if null to avoid FK violation
     if (resolvedSessionId) {
       await supabase.from('content_research_logs').insert({
         session_id: resolvedSessionId,
         stage: 'regen_affiliate',
-        level: 'info',
-        message: `regen_affiliate draft ${draftId} -> ${prod.friendly_code} target ${boundedTarget} (${llmResult.providerSlug}/${llmResult.model})`
+        level: didFallback ? 'warn' : 'info',
+        message: `regen_affiliate draft ${draftId} -> ${prod.friendly_code} target ${boundedTarget} (${llmResult.providerSlug}/${llmResult.model})${didFallback ? ' [fallback ke global]' : ''}`
       } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
     }
 

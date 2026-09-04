@@ -132,7 +132,8 @@ export interface DiscoveryRunResult {
 export async function runDiscovery(
   supabase: SupabaseClient,
   sessionId: string,
-  input: DiscoveryInput
+  input: DiscoveryInput,
+  pinnedModelId?: string | null
 ): Promise<DiscoveryRunResult> {
   const provider = await getSearchProvider(supabase);
   const queries = buildQueries(input);
@@ -189,10 +190,23 @@ export async function runDiscovery(
   });
 
   const { system, user } = buildDiscoveryPrompt(input, chunked);
+  let discoveryModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
+  if (pinnedModelId) {
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id').eq('id', pinnedModelId).maybeSingle();
+    const mr = m as { id: string; provider_id: string } | null;
+    if (mr) discoveryModel = { providerId: mr.provider_id, modelUuid: mr.id };
+  } else {
+    try {
+      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+      discoveryModel = await resolveStageModel('discovering', null);
+    } catch { void 0; }
+  }
   const result = await runLLMCompletion(supabase, {
     requestId: null,
     sessionId,
     stage: 'discovering',
+    providerId: discoveryModel.providerId,
+    modelUuid: discoveryModel.modelUuid,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user }

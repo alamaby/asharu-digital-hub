@@ -60,9 +60,14 @@ export default async function AdminLlmPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight text-ink">LLM Providers</h1>
           <p className="mt-1 text-sm text-ink-muted">Drag ≡ untuk urutan fallback. Semua configurable by table.</p>
         </div>
-        <Link href={{ pathname: '/admin/llm/logs' }} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-primary">
-          Lihat Logs Lengkap
-        </Link>
+        <div className="flex gap-2">
+          <Link href={{ pathname: '/admin/llm/stages' }} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-primary">
+            Stage Defaults
+          </Link>
+          <Link href={{ pathname: '/admin/llm/logs' }} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-primary">
+            Lihat Logs Lengkap
+          </Link>
+        </div>
       </header>
 
       <div className="mt-8 rounded-xl border border-line bg-surface p-4 shadow-card">

@@ -4,13 +4,20 @@ import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { createResearchSession, generateIdea } from '@/lib/content/actions';
+import { StageModelPicker } from './StageModelPicker';
+
+interface LlmProviderOpt { id: string; slug: string; display_name: string; }
+interface LlmModelOpt { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null; }
 
 interface ContentRequestFormProps {
   platforms: { slug: string; display_name: string }[];
   categories: { slug: string; display_name: string }[];
+  llmProviders?: LlmProviderOpt[];
+  llmModels?: LlmModelOpt[];
+  isAdmin?: boolean;
 }
 
-export function ContentRequestForm({ platforms, categories }: ContentRequestFormProps) {
+export function ContentRequestForm({ platforms, categories, llmProviders = [], llmModels = [], isAdmin = false }: ContentRequestFormProps) {
   const t = useTranslations('content.form');
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -43,6 +50,17 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
   const [allowedCategories, setAllowedCategories] = useState('');
   const [excludedCategories, setExcludedCategories] = useState('');
   const [targetReplyCount, setTargetReplyCount] = useState('7');
+  // Per-stage model overrides (admin only) — provider→model cascade
+  const [genProviderId, setGenProviderId] = useState('');
+  const [genModelId, setGenModelId] = useState('');
+  const [discProviderId, setDiscProviderId] = useState('');
+  const [discModelId, setDiscModelId] = useState('');
+  const [verifyProviderId, setVerifyProviderId] = useState('');
+  const [verifyModelId, setVerifyModelId] = useState('');
+  const [scoringProviderId, setScoringProviderId] = useState('');
+  const [scoringModelId, setScoringModelId] = useState('');
+  const [devProviderId, setDevProviderId] = useState('');
+  const [devModelId, setDevModelId] = useState('');
 
   function handleGenerateIdea() {
     setIdeaError(null);
@@ -68,6 +86,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
       if (accountGoal) fd.set('accountGoal', accountGoal);
       if (allowedCategories) fd.set('allowedCategories', allowedCategories);
       if (excludedCategories) fd.set('excludedCategories', excludedCategories);
+      if (isAdmin && genModelId) fd.set('ideaGenerationModelId', genModelId);
       // call server action
       const res = await generateIdea(fd);
       setIdeaGenerating(false);
@@ -107,6 +126,13 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    if (isAdmin) {
+      if (genModelId) formData.set('ideaGenerationModelId', genModelId);
+      if (discModelId) formData.set('discoveringModelId', discModelId);
+      if (verifyModelId) formData.set('verifyingModelId', verifyModelId);
+      if (scoringModelId) formData.set('scoringModelId', scoringModelId);
+      if (devModelId) formData.set('developingModelId', devModelId);
+    }
     await processForm(formData);
   }
 
@@ -138,6 +164,11 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
       setAccountGoal('');
       setAllowedCategories('');
       setExcludedCategories('');
+      setGenProviderId(''); setGenModelId('');
+      setDiscProviderId(''); setDiscModelId('');
+      setVerifyProviderId(''); setVerifyModelId('');
+      setScoringProviderId(''); setScoringModelId('');
+      setDevProviderId(''); setDevModelId('');
       setShowAdvanced(false);
       setIdeaApplied(false);
     } else if (result.error === 'honeypot') {
@@ -657,6 +688,19 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                 />
               </div>
             </div>
+            {isAdmin && llmProviders.length > 0 ? (
+              <div className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] p-3">
+                <p className="text-xs font-semibold text-ink">{t('stageModelSectionTitle')}</p>
+                <p className="text-[11px] text-ink-muted">{t('stageModelSectionHint')}</p>
+                <StageModelPicker stage="idea_generation" label={t('stageLabel.idea_generation')} providers={llmProviders} models={llmModels} providerId={genProviderId} modelId={genModelId} onProviderChange={setGenProviderId} onModelChange={setGenModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="discovering" label={t('stageLabel.discovering')} providers={llmProviders} models={llmModels} providerId={discProviderId} modelId={discModelId} onProviderChange={setDiscProviderId} onModelChange={setDiscModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="verifying" label={t('stageLabel.verifying')} providers={llmProviders} models={llmModels} providerId={verifyProviderId} modelId={verifyModelId} onProviderChange={setVerifyProviderId} onModelChange={setVerifyModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="scoring" label={t('stageLabel.scoring')} providers={llmProviders} models={llmModels} providerId={scoringProviderId} modelId={scoringModelId} onProviderChange={setScoringProviderId} onModelChange={setScoringModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="developing" label={t('stageLabel.developing')} providers={llmProviders} models={llmModels} providerId={devProviderId} modelId={devModelId} onProviderChange={setDevProviderId} onModelChange={setDevModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="regen_affiliate" label={t('stageLabel.regen_affiliate')} providers={llmProviders} models={llmModels} providerId="" modelId="" onProviderChange={() => {}} onModelChange={() => {}} disabled />
+                <p className="text-[11px] text-ink-muted">{t('stageLabel.regen_affiliate_hint')}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -41,4 +41,30 @@ export class ProviderRegistry {
     if (error) throw new Error(`listModels: ${error.message}`);
     return (data ?? []) as unknown as ModelRow[];
   }
+
+  async getModelById(modelId: string): Promise<ModelRow | null> {
+    const supabase = getServiceClient();
+    const { data, error } = await supabase.from('llm_models').select('*').eq('id', modelId).maybeSingle();
+    if (error) throw new Error(`getModelById ${modelId}: ${error.message}`);
+    return data as unknown as ModelRow | null;
+  }
+
+  async getProviderById(providerId: string): Promise<ProviderRow | null> {
+    const supabase = getServiceClient();
+    const { data, error } = await supabase.from('llm_providers').select('*').eq('id', providerId).maybeSingle();
+    if (error) throw new Error(`getProviderById ${providerId}: ${error.message}`);
+    return data as unknown as ProviderRow | null;
+  }
+
+  async listAllActiveModels(): Promise<ModelRow[]> {
+    const supabase = getServiceClient();
+    const { data, error } = await supabase
+      .from('llm_models')
+      .select('*')
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true });
+    if (error) throw new Error(`listAllActiveModels: ${error.message}`);
+    return (data ?? []) as unknown as ModelRow[];
+  }
 }

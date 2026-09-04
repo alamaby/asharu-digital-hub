@@ -24,6 +24,12 @@ interface ResearchSessionRow {
   required_winners: number;
   maximum_iterations: number;
   target_reply_count: number | null;
+  // Per-stage model overrides (nullable UUIDs)
+  idea_generation_model_id: string | null;
+  discovering_model_id: string | null;
+  verifying_model_id: string | null;
+  scoring_model_id: string | null;
+  developing_model_id: string | null;
   // New detail fields (20260904000002)
   topic: string | null;
   language: string | null;
@@ -126,7 +132,7 @@ export async function advanceStage(
         return await runStage(supabase, sessionId, 'discovering', session);
       }
       case 'discovering': {
-        const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+        const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session), session.discovering_model_id ?? null);
         if (result.topics.length === 0) {
           throw new Error(
             'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Coba lagi setelah cek prompt/model.'
@@ -136,12 +142,12 @@ export async function advanceStage(
         return { status: 'verifying', advanced: true };
       }
       case 'verifying': {
-        await runVerification(supabase, sessionId);
+        await runVerification(supabase, sessionId, session.verifying_model_id ?? null);
         await atomicTransition(supabase, sessionId, 'verifying', 'scoring');
         return { status: 'scoring', advanced: true };
       }
       case 'scoring': {
-        await runScoring(supabase, sessionId);
+        await runScoring(supabase, sessionId, session.scoring_model_id ?? null);
         await atomicTransition(supabase, sessionId, 'scoring', 'awaiting_selection');
         return { status: 'awaiting_selection', advanced: true };
       }
@@ -150,7 +156,7 @@ export async function advanceStage(
         return { status: 'awaiting_selection', advanced: false };
       }
       case 'developing': {
-        await runDevelopment(supabase, sessionId);
+        await runDevelopment(supabase, sessionId, session.developing_model_id ?? null);
         // runDevelopment may have set status='failed' when no shortlisted topics;
         // in that case don't claim completed — re-read current status.
         const { data: afterDev } = await supabase
@@ -205,7 +211,7 @@ async function runStage(
   session: ResearchSessionRow
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   if (stage === 'discovering') {
-    const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session));
+    const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session), session.discovering_model_id ?? null);
     if (result.topics.length === 0) {
       throw new Error(
         'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Cek prompt/model/tavily.'

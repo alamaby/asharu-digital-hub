@@ -1,5 +1,16 @@
 export type ProviderSlug = 'naraya' | 'openrouter' | 'gemini' | 'cloudflare';
 
+/** 6 LLM stages that support per-stage provider→model pinning */
+export type LLMStage = 'idea_generation' | 'discovering' | 'verifying' | 'scoring' | 'developing' | 'regen_affiliate';
+export const LLM_STAGES: readonly LLMStage[] = [
+  'idea_generation',
+  'discovering',
+  'verifying',
+  'scoring',
+  'developing',
+  'regen_affiliate'
+] as const;
+
 /**
  * HTTP-level failure from an LLM provider (non-2xx response). Carrying the
  * status lets KeyPool distinguish key-blamable errors (401/403/429) from
