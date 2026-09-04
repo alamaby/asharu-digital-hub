@@ -1223,7 +1223,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Bee Flower Import Cendana 125 gr (4pcs) - Sabun Tawon Cendana (Sandalwood) Original 125gr', en: 'Bee Flower Import Cendana 125 gr (4pcs) - Sabun Tawon Cendana (Sandalwood) Original 125gr' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/2Vg3t5Tqam',
-    image: '/images/products/affiliate/16602825-f0c1bd40082b.webp',
+    image: '/images/products/affiliate/16602825-ed83b93bfeaf.webp',
     featured: false
   },
   {
