@@ -8,7 +8,7 @@ import { Link } from '@/i18n/navigation';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ provider?: string; status?: string; sort?: string; dir?: string; page?: string }>;
+  searchParams: Promise<{ provider?: string; status?: string; stage?: string; sort?: string; dir?: string; page?: string }>;
 }
 
 const PAGE_SIZE = 20;
@@ -23,6 +23,7 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const sp = await searchParams;
   const providerFilter = sp.provider ?? 'all';
   const statusFilter = sp.status ?? 'all';
+  const stageFilter = sp.stage ?? 'all';
   const sortBy = sp.sort === 'latency' ? 'latency_ms' : sp.sort === 'provider' ? 'provider_slug' : 'created_at';
   const dir = sp.dir === 'asc' ? true : false;
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
@@ -36,9 +37,15 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   if (providerFilter !== 'all') query = query.eq('provider_slug', providerFilter);
   if (statusFilter === 'success') query = query.eq('http_status', 200);
   if (statusFilter === 'error') query = query.or('http_status.is.null,http_status.neq.200');
+  if (stageFilter !== 'all') query = query.eq('stage', stageFilter);
 
   const { data: logs, count } = await query;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+
+  const { data: stageRows } = await supabase.from('llm_call_logs').select('stage').limit(500);
+  const stageOptions = Array.from(
+    new Set(((stageRows ?? []) as { stage: string | null }[]).map((r) => r.stage).filter((s): s is string => Boolean(s)))
+  ).sort();
 
   const { data: providers } = await supabase.from('llm_providers').select('slug').order('priority');
   const slugs = ((providers ?? []) as { slug: string }[]).map((p) => p.slug);
@@ -78,6 +85,12 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
           <option value="success">Sukses (200)</option>
           <option value="error">Error</option>
         </select>
+        <select name="stage" defaultValue={stageFilter} className="rounded border border-line px-2 py-1 text-sm">
+          <option value="all">Semua stage</option>
+          {stageOptions.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
         <select name="sort" defaultValue={sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at'} className="rounded border border-line px-2 py-1 text-sm">
           <option value="created_at">Sort: Waktu</option>
           <option value="latency">Sort: Latency</option>
@@ -103,7 +116,7 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
           </thead>
           <tbody>
             {(logs ?? []).map((row) => {
-              const r = row as { id: string; created_at: string; provider_slug: string; model_id: string; stage?: string | null; latency_ms?: number | null; http_status?: number | null; error?: string | null; key_hash?: string | null; request_messages?: unknown; response_text?: string | null; prompt_tokens?: number | null; completion_tokens?: number | null };
+              const r = row as { id: string; created_at: string; provider_slug: string; model_id: string; stage?: string | null; session_id?: string | null; request_id?: string | null; latency_ms?: number | null; http_status?: number | null; error?: string | null; key_hash?: string | null; request_messages?: unknown; response_text?: string | null; prompt_tokens?: number | null; completion_tokens?: number | null };
               return (
                 <tr key={r.id} className="border-t border-line align-top">
                   <td className="px-3 py-2 text-xs">{new Date(r.created_at).toLocaleString('id-ID')}</td>
@@ -113,7 +126,11 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
                     {r.key_hash ? <div className="text-xs font-mono text-ink-muted">{r.key_hash}</div> : null}
                     <div className="text-xs text-ink-muted">p:{r.prompt_tokens ?? '-'} c:{r.completion_tokens ?? '-'}</div>
                   </td>
-                  <td className="px-3 py-2 text-xs">{r.stage ?? '-'}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <div>{r.stage ?? '-'}</div>
+                    {r.session_id ? <div className="font-mono text-[11px] text-ink-muted" title={r.session_id}>ses {r.session_id.slice(0, 8)}</div> : null}
+                    {r.request_id ? <div className="font-mono text-[11px] text-ink-muted" title={r.request_id}>req {r.request_id.slice(0, 8)}</div> : null}
+                  </td>
                   <td className="px-3 py-2 text-xs">{r.latency_ms ?? '-'}ms / {r.http_status ?? '-'}</td>
                   <td className="px-3 py-2">
                     {r.error ? <span className="text-xs text-red-600">{r.error.slice(0, 400)}</span> : <span className="text-xs text-emerald-600">OK</span>}
@@ -139,8 +156,8 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
       <div className="mt-4 flex items-center justify-between text-sm">
         <span className="text-ink-muted">Halaman {page} / {totalPages} · {count ?? 0} total</span>
         <div className="flex gap-2">
-          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
-          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
+          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
+          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
         </div>
       </div>
     </div>

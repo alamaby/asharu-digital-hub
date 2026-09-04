@@ -43,6 +43,24 @@ export const AFFILIATE_OPENERS_EN = [
 const AFFILIATE_OPENER_RULE =
   `- AFFILIATE OPENER: reply yang berisi {{PRODUCT_URL}} WAJIB diawali salah satu opener natural ID ${AFFILIATE_OPENERS_ID.map((o) => `"${o}"`).join(' / ')} (pilih yang paling natural, jangan selalu "Btw"). Untuk field EN padanannya: ${AFFILIATE_OPENERS_EN.map((o) => `"${o}"`).join(' / ')}. Contoh: "Btw, kalau setup kamu ... ${'{{PRODUCT_URL}}'}" / "Intermezzo dulu ya, ...".`;
 
+// Target utilisasi panjang: tiap post ditulis MENDEKATI batas maksimum (±90%),
+// bukan one-liner. URL afiliasi (±30 char) wajib dihitung dalam budget post afiliasi.
+export const AFFILIATE_URL_RESERVE_CHARS = 30;
+
+function lengthTargetRule(maxChars: number | null): string | null {
+  if (!maxChars || maxChars < 100) return null;
+  const target = Math.floor(maxChars * 0.9);
+  return `- LENGTH: each post (id and en separately) MUST be long and substantive — target ≥ ${target} chars (±90% of max ${maxChars}), as close to the limit as possible WITHOUT exceeding it. Each reply 3-5 sentences. Never write one-liners.`;
+}
+
+const EMOJI_RULE =
+  '- EMOJI: include 1-2 relevant emoji per post (in both id and en) so the post feels alive. Emoji must relate to the content; never replace words with emoji.';
+
+function urlBudgetRule(maxChars: number | null): string {
+  const cap = maxChars ?? 500;
+  return `- URL BUDGET: the affiliate reply holds {{PRODUCT_URL}} which becomes a ±${AFFILIATE_URL_RESERVE_CHARS}-char real URL. Keep (reply text + ${AFFILIATE_URL_RESERVE_CHARS}) ≤ ${cap} AND (reply text + URL) ≥ 90% of ${cap}. Reserve room for the URL — shorten the lead-in sentence if needed, never drop the URL.`;
+}
+
 export function buildThreadPrompt(
   input: ThreadPromptInput,
   product: AffiliateProductForPrompt
@@ -59,16 +77,21 @@ export function buildThreadPrompt(
     ? '- FALLBACK RANDOM: produk dipilih random dari 20 terbaru, mungkin tidak 1:1 dengan topik. Reply yang berisi {{PRODUCT_URL}} WAJIB diawali 1-2 kalimat jembatan natural yang menghubungkan topik ke produk (analogi, use-case WFH/lifestyle, transisi kebutuhan). Jangan hard-sell, jangan klaim fitur yang tidak ada di nama produk. Natural soft-sell.'
     : null;
 
+  const lengthRule = lengthTargetRule(input.platform.maxChars);
+
   const system = [
     'You are a senior copywriter for Asharu (asharu.id), bilingual ID+EN, helpful and authentic.',
     'You write short-form content for Threads/Twitter/Instagram/TikTok/LinkedIn/Facebook.',
     'Rules:',
     '- Output JSON ONLY with shape: {"main":{"id":"...","en":"..."},"replies":[{"id":"...","en":"..."}]}',
     '- Text murni tanpa markdown, tanpa bullet, tanpa formatting berlebihan.',
-    '- MAIN POST: maksimal 2-3 kalimat. Buka dengan hook KUAT (angka mengejutkan, pertanyaan provokatif, atau klaim kontra-intuitif) yang memaksa reader berhenti scroll dan membuka thread. Jangan taruh seluruh detail/fakta di main — main hanya pengantar yang bikin penasaran.',
+    '- MAIN POST: 2-3 kalimat yang padat dan mendekati batas karakter. Buka dengan hook KUAT (angka mengejutkan, pertanyaan provokatif, atau klaim kontra-intuitif) yang memaksa reader berhenti scroll dan membuka thread. Jangan taruh seluruh detail/fakta di main — main hanya pengantar yang bikin penasaran.',
     `- DISTRIBUSI KONTEN: detail, fakta, tips, dan sub-angle HARUS didistribusikan ke reply-reply secara bertahap (satu poin per reply). Jangan ringkas semua di main.`,
     replyRule,
-    '- Each post must respect max_chars for the platform.',
+    '- Each post must respect max_chars for the platform (HARD LIMIT — never exceed).',
+    ...(lengthRule ? [lengthRule] : []),
+    EMOJI_RULE,
+    urlBudgetRule(input.platform.maxChars),
     '- Tone, audience, CTA style, purpose, and constraints must be respected.',
     '- AFFILIATE PLACEMENT: tempatkan {{PRODUCT_URL}} di reply TENGAH (atau kedua terakhir jika genap). DILARANG menempatkan {{PRODUCT_URL}} di main post.',
     '- AFFILIATE STYLE: reply yang berisi {{PRODUCT_URL}} wajib dibungkus 1-2 kalimat basa-basi konversasional yang menjelaskan kenapa produk ini relevan dengan topik (natural soft-sell). DILARANG menaruh bare link tanpa konteks/kalimat pengantar.',
@@ -151,7 +174,10 @@ export function buildSingleReplyRewritePrompt(
     '- BAHASA: HANYA huruf Latin, angka, tanda baca standar, emoji relevan. DILARANG CJK.',
     '- Language: follow input language (id/en/both — fill id and en accordingly).',
     ...(input.tone ? [`- Tone: ${input.tone}`] : []),
-    ...(input.maxChars ? [`- Max chars per post for rewrite: ${input.maxChars} (HARUS patuh).`] : []),
+    ...(input.maxChars ? [`- Max chars per post for rewrite: ${input.maxChars} (HARUS patuh — HARD LIMIT, never exceed).`] : []),
+    ...(lengthTargetRule(input.maxChars ?? null) ? [lengthTargetRule(input.maxChars ?? null)!] : []),
+    EMOJI_RULE,
+    urlBudgetRule(input.maxChars ?? null),
     '- Jangan tinggalkan placeholder kosong (mis. "produk dari ___"). Link diwakili {{PRODUCT_URL}}.'
   ].join('\n');
 

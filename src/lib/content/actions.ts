@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
+import { extractUrls } from '@/lib/utils/urls';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -294,14 +295,56 @@ export async function generateIdea(formData: FormData): Promise<GenerateIdeaResu
     return { success: false, error: `rate_limit:${count}` };
   }
 
-  const platformHint = (raw.platform ?? 'all').trim() || 'all';
-  const toneHint = (raw.tone ?? '').trim();
-  const languageHint = (raw.language ?? 'both').trim() || 'both';
-  const targetLocationHint = (raw.targetLocation ?? '').trim();
-  const currentHints = [platformHint, toneHint, languageHint, targetLocationHint].filter(Boolean).join(', ');
+  const pick = (v: unknown): string | null => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s ? s : null;
+  };
+  const platformHint = pick(raw.platform) ?? 'all';
+  const toneHint = pick(raw.tone);
+  const languageHint = pick(raw.language) ?? 'both';
+  const topicHint = pick(raw.topic);
+  const targetCategoryHint = pick(raw.targetCategory);
+  const audienceHint = pick(raw.audience);
+  const ctaHint = pick(raw.ctaStyle);
+  const purposeHint = pick(raw.purpose);
+  const constraintsHint = pick(raw.constraints);
+  const keywordsHint = pick(raw.keywords);
+  const targetLocationHint = pick(raw.targetLocation);
+  const secondaryLocationHint = pick(raw.secondaryLocation);
+  const audienceAgeHint = pick(raw.audienceAge);
+  const audienceInterestsHint = pick(raw.audienceInterests);
+  const accountGoalHint = pick(raw.accountGoal);
+  const allowedCategoriesHint = pick(raw.allowedCategories);
+  const excludedCategoriesHint = pick(raw.excludedCategories);
+  const pastedUrls = extractUrls(`${raw.topic ?? ''} ${raw.keywords ?? ''} ${raw.purpose ?? ''}`);
+
+  // Variety seed: tiap klik harus menghasilkan ide BERBEDA meski hint sama.
+  const varietySeed = `${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffff).toString(16)}`;
+
+  // Jika user paste link di topik/keywords/purpose, telusuri isinya via
+  // Tavily extract agar LLM menganalisa halaman tersebut (best-effort).
+  let pastedContext: string | null = null;
+  if (pastedUrls.length > 0) {
+    try {
+      const supabaseService = getServiceClient();
+      const { getSearchProvider } = await import('@/lib/research/search');
+      const searchProvider = await getSearchProvider(supabaseService);
+      const pages = await searchProvider.extract(pastedUrls.slice(0, 2), {
+        query: topicHint ?? keywordsHint ?? undefined
+      });
+      const usable = pages.filter((p) => p.content.trim().length > 100);
+      if (usable.length > 0) {
+        pastedContext = usable
+          .map((p, i) => `[Halaman ${i + 1}] ${p.title}\n${p.url}\n${p.content.slice(0, 3000)}`)
+          .join('\n\n');
+      }
+    } catch {
+      pastedContext = null;
+    }
+  }
 
   // Build prompt — lightweight idea generator
-  const system = `Anda adalah Content Idea Generator untuk Asharu (asharu.id). Tugas: buat 1 ide konten afiliasi yang siap isi form.
+  const system = `Anda adalah Content Idea Generator untuk Asharu (asharu.id). Tugas: buat 1 ide konten afiliasi yang segar, spesifik, dan siap isi form.
 WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
 {
   "topic": "judul topik 10-500 karakter, hook kuat",
@@ -322,9 +365,34 @@ WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
   "allowedCategories": "kategori diperbolehkan pisah koma",
   "excludedCategories": "kategori dihindari pisah koma"
 }
-Aturan: topic harus 10-500 char, jangan asal; sesuaikan dengan hint platform/tone jika diberikan. Bahasa output ${languageHint}.`;
-  const user = `Hint saat ini: platform=${platformHint}, tone=${toneHint || '-'}, language=${languageHint}, lokasi=${targetLocationHint || 'Indonesia'}${currentHints ? ` (${currentHints})` : ''}.
-Berikan 1 ide terbaik sesuai schema. Pastikan semua field terisi natural, jangan kosongkan topic/audience/purpose. Keywords relevan dengan topic.`;
+Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"); JANGAN mengulang ide umum yang sudah sering dipakai — variasikan sudut, audiens, dan kategori. Hormati hint user yang sudah diisi (jangan ubah maknanya, pertajam). Bahasa output ${languageHint}.`;
+  const hintLines = [
+    `platform=${platformHint}`,
+    toneHint ? `tone=${toneHint}` : null,
+    `language=${languageHint}`,
+    topicHint ? `topik existing (JANGAN ulangi, buat sudut BERBEDA)=${topicHint}` : null,
+    targetCategoryHint ? `targetCategory=${targetCategoryHint}` : null,
+    audienceHint ? `audience=${audienceHint}` : null,
+    ctaHint ? `ctaStyle=${ctaHint}` : null,
+    purposeHint ? `purpose=${purposeHint}` : null,
+    constraintsHint ? `constraints=${constraintsHint}` : null,
+    keywordsHint ? `keywords=${keywordsHint}` : null,
+    targetLocationHint ? `targetLocation=${targetLocationHint}` : `targetLocation=Indonesia`,
+    secondaryLocationHint ? `secondaryLocation=${secondaryLocationHint}` : null,
+    audienceAgeHint ? `audienceAge=${audienceAgeHint}` : null,
+    audienceInterestsHint ? `audienceInterests=${audienceInterestsHint}` : null,
+    accountGoalHint ? `accountGoal=${accountGoalHint}` : null,
+    allowedCategoriesHint ? `allowedCategories=${allowedCategoriesHint}` : null,
+    excludedCategoriesHint ? `excludedCategories=${excludedCategoriesHint}` : null,
+    pastedUrls.length > 0 ? `pastedUrls=${pastedUrls.join(', ')}` : null
+  ].filter((l): l is string => Boolean(l));
+  const user = `Hint user:\n${hintLines.map((l) => `- ${l}`).join('\n')}${
+    pastedContext
+      ? `\n\nKonten link yang dipaste user (ANALISA halaman ini dan buat topik dari isinya — jangan mengarang di luar isi berikut):\n${pastedContext}`
+      : pastedUrls.length > 0
+        ? `\n\nCatatan: user mempaste link (${pastedUrls.join(', ')}) tapi isinya tidak bisa diambil — buat topik dari konteks URL/teks yang ada sebisanya.`
+        : ''
+  }\nVariasi #${varietySeed} — berikan 1 ide yang segar dan BERBEDA dari pola umum. Pastikan semua field terisi natural, jangan kosongkan topic/audience/purpose. Keywords relevan dengan topic.`;
 
   // Use service client for LLM pool (bypasses RLS)
   const supabaseService = getServiceClient();
@@ -332,13 +400,13 @@ Berikan 1 ide terbaik sesuai schema. Pastikan semua field terisi natural, jangan
   let text = '';
   try {
     const result = await runLLMCompletion(supabaseService, {
-      requestId: `idea-${Date.now()}`,
+      requestId: null,
       stage: 'idea_generation',
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user }
       ],
-      temperature: 0.85,
+      temperature: 1.0,
       maxTokens: 900
     });
     text = result.output.text;
@@ -910,14 +978,15 @@ export async function regenerateAffiliateInsertion(
     );
 
     const llmResult = await runLLMCompletion(supabase, {
-      requestId: resolvedSessionId ?? d.request_id ?? draftId,
+      requestId: null,
+      sessionId: resolvedSessionId,
       stage: 'regen_affiliate',
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user }
       ],
       temperature: 0.7,
-      maxTokens: 400
+      maxTokens: 600
     });
 
     const raw = llmResult.output.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();

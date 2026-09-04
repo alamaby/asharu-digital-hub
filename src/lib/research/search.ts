@@ -31,6 +31,8 @@ export interface SearchOptions {
 export interface SearchProvider {
   readonly name: string;
   search(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+  /** Fetch full page content for user-pasted URLs (Tavily /extract). */
+  extract(urls: string[], options?: { query?: string; maxChars?: number }): Promise<SearchResult[]>;
 }
 
 interface TavilyResponse {
@@ -43,6 +45,16 @@ interface TavilyResponse {
     published_date?: string;
   }>;
   answer?: string;
+}
+
+interface TavilyExtractResponse {
+  results?: Array<{
+    url?: string;
+    title?: string;
+    content?: string;
+    raw_content?: string;
+  }>;
+  failed_results?: Array<{ url?: string; error?: string }>;
 }
 
 export class TavilyProvider implements SearchProvider {
@@ -87,6 +99,45 @@ export class TavilyProvider implements SearchProvider {
       content: r.content ?? r.raw_content ?? '',
       score: typeof r.score === 'number' ? r.score : 0,
       publishedDate: r.published_date
+    }));
+  }
+
+  async extract(urls: string[], options: { query?: string; maxChars?: number } = {}): Promise<SearchResult[]> {
+    if (urls.length === 0) return [];
+    const { query, maxChars = 4000 } = options;
+    const body: Record<string, unknown> = {
+      api_key: this.apiKey,
+      urls: urls.slice(0, 3),
+      extract_depth: 'basic',
+      format: 'text',
+      include_images: false
+    };
+    if (query) body.query = query;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    let res: Response;
+    try {
+      res = await fetch('https://api.tavily.com/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (e) {
+      throw new Error(`Tavily extract network error: ${(e as Error).message}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!res.ok) {
+      throw new Error(`Tavily extract failed: ${res.status} ${await res.text().catch(() => '')}`);
+    }
+    const data = (await res.json()) as TavilyExtractResponse;
+    return (data.results ?? []).map((r) => ({
+      title: r.title ?? r.url ?? '',
+      url: r.url ?? '',
+      content: (r.content ?? r.raw_content ?? '').slice(0, maxChars),
+      score: 1
     }));
   }
 }

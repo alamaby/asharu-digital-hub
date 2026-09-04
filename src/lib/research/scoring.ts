@@ -66,7 +66,8 @@ export async function runScoring(
     weights: DEFAULT_SCORING_WEIGHTS
   });
   const result = await runLLMCompletion(supabase, {
-    requestId: sessionId,
+    requestId: null,
+    sessionId,
     stage: 'scoring',
     messages: [
       { role: 'system', content: system },

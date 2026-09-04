@@ -208,7 +208,8 @@ async function generateAndInsertDraft(
   );
 
   const llmResult = await runLLMCompletion(supabase, {
-    requestId: sessionId,
+    requestId: null,
+    sessionId,
     stage: 'developing',
     messages: [
       { role: 'system', content: system },
@@ -216,7 +217,8 @@ async function generateAndInsertDraft(
     ],
     temperature: 0.7,
     // Bilingual 7-reply thread ≈ besar; tanpa maxTokens eksplisit output bisa terpotong → parse fail.
-    maxTokens: 2200
+    // 90% length target per post → butuh headroom lebih.
+    maxTokens: 3200
   }).catch(() => null);
   // Meta LLM aktif: attempt-1 bila sukses, else retry bila sukses.
   let activeLlm: Awaited<ReturnType<typeof runLLMCompletion>> | null = llmResult;
@@ -226,14 +228,15 @@ async function generateAndInsertDraft(
     // 1x retry suhu lebih rendah untuk format JSON yang lebih disiplin.
     // Retry juga mencakup kasus attempt-1 throw (transport/provider fail).
     const retry = await runLLMCompletion(supabase, {
-      requestId: sessionId,
+      requestId: null,
+      sessionId,
       stage: 'developing',
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: `${user}\n\nPENTING: output sebelumnya gagal diparse. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan.` }
       ],
       temperature: 0.3,
-      maxTokens: 2200
+      maxTokens: 3200
     }).catch(() => null);
     parsed = retry ? parseThread(retry.output.text) : null;
     if (!parsed) {

@@ -49,13 +49,25 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
     setIdeaApplied(false);
     setIdeaGenerating(true);
     startIdeaTransition(async () => {
-      // Collect current partial state as hints
+      // Collect all current field states as hints so the idea varies with input
       const fd = new FormData();
       fd.set('platform', platform);
       fd.set('tone', tone);
       fd.set('language', language);
-      if (targetLocation) fd.set('targetLocation', targetLocation);
+      if (topic) fd.set('topic', topic);
+      if (targetCategory) fd.set('targetCategory', targetCategory);
       if (audience) fd.set('audience', audience);
+      if (ctaStyle) fd.set('ctaStyle', ctaStyle);
+      if (purpose) fd.set('purpose', purpose);
+      if (constraints) fd.set('constraints', constraints);
+      if (keywords) fd.set('keywords', keywords);
+      if (targetLocation) fd.set('targetLocation', targetLocation);
+      if (secondaryLocation) fd.set('secondaryLocation', secondaryLocation);
+      if (audienceAge) fd.set('audienceAge', audienceAge);
+      if (audienceInterests) fd.set('audienceInterests', audienceInterests);
+      if (accountGoal) fd.set('accountGoal', accountGoal);
+      if (allowedCategories) fd.set('allowedCategories', allowedCategories);
+      if (excludedCategories) fd.set('excludedCategories', excludedCategories);
       // call server action
       const res = await generateIdea(fd);
       setIdeaGenerating(false);
@@ -240,7 +252,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder={t('topicPlaceholder')}
-          disabled={pending}
+          disabled={pending || ideaGenerating}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
         />
         {fieldErrors.topic ? <p className="mt-1 text-xs text-red-600">{fieldErrors.topic}</p> : null}
@@ -462,7 +474,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                   max={10}
                   value={targetReplyCount}
                   onChange={(e) => setTargetReplyCount(e.target.value)}
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -595,7 +607,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                   min={1}
                   max={720}
                   placeholder="24"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -610,7 +622,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                   min={3}
                   max={50}
                   placeholder="12"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -625,7 +637,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                   min={1}
                   max={10}
                   placeholder="3"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -640,7 +652,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
                   min={1}
                   max={10}
                   placeholder="3"
-                  disabled={pending}
+                  disabled={pending || ideaGenerating}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>

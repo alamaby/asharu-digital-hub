@@ -20,8 +20,16 @@ export interface LLMCompletionInput {
   temperature?: number;
   maxTokens?: number;
   modelHint?: string;
-  /** Optional request/session id for llm_call_logs auditing. */
-  requestId?: string;
+  /**
+   * Optional legacy request id for llm_call_logs auditing (must be a
+   * content_requests UUID or null). Research stages should pass the session
+   * id via `sessionId` instead — request_id FK was dropped (see migration
+   * 20260904000003) so free-form ids no longer fail, but session linkage
+   * belongs in session_id.
+   */
+  requestId?: string | null;
+  /** Optional research session id → llm_call_logs.session_id. */
+  sessionId?: string | null;
   /** Stage tag for llm_call_logs (e.g. 'discovering'). */
   stage?: string;
 }
@@ -82,24 +90,29 @@ export async function runLLMCompletion(
         if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
           await markModelUsage(mod.id).catch(() => undefined);
         }
-        await supabase
-          .from('llm_call_logs')
-          .insert({
-            request_id: input.requestId ?? null,
-            provider_slug: prov.slug,
-            provider_id: prov.id,
-            model_id: result.model,
-            key_hash: keyRow.key_hash,
-            key_id: keyRow.id,
-            stage: input.stage ?? null,
-            request_messages: input.messages as unknown as Record<string, unknown>,
-            response_text: result.text.slice(0, 8000),
-            prompt_tokens: result.usage?.promptTokens ?? null,
-            completion_tokens: result.usage?.completionTokens ?? null,
-            latency_ms: result.latencyMs,
-            http_status: 200
-          } as unknown as Record<string, unknown>)
-          .then(() => undefined, () => undefined);
+        {
+          const { error: logError } = await supabase
+            .from('llm_call_logs')
+            .insert({
+              request_id: input.requestId ?? null,
+              session_id: input.sessionId ?? null,
+              provider_slug: prov.slug,
+              provider_id: prov.id,
+              model_id: result.model,
+              key_hash: keyRow.key_hash,
+              key_id: keyRow.id,
+              stage: input.stage ?? null,
+              request_messages: input.messages as unknown as Record<string, unknown>,
+              response_text: result.text.slice(0, 8000),
+              prompt_tokens: result.usage?.promptTokens ?? null,
+              completion_tokens: result.usage?.completionTokens ?? null,
+              latency_ms: result.latencyMs,
+              http_status: 200
+            } as unknown as Record<string, unknown>);
+          if (logError) {
+            console.error(`[llm] call log insert failed (${input.stage ?? '-'}): ${logError.message}`);
+          }
+        }
         return {
           output,
           providerSlug: prov.slug,
@@ -110,10 +123,11 @@ export async function runLLMCompletion(
       } catch (e) {
         lastError = e;
         const msg = e instanceof Error ? e.message : String(e);
-        await supabase
+        const { error: logError } = await supabase
           .from('llm_call_logs')
           .insert({
             request_id: input.requestId ?? null,
+            session_id: input.sessionId ?? null,
             provider_slug: prov.slug,
             provider_id: prov.id,
             model_id: mod.model_id,
@@ -121,8 +135,10 @@ export async function runLLMCompletion(
             request_messages: input.messages as unknown as Record<string, unknown>,
             error: msg.slice(0, 2000),
             http_status: e instanceof LLMHttpError ? e.status : null
-          } as unknown as Record<string, unknown>)
-          .then(() => undefined, () => undefined);
+          } as unknown as Record<string, unknown>);
+        if (logError) {
+          console.error(`[llm] error log insert failed (${input.stage ?? '-'}): ${logError.message}`);
+        }
         // Continue to next model in same provider
       }
     }

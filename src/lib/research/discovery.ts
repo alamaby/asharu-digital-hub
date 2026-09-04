@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { extractUrls } from '@/lib/utils/urls';
 import { getSearchProvider, type SearchResult } from './search';
 import { buildDiscoveryPrompt } from './prompts';
 import type { DiscoveryInput } from './prompts';
@@ -151,18 +152,46 @@ export async function runDiscovery(
     .filter((r): r is PromiseFulfilledResult<SearchResult[]> => r.status === 'fulfilled')
     .flatMap((r) => r.value);
   const deduped = dedupResults(rawResults);
-  const chunked = chunkSourcesForLLM(deduped);
+
+  // Jika user paste link di topik/keywords, telusuri isinya dan prioritaskan
+  // sebagai sumber utama LLM (best-effort; gagal → lanjut search biasa).
+  let pastedResults: SearchResult[] = [];
+  const pastedUrls = extractUrls(`${input.topicHint ?? ''} ${input.keywords ?? ''}`);
+  if (pastedUrls.length > 0) {
+    try {
+      pastedResults = (
+        await provider.extract(pastedUrls.slice(0, 2), { query: input.topicHint ?? input.keywords ?? undefined })
+      )
+        .filter((p) => p.content.trim().length > 100)
+        .map((p) => ({ ...p, title: `[LINK USER] ${p.title}` }));
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'discovering',
+        level: 'info',
+        message: `pasted link extract: ${pastedResults.length}/${pastedUrls.length} halaman berhasil diambil`
+      });
+    } catch (e) {
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'discovering',
+        level: 'warn',
+        message: `pasted link extract gagal, lanjut search biasa: ${e instanceof Error ? e.message : String(e)}`
+      });
+    }
+  }
+  const chunked = [...pastedResults, ...chunkSourcesForLLM(deduped)];
 
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
     stage: 'discovering',
     level: 'info',
-    message: `search complete: ${rawResults.length} raw, ${deduped.length} deduped, sent ${chunked.length} to LLM`
+    message: `search complete: ${rawResults.length} raw, ${deduped.length} deduped, ${pastedResults.length} pasted, sent ${chunked.length} to LLM`
   });
 
   const { system, user } = buildDiscoveryPrompt(input, chunked);
   const result = await runLLMCompletion(supabase, {
-    requestId: sessionId,
+    requestId: null,
+    sessionId,
     stage: 'discovering',
     messages: [
       { role: 'system', content: system },

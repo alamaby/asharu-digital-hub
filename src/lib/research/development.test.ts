@@ -334,4 +334,31 @@ describe('affiliate opener rule', () => {
     expect(system).toContain('EXACTLY 1 replies');
     expect(system).not.toContain('0 CONTENT');
   });
+
+  it('length rule targets 90% of max chars (threads 500 → 450)', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 500 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('450');
+    expect(system).toContain('90%');
+    expect(system).toContain('1-2 relevant emoji');
+  });
+
+  it('url budget reserves room for the real URL', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 500 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('URL BUDGET');
+    expect(system).toContain('30');
+  });
+
+  it('no length rule when platform has no max chars', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'blog', maxChars: null }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).not.toContain('90% of max');
+  });
 });

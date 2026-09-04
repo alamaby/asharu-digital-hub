@@ -143,7 +143,7 @@ async function handle(request: NextRequest) {
             { role: 'user', content: user }
           ],
           temperature: 0.7,
-          maxTokens: 2200
+          maxTokens: 3200
         });
         success = {
           providerSlug: llmResult.providerSlug,
