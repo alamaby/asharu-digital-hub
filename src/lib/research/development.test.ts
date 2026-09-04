@@ -326,6 +326,15 @@ describe('affiliate opener rule', () => {
     expect(system).toContain('6 CONTENT');
   });
 
+  it('platform all with 7 replies produces same 6+1 rule (fix 641956c7)', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'all', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('EXACTLY 7 replies');
+    expect(system).toContain('6 CONTENT');
+  });
+
   it('small custom count falls back to generic rule (no negative content count)', () => {
     const { system } = buildThreadPrompt(
       { topic: 't', platform: { slug: 'threads', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 1 },

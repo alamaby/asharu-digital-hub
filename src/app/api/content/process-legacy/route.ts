@@ -115,7 +115,7 @@ async function handle(request: NextRequest) {
           language: req.language,
           targetCategory: req.target_category,
           // Samakan dengan development flow: 6 konten + 1 affiliate = 7 untuk threads/twitter.
-          targetReplyCount: req.platform_slug === 'threads' || req.platform_slug === 'twitter' ? 7 : null
+          targetReplyCount: req.platform_slug === 'threads' || req.platform_slug === 'twitter' || req.platform_slug === 'all' ? 7 : null
         },
         {
           friendlyCode: product.friendly_code,

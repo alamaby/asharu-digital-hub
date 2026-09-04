@@ -165,7 +165,10 @@ async function generateAndInsertDraft(
   const audience = sess.audience_age ?? 'umum';
   const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
 
-  const isMultiReplyPlatform = platform.slug === 'threads' || platform.slug === 'twitter';
+  const isMultiReplyPlatform = platform.slug === 'threads' || platform.slug === 'twitter' || platform.slug === 'all';
+  // Threads/Twitter/"all" (Semua Platform) butuh percakapan detail — jangan fallback ke 0-2/0-3.
+  // maxChars untuk "all" tetap 280 (strictest di development.ts:60) agar repost aman,
+  // hanya replyCount yang di-EXACTLY 7 (6 konten + 1 affiliate di tengah).
   const targetReplyCount = sess.target_reply_count ?? (isMultiReplyPlatform ? TOTAL_REPLIES : null);
 
   const topicHooks = Array.isArray(topic.hooks)
