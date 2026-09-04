@@ -358,7 +358,7 @@
       "requiredWinners": "Pemenang minimum",
       "maximumIterations": "Iterasi maksimum",
       "targetReplyCount": "Jumlah Reply Target",
-      "targetReplyCountHint": "(hanya Threads/Twitter — detail topik disebarkan ke N reply)"
+      "targetReplyCountHint": "(hanya Threads/Twitter — 6 konten + 1 affiliate = 7)"
     },
     "review": {
       "title": "Tinjau Draf Konten",
@@ -427,6 +427,7 @@
       "createdLabel": "Dibuat",
       "errorLabel": "Error",
       "draftsHeading": "Draf yang dihasilkan",
+      "viewAllReview": "Lihat semua",
       "productLabel": "Produk",
       "topicsHeading": "Topik",
       "noTopics": "Belum ada topik.",

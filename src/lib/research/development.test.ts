@@ -232,6 +232,30 @@ describe('repositionPlaceholder', () => {
     expect(out!.replies[0]).toEqual({ id: 'reply satu', en: 'reply satu' });
     expect(out!.replies[1]!.id).toContain(P);
   });
+
+  it('string-coerced thread without placeholder gets one injected in main (normalize backstop)', () => {
+    const raw = JSON.stringify({
+      main: { id: 'main id', en: 'main en' },
+      replies: ['reply satu tanpa link', 'reply dua tanpa link']
+    });
+    const out = parseThread(raw);
+    expect(out).not.toBeNull();
+    expect(out!.main.id).toContain(P);
+  });
+
+  it('repositionPlaceholder on 7 replies targets middle idx 3 (6 konten + 1 affiliate)', () => {
+    const t = mk(7, -1);
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.replies[3]!.id).toContain(P);
+    expect(postIndex).toBe(4);
+  });
+
+  it('repositioned affiliate reply starts with opener', () => {
+    const t = mk(4, -1);
+    const { thread: out } = repositionPlaceholder(t, 'middle');
+    const target = out.replies[2]!.id;
+    expect(target.startsWith('Btw,') || target.startsWith('Intermezzo')).toBe(true);
+  });
 });
 
 describe('sanitizeThreadText', () => {
@@ -300,5 +324,14 @@ describe('affiliate opener rule', () => {
     );
     expect(system).toContain('EXACTLY 7 replies');
     expect(system).toContain('6 CONTENT');
+  });
+
+  it('small custom count falls back to generic rule (no negative content count)', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 1 },
+      product
+    );
+    expect(system).toContain('EXACTLY 1 replies');
+    expect(system).not.toContain('0 CONTENT');
   });
 });

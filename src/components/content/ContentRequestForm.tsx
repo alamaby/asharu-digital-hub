@@ -42,7 +42,7 @@ export function ContentRequestForm({ platforms, categories }: ContentRequestForm
   const [accountGoal, setAccountGoal] = useState('');
   const [allowedCategories, setAllowedCategories] = useState('');
   const [excludedCategories, setExcludedCategories] = useState('');
-  const [targetReplyCount, setTargetReplyCount] = useState('6');
+  const [targetReplyCount, setTargetReplyCount] = useState('7');
 
   function handleGenerateIdea() {
     setIdeaError(null);

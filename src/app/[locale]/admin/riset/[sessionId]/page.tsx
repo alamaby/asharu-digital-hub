@@ -336,7 +336,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           <div className="flex flex-wrap items-end justify-between gap-2">
             <h2 className="text-lg font-semibold text-ink">{t('draftsHeading')}</h2>
             <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary hover:underline">
-              Lihat semua →
+              {t('viewAllReview')} →
             </Link>
           </div>
           {draftList.map((d) => {

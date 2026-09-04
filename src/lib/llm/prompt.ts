@@ -47,9 +47,13 @@ export function buildThreadPrompt(
   input: ThreadPromptInput,
   product: AffiliateProductForPrompt
 ): { system: string; user: string } {
-  const replyRule = input.targetReplyCount
-    ? `- Produce EXACTLY ${input.targetReplyCount} replies total: ${input.targetReplyCount - 1} CONTENT replies (each adds NEW information — fact, tip, sub-angle, jangan repetisi) + 1 AFFILIATE reply (the {{PRODUCT_URL}} reply in the middle). The affiliate reply is EXTRA, not one of the content replies.`
-    : '- Replies: 0-2 for twitter, 0-3 for threads, 0-1 for others. Empty replies array if not needed.';
+  const n = input.targetReplyCount ?? 0;
+  const replyRule =
+    n >= 3
+      ? `- Produce EXACTLY ${n} replies total: ${n - 1} CONTENT replies (each adds NEW information — fact, tip, sub-angle, jangan repetisi) + 1 AFFILIATE reply (the {{PRODUCT_URL}} reply in the middle). The affiliate reply is EXTRA, not one of the content replies.`
+      : n > 0
+        ? `- Produce EXACTLY ${n} replies. Spread the topic detail/angle across all ${n} replies — each reply must add NEW information (a fact, a tip, a sub-angle), jangan repetisi.`
+        : '- Replies: 0-2 for twitter, 0-3 for threads, 0-1 for others. Empty replies array if not needed.';
 
   const fallbackBridge = input.isFallbackRandom
     ? '- FALLBACK RANDOM: produk dipilih random dari 20 terbaru, mungkin tidak 1:1 dengan topik. Reply yang berisi {{PRODUCT_URL}} WAJIB diawali 1-2 kalimat jembatan natural yang menghubungkan topik ke produk (analogi, use-case WFH/lifestyle, transisi kebutuhan). Jangan hard-sell, jangan klaim fitur yang tidak ada di nama produk. Natural soft-sell.'

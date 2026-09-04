@@ -113,7 +113,9 @@ async function handle(request: NextRequest) {
           constraints: req.constraints,
           keywords: req.keywords,
           language: req.language,
-          targetCategory: req.target_category
+          targetCategory: req.target_category,
+          // Samakan dengan development flow: 6 konten + 1 affiliate = 7 untuk threads/twitter.
+          targetReplyCount: req.platform_slug === 'threads' || req.platform_slug === 'twitter' ? 7 : null
         },
         {
           friendlyCode: product.friendly_code,
@@ -140,7 +142,8 @@ async function handle(request: NextRequest) {
             { role: 'system', content: system },
             { role: 'user', content: user }
           ],
-          temperature: 0.7
+          temperature: 0.7,
+          maxTokens: 2200
         });
         success = {
           providerSlug: llmResult.providerSlug,

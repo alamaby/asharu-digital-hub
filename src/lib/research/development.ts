@@ -14,6 +14,11 @@ interface ShortlistedTopic {
   unique_angle: string | null;
 }
 
+// 6 reply konten + 1 reply affiliate di tengah = total EXACTLY 7 untuk Threads/Twitter.
+// Reply affiliate dihitung terpisah agar percakapan konten tetap detail (min 6) di luar sisipan produk.
+export const CONTENT_REPLIES = 6;
+export const TOTAL_REPLIES = CONTENT_REPLIES + 1;
+
 export async function runDevelopment(
   supabase: SupabaseClient,
   sessionId: string
@@ -128,21 +133,21 @@ export async function runDevelopment(
   }
 
   // Jika SEMUA topik pending gagal, tandai failed agar admin tahu.
+  // Basis: hanya pendingTopics (topik yang dicoba run ini), bukan allTopics.
   const { data: afterDrafts } = await supabase
     .from('content_drafts')
     .select('research_topic_id')
-    .in('research_topic_id', topicIds);
+    .in('research_topic_id', pendingTopics.map((t) => t.id));
   const afterDone = new Set(
     ((afterDrafts ?? []) as { research_topic_id: string | null }[])
       .map((d) => d.research_topic_id)
       .filter((v): v is string => Boolean(v))
   );
-  const newDraftCount = allTopics.filter((t) => afterDone.has(t.id)).length - doneTopicIds.size;
+  const newDraftCount = pendingTopics.filter((t) => afterDone.has(t.id)).length;
   if (newDraftCount <= 0) {
-    const stillPending = pendingTopics.filter((t) => !afterDone.has(t.id));
     await supabase
       .from('content_research_sessions')
-      .update({ status: 'failed', error_message: `developing: ${stillPending.length} topik gagal (lihat log warn per-topik)` })
+      .update({ status: 'failed', error_message: `developing: ${pendingTopics.length} topik gagal (lihat log warn per-topik)` })
       .eq('id', sessionId);
   }
 }
@@ -161,10 +166,6 @@ async function generateAndInsertDraft(
   const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
 
   const isMultiReplyPlatform = platform.slug === 'threads' || platform.slug === 'twitter';
-  // 6 reply konten + 1 reply affiliate di tengah = total EXACTLY 7 untuk Threads/Twitter.
-  // Reply affiliate dihitung terpisah agar percakapan konten tetap detail (min 6) di luar sisipan produk.
-  const CONTENT_REPLIES = 6;
-  const TOTAL_REPLIES = CONTENT_REPLIES + 1;
   const targetReplyCount = sess.target_reply_count ?? (isMultiReplyPlatform ? TOTAL_REPLIES : null);
 
   const topicHooks = Array.isArray(topic.hooks)
@@ -216,11 +217,14 @@ async function generateAndInsertDraft(
     temperature: 0.7,
     // Bilingual 7-reply thread ≈ besar; tanpa maxTokens eksplisit output bisa terpotong → parse fail.
     maxTokens: 2200
-  });
+  }).catch(() => null);
+  // Meta LLM aktif: attempt-1 bila sukses, else retry bila sukses.
+  let activeLlm: Awaited<ReturnType<typeof runLLMCompletion>> | null = llmResult;
 
-  let parsed = parseThread(llmResult.output.text);
+  let parsed = llmResult ? parseThread(llmResult.output.text) : null;
   if (!parsed) {
     // 1x retry suhu lebih rendah untuk format JSON yang lebih disiplin.
+    // Retry juga mencakup kasus attempt-1 throw (transport/provider fail).
     const retry = await runLLMCompletion(supabase, {
       requestId: sessionId,
       stage: 'developing',
@@ -230,17 +234,18 @@ async function generateAndInsertDraft(
       ],
       temperature: 0.3,
       maxTokens: 2200
-    });
-    parsed = parseThread(retry.output.text);
+    }).catch(() => null);
+    parsed = retry ? parseThread(retry.output.text) : null;
     if (!parsed) {
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'developing',
         level: 'error',
-        message: `development LLM raw topic ${topicId} (first 2000 chars, attempt 2): ${retry.output.text.slice(0, 2000)}`
+        message: `development LLM raw topic ${topicId} (first 2000 chars, attempt 2): ${(retry?.output.text ?? llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
       });
       throw new Error('thread parse failed');
     }
+    activeLlm = retry;
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'developing',
@@ -248,15 +253,15 @@ async function generateAndInsertDraft(
       message: `topic ${topicId} parsed on retry`
     });
   }
+  if (!activeLlm) throw new Error('thread parse failed');
 
-  // Reposition affiliate placeholder into a middle reply (code-level backstop;
-  // the prompt also instructs the LLM to place it there). Resolved postIndex
-  // is recorded so ContentDraftCard highlights the correct reply (0 = main,
-  // k+1 = reply[k]). If no affiliate matched, skip repositioning.
+  // parsed & activeLlm dijamin non-null di sini (throw di atas jika gagal dua kali).
+  const parsedThread = parsed!;
+  const resolvedLlm = activeLlm!;
   let resolvedPostIndex = 0;
-  let working = parsed;
+  let working = parsedThread;
   if (affiliate) {
-    const repositioned = repositionPlaceholder(parsed, 'middle');
+    const repositioned = repositionPlaceholder(parsedThread, 'middle');
     working = repositioned.thread;
     resolvedPostIndex = repositioned.postIndex;
   }
@@ -270,7 +275,7 @@ async function generateAndInsertDraft(
   const { data: providerRow } = await supabase
     .from('llm_providers')
     .select('id')
-    .eq('slug', llmResult.providerSlug)
+    .eq('slug', resolvedLlm.providerSlug)
     .maybeSingle();
   const providerId = (providerRow as { id: string } | null)?.id ?? null;
 
@@ -294,16 +299,16 @@ async function generateAndInsertDraft(
   const { error: draftError } = await supabase.from('content_drafts').insert({
     request_id: sessionId,
     provider_id: providerId,
-    model_id: llmResult.model,
+    model_id: resolvedLlm.model,
     research_topic_id: topicId,
     generated_thread: replaced as unknown as Record<string, unknown>,
     affiliate_injections: injection as unknown as Record<string, unknown>[],
     status: 'needs_review',
     llm_meta: {
-      provider: llmResult.providerSlug,
-      model: llmResult.model,
-      latency_ms: llmResult.latencyMs,
-      key_hash: llmResult.keyHash
+      provider: resolvedLlm.providerSlug,
+      model: resolvedLlm.model,
+      latency_ms: resolvedLlm.latencyMs,
+      key_hash: resolvedLlm.keyHash
     },
     affiliate_match_score: affiliate?.matchScore ?? null,
     affiliate_match_signals: affiliate

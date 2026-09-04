@@ -31,8 +31,13 @@ function sanitizeThread(thread: ThreadGeneration): ThreadGeneration {
 
 const PLACEHOLDER = '{{PRODUCT_URL}}';
 // Backstop opener mengikuti rule wajib (pilih varian natural; default "Btw,").
-const BASA_BASI_TEMPLATE = `Btw, kalau ini relevan buat kamu, cek rekomendasinya di sini ya ${PLACEHOLDER}`;
-const BASA_BASI_TEMPLATE_EN = `By the way, if this is relevant for you, check the pick here ${PLACEHOLDER}`;
+// Body dipisah dari opener agar prepend tidak menduplikasi opener.
+const BASA_BASI_OPENER = 'Btw,';
+const BASA_BASI_OPENER_EN = 'By the way,';
+const BASA_BASI_BODY = `kalau ini relevan buat kamu, cek rekomendasinya di sini ya ${PLACEHOLDER}`;
+const BASA_BASI_BODY_EN = `if this is relevant for you, check the pick here ${PLACEHOLDER}`;
+const BASA_BASI_TEMPLATE = `${BASA_BASI_OPENER} ${BASA_BASI_BODY}`;
+const BASA_BASI_TEMPLATE_EN = `${BASA_BASI_OPENER_EN} ${BASA_BASI_BODY_EN}`;
 
 function findPlaceholderLocation(thread: {
   main: { id: string; en: string };
@@ -92,7 +97,14 @@ export function repositionPlaceholder(
   // placeholder, so we move that single token to the same surface of the
   // target reply to avoid introducing a second placeholder.
   const field: 'id' | 'en' = loc.field;
-  let newTargetText = target[field].includes(PLACEHOLDER) ? target[field] : `${target[field]} ${BASA_BASI_TEMPLATE}`;
+  const opener = field === 'en' ? BASA_BASI_OPENER_EN : BASA_BASI_OPENER;
+  const body = field === 'en' ? BASA_BASI_BODY_EN : BASA_BASI_BODY;
+  // Prepend opener di depan target agar reply diawali opener (sesuai AFFILIATE_OPENER_RULE),
+  // bukan menempel di tengah kalimat. Target dijadikan lanjutan kalimat (lowercase awal).
+  const lowered = target[field].charAt(0).toLowerCase() + target[field].slice(1);
+  let newTargetText = target[field].includes(PLACEHOLDER)
+    ? target[field]
+    : `${opener} ${lowered} ${body}`;
 
   const textAround = (s: string) => s.replace(PLACEHOLDER, '').trim();
   if (textAround(newTargetText).length < 20) {

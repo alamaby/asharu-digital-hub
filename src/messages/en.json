@@ -358,7 +358,7 @@
       "requiredWinners": "Required winners",
       "maximumIterations": "Maximum iterations",
       "targetReplyCount": "Target Reply Count",
-      "targetReplyCountHint": "(Threads/Twitter only — topic detail spread across N replies)"
+      "targetReplyCountHint": "(Threads/Twitter only — 6 content + 1 affiliate = 7)"
     },
     "review": {
       "title": "Review Content Drafts",
@@ -427,6 +427,7 @@
       "createdLabel": "Created",
       "errorLabel": "Error",
       "draftsHeading": "Generated drafts",
+      "viewAllReview": "View all",
       "productLabel": "Product",
       "topicsHeading": "Topics",
       "noTopics": "No topics yet.",
