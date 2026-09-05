@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
@@ -15,6 +15,17 @@ interface Product {
   image: string;
 }
 
+const LATEST_LIMIT = 20;
+const SEARCH_LIMIT = 30;
+const SEARCH_DEBOUNCE_MS = 300;
+
+const PRODUCT_COLUMNS = 'id, friendly_code, name_id, name_en, category, merchant, url, image';
+
+/** Escape LIKE wildcards so keyword search is a literal substring match. */
+function escapeIlike(s: string): string {
+  return s.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
 interface Props {
   draftId: string;
   currentProductId?: string;
@@ -24,11 +35,16 @@ interface Props {
 
 export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: Props) {
   const t = useTranslations('content.review.affiliate');
-  const [products, setProducts] = useState<Product[]>([]);
+  const [latest, setLatest] = useState<Product[]>([]);
+  const [results, setResults] = useState<Product[]>([]);
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const requestId = useRef(0);
 
+  // Initial load: 20 newest (cached for when the query is cleared).
   useEffect(() => {
     const supabase = createSupabaseBrowser();
     if (!supabase) {
@@ -38,28 +54,62 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
     }
     supabase
       .from('affiliate_products')
-      .select('id, friendly_code, name_id, name_en, category, merchant, url, image')
+      .select(PRODUCT_COLUMNS)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(LATEST_LIMIT)
       .then(({ data, error }) => {
         if (error) setError(error.message);
-        else setProducts((data ?? []) as Product[]);
+        else setLatest((data ?? []) as Product[]);
         setLoading(false);
       });
   }, []);
 
-  const filtered = query.trim()
-    ? products.filter((p) => {
-        const q = query.toLowerCase();
-        return (
-          p.name_id.toLowerCase().includes(q) ||
-          p.name_en.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          p.friendly_code.toLowerCase().includes(q)
-        );
-      })
-    : products;
+  // Keyword search across the FULL catalog (debounced). Empty query → latest.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setIsSearchMode(false);
+      setSearching(false);
+      return;
+    }
+    const id = ++requestId.current;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      const supabase = createSupabaseBrowser();
+      if (!supabase) {
+        if (requestId.current === id) {
+          setError('Supabase not configured');
+          setSearching(false);
+        }
+        return;
+      }
+      const pattern = `%${escapeIlike(q)}%`;
+      supabase
+        .from('affiliate_products')
+        .select(PRODUCT_COLUMNS)
+        .eq('is_active', true)
+        .or(
+          `name_id.ilike.${pattern},name_en.ilike.${pattern},category.ilike.${pattern},friendly_code.ilike.${pattern},merchant.ilike.${pattern}`
+        )
+        .order('created_at', { ascending: false })
+        .limit(SEARCH_LIMIT)
+        .then(({ data, error }) => {
+          if (requestId.current !== id) return; // stale response
+          if (error) setError(error.message);
+          else {
+            setResults((data ?? []) as Product[]);
+            setIsSearchMode(true);
+            setError(null);
+          }
+          setSearching(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const products = isSearchMode ? results : latest;
+  const busy = loading || searching;
 
   return (
     <div
@@ -91,17 +141,20 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
             placeholder={t('pickerSearch')}
             className="w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
+          <p className="mt-1 text-[11px] text-ink-muted" aria-live="polite">
+            {searching ? t('pickerSearching') : isSearchMode ? t('pickerAllResults') : t('pickerLatest')}
+          </p>
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-2">
-          {loading ? (
+          {busy ? (
             <p className="px-2 py-4 text-center text-sm text-ink-muted">...</p>
           ) : error ? (
             <p className="px-2 py-4 text-center text-sm text-red-700">{error}</p>
-          ) : filtered.length === 0 ? (
+          ) : products.length === 0 ? (
             <p className="px-2 py-4 text-center text-sm text-ink-muted">{t('pickerEmpty')}</p>
           ) : (
             <ul className="space-y-1">
-              {filtered.map((p) => {
+              {products.map((p) => {
                 const isCurrent = p.id === currentProductId;
                 return (
                   <li key={p.id}>
