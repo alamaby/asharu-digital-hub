@@ -2,7 +2,7 @@
  * Pure state-machine for content research sessions.
  * Allowed transitions:
  *   pending          -> discovering
- *   discovering      -> verifying  | failed
+ *   discovering      -> verifying  | awaiting_selection (mekanisme dua, ramping) | failed
  *   verifying        -> scoring    | failed
  *   scoring          -> awaiting_selection | failed
  *   awaiting_selection -> developing | failed
@@ -32,7 +32,7 @@ export const RESEARCH_STATUSES: readonly ResearchStatus[] = [
 
 const ALLOWED: Record<ResearchStatus, readonly ResearchStatus[]> = {
   pending: ['discovering', 'failed'],
-  discovering: ['verifying', 'failed'],
+  discovering: ['verifying', 'awaiting_selection', 'failed'],
   verifying: ['scoring', 'failed'],
   scoring: ['awaiting_selection', 'failed'],
   awaiting_selection: ['developing', 'failed'],

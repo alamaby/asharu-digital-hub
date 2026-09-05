@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { createResearchSession, generateIdea } from '@/lib/content/actions';
+import { AffiliateProductPicker } from './AffiliateProductPicker';
 import { StageModelPicker } from './StageModelPicker';
 
 interface LlmProviderOpt { id: string; slug: string; display_name: string; }
@@ -35,6 +36,10 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
   const [topic, setTopic] = useState('');
   const realPlatforms = platforms.filter((p) => p.slug !== 'all');
   const [selPlatforms, setSelPlatforms] = useState<string[]>(() => realPlatforms.map((p) => p.slug));
+  // Mekanisme riset: 'satu' topik-dulu | 'dua' produk-dulu (1-2 produk tetap).
+  const [mechanism, setMechanism] = useState<'satu' | 'dua'>('satu');
+  const [mechProducts, setMechProducts] = useState<{ id: string; name: string }[]>([]);
+  const [mechPickerOpen, setMechPickerOpen] = useState(false);
   const [tone, setTone] = useState('casual');
   const [language, setLanguage] = useState('both');
   const [targetCategory, setTargetCategory] = useState('');
@@ -131,6 +136,11 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       setFieldErrors({ platforms: t('platformMinOne') });
       return;
     }
+    if (mechanism === 'dua' && (mechProducts.length === 0 || mechProducts.length > 2)) {
+      setStatus('error');
+      setFieldErrors({ mechProducts: t('productMinMax') });
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     if (isAdmin) {
       if (genModelId) formData.set('ideaGenerationModelId', genModelId);
@@ -159,6 +169,8 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       // reset controlled states
       setTopic('');
       setSelPlatforms(realPlatforms.map((p) => p.slug));
+      setMechanism('satu');
+      setMechProducts([]);
       setAudience('');
       setPurpose('');
       setKeywords('');
@@ -305,6 +317,103 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
           </p>
         ) : null}
         <p className="mt-1 text-xs text-ink-muted">{t('generateIdeaHint')}</p>
+      </div>
+
+      <div>
+        <fieldset>
+          <legend className="block text-sm font-medium text-ink">
+            {t('mechanism')} <span className="text-red-600">*</span>
+          </legend>
+          <div className="mt-2 space-y-1">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink has-checked:border-primary">
+              <input
+                type="radio"
+                name="mechanism"
+                value="satu"
+                checked={mechanism === 'satu'}
+                disabled={pending || ideaGenerating}
+                onChange={() => setMechanism('satu')}
+                className="mt-1 size-4"
+              />
+              <span>
+                <span className="block font-medium">{t('mechanismOne')}</span>
+                <span className="block text-xs text-ink-muted">{t('mechanismOneHint')}</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink has-checked:border-primary">
+              <input
+                type="radio"
+                name="mechanism"
+                value="dua"
+                checked={mechanism === 'dua'}
+                disabled={pending || ideaGenerating}
+                onChange={() => setMechanism('dua')}
+                className="mt-1 size-4"
+              />
+              <span>
+                <span className="block font-medium">{t('mechanismTwo')}</span>
+                <span className="block text-xs text-ink-muted">{t('mechanismTwoHint')}</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        {mechanism === 'dua' ? (
+          <div className="mt-2 rounded-lg border border-line bg-surface px-3 py-2">
+            {mechProducts.map((p) => (
+              <input key={p.id} type="hidden" name="productIds" value={p.id} />
+            ))}
+            {mechProducts.length > 0 ? (
+              <ul className="space-y-1">
+                {mechProducts.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm text-ink">
+                    <span className="truncate">{p.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setMechProducts((prev) => prev.filter((x) => x.id !== p.id))}
+                      disabled={pending || ideaGenerating}
+                      className="shrink-0 rounded-md px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                      aria-label={`✕ ${p.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-ink-muted">{t('pickProductsHint')}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => setMechPickerOpen(true)}
+              disabled={pending || ideaGenerating}
+              className="mt-2 rounded-lg border border-line bg-background px-3 py-1.5 text-xs font-medium text-ink hover:border-primary disabled:opacity-60"
+            >
+              {t('pickProducts')} ({mechProducts.length}/2)
+            </button>
+            {fieldErrors.mechProducts ? (
+              <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.mechProducts}</p>
+            ) : null}
+            {mechPickerOpen ? (
+              <AffiliateProductPicker
+                draftId="new"
+                multi
+                maxSelect={2}
+                initialSelectedIds={mechProducts.map((p) => p.id)}
+                onSelect={() => undefined}
+                onClose={() => setMechPickerOpen(false)}
+                onConfirmSelect={(items) => {
+                  setMechProducts(items);
+                  setMechPickerOpen(false);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.mechProducts;
+                    return next;
+                  });
+                }}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

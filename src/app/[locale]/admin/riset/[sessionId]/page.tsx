@@ -73,7 +73,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, target_location, secondary_location, platform_slug, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, mechanism, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, target_location, secondary_location, platform_slug, platform_slugs, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -88,6 +88,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   const s = session as {
     id: string;
     status: string;
+    mechanism: string | null;
     topic: string | null;
     language: string | null;
     target_category: string | null;
@@ -99,6 +100,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     target_location: string | null;
     secondary_location: string | null;
     platform_slug: string | null;
+    platform_slugs: string[] | null;
     audience_age: string | null;
     audience_interests: string[] | null;
     account_goal: string | null;
@@ -148,12 +150,26 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const list = (topics ?? []) as TopicRow[];
 
+  // Produk tetap mekanisme dua (product-first) untuk badge header.
+  let fixedProducts: { id: string; friendly_code: string; name_id: string }[] = [];
+  const isDua = (s.mechanism ?? 'satu') === 'dua';
+  if (isDua) {
+    const { data: sp } = await supabase
+      .from('content_research_session_products')
+      .select('product:affiliate_products(id, friendly_code, name_id)')
+      .eq('session_id', sessionId)
+      .order('position', { ascending: true });
+    fixedProducts = ((sp ?? []) as { product: unknown }[])
+      .map((r) => r.product as { id: string; friendly_code: string; name_id: string } | null)
+      .filter((p): p is { id: string; friendly_code: string; name_id: string } => Boolean(p?.id));
+  }
+
   // At awaiting_selection, preview affiliate match per topic so the admin
   // sees which topics will generate a draft without an affiliate (pool
   // mismatch) before shortlisting — and can add a relevant product or pick a
-  // more matchable topic.
+  // more matchable topic. Mekanisme dua dilewati: produk sudah tetap.
   let affiliatePreviews: Map<string, { matched: boolean; bestScore: number; band: 'high' | 'medium' | 'low' | 'none' }> | null = null;
-  if (s.status === 'awaiting_selection' && draftList.length === 0 && list.length > 0) {
+  if (!isDua && s.status === 'awaiting_selection' && draftList.length === 0 && list.length > 0) {
     try {
       affiliatePreviews = await previewAffiliateMatches(supabase, list.map((tp) => ({
         id: tp.id,
@@ -208,6 +224,16 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         <p className="mt-2 text-sm text-ink-muted">
           {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {t('languageLabel')}: {s.language ?? '—'} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}
         </p>
+        {isDua ? (
+          <p className="mt-2 text-sm text-ink">
+            <span className="mr-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Mekanisme 2 · produk dulu</span>
+            {fixedProducts.map((p) => (
+              <span key={p.id} className="mr-1 inline-flex items-center rounded-full border border-line bg-surface px-2 py-0.5 text-xs text-ink" title={p.name_id}>
+                ASH-{p.friendly_code.replace('ASH-', '')}
+              </span>
+            ))}
+          </p>
+        ) : null}
         {s.topic ? <p className="mt-2 text-sm text-ink">Topik: {s.topic}</p> : null}
         {s.error_message ? (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">

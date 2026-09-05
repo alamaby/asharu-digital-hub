@@ -103,6 +103,9 @@ const researchSchema = z.object({
   // Legacy single platform (generateIdea hint + old clients). The form now
   // sends repeated `platforms` fields; parsed separately via getAll().
   platform: z.string().min(1).optional(),
+  // Mekanisme riset: 'satu' topik-dulu | 'dua' produk-dulu. Produk tetap
+  // (`productIds`, 1-2) dibaca via getAll — fromEntries hanya simpan terakhir.
+  mechanism: z.enum(['satu', 'dua']).optional(),
   tone: z.enum(['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif']),
   targetCategory: z.enum(['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others']).optional(),
   audience: z.string().min(3).max(200),
@@ -275,6 +278,26 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     return { success: false, fieldErrors: { platforms: 'Pilih minimal 1 platform' }, error: 'validation' };
   }
 
+  // Mekanisme dua: wajib 1-2 produk tetap yang aktif.
+  const mechanism = data.mechanism ?? 'satu';
+  let fixedProductIds: string[] = [];
+  if (mechanism === 'dua') {
+    fixedProductIds = [...new Set(formData.getAll('productIds').map((v) => String(v)))].filter(Boolean);
+    if (fixedProductIds.length === 0 || fixedProductIds.length > 2) {
+      return { success: false, fieldErrors: { mechProducts: 'Pilih 1-2 produk afiliasi' }, error: 'validation' };
+    }
+    const { data: activeProducts } = await supabase
+      .from('affiliate_products')
+      .select('id')
+      .in('id', fixedProductIds)
+      .eq('is_active', true);
+    const validIds = new Set(((activeProducts ?? []) as { id: string }[]).map((p) => p.id));
+    const unknown = fixedProductIds.filter((id) => !validIds.has(id));
+    if (unknown.length > 0) {
+      return { success: false, fieldErrors: { mechProducts: 'Produk tidak valid atau nonaktif' }, error: 'validation' };
+    }
+  }
+
   // created_by is the signed-in user if any; null for anonymous submit.
   const {
     data: { user }
@@ -284,6 +307,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     .from('content_research_sessions')
     .insert({
       status: 'pending',
+      mechanism,
       topic: data.topic,
       language: data.language,
       target_category: data.targetCategory ?? null,
@@ -321,9 +345,19 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   if (error || !inserted) {
     return { success: false, error: error?.message ?? 'insert failed' };
   }
+  const sessionId = (inserted as { id: string }).id;
+
+  if (mechanism === 'dua') {
+    const { error: prodError } = await supabase.from('content_research_session_products').insert(
+      fixedProductIds.map((id, i) => ({ session_id: sessionId, product_id: id, position: i }))
+    );
+    if (prodError) {
+      return { success: false, error: prodError.message };
+    }
+  }
 
   await incrementRateLimit(ip);
-  return { success: true, sessionId: (inserted as { id: string }).id };
+  return { success: true, sessionId };
 }
 
 /* ------------------------------------------------------------------ */

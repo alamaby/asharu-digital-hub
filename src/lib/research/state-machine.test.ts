@@ -26,6 +26,7 @@ describe('research state-machine', () => {
   it('allows forward transitions', () => {
     expect(canTransition('pending', 'discovering')).toBe(true);
     expect(canTransition('discovering', 'verifying')).toBe(true);
+    expect(canTransition('discovering', 'awaiting_selection')).toBe(true); // mekanisme dua ramping
     expect(canTransition('verifying', 'scoring')).toBe(true);
     expect(canTransition('scoring', 'awaiting_selection')).toBe(true);
     expect(canTransition('awaiting_selection', 'developing')).toBe(true);

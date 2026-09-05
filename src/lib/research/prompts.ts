@@ -27,6 +27,9 @@ export interface DiscoveryInput {
   // Second-pass retry: kategori/freshness dilonggarkan, boleh derivasi niche
   // dari hint user bila search tidak mengandungnya (fix 4e03bde2: 1 topik).
   isRetryPass?: boolean;
+  // Mekanisme dua (product-first): produk tetap pilihan user. Setiap topik
+  // harus memungkinkan sisipan natural produk-produk ini.
+  fixedProducts?: Array<{ name: string; category?: string | null; merchant?: string | null }>;
 }
 
 export interface VerificationInput {
@@ -121,6 +124,8 @@ ${ctaLine ?? ''}
 ${constraintsLine ?? ''}
 Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || (input.targetCategory ? input.targetCategory : '(semua — derivasi dari targetCategory/keywords)')}
 Kategori yang harus dihindari: ${input.excludedCategories.join(', ') || '(tidak ada)'}
+${input.fixedProducts && input.fixedProducts.length > 0 ? `PRODUK TETAP (mekanisme product-first — konten akhir WAJIB menyisipkan produk ini secara natural):
+${input.fixedProducts.map((p, i) => `${i + 1}. ${p.name}${p.category ? ` (kategori: ${p.category})` : ''}${p.merchant ? ` — ${p.merchant}` : ''}`).join('\n')}` : ''}
 
 WAKTU PENELITIAN
 Tanggal dan waktu saat ini: ${input.currentDatetime}
@@ -146,6 +151,7 @@ Tahap 1: Discovery dari hasil search di bawah
 - Pilih topik terbaik dari hasil search yang RELEVAN dengan TARGET AUDIENS di atas. Prioritaskan Minat, Deskripsi audiens, Kategori diperbolehkan/target, dan Hint topik user.
 - Jika hasil search tidak relevan dengan audiens (mis. audiens minta elektronik/home-living tapi search mengembalikan finance murni), TOLAK topik tersebut — lebih baik kembalikan <${input.minimumCandidates} daripada memaksa filler tidak relevan. Sebutkan penolakan di mind set Anda.
 - Dedup: gabungkan yang membahas peristiwa sama.
+${input.fixedProducts && input.fixedProducts.length > 0 ? `- PRODUK TETAP: setiap topik WAJIB memungkinkan sisipan natural salah satu PRODUK TETAP di atas (use-case, tips, atau cerita yang nyambung). Tolak angle yang memaksa/memasukkan produk secara artifisial. Jangan mengarang fitur, harga, atau klaim produk di luar hasil search.` : ''}
 ${input.isRetryPass ? `- RETRY PASS: pass pertama menghasilkan <${input.requiredWinners ?? 3} topik. Longgarkan filter kategori tapi TETAP jaga relevansi audiens. Jika hint topik user niche (mis. coffee maker portable) tidak ada di hasil search, buat sudut turunan dari hint tersebut (tips/perbandingan/use-case) dengan why_now jujur berbasis relevansi evergreen — jangan fallback ke event generik jauh (mis. IFA 2026) yang tidak match hint.` : `- NICHE HINT: jika hint topik user spesifik/niche dan tidak muncul verbatim di hasil search, tetap turunkan 1-3 angle dari hint itu (tips, perbandingan, use-case audiens) dengan why_now jujur; jangan fallback ke event generik yang tidak match hint hanya demi kuota.`}
 
 Tahap 2: Struktur setiap topik

@@ -58,6 +58,13 @@ function buildQueries(input: DiscoveryInput): string[] {
   if (topicHint) {
     queries.push(`${topicHint} ${target}`);
   }
+  // Mekanisme dua: turunkan query dari produk tetap agar search relevan
+  // dengan konten yang harus menyisipkannya.
+  const fixedProducts = (input as unknown as { fixedProducts?: Array<{ name?: string | null; category?: string | null }> }).fixedProducts ?? [];
+  for (const p of fixedProducts.slice(0, 2)) {
+    if (p.name) queries.push(`${p.name} tips ${target}`);
+    if (p.category) queries.push(`${p.category} tren ${target} untuk ${audience}`);
+  }
   if (targetCategory) {
     queries.push(`${targetCategory} tren ${target} untuk ${audience}`);
   }

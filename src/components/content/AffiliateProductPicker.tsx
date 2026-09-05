@@ -31,9 +31,14 @@ interface Props {
   currentProductId?: string;
   onSelect: (productId: string, productName?: string) => void;
   onClose: () => void;
+  /** Mode multi: centang ≤ maxSelect lalu konfirmasi (dipakai form mekanisme dua). */
+  multi?: boolean;
+  maxSelect?: number;
+  initialSelectedIds?: string[];
+  onConfirmSelect?: (items: { id: string; name: string }[]) => void;
 }
 
-export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: Props) {
+export function AffiliateProductPicker({ currentProductId, onSelect, onClose, multi = false, maxSelect = 2, initialSelectedIds = [], onConfirmSelect }: Props) {
   const t = useTranslations('content.review.affiliate');
   const [latest, setLatest] = useState<Product[]>([]);
   const [results, setResults] = useState<Product[]>([]);
@@ -42,6 +47,9 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [multiSelected, setMultiSelected] = useState<Map<string, string>>(
+    () => new Map(initialSelectedIds.map((id) => [id, id]))
+  );
   const requestId = useRef(0);
 
   // Initial load: 20 newest (cached for when the query is cleared).
@@ -156,14 +164,50 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
             <ul className="space-y-1">
               {products.map((p) => {
                 const isCurrent = p.id === currentProductId;
-                return (
-                  <li key={p.id}>
+                if (!multi) {
+                  return (
+                    <li key={p.id}>
                       <button
                         type="button"
                         disabled={isCurrent}
                         onClick={() => onSelect(p.id, p.name_id)}
                         className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
                       >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {p.name_id}
+                          </span>
+                          <span className="block truncate text-xs text-ink-muted">
+                            ASH-{p.friendly_code.replace('ASH-', '')} · {p.category} · {p.merchant}
+                          </span>
+                        </span>
+                        {isCurrent ? (
+                          <span className="text-xs text-ink-muted">{t('pickerCurrent')}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                }
+                const checked = multiSelected.has(p.id);
+                const atMax = !checked && multiSelected.size >= maxSelect;
+                return (
+                  <li key={p.id}>
+                    <label className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:border-primary has-checked:border-primary">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={atMax}
+                        onChange={(e) => {
+                          setMultiSelected((prev) => {
+                            const next = new Map(prev);
+                            if (e.target.checked) {
+                              if (next.size < maxSelect) next.set(p.id, p.name_id);
+                            } else next.delete(p.id);
+                            return next;
+                          });
+                        }}
+                        className="size-4 shrink-0"
+                      />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-ink">
                           {p.name_id}
@@ -172,16 +216,32 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
                           ASH-{p.friendly_code.replace('ASH-', '')} · {p.category} · {p.merchant}
                         </span>
                       </span>
-                      {isCurrent ? (
-                        <span className="text-xs text-ink-muted">{t('pickerCurrent')}</span>
-                      ) : null}
-                    </button>
+                    </label>
                   </li>
                 );
               })}
             </ul>
           )}
         </div>
+        {multi ? (
+          <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
+            <span className="text-xs text-ink-muted">
+              {t('pickerMultiCount', { count: multiSelected.size, max: maxSelect })}
+            </span>
+            <button
+              type="button"
+              disabled={multiSelected.size === 0}
+              onClick={() =>
+                onConfirmSelect?.(
+                  [...multiSelected.entries()].map(([id, name]) => ({ id, name }))
+                )
+              }
+              className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {t('pickerConfirm')}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

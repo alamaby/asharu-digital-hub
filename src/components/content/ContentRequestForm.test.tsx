@@ -8,7 +8,7 @@ const mockCategories = [{ slug: 'fashion', display_name: 'Fashion' }];
 describe('ContentRequestForm', () => {
   it('renders all required fields and honeypot', () => {
     renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} categories={mockCategories} />);
-    expect(screen.getByLabelText(/Topik/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Topik / angle *')).toBeInTheDocument();
     expect(screen.getByText('Platform', { selector: 'legend' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Threads/ })).toBeChecked();
     expect(screen.getByLabelText(/Nada/)).toBeInTheDocument();
@@ -22,5 +22,11 @@ describe('ContentRequestForm', () => {
     renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }, { slug: 'twitter', display_name: 'Twitter' }]} categories={mockCategories} />);
     expect(screen.getByRole('checkbox', { name: /Threads/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Twitter/ })).toBeChecked();
+  });
+
+  it('renders mechanism radio defaulting to satu with product picker hidden', () => {
+    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} categories={mockCategories} />);
+    expect(screen.getByRole('radio', { name: /Mekanisme 1/ })).toBeChecked();
+    expect(screen.queryByText(/Belum ada produk dipilih/)).not.toBeInTheDocument();
   });
 });

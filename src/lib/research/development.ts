@@ -26,6 +26,11 @@ export interface TargetPlatform {
   maxChars: number | null;
 }
 
+/** Kunci idempotensi pasangan draf: topik × platform × produk (null = mekanisme satu). */
+export function pairKey(topicId: string | null, platformSlug: string | null, productId: string | null): string {
+  return `${topicId}|${platformSlug ?? 'all'}|${productId ?? '-'}`;
+}
+
 /**
  * Resolver tunggal daftar platform target sesi (sumber kebenaran ganda legacy):
  * platform_slugs (multi baru) > platform_slug (tunggal) > ekspansi semua aktif.
@@ -76,12 +81,13 @@ export async function runDevelopment(
 ): Promise<number> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select('id, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
+    .select('id, mechanism, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
   const sess = session as {
     id: string;
+    mechanism: string | null;
     platform_slug: string | null;
     platform_slugs: string[] | null;
     tone: string | null;
@@ -89,6 +95,7 @@ export async function runDevelopment(
     audience_age: string | null;
     target_reply_count: number | null;
   };
+  const isDua = sess.mechanism === 'dua';
 
   const { data: topics, error: topicError } = await supabase
     .from('content_research_topics')
@@ -109,23 +116,53 @@ export async function runDevelopment(
   const targets = await resolveTargetPlatforms(supabase, sess);
   if (targets.length === 0) throw new Error('no active target platforms');
 
-  // Idempotency per pasangan (topik × platform) agar cron re-pick dan
-  // inline retry tidak memproduksi duplikat.
+  // Idempotency per pasangan agar cron re-pick dan inline retry tidak
+  // memproduksi duplikat. Mekanisme satu: (topik × platform); dua: + produk.
   const topicIds = allTopics.map((t) => t.id);
   const { data: existingDrafts } = await supabase
     .from('content_drafts')
-    .select('research_topic_id, platform_slug')
+    .select('research_topic_id, platform_slug, product_id')
     .in('research_topic_id', topicIds);
+  type ExistingRow = { research_topic_id: string | null; platform_slug: string | null; product_id: string | null };
   const donePairs = new Set(
-    ((existingDrafts ?? []) as { research_topic_id: string | null; platform_slug: string | null }[])
-      .map((d) => `${d.research_topic_id}|${d.platform_slug ?? 'all'}`)
+    ((existingDrafts ?? []) as ExistingRow[])
+      .map((d) => pairKey(d.research_topic_id, d.platform_slug, isDua ? d.product_id : null))
       .filter((v) => !v.startsWith('null|'))
   );
-  const pendingPairs: { topic: ShortlistedTopic; platform: TargetPlatform }[] = [];
+
+  // Mekanisme dua: produk tetap pilihan user (tanpa seleksi acak).
+  let fixedProducts: Array<{ id: string; friendly_code: string; external_id: string; name_id: string; name_en: string; category: string; merchant: string; url: string; image: string }> = [];
+  if (isDua) {
+    const { fetchFixedProducts } = await import('./orchestrator');
+    fixedProducts = await fetchFixedProducts(supabase, sessionId);
+    // Hanya yang masih aktif.
+    const { data: activeRows } = await supabase
+      .from('affiliate_products')
+      .select('id')
+      .in('id', fixedProducts.map((p) => p.id))
+      .eq('is_active', true);
+    const activeIds = new Set(((activeRows ?? []) as { id: string }[]).map((r) => r.id));
+    fixedProducts = fixedProducts.filter((p) => activeIds.has(p.id));
+    if (fixedProducts.length === 0) {
+      await supabase
+        .from('content_research_sessions')
+        .update({ status: 'failed', error_message: 'developing: produk tetap tidak aktif/hilang' })
+        .eq('id', sessionId);
+      return 0;
+    }
+  }
+
+  const pendingPairs: { topic: ShortlistedTopic; platform: TargetPlatform; productId: string | null }[] = [];
   for (const topic of allTopics) {
     for (const platform of targets) {
-      if (!donePairs.has(`${topic.id}|${platform.slug}`)) {
-        pendingPairs.push({ topic, platform });
+      if (isDua) {
+        for (const fp of fixedProducts) {
+          if (!donePairs.has(pairKey(topic.id, platform.slug, fp.id))) {
+            pendingPairs.push({ topic, platform, productId: fp.id });
+          }
+        }
+      } else if (!donePairs.has(pairKey(topic.id, platform.slug, null))) {
+        pendingPairs.push({ topic, platform, productId: null });
       }
     }
   }
@@ -143,48 +180,71 @@ export async function runDevelopment(
   // Chunking: kerjakan maksimal N pasangan per tick agar tidak timeout.
   const batch = pendingPairs.slice(0, DEVELOP_PAIRS_PER_TICK);
   const affiliateCache = new Map<string, SelectedAffiliate | null>();
+  const fixedById = new Map(fixedProducts.map((p) => [p.id, p]));
 
-  for (const { topic, platform } of batch) {
-    // Affiliate dipilih 1× per topik lalu dipakai ulang lintas platform.
-    if (!affiliateCache.has(topic.id)) {
-      affiliateCache.set(
-        topic.id,
-        await selectAffiliateWithRandomFallback(supabase, {
-          topic: topic.topic,
-          category: topic.category,
-          unique_angle: topic.unique_angle,
-          key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
-          hooks: Array.isArray(topic.hooks)
-            ? (topic.hooks as Array<{ type: string; text: string }>)
-            : undefined
-        })
-      );
+  for (const { topic, platform, productId } of batch) {
+    // Mekanisme satu: affiliate dipilih 1× per topik lalu dipakai ulang
+    // lintas platform. Mekanisme dua: produk tetap pilihan user.
+    let affiliate: SelectedAffiliate | null;
+    if (isDua) {
+      const fp = productId ? fixedById.get(productId) : undefined;
+      if (!fp) {
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'warn',
+          message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) × ${platform.slug} skipped: produk tetap hilang — lanjut ke pasangan berikut`
+        });
+        continue;
+      }
+      affiliate = {
+        product: fp,
+        matchScore: 0,
+        signals: { category_match: false, keyword_overlap: 0, scored_from_pool_size: 0, fixed_pick: true }
+      };
+    } else {
+      if (!affiliateCache.has(topic.id)) {
+        affiliateCache.set(
+          topic.id,
+          await selectAffiliateWithRandomFallback(supabase, {
+            topic: topic.topic,
+            category: topic.category,
+            unique_angle: topic.unique_angle,
+            key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
+            hooks: Array.isArray(topic.hooks)
+              ? (topic.hooks as Array<{ type: string; text: string }>)
+              : undefined
+          })
+        );
+      }
+      affiliate = affiliateCache.get(topic.id) ?? null;
     }
-    const affiliate = affiliateCache.get(topic.id) ?? null;
 
     // Per-pasangan guard: 1 pasangan gagal tidak boleh menggagalkan sisanya.
     try {
-      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId);
+      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId, isDua ? productId : null);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'developing',
         level: 'warn',
-        message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) × ${platform.slug} skipped: ${message} — lanjut ke pasangan berikut`
+        message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) × ${platform.slug}${productId ? ` × ${productId.slice(0, 8)}` : ''} skipped: ${message} — lanjut ke pasangan berikut`
       });
     }
   }
 
   // Jika SEMUA pasangan batch gagal, tandai failed agar admin tahu.
-  const batchKeys = batch.map(({ topic, platform }) => `${topic.id}|${platform.slug}`);
+  const batchKeys = batch.map(({ topic, platform, productId }) =>
+    pairKey(topic.id, platform.slug, isDua ? productId : null)
+  );
   const { data: afterDrafts } = await supabase
     .from('content_drafts')
-    .select('research_topic_id, platform_slug')
+    .select('research_topic_id, platform_slug, product_id')
     .in('research_topic_id', topicIds);
   const afterDone = new Set(
-    ((afterDrafts ?? []) as { research_topic_id: string | null; platform_slug: string | null }[])
-      .map((d) => `${d.research_topic_id}|${d.platform_slug ?? 'all'}`)
+    ((afterDrafts ?? []) as { research_topic_id: string | null; platform_slug: string | null; product_id: string | null }[])
+      .map((d) => pairKey(d.research_topic_id, d.platform_slug, isDua ? d.product_id : null))
   );
   const newDraftCount = batchKeys.filter((k) => afterDone.has(k)).length;
   if (newDraftCount <= 0) {
@@ -214,7 +274,8 @@ async function generateAndInsertDraft(
   sess: { tone: string | null; account_goal: string | null; audience_age: string | null; target_reply_count: number | null },
   topic: ShortlistedTopic,
   affiliate: SelectedAffiliate | null,
-  pinnedModelId?: string | null
+  pinnedModelId?: string | null,
+  fixedProductId?: string | null
 ): Promise<void> {
   const tone = sess.tone ?? 'casual';
   const audience = sess.audience_age ?? 'umum';
@@ -462,7 +523,7 @@ async function generateAndInsertDraft(
           friendly_code: affiliate.product.friendly_code,
           url: affiliate.product.url,
           post_index: resolvedPostIndex,
-          match_score: affiliate.matchScore,
+          match_score: fixedProductId ? null : affiliate.matchScore,
           match_signals: affiliate.signals,
           product_name_id: affiliate.product.name_id,
           product_name_en: affiliate.product.name_en,
@@ -479,6 +540,7 @@ async function generateAndInsertDraft(
     model_id: resolvedLlm.model,
     research_topic_id: topicId,
     platform_slug: platform.slug,
+    product_id: fixedProductId ?? null,
     generated_thread: finalThread as unknown as Record<string, unknown>,
     affiliate_injections: injection as unknown as Record<string, unknown>[],
     status: 'needs_review',
@@ -494,7 +556,7 @@ async function generateAndInsertDraft(
       emoji_missing: emojiMissing,
       emoji_gaps: emojiGaps
     },
-    affiliate_match_score: affiliate?.matchScore ?? null,
+    affiliate_match_score: fixedProductId ? null : (affiliate?.matchScore ?? null),
     affiliate_match_signals: affiliate
       ? (affiliate.signals as unknown as Record<string, unknown>)
       : null
@@ -514,7 +576,7 @@ async function generateAndInsertDraft(
     stage: 'developing',
     level: 'info',
     message: affiliate
-      ? `draft generated [${platform.slug}] with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}${emojiMissing ? ' EMOJI-MISSING' : ''}`
+      ? `draft generated [${platform.slug}]${fixedProductId ? ' [fixed]' : ''} with affiliate ${affiliate.product.friendly_code} (match ${fixedProductId ? 'fixed' : affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}${emojiMissing ? ' EMOJI-MISSING' : ''}`
       : `draft generated [${platform.slug}] without affiliate (empty pool)`
   });
 }

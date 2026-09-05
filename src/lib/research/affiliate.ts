@@ -19,6 +19,8 @@ export interface AffiliateMatchSignals {
   no_recent_products?: boolean;
   fallback_random?: boolean;
   original_best_score?: number;
+  /** Mekanisme dua: produk pilihan user, bukan hasil scoring. */
+  fixed_pick?: boolean;
 }
 
 export interface SelectedAffiliate {

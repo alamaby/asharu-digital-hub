@@ -9,6 +9,7 @@ import { runDevelopment } from './development';
 interface ResearchSessionRow {
   id: string;
   status: ResearchStatus;
+  mechanism: string | null;
   target_location: string | null;
   secondary_location: string | null;
   audience_age: string | null;
@@ -41,7 +42,10 @@ interface ResearchSessionRow {
   keywords: string | null;
 }
 
-function buildDiscoveryInput(row: ResearchSessionRow) {
+function buildDiscoveryInput(
+  row: ResearchSessionRow,
+  fixedProducts?: Array<{ name: string; category?: string | null; merchant?: string | null }>
+) {
   // Derive allowed categories dynamically from target_category + keywords when empty
   let allowed = row.allowed_categories ?? [];
   if (allowed.length === 0 && row.target_category) {
@@ -69,8 +73,36 @@ function buildDiscoveryInput(row: ResearchSessionRow) {
     purpose: row.purpose ?? null,
     ctaStyle: row.cta_style ?? null,
     constraints: row.constraints ?? null,
-    requiredWinners: row.required_winners ?? 3
+    requiredWinners: row.required_winners ?? 3,
+    fixedProducts
   };
+}
+
+/** Produk tetap mekanisme dua (product-first) untuk discovery/developing. */
+export async function fetchFixedProducts(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<Array<{ id: string; friendly_code: string; external_id: string; name_id: string; name_en: string; category: string; merchant: string; url: string; image: string }>> {
+  const { data } = await supabase
+    .from('content_research_session_products')
+    .select('position, product:affiliate_products(id, friendly_code, external_id, name_id, name_en, category, merchant, url, image)')
+    .eq('session_id', sessionId)
+    .order('position', { ascending: true });
+  const rows = (data ?? []) as Array<{ product: unknown }>;
+  return rows
+    .map((r) => r.product as unknown as Record<string, unknown> | null)
+    .filter((p): p is Record<string, unknown> => Boolean(p?.id))
+    .map((p) => ({
+      id: p.id as string,
+      friendly_code: p.friendly_code as string,
+      external_id: p.external_id as string,
+      name_id: p.name_id as string,
+      name_en: p.name_en as string,
+      category: p.category as string,
+      merchant: p.merchant as string,
+      url: p.url as string,
+      image: p.image as string
+    }));
 }
 
 /**
@@ -113,7 +145,7 @@ export async function advanceStage(
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   const { data: row, error } = await supabase
     .from('content_research_sessions')
-    .select('id, status, target_location, secondary_location, audience_age, audience_interests, platform_slug, tone, account_goal, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, idea_generation_model_id, discovering_model_id, verifying_model_id, scoring_model_id, developing_model_id, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, mechanism, target_location, secondary_location, audience_age, audience_interests, platform_slug, platform_slugs, tone, account_goal, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, idea_generation_model_id, discovering_model_id, verifying_model_id, scoring_model_id, developing_model_id, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .single();
   if (error || !row) {
@@ -133,11 +165,27 @@ export async function advanceStage(
         return await runStage(supabase, sessionId, 'discovering', session);
       }
       case 'discovering': {
-        const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session), session.discovering_model_id ?? null);
+        // Mekanisme dua: discovery produk-aware, lalu langsung ke
+        // awaiting_selection (verifying + scoring dilewati).
+        const isDua = session.mechanism === 'dua';
+        const fixed = isDua ? await fetchFixedProducts(supabase, sessionId) : [];
+        const result = await runDiscovery(
+          supabase,
+          sessionId,
+          buildDiscoveryInput(
+            session,
+            fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant }))
+          ),
+          session.discovering_model_id ?? null
+        );
         if (result.topics.length === 0) {
           throw new Error(
             'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Coba lagi setelah cek prompt/model.'
           );
+        }
+        if (isDua) {
+          await atomicTransition(supabase, sessionId, 'discovering', 'awaiting_selection');
+          return { status: 'awaiting_selection', advanced: true };
         }
         await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
         return { status: 'verifying', advanced: true };
@@ -215,11 +263,25 @@ async function runStage(
   session: ResearchSessionRow
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   if (stage === 'discovering') {
-    const result = await runDiscovery(supabase, sessionId, buildDiscoveryInput(session), session.discovering_model_id ?? null);
+    const isDua = session.mechanism === 'dua';
+    const fixed = isDua ? await fetchFixedProducts(supabase, sessionId) : [];
+    const result = await runDiscovery(
+      supabase,
+      sessionId,
+      buildDiscoveryInput(
+        session,
+        fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant }))
+      ),
+      session.discovering_model_id ?? null
+    );
     if (result.topics.length === 0) {
       throw new Error(
         'Discovery menghasilkan 0 topik. LLM mungkin return JSON kosong atau tidak mengikuti schema. Cek prompt/model/tavily.'
       );
+    }
+    if (isDua) {
+      await atomicTransition(supabase, sessionId, 'discovering', 'awaiting_selection');
+      return { status: 'awaiting_selection', advanced: true };
     }
     await atomicTransition(supabase, sessionId, 'discovering', 'verifying');
     return { status: 'verifying', advanced: true };
