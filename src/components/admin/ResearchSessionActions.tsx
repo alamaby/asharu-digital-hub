@@ -52,7 +52,11 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<'shortlist' | 'reject' | 'advance' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<
+    | { kind: 'working' | 'success'; action: 'shortlist' | 'reject' | 'advance'; count?: number }
+    | null
+  >(null);
+  const [error, setError] = useState<{ message: string; technical?: string } | null>(null);
   const [, startTransition] = useTransition();
 
   const shortlistedCount = topics.filter((tp) => tp.status === 'shortlisted').length;
@@ -66,33 +70,65 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
     });
   }
 
+  function friendlyError(raw: string): { message: string; technical?: string } {
+    if (/no shortlisted topics/i.test(raw)) {
+      return { message: t('statusErrorNoShortlist'), technical: raw };
+    }
+    if (/not in awaiting_selection|not failed|retryable/i.test(raw)) {
+      return { message: t('statusErrorStaleState'), technical: raw };
+    }
+    return { message: t('statusErrorDefault'), technical: raw };
+  }
+
   async function onShortlist() {
     if (selected.size === 0) return;
+    const n = selected.size;
     setBusy('shortlist');
     setError(null);
+    setNotice({ kind: 'working', action: 'shortlist', count: n });
     const result = await shortlistTopics(sessionId, Array.from(selected));
     setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setSelected(new Set());
+      setNotice({ kind: 'success', action: 'shortlist', count: n });
+      startTransition(() => router.refresh());
+    }
   }
 
   async function onReject() {
     if (selected.size === 0) return;
+    const n = selected.size;
     setBusy('reject');
     setError(null);
+    setNotice({ kind: 'working', action: 'reject', count: n });
     const result = await rejectTopics(sessionId, Array.from(selected));
     setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setSelected(new Set());
+      setNotice({ kind: 'success', action: 'reject', count: n });
+      startTransition(() => router.refresh());
+    }
   }
 
   async function onAdvance() {
     setBusy('advance');
     setError(null);
+    setNotice({ kind: 'working', action: 'advance' });
     const result = await advanceToDevelopment(sessionId);
     setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setNotice({ kind: 'success', action: 'advance' });
+      startTransition(() => router.refresh());
+    }
   }
 
   return (
@@ -134,10 +170,46 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
         );
       })()}
 
-      {error ? (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
+      {notice ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+            notice.kind === 'working' ? 'bg-blue-50 text-blue-900' : 'bg-emerald-50 text-emerald-900'
+          }`}
+        >
+          {notice.kind === 'working' ? (
+            <svg viewBox="0 0 20 20" fill="none" className="size-4 shrink-0 animate-spin" aria-hidden>
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">✓</span>
+          )}
+          {notice.kind === 'working'
+            ? notice.action === 'advance'
+              ? t('statusWorkingAdvance')
+              : notice.action === 'shortlist'
+                ? t('statusWorkingShortlist', { count: notice.count ?? 0 })
+                : t('statusWorkingReject', { count: notice.count ?? 0 })
+            : notice.action === 'advance'
+              ? t('statusSuccessAdvance')
+              : notice.action === 'shortlist'
+                ? t('statusSuccessShortlist', { count: notice.count ?? 0 })
+                : t('statusSuccessReject', { count: notice.count ?? 0 })}
         </p>
+      ) : null}
+
+      {error ? (
+        <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p>{error.message}</p>
+          {error.technical ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-xs text-red-700 underline">{t('statusTechDetails')}</summary>
+              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-red-100/60 p-2 text-xs">{error.technical.slice(0, 1000)}</pre>
+            </details>
+          ) : null}
+        </div>
       ) : null}
 
       <ul className="space-y-2">
@@ -180,6 +252,12 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
           aria-busy={busy === 'shortlist'}
           className="btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
         >
+          {busy === 'shortlist' ? (
+            <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : null}
           {t('shortlistAction')}
         </button>
         <button
@@ -187,8 +265,14 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
           onClick={onReject}
           disabled={selected.size === 0 || busy !== null}
           aria-busy={busy === 'reject'}
-          className="rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
         >
+          {busy === 'reject' ? (
+            <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : null}
           {t('rejectAction')}
         </button>
         <button
@@ -196,8 +280,14 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
           onClick={onAdvance}
           disabled={shortlistedCount === 0 || busy !== null}
           aria-busy={busy === 'advance'}
-          className="ml-auto rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ml-auto flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          {busy === 'advance' ? (
+            <svg viewBox="0 0 20 20" fill="none" className="size-4 animate-spin" aria-hidden>
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : null}
           {t('advanceAction')}
         </button>
       </div>
