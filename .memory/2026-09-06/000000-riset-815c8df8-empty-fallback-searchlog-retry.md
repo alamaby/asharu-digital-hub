@@ -1,0 +1,10 @@
+# 815c8df8 empty-response fix + self-retry + search log generik
+
+- Task: riset 815c8df8 gagal `Discovery LLM did not return valid JSON` (Tavily OK 62 raw/42 deduped, naraya qwen3.8-27b HTTP 200 tapi `response_text=''` + tokens null, 2x). Minta: preventif, ulang oleh user, log Tavily lengkap di menu LLM, perf per provider/model untuk dashboard.
+- Key files: `src/lib/llm/providers/openai-compatible.ts` (extract content array/tool_calls/reasoning + usage alias + finish/rawPreview), `src/lib/llm/completion.ts` (empty guard waterfall+pinned+hint, total/finish/is_fallback, markModelFailure), `src/lib/research/discovery.ts` (search_call_logs audit search/extract, chunked-empty guard, maxTokens 4000, raw_len+fallback log, extractLargestJson), `src/lib/content/actions.ts` (retryOwnSession owner/admin + 5/jam), `src/components/content/RetryOwnSessionButton.tsx` + `src/app/[locale]/konten/riset/[sessionId]/page.tsx` (status user), `src/app/[locale]/admin/llm/logs/page.tsx` (tab LLM/Search), `src/app/[locale]/admin/riset/[sessionId]/page.tsx` (blok perf), `src/i18n/routing.ts` (route baru), `supabase/migrations/20260906000001_search_logs_llm_perf.sql` + `20260906000002_research_owner_retry.sql`.
+- Decisions: retry = pemilik+admin (anon hanya admin); log search = tabel baru generik `search_call_logs(provider_slug)` bukan `tavily_*`; fallback = auto + banner UI + warn log + failure_count (bukan silent). RLS owner read untuk sessions/topics/logs.
+- Risks: shape Naraya berubah → rawPreview forensik; log membesar → summary top-3; spam retry → 5/jam.
+- Blockers: sesi 815c8df8 `created_by=null` (anon) → user biasa tak bisa retry, hanya admin. Verifikasi E2E Ulangi belum diklik.
+- Verification: `npm run typecheck` ✓, `npm run lint` ✓, `npm test` 263/263 ✓, migrasi applied production via MCP (search_call_logs + kolom llm + RLS owner).
+- Commit proposal: `fix(research): empty-LLM fallback + self-retry + generic search logs + perf columns`
+- Related: `plans/2026-09-06-riset-815c8df8-fix-retry-tavily-log-perf.md`, sesi `815c8df8-b483-42a8-963b-3e77cb801dc2`.

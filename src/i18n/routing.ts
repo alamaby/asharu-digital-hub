@@ -50,6 +50,10 @@ export const routing = defineRouting({
       id: '/konten/review/[draftId]',
       en: '/content/review/[draftId]'
     },
+    '/konten/riset/[sessionId]': {
+      id: '/konten/riset/[sessionId]',
+      en: '/content/research/[sessionId]'
+    },
     '/admin': {
       id: '/admin',
       en: '/admin'

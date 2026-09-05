@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-05 14:45 (local time)
+Last updated: 2026-09-06 00:00 (local time)
 
 ## Current State
 
@@ -50,6 +50,7 @@ Last updated: 2026-09-05 14:45 (local time)
 
 ## Recent Entries
 
+- [2026-09-06 000000-riset-815c8df8-empty-fallback-searchlog-retry.md](2026-09-06/000000-riset-815c8df8-empty-fallback-searchlog-retry.md) — Fix 815c8df8: empty-LLM guard + auto-fallback + self-retry owner + search_call_logs generik + kolom perf; migrasi applied; gate hijau.
 - [2026-09-05 144500-llm-model-cloudflare.md](2026-09-05/144500-llm-model-cloudflare.md) — Resync `llm_models` cloudflare: 10 unik aktif (reasoning false), `llama-3.1-8b` nonaktif; migrasi applied production; gate hijau.
 - [2026-09-05 125500-llm-model-resync.md](2026-09-05/125500-llm-model-resync.md) — Resync `llm_models`: 7 Bynara + 9 OpenRouter aktif, sisanya `is_active=false`; migrasi applied production; 263 tests + gate hijau.
 - [2026-09-05 072149-riset-4e03bde2-thread-shape-fix.md](2026-09-05/072149-riset-4e03bde2-thread-shape-fix.md) — Fix riset 4e03bde2/f7c91699: thread_shape ≤5→≤10 (migrasi applied production) + discovery second-pass + guard developing. 263 tests, 2 sesi backfill developing.

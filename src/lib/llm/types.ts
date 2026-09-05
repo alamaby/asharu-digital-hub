@@ -47,6 +47,10 @@ export interface ChatOutput {
   model: string;
   keyId: string;
   latencyMs: number;
+  /** Provider finish reason (stop/length/tool_calls/...) — null when unknown. */
+  finishReason?: string | null;
+  /** Truncated raw payload preview (≤2000 chars) for forensics when text is empty. */
+  rawPreview?: string | null;
 }
 
 export interface LLMProvider {

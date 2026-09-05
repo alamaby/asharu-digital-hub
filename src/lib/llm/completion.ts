@@ -7,7 +7,7 @@ import { LLMHttpError } from './types';
 import { OpenAICompatibleProvider } from './providers/openai-compatible';
 import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
-import { fetchOrderedModels, markModelUsage } from '@/lib/supabase/vault';
+import { fetchOrderedModels, markModelFailure, markModelUsage } from '@/lib/supabase/vault';
 
 function providerFromRow(row: ProviderRow): LLMProvider {
   if (row.slug === 'gemini') return new GeminiProvider(row.base_url);
@@ -124,6 +124,39 @@ export async function runLLMCompletion(
           provider: prov.slug,
           keyId: keyRow.id
         };
+        // Empty-response guard (fix 815c8df8): HTTP 200 tapi text kosong —
+        // jangan catat sebagai sukses; perlakukan sebagai failure agar
+        // waterfall lanjut ke model berikutnya.
+        if (!result.text || result.text.trim().length === 0) {
+          const emptyMsg = `LLM returned empty response (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason ?? 'unknown'}, latency ${result.latencyMs}ms)`;
+          await supabase
+            .from('llm_call_logs')
+            .insert({
+              request_id: input.requestId ?? null,
+              session_id: input.sessionId ?? null,
+              provider_slug: prov.slug,
+              provider_id: prov.id,
+              model_id: result.model,
+              key_hash: keyRow.key_hash,
+              key_id: keyRow.id,
+              stage: input.stage ?? null,
+              request_messages: input.messages as unknown as Record<string, unknown>,
+              response_text: (result.rawPreview ?? '').slice(0, 8000),
+              prompt_tokens: result.usage?.promptTokens ?? null,
+              completion_tokens: result.usage?.completionTokens ?? null,
+              total_tokens: result.usage?.totalTokens ?? null,
+              finish_reason: result.finishReason ?? null,
+              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
+              latency_ms: result.latencyMs,
+              http_status: 200,
+              error: emptyMsg.slice(0, 2000)
+            } as unknown as Record<string, unknown>);
+          if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
+            await markModelFailure(mod.id).catch(() => undefined);
+          }
+          lastError = new Error(emptyMsg);
+          continue;
+        }
         // RR bookkeeping for model (best-effort)
         if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
           await markModelUsage(mod.id).catch(() => undefined);
@@ -144,6 +177,9 @@ export async function runLLMCompletion(
               response_text: result.text.slice(0, 8000),
               prompt_tokens: result.usage?.promptTokens ?? null,
               completion_tokens: result.usage?.completionTokens ?? null,
+              total_tokens: result.usage?.totalTokens ?? null,
+              finish_reason: result.finishReason ?? null,
+              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
               latency_ms: result.latencyMs,
               http_status: 200
             } as unknown as Record<string, unknown>);
@@ -156,7 +192,8 @@ export async function runLLMCompletion(
           providerSlug: prov.slug,
           model: result.model,
           keyHash: keyRow.key_hash,
-          latencyMs: result.latencyMs
+          latencyMs: result.latencyMs,
+          fallback: Boolean(input.modelUuid ?? input.modelHint)
         };
       } catch (e) {
         lastError = e;
@@ -206,7 +243,7 @@ async function pickDefaultModel(supabase: SupabaseClient, providerId: string): P
 async function tryPinnedModel(
   supabase: SupabaseClient,
   input: LLMCompletionInput
-): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number } | null> {
+): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number; fallback?: boolean } | null> {
   const registry = new ProviderRegistry();
   // Resolve model row for model_id + config + correct provider — only active models (P0-02)
   const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config, is_active').eq('id', input.modelUuid!).eq('is_active', true).maybeSingle();
@@ -235,6 +272,31 @@ async function tryPinnedModel(
       const provider = providerFromRow(prov);
       return provider.chat({ model: model.model_id, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort }, apiKey);
     });
+    if (!result.text || result.text.trim().length === 0) {
+      const emptyMsg = `Model pilihan return kosong (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason ?? 'unknown'}) — fallback ke urutan global`;
+      await supabase.from('llm_call_logs').insert({
+        request_id: input.requestId ?? null,
+        session_id: input.sessionId ?? null,
+        provider_slug: prov.slug,
+        provider_id: prov.id,
+        model_id: result.model,
+        key_hash: keyRow.key_hash,
+        key_id: keyRow.id,
+        stage: input.stage ?? null,
+        request_messages: input.messages as unknown as Record<string, unknown>,
+        response_text: (result.rawPreview ?? '').slice(0, 8000),
+        prompt_tokens: result.usage?.promptTokens ?? null,
+        completion_tokens: result.usage?.completionTokens ?? null,
+        total_tokens: result.usage?.totalTokens ?? null,
+        finish_reason: result.finishReason ?? null,
+        is_fallback: false,
+        latency_ms: result.latencyMs,
+        http_status: 200,
+        error: emptyMsg.slice(0, 2000)
+      } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+      await markModelFailure(model.id).catch(() => undefined);
+      return null;
+    }
     await markModelUsage(model.id).catch(() => undefined);
     await supabase.from('llm_call_logs').insert({
       request_id: input.requestId ?? null,
@@ -249,10 +311,13 @@ async function tryPinnedModel(
       response_text: result.text.slice(0, 8000),
       prompt_tokens: result.usage?.promptTokens ?? null,
       completion_tokens: result.usage?.completionTokens ?? null,
+      total_tokens: result.usage?.totalTokens ?? null,
+      finish_reason: result.finishReason ?? null,
+      is_fallback: false,
       latency_ms: result.latencyMs,
       http_status: 200
     } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
-    return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs };
+    return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs, fallback: false };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await supabase.from('llm_call_logs').insert({
@@ -270,10 +335,9 @@ async function tryPinnedModel(
   }
 }
 
-async function tryPinnedModelHint(
-  supabase: SupabaseClient,
+async function tryPinnedModelHint(  supabase: SupabaseClient,
   input: LLMCompletionInput
-): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number } | null> {
+): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number; fallback?: boolean } | null> {
   // Single-provider resolve from model_id string — avoid looping all providers (P1-04)
   const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config, is_active').eq('model_id', input.modelHint!).eq('is_active', true).maybeSingle();
   const model = modelRow as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null; is_active: boolean } | null;
@@ -296,6 +360,31 @@ async function tryPinnedModelHint(
         const provider = providerFromRow(prov);
         return provider.chat({ model: resolvedModelId, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort }, apiKey);
       });
+      if (!result.text || result.text.trim().length === 0) {
+        const emptyMsg = `Model hint return kosong (provider ${prov.slug}, model ${result.model}) — lanjut fallback`;
+        await supabase.from('llm_call_logs').insert({
+          request_id: input.requestId ?? null,
+          session_id: input.sessionId ?? null,
+          provider_slug: prov.slug,
+          provider_id: prov.id,
+          model_id: result.model,
+          key_hash: keyRow.key_hash,
+          key_id: keyRow.id,
+          stage: input.stage ?? null,
+          request_messages: input.messages as unknown as Record<string, unknown>,
+          response_text: (result.rawPreview ?? '').slice(0, 8000),
+          prompt_tokens: result.usage?.promptTokens ?? null,
+          completion_tokens: result.usage?.completionTokens ?? null,
+          total_tokens: result.usage?.totalTokens ?? null,
+          finish_reason: result.finishReason ?? null,
+          is_fallback: false,
+          latency_ms: result.latencyMs,
+          http_status: 200,
+          error: emptyMsg.slice(0, 2000)
+        } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+        if (model) await markModelFailure(model.id).catch(() => undefined);
+        continue;
+      }
       if (model) await markModelUsage(model.id).catch(() => undefined);
       await supabase.from('llm_call_logs').insert({
         request_id: input.requestId ?? null,
@@ -310,10 +399,13 @@ async function tryPinnedModelHint(
         response_text: result.text.slice(0, 8000),
         prompt_tokens: result.usage?.promptTokens ?? null,
         completion_tokens: result.usage?.completionTokens ?? null,
+        total_tokens: result.usage?.totalTokens ?? null,
+        finish_reason: result.finishReason ?? null,
+        is_fallback: false,
         latency_ms: result.latencyMs,
         http_status: 200
       } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
-      return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs };
+      return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs, fallback: false };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await supabase.from('llm_call_logs').insert({

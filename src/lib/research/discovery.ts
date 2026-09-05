@@ -154,6 +154,7 @@ export async function runDiscovery(
   const queries = buildQueries(input);
   const timeRange =
     input.freshnessHours <= 24 ? 'day' : input.freshnessHours <= 168 ? 'week' : 'month';
+  const searchStarted = Date.now();
   const settled = await Promise.allSettled(
     queries.map((q) =>
       provider.search(q, {
@@ -168,18 +169,63 @@ export async function runDiscovery(
     .filter((r): r is PromiseFulfilledResult<SearchResult[]> => r.status === 'fulfilled')
     .flatMap((r) => r.value);
   const deduped = dedupResults(rawResults);
+  const searchLatency = Date.now() - searchStarted;
+  const failedQueries = settled.filter((r) => r.status === 'rejected').length;
+  // Audit search generik (best-effort; gagal log ≠ gagal riset).
+  try {
+    await supabase.from('search_call_logs').insert({
+      session_id: sessionId,
+      provider_slug: provider.name,
+      operation: 'search',
+      queries,
+      query_count: queries.length,
+      latency_ms: searchLatency,
+      result_count: rawResults.length,
+      http_status: failedQueries === queries.length ? 500 : 200,
+      error:
+        failedQueries === queries.length
+          ? String((settled[0] as PromiseRejectedResult)?.reason ?? 'all search queries failed').slice(0, 2000)
+          : failedQueries > 0
+            ? `${failedQueries}/${queries.length} queries failed`.slice(0, 2000)
+            : null,
+      request_payload: { timeRange, topic: input.freshnessHours <= 48 ? 'news' : 'general', maxResults: 8 },
+      response_summary: {
+        deduped: deduped.length,
+        top: deduped.slice(0, 3).map((r) => ({ title: r.title.slice(0, 120), url: r.url }))
+      }
+    } as unknown as Record<string, unknown>);
+  } catch {
+    /* audit-only */
+  }
 
   // Jika user paste link di topik/keywords, telusuri isinya dan prioritaskan
   // sebagai sumber utama LLM (best-effort; gagal → lanjut search biasa).
   let pastedResults: SearchResult[] = [];
   const pastedUrls = extractUrls(`${input.topicHint ?? ''} ${input.keywords ?? ''}`);
   if (pastedUrls.length > 0) {
+    const extractStarted = Date.now();
     try {
       pastedResults = (
         await provider.extract(pastedUrls.slice(0, 2), { query: input.topicHint ?? input.keywords ?? undefined })
       )
         .filter((p) => p.content.trim().length > 100)
         .map((p) => ({ ...p, title: `[LINK USER] ${p.title}` }));
+      try {
+        await supabase.from('search_call_logs').insert({
+          session_id: sessionId,
+          provider_slug: provider.name,
+          operation: 'extract',
+          queries: pastedUrls.slice(0, 2),
+          query_count: Math.min(pastedUrls.length, 2),
+          latency_ms: Date.now() - extractStarted,
+          result_count: pastedResults.length,
+          http_status: 200,
+          request_payload: { query: input.topicHint ?? input.keywords ?? null },
+          response_summary: { extracted: pastedResults.length }
+        } as unknown as Record<string, unknown>);
+      } catch {
+        /* audit-only */
+      }
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'discovering',
@@ -203,6 +249,11 @@ export async function runDiscovery(
     level: 'info',
     message: `search complete: ${rawResults.length} raw, ${deduped.length} deduped, ${pastedResults.length} pasted, sent ${chunked.length} to LLM`
   });
+  if (chunked.length === 0) {
+    throw new Error(
+      `Tavily tidak mengembalikan hasil (raw ${rawResults.length}, gagal ${failedQueries}/${queries.length}). Cek API key / kuota di log Search, lalu ulangi riset.`
+    );
+  }
 
   let discoveryModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
   if (pinnedModelId) {
@@ -227,14 +278,16 @@ export async function runDiscovery(
         { role: 'system', content: sys },
         { role: 'user', content: usr }
       ],
-      temperature
+      temperature,
+      maxTokens: 4000
     });
+    const rawLen = out.output.text.length;
     // Log raw LLM output (truncated) for debugging field-mapping issues.
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'discovering',
       level: 'info',
-      message: `LLM raw output (first 2000 chars): ${out.output.text.slice(0, 2000)}`
+      message: `LLM raw output (${rawLen} chars, ${out.providerSlug}/${out.model}, fallback=${out.fallback ? 'yes' : 'no'}; first 2000 chars): ${out.output.text.slice(0, 2000)}`
     });
     const parsedOnce = parseDiscoveryOutput(out.output.text);
     await supabase.from('content_research_logs').insert({
@@ -387,14 +440,33 @@ function normalizeTopic(raw: unknown): DiscoveryTopicRow | null {
 }
 
 function parseDiscoveryOutput(text: string): DiscoveryRunResult {
-  const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+  // Strip markdown fences robustly (```json ... ``` possibly multiline).
+  const trimmed = text
+    .replace(/^[\s\S]*?```(?:json)?\s*/i, (m) => (m.includes('```') ? '' : m))
+    .replace(/```[\s\S]*$/i, '')
+    .trim();
+  if (!trimmed) {
+    throw new Error(
+      `Discovery LLM returned empty response (${text.length} chars). Provider mungkin truncate / response_format tidak didukung — fallback otomatis akan mencoba model lain.`
+    );
+  }
   let data: Record<string, unknown>;
   try {
     data = JSON.parse(trimmed);
   } catch {
-    const m = trimmed.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Discovery LLM did not return valid JSON');
-    data = JSON.parse(m[0]);
+    const extracted = extractLargestJson(trimmed);
+    if (!extracted) {
+      throw new Error(
+        `Discovery LLM did not return valid JSON (${trimmed.length} chars, preview: ${trimmed.slice(0, 200)}). Cek log LLM raw output.`
+      );
+    }
+    try {
+      data = JSON.parse(extracted);
+    } catch {
+      throw new Error(
+        `Discovery LLM did not return valid JSON (${trimmed.length} chars, preview: ${trimmed.slice(0, 200)}). Cek log LLM raw output.`
+      );
+    }
   }
   // The LLM may nest topics under different keys; try the common ones.
   const rawTopics = objArr(
@@ -405,4 +477,27 @@ function parseDiscoveryOutput(text: string): DiscoveryRunResult {
     .filter((t): t is DiscoveryTopicRow => t !== null);
   const searchSummary = (data.search_summary ?? data.summary ?? undefined) as DiscoveryLLMOutput['search_summary'];
   return { topics, searchSummary };
+}
+
+/** Ambil blok JSON terbesar (brace-matched) agar prefix/suffix reasoning tidak merusak parse. */
+function extractLargestJson(s: string): string | null {
+  let best: string | null = null;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        const cand = s.slice(start, i + 1);
+        if (!best || cand.length > best.length) best = cand;
+        start = -1;
+      }
+      if (depth < 0) depth = 0;
+    }
+  }
+  return best;
 }

@@ -174,6 +174,20 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     .order('created_at', { ascending: false })
     .limit(100);
 
+  const { data: llmLogs } = await supabase
+    .from('llm_call_logs')
+    .select('provider_slug, model_id, stage, latency_ms, http_status, error, prompt_tokens, completion_tokens, total_tokens, finish_reason, is_fallback, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  const { data: searchLogs } = await supabase
+    .from('search_call_logs')
+    .select('provider_slug, operation, query_count, latency_ms, result_count, http_status, error, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <div className="mb-4 text-sm">
@@ -404,6 +418,38 @@ export default async function ResearchSessionPage({ params }: PageProps) {
             ))}
           </ol>
         )}
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-lg font-semibold text-ink">Performa LLM & Search</h2>
+        <div className="grid gap-2 text-xs sm:grid-cols-2">
+          <div className="rounded-xl border border-line bg-surface p-3">
+            <p className="font-semibold text-ink">LLM terakhir ({(llmLogs ?? []).length})</p>
+            {((llmLogs ?? []) as Array<{ provider_slug: string; model_id: string; stage: string | null; latency_ms: number | null; http_status: number | null; error: string | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; finish_reason: string | null; is_fallback: boolean | null }>).map((l, i) => (
+              <p key={i} className="mt-1 text-ink-muted">
+                {l.provider_slug}/{l.model_id} · {l.stage ?? '-'} · {l.latency_ms ?? '-'}ms · {l.http_status ?? '-'}
+                {l.is_fallback ? ' · fallback' : ''} · p:{l.prompt_tokens ?? '-'} c:{l.completion_tokens ?? '-'} t:{l.total_tokens ?? '-'}
+                {l.finish_reason ? ` · ${l.finish_reason}` : ''}{l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
+              </p>
+            ))}
+            {(!llmLogs || llmLogs.length === 0) ? <p className="mt-1 text-ink-muted">Belum ada log LLM.</p> : null}
+          </div>
+          <div className="rounded-xl border border-line bg-surface p-3">
+            <p className="font-semibold text-ink">Search terakhir ({(searchLogs ?? []).length})</p>
+            {((searchLogs ?? []) as Array<{ provider_slug: string; operation: string; query_count: number | null; latency_ms: number | null; result_count: number | null; http_status: number | null; error: string | null }>).map((l, i) => (
+              <p key={i} className="mt-1 text-ink-muted">
+                {l.provider_slug}/{l.operation} · q:{l.query_count ?? '-'} · {l.latency_ms ?? '-'}ms · hasil:{l.result_count ?? '-'} · {l.http_status ?? '-'}
+                {l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
+              </p>
+            ))}
+            {(!searchLogs || searchLogs.length === 0) ? <p className="mt-1 text-ink-muted">Belum ada log search (riset lama).</p> : null}
+          </div>
+        </div>
+        <p className="text-xs text-ink-muted">
+          Log lengkap: <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm', stage: 'discovering' } }} className="text-primary hover:underline">LLM</Link>
+          {' · '}
+          <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'search' } }} className="text-primary hover:underline">Search</Link>
+        </p>
       </section>
 
       <section className="mt-8 space-y-3">

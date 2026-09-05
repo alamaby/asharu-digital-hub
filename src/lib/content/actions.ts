@@ -589,6 +589,78 @@ export async function retrySession(sessionId: string): Promise<ResearchAdminResu
 }
 
 /**
+ * Self-retry untuk pemilik sesi (atau admin). Sama seperti retrySession
+ * tapi guard: admin ATAU created_by = user login. Rate-limit 5x/jam/sesi
+ * agar tidak membanjiri Tavily/LLM. Sesi anon (created_by null) hanya bisa
+ * diulang admin.
+ */
+export async function retryOwnSession(sessionId: string): Promise<ResearchAdminResult> {
+  try {
+    const { createSupabaseServer } = await import('@/lib/supabase/server');
+    const userClient = await createSupabaseServer();
+    const {
+      data: { user }
+    } = (await userClient?.auth.getUser()) ?? { data: { user: null } };
+    if (!user) return { success: false, error: 'Login diperlukan untuk mengulang riset' };
+    const admin = await isAdmin().catch(() => false);
+    const supabase = getServiceClient();
+    const { data: session } = await supabase
+      .from('content_research_sessions')
+      .select('id, status, created_by')
+      .eq('id', sessionId)
+      .maybeSingle();
+    const row = session as { id: string; status: string; created_by: string | null } | null;
+    if (!row) return { success: false, error: 'Riset tidak ditemukan' };
+    if (!admin && row.created_by !== user.id) {
+      return { success: false, error: 'Hanya pemilik riset atau admin yang bisa mengulang' };
+    }
+    if (!['failed', 'awaiting_selection', 'completed'].includes(row.status)) {
+      return { success: false, error: `Status ${row.status} tidak bisa diulang (hanya failed/selesai)` };
+    }
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await supabase
+      .from('content_research_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .gte('created_at', oneHourAgo)
+      .ilike('message', '%triggered retr%');
+    if ((count ?? 0) >= 5) {
+      return { success: false, error: 'Terlalu sering mengulang — coba lagi 1 jam lagi' };
+    }
+    await supabase.from('content_research_topics').delete().eq('session_id', sessionId);
+    const { data, error } = await supabase
+      .from('content_research_sessions')
+      .update({
+        status: 'discovering',
+        error_message: null,
+        current_stage_started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .in('status', ['failed', 'awaiting_selection', 'completed'])
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'Riset tidak dalam status bisa-diulang' };
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'retry',
+      level: 'info',
+      message: `${admin ? 'admin' : 'user'} triggered retry — topics cleared, status reset to discovering`
+    });
+    try {
+      const { advanceStage } = await import('@/lib/research/orchestrator');
+      await advanceStage(supabase, sessionId);
+    } catch (e) {
+      return { success: true, error: `retry started but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Resume a failed research session from the stage that failed, WITHOUT
  * discarding prior stage outputs (topics, scores, admin shortlist). Only the
  * failed stage is retried. Falls back to `developing` when the failed stage

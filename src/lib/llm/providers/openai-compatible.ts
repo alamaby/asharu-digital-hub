@@ -15,8 +15,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       temperature: input.temperature ?? 0.7,
       max_tokens: input.maxTokens,
       response_format: { type: 'json_object' }
-    };
-    if (input.reasoningEffort) {
+    };    if (input.reasoningEffort) {
       (body as Record<string, unknown>).reasoning_effort = input.reasoningEffort;
       // Compat: some routers use `reasoning: { effort: "max" }`
       (body as Record<string, unknown>).reasoning = { effort: input.reasoningEffort };
@@ -38,23 +37,83 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }
 
     const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      choices?: Array<{
+        message?: {
+          content?: string | Array<{ type?: string; text?: string } | string>;
+          tool_calls?: Array<{ function?: { arguments?: string; name?: string } }>;
+          reasoning_content?: string;
+        };
+        finish_reason?: string;
+        text?: string;
+      }>;
+      usage?: Record<string, unknown>;
     };
-    const content = json.choices?.[0]?.message?.content ?? '';
+    const choice = json.choices?.[0];
+    const msg = choice?.message;
+    const content = extractMessageText(msg) || choice?.text || '';
+    const finishReason = choice?.finish_reason ?? null;
     return {
       text: content,
-      usage: json.usage
-        ? {
-            promptTokens: json.usage.prompt_tokens ?? 0,
-            completionTokens: json.usage.completion_tokens ?? 0,
-            totalTokens: json.usage.total_tokens
-          }
-        : undefined,
+      usage: normalizeUsage(json.usage),
       model: input.model,
-      latencyMs: Date.now() - started
+      latencyMs: Date.now() - started,
+      finishReason,
+      rawPreview: content ? null : JSON.stringify(json).slice(0, 2000)
     };
   }
+}
+
+/** Accept snake_case, camelCase, and short aliases from various gateways. */
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+function normalizeUsage(u: Record<string, unknown> | undefined):
+  | { promptTokens: number; completionTokens: number; totalTokens?: number }
+  | undefined {
+  if (!u) return undefined;
+  const prompt = num(u.prompt_tokens) ?? num(u.promptTokens) ?? num(u.input_tokens) ?? num(u.prompt_eval_count);
+  const completion =
+    num(u.completion_tokens) ?? num(u.completionTokens) ?? num(u.output_tokens) ?? num(u.eval_count);
+  const total = num(u.total_tokens) ?? num(u.totalTokens);
+  if (prompt === undefined && completion === undefined && total === undefined) return undefined;
+  return {
+    promptTokens: prompt ?? 0,
+    completionTokens: completion ?? 0,
+    totalTokens: total
+  };
+}
+
+/**
+ * Extract usable text from OpenAI-compatible message shapes.
+ * Order: string content → content parts[] → tool_calls args → reasoning_content
+ * (last resort, some reasoning routers put JSON there) → ''.
+ */
+function extractMessageText(
+  msg:
+    | {
+        content?: string | Array<{ type?: string; text?: string } | string>;
+        tool_calls?: Array<{ function?: { arguments?: string } }>;
+        reasoning_content?: string;
+      }
+    | undefined
+): string {
+  if (!msg) return '';
+  if (typeof msg.content === 'string' && msg.content.trim()) return msg.content;
+  if (Array.isArray(msg.content)) {
+    const joined = msg.content
+      .map((p) => (typeof p === 'string' ? p : (p.text ?? '')))
+      .join('')
+      .trim();
+    if (joined) return joined;
+  }
+  const toolArgs = msg.tool_calls?.[0]?.function?.arguments;
+  if (typeof toolArgs === 'string' && toolArgs.trim()) return toolArgs;
+  if (typeof msg.reasoning_content === 'string' && msg.reasoning_content.trim()) {
+    const m = msg.reasoning_content.match(/\{[\s\S]*\}/);
+    if (m) return m[0];
+  }
+  return '';
 }
 
 
