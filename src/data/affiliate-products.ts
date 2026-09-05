@@ -7,6 +7,96 @@ import type { AffiliateProduct } from './schemas';
 
 export const affiliateProducts: AffiliateProduct[] = [
   {
+    id: 'affiliate-41926248',
+    name: { id: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru', en: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru' },
+    category: 'electronics',
+    description: { id: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru', en: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/W6Puq19QT',
+    image: '/images/products/affiliate/41926248-1e3ebdd3e27d.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914588',
+    name: { id: 'Keychain Keyboard Custom | Mechanical Switch Fidget Keycaps | Gantungan Kunci Keyboard K23X', en: 'Keychain Keyboard Custom | Mechanical Switch Fidget Keycaps | Gantungan Kunci Keyboard K23X' },
+    category: 'electronics',
+    description: { id: 'Keychain Keyboard Custom | Mechanical Switch Fidget Keycaps | Gantungan Kunci Keyboard K23X', en: 'Keychain Keyboard Custom | Mechanical Switch Fidget Keycaps | Gantungan Kunci Keyboard K23X' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/40gHo2EsAE',
+    image: '/images/products/affiliate/41914588-c9f2f2147323.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914578',
+    name: { id: 'Rak Galon Minimalis Bulat Estetik – Lemari Galon Air Modern Fluted Design Dengan Roda Caster', en: 'Rak Galon Minimalis Bulat Estetik – Lemari Galon Air Modern Fluted Design Dengan Roda Caster' },
+    category: 'home-living',
+    description: { id: 'Rak Galon Minimalis Bulat Estetik – Lemari Galon Air Modern Fluted Design Dengan Roda Caster', en: 'Rak Galon Minimalis Bulat Estetik – Lemari Galon Air Modern Fluted Design Dengan Roda Caster' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4qFOnXl5Sr',
+    image: '/images/products/affiliate/41914578-8a43792ae97f.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914572',
+    name: { id: '[READY EXCLUSIVE] NEW DISNEY Tumbler Toystory Woody 600ml Stainless Steel 316 - 3in1 Phone Stand Han', en: '[READY EXCLUSIVE] NEW DISNEY Tumbler Toystory Woody 600ml Stainless Steel 316 - 3in1 Phone Stand Han' },
+    category: 'home-living',
+    description: { id: '[READY EXCLUSIVE] NEW DISNEY Tumbler Toystory Woody 600ml Stainless Steel 316 - 3in1 Phone Stand Han', en: '[READY EXCLUSIVE] NEW DISNEY Tumbler Toystory Woody 600ml Stainless Steel 316 - 3in1 Phone Stand Han' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/50YozpOijf',
+    image: '/images/products/affiliate/41914572-20f783cf547d.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914559',
+    name: { id: 'PHILIPS Vacuum Cleaner 998000Pa 5 in 1 Nirkabel Penyedot Debu Genggam Daya Hisap Kuat Portable untuk', en: 'PHILIPS Vacuum Cleaner 998000Pa 5 in 1 Nirkabel Penyedot Debu Genggam Daya Hisap Kuat Portable untuk' },
+    category: 'others',
+    description: { id: 'PHILIPS Vacuum Cleaner 998000Pa 5 in 1 Nirkabel Penyedot Debu Genggam Daya Hisap Kuat Portable untuk', en: 'PHILIPS Vacuum Cleaner 998000Pa 5 in 1 Nirkabel Penyedot Debu Genggam Daya Hisap Kuat Portable untuk' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/7VG9yOfeZ4',
+    image: '/images/products/affiliate/41914559-49cf37ea759f.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914525',
+    name: { id: 'Wardah Sunscreen UV Shield All Series (Airy Smooth Essential Gel Acne Calming Aqua Fresh Tone Up Phy', en: 'Wardah Sunscreen UV Shield All Series (Airy Smooth Essential Gel Acne Calming Aqua Fresh Tone Up Phy' },
+    category: 'others',
+    description: { id: 'Wardah Sunscreen UV Shield All Series (Airy Smooth Essential Gel Acne Calming Aqua Fresh Tone Up Phy', en: 'Wardah Sunscreen UV Shield All Series (Airy Smooth Essential Gel Acne Calming Aqua Fresh Tone Up Phy' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/9AONxLcCko',
+    image: '/images/products/affiliate/41914525-b528ca044eda.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-41914496',
+    name: { id: 'OMG OH MY GLAM Mattelast Lip Cream 2.9 g - Lip Cream Matte Dengan Warna Intense, Tahan Lama & Ringan', en: 'OMG OH MY GLAM Mattelast Lip Cream 2.9 g - Lip Cream Matte Dengan Warna Intense, Tahan Lama & Ringan' },
+    category: 'others',
+    description: { id: 'OMG OH MY GLAM Mattelast Lip Cream 2.9 g - Lip Cream Matte Dengan Warna Intense, Tahan Lama & Ringan', en: 'OMG OH MY GLAM Mattelast Lip Cream 2.9 g - Lip Cream Matte Dengan Warna Intense, Tahan Lama & Ringan' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4LJ8CNAQxt',
+    image: '/images/products/affiliate/41914496-a66cf937a24b.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41914437',
+    name: { id: '[ 1 box isi 2 sabun ] JJ Glow Sabun Gluta Pink 10X Brightening Soap Sabun Mandi Barsoap Niacinamide', en: '[ 1 box isi 2 sabun ] JJ Glow Sabun Gluta Pink 10X Brightening Soap Sabun Mandi Barsoap Niacinamide' },
+    category: 'home-living',
+    description: { id: '[ 1 box isi 2 sabun ] JJ Glow Sabun Gluta Pink 10X Brightening Soap Sabun Mandi Barsoap Niacinamide', en: '[ 1 box isi 2 sabun ] JJ Glow Sabun Gluta Pink 10X Brightening Soap Sabun Mandi Barsoap Niacinamide' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/40gHnhUdtw',
+    image: '/images/products/affiliate/41914437-051f0f82bc50.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-41914425',
+    name: { id: 'BC Dokumen/Tas File Handle Map File Clear Holder Anti Air Multi Layer Tas Dokumen A4 Folder Map', en: 'BC Dokumen/Tas File Handle Map File Clear Holder Anti Air Multi Layer Tas Dokumen A4 Folder Map' },
+    category: 'fashion',
+    description: { id: 'BC Dokumen/Tas File Handle Map File Clear Holder Anti Air Multi Layer Tas Dokumen A4 Folder Map', en: 'BC Dokumen/Tas File Handle Map File Clear Holder Anti Air Multi Layer Tas Dokumen A4 Folder Map' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/8plXYYDX1D',
+    image: '/images/products/affiliate/41914425-b43878ee6422.webp',
+    featured: false
+  },
+  {
     id: 'affiliate-41707092',
     name: { id: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion', en: 'RCCOR Motorcycle stand Holder Hp Motor Stand Penyangga Handphone Braket Spion' },
     category: 'automotive',
@@ -14,7 +104,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4VcTULlODf',
     image: '/images/products/affiliate/41707092-e54e772028eb.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41706978',
@@ -24,7 +114,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7VG53VUtt1',
     image: '/images/products/affiliate/41706978-8c0f37f52c7d.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41706973',
@@ -34,7 +124,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fS2Rd0wiP',
     image: '/images/products/affiliate/41706973-0aef1d79ec74.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41706967',
@@ -44,7 +134,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8KpC2zyDec',
     image: '/images/products/affiliate/41706967-b75e6146f8b7.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41706960',
@@ -54,7 +144,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/gPkusjGJu',
     image: '/images/products/affiliate/41706960-cee3baf74347.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41552911',
@@ -64,7 +154,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4LIzxxLEn6',
     image: '/images/products/affiliate/41552911-9c6b9385b9e4.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41552903',
