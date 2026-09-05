@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-04 20:40 (local time)
+Last updated: 2026-09-05 07:25 (local time)
 
 ## Current State
 
@@ -50,6 +50,7 @@ Last updated: 2026-09-04 20:40 (local time)
 
 ## Recent Entries
 
+- [2026-09-05 072149-riset-4e03bde2-thread-shape-fix.md](2026-09-05/072149-riset-4e03bde2-thread-shape-fix.md) — Fix riset 4e03bde2/f7c91699: thread_shape ≤5→≤10 (migrasi applied production) + discovery second-pass + guard developing. 263 tests, 2 sesi backfill developing.
 - [2026-09-04 204000-supabase-migration-sync.md](2026-09-04/204000-supabase-migration-sync.md) — Supabase migration sync: drift restore (research_target_reply_count + research_cron_5min) + per-stage LLM (llm_stage_defaults + review fixes) + processor_cron_bearer no-op repair. 3 apply_migration, 25/25 synced.
 - [2026-09-02 102000-content-pipeline-4stage.md](2026-09-02/102000-content-pipeline-4stage.md) — Content pipeline 4-tahap (Discovery→Verification→Scoring→Development) + Tavily search + affiliate top-20 scoring + admin riset pages + affiliate card review. 199 tests.
 - [2026-09-01 162500-admin-list-i18n-loading-fix.md](2026-09-01/162500-admin-list-i18n-loading-fix.md) — Fix i18n keys literal di list page (admin namespace missing di CLIENT_MESSAGE_NAMESPACES) + loading feedback (useFormStatus → useTransition).
@@ -69,7 +70,6 @@ Last updated: 2026-09-04 20:40 (local time)
 - [2026-08-25 111000-shopee-review-fixes.md](2026-08-25/111000-shopee-review-fixes.md) — identitas riil Shopee + accessible name.
 - [2026-08-25 104500-shopee-store-integration.md](2026-08-25/104500-shopee-store-integration.md) — Shopee riil: kanonis + affiliate fallback.
 - [2026-08-24 131000-asharu-code-review-fixes.md](2026-08-24/131000-asharu-code-review-fixes.md) — remediasi 9 temuan review.
-- [2026-08-24 123500-asharu-digital-hub-full-implementation.md](2026-08-24/123500-asharu-digital-hub-full-implementation.md) — implementasi lengkap end-to-end.
 
 ## Legacy Archive
 

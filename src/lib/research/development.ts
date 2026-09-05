@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
-import { parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
+import { MAX_THREAD_REPLIES_DB, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -283,6 +283,17 @@ async function generateAndInsertDraft(
   // parsed & activeLlm dijamin non-null di sini (throw di atas jika gagal dua kali).
   const parsedThread = parsed!;
   const resolvedLlm = activeLlm!;
+  // Guard selaras CHECK DB thread_shape (MAX_THREAD_REPLIES_DB): jangan kirim
+  // insert yang pasti 23514 (kasus 4e03bde2/f7c91699). Fail cepat dengan pesan jelas.
+  if (parsedThread.replies.length > MAX_THREAD_REPLIES_DB) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'error',
+      message: `thread replies ${parsedThread.replies.length} melebihi batas DB ${MAX_THREAD_REPLIES_DB} (topic ${topicId})`
+    });
+    throw new Error(`thread replies ${parsedThread.replies.length} melebihi batas DB ${MAX_THREAD_REPLIES_DB}`);
+  }
   let resolvedPostIndex = 0;
   let working = parsedThread;
   if (affiliate) {

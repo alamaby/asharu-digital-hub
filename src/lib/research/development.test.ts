@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { MAX_THREAD_REPLIES_DB, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -136,6 +136,19 @@ describe('parseThread', () => {
       replies
     });
     expect(parseThread(raw)).not.toBeNull();
+  });
+
+  it('MAX_THREAD_REPLIES_DB=10 selaras CHECK DB thread_shape (fix 4e03bde2: 7 replies lolos)', () => {
+    expect(MAX_THREAD_REPLIES_DB).toBe(10);
+    const replies = Array.from({ length: 7 }, (_, i) => ({ id: `r${i} ${i === 3 ? P : ''}`, en: `r${i} en` }));
+    const raw = JSON.stringify({
+      main: { id: 'm', en: 'm en' },
+      replies
+    });
+    const out = parseThread(raw);
+    expect(out).not.toBeNull();
+    expect(out!.replies).toHaveLength(7);
+    expect(out!.replies.length).toBeLessThanOrEqual(MAX_THREAD_REPLIES_DB);
   });
 
   it('regression: 2 placeholders split across main.id + main.en now parses (previously failed)', () => {

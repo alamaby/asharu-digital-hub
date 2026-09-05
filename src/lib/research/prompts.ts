@@ -23,6 +23,10 @@ export interface DiscoveryInput {
   purpose?: string | null;
   ctaStyle?: string | null;
   constraints?: string | null;
+  requiredWinners?: number | null;
+  // Second-pass retry: kategori/freshness dilonggarkan, boleh derivasi niche
+  // dari hint user bila search tidak mengandungnya (fix 4e03bde2: 1 topik).
+  isRetryPass?: boolean;
 }
 
 export interface VerificationInput {
@@ -142,6 +146,7 @@ Tahap 1: Discovery dari hasil search di bawah
 - Pilih topik terbaik dari hasil search yang RELEVAN dengan TARGET AUDIENS di atas. Prioritaskan Minat, Deskripsi audiens, Kategori diperbolehkan/target, dan Hint topik user.
 - Jika hasil search tidak relevan dengan audiens (mis. audiens minta elektronik/home-living tapi search mengembalikan finance murni), TOLAK topik tersebut — lebih baik kembalikan <${input.minimumCandidates} daripada memaksa filler tidak relevan. Sebutkan penolakan di mind set Anda.
 - Dedup: gabungkan yang membahas peristiwa sama.
+${input.isRetryPass ? `- RETRY PASS: pass pertama menghasilkan <${input.requiredWinners ?? 3} topik. Longgarkan filter kategori tapi TETAP jaga relevansi audiens. Jika hint topik user niche (mis. coffee maker portable) tidak ada di hasil search, buat sudut turunan dari hint tersebut (tips/perbandingan/use-case) dengan why_now jujur berbasis relevansi evergreen — jangan fallback ke event generik jauh (mis. IFA 2026) yang tidak match hint.` : `- NICHE HINT: jika hint topik user spesifik/niche dan tidak muncul verbatim di hasil search, tetap turunkan 1-3 angle dari hint itu (tips, perbandingan, use-case audiens) dengan why_now jujur; jangan fallback ke event generik yang tidak match hint hanya demi kuota.`}
 
 Tahap 2: Struktur setiap topik
 Untuk setiap topik, isi:

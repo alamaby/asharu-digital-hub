@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { countPlaceholdersInThread } from '@/lib/llm/prompt';
 import type { ThreadGeneration } from '@/lib/llm/types';
 
+// Batas replies diselaraskan dengan CHECK DB content_drafts.thread_shape.
+// Migrasi 20260905000003: <=5 → <=10 agar TOTAL_REPLIES=7 (6 konten + 1 affiliate) lolos.
+// Ubah di satu tempat ini + migrasi DB bila perlu menaikkan lagi.
+export const MAX_THREAD_REPLIES_DB = 10;
+
 export const threadSchema = z.object({
   main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
   replies: z
@@ -10,7 +15,7 @@ export const threadSchema = z.object({
       // Toleransi: LLM kadang return string polos — coerce jadi {id,en} sama
       z.string().min(1).transform((s) => ({ id: s, en: s }))
     ]))
-    .max(10)
+    .max(MAX_THREAD_REPLIES_DB)
 });
 
 const CJK_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g;

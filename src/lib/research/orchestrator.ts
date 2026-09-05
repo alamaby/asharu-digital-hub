@@ -68,7 +68,8 @@ function buildDiscoveryInput(row: ResearchSessionRow) {
     topicHint: row.topic ?? null,
     purpose: row.purpose ?? null,
     ctaStyle: row.cta_style ?? null,
-    constraints: row.constraints ?? null
+    constraints: row.constraints ?? null,
+    requiredWinners: row.required_winners ?? 3
   };
 }
 

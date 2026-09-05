@@ -118,9 +118,24 @@ function dedupResults(results: SearchResult[]): SearchResult[] {
   return out;
 }
 
-function chunkSourcesForLLM(results: SearchResult[]): SearchResult[] {
+function chunkSourcesForLLM(results: SearchResult[], topicHint?: string | null): SearchResult[] {
   // Cap at 15 results with richer content (500 chars) — audience-first queries already filtered
   // Keep manageable for bynara 9 models with max reasoning; prior 10×300 was too lossy for niche.
+  // Fix 4e03bde2: prioritaskan chunk yang match topicHint user agar konteks niche
+  // (mis. coffee maker portable) tidak tenggelam di generic fallback.
+  if (topicHint && topicHint.trim().length > 3) {
+    const keywords = topicHint.toLowerCase().split(/[\s,;]+/).filter((w) => w.length > 3).slice(0, 6);
+    if (keywords.length > 0) {
+      const scored = results.map((r, i) => {
+        const hay = `${r.title} ${r.content}`.toLowerCase();
+        let hits = 0;
+        for (const k of keywords) if (hay.includes(k)) hits++;
+        return { r, hits, i };
+      });
+      scored.sort((a, b) => b.hits - a.hits || a.i - b.i);
+      return scored.map((s) => s.r).slice(0, 15);
+    }
+  }
   return results.slice(0, 15);
 }
 
@@ -180,7 +195,7 @@ export async function runDiscovery(
       });
     }
   }
-  const chunked = [...pastedResults, ...chunkSourcesForLLM(deduped)];
+  const chunked = [...pastedResults, ...chunkSourcesForLLM(deduped, input.topicHint)];
 
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
@@ -189,7 +204,6 @@ export async function runDiscovery(
     message: `search complete: ${rawResults.length} raw, ${deduped.length} deduped, ${pastedResults.length} pasted, sent ${chunked.length} to LLM`
   });
 
-  const { system, user } = buildDiscoveryPrompt(input, chunked);
   let discoveryModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
   if (pinnedModelId) {
     const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).eq('is_active', true).maybeSingle();
@@ -201,37 +215,81 @@ export async function runDiscovery(
       discoveryModel = await resolveStageModel('discovering', null);
     } catch { void 0; }
   }
-  const result = await runLLMCompletion(supabase, {
-    requestId: null,
-    sessionId,
-    stage: 'discovering',
-    providerId: discoveryModel.providerId,
-    modelUuid: discoveryModel.modelUuid,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ],
-    temperature: 0.5
-  });
+  async function runOnce(passInput: DiscoveryInput, temperature: number) {
+    const { system: sys, user: usr } = buildDiscoveryPrompt(passInput, chunked);
+    const out = await runLLMCompletion(supabase, {
+      requestId: null,
+      sessionId,
+      stage: 'discovering',
+      providerId: discoveryModel.providerId,
+      modelUuid: discoveryModel.modelUuid,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: usr }
+      ],
+      temperature
+    });
+    // Log raw LLM output (truncated) for debugging field-mapping issues.
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'discovering',
+      level: 'info',
+      message: `LLM raw output (first 2000 chars): ${out.output.text.slice(0, 2000)}`
+    });
+    const parsedOnce = parseDiscoveryOutput(out.output.text);
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'discovering',
+      level: 'info',
+      message: `parsed ${parsedOnce.topics.length} topics; first topic field: "${parsedOnce.topics[0]?.topic ?? '(none)'}"`
+    });
+    return parsedOnce;
+  }
 
-  // Log raw LLM output (truncated) for debugging field-mapping issues.
-  await supabase.from('content_research_logs').insert({
-    session_id: sessionId,
-    stage: 'discovering',
-    level: 'info',
-    message: `LLM raw output (first 2000 chars): ${result.output.text.slice(0, 2000)}`
-  });
+  const parsed = await runOnce(input, 0.5);
+  let allTopics = parsed.topics;
+  let searchSummary = parsed.searchSummary;
 
-  const parsed = parseDiscoveryOutput(result.output.text);
-  await supabase.from('content_research_logs').insert({
-    session_id: sessionId,
-    stage: 'discovering',
-    level: 'info',
-    message: `parsed ${parsed.topics.length} topics; first topic field: "${parsed.topics[0]?.topic ?? '(none)'}"`
-  });
-  if (parsed.topics.length > 0) {
+  // Second-pass (cap 1x, reuse chunk search yang sama — tanpa cost Tavily ekstra):
+  // bila pass pertama < requiredWinners (default 3), panggil LLM sekali lagi
+  // dengan filter dilonggarkan (isRetryPass) lalu merge dedup. Fix 4e03bde2: 1 topik.
+  const need = input.requiredWinners ?? 3;
+  if (!input.isRetryPass && allTopics.length < need) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'discovering',
+      level: 'warn',
+      message: `first pass only ${allTopics.length}/${need} topics; retry with relaxed filter (reuse ${chunked.length} sources, no extra search)`
+    });
+    const retryInput: DiscoveryInput = {
+      ...input,
+      isRetryPass: true,
+      allowedCategories: [],
+      freshnessHours: Math.max(input.freshnessHours, 168)
+    };
+    const retryParsed = await runOnce(retryInput, 0.7);
+    const seen = new Set(allTopics.map((t) => t.topic.toLowerCase().trim()));
+    let added = 0;
+    for (const t of retryParsed.topics) {
+      const k = t.topic.toLowerCase().trim();
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        allTopics.push(t);
+        added++;
+      }
+    }
+    if (retryParsed.searchSummary && !searchSummary) searchSummary = retryParsed.searchSummary;
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'discovering',
+      level: 'info',
+      message: `retry merged: +${added} topics, total ${allTopics.length}`
+    });
+  }
+
+  if (allTopics.length > 0) {
     await supabase.from('content_research_topics').insert(
-      parsed.topics.map((t, i) => ({
+      allTopics.map((t, i) => ({
         session_id: sessionId,
         rank: i + 1,
         topic: t.topic,
@@ -252,7 +310,7 @@ export async function runDiscovery(
       }))
     );
   }
-  return { topics: parsed.topics, searchSummary: parsed.searchSummary };
+  return { topics: allTopics, searchSummary };
 }
 
 /** Coerce a value to string, defaulting to '' for null/undefined. */
