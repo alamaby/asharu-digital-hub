@@ -33,6 +33,27 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: npm run scrape:affiliate
 
+      - name: Verify DB sync (no file-vs-DB drift)
+        # Scrape exits non-zero on sync failure, but double-check coverage here
+        # so a partial sync can never be committed file-only.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          node --input-type=module -e "
+          import fs from 'node:fs';
+          import { createClient } from '@supabase/supabase-js';
+          const s = fs.readFileSync('src/data/affiliate-products.ts', 'utf8');
+          const ids = [...s.matchAll(/id: 'affiliate-(\d+)'/g)].map((m) => m[1]);
+          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
+          const { data, error } = await supabase.from('affiliate_products').select('external_id');
+          if (error) { console.error('::error::drift check query failed: ' + error.message); process.exit(1); }
+          const have = new Set(data.map((r) => r.external_id));
+          const missing = ids.filter((id) => !have.has(id));
+          if (missing.length > 0) { console.error('::error::DB drift: ' + missing.length + ' file products missing in DB: ' + missing.slice(0, 10).join(',')); process.exit(1); }
+          console.log('drift check ok: ' + ids.length + ' file products all present in DB (' + data.length + ' rows).');
+          "
+
       - name: Validate gates
         run: |
           npm run typecheck

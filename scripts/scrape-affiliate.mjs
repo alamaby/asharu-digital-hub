@@ -157,6 +157,10 @@ async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
   const supabaseKey =
     process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Fail-loud: file-only runs mask DB drift (kasus Sep 2026: 9 produk hilang
+  // karena friendly_code collision, run tetap hijau). Non-dry-run tanpa sync
+  // sukses = exit non-zero agar workflow merah dan tidak commit file-only.
+  let syncFailed = false;
   if (supabaseUrl && supabaseKey) {
     try {
       const { createClient } = await import('@supabase/supabase-js');
@@ -172,11 +176,26 @@ async function main() {
         image: p.image,
         is_active: true
       }));
-      for (let i = 0; i < rows.length; i += 50) {
-        const batch = rows.slice(i, i + 50);
+      // Upsert hanya baris baru/berubah: tiap baris upsert memicu trigger
+      // BEFORE INSERT spekulatif yang membakar 1 nilai sequence meski akhirnya
+      // UPDATE — full-upsert 221 baris/hari menghabiskan sequence sia-sia.
+      const { data: existingRows, error: fetchError } = await supabase
+        .from('affiliate_products')
+        .select('external_id, name_id, name_en, category, merchant, url, image, is_active');
+      if (fetchError) throw new Error(`Supabase fetch existing: ${fetchError.message}`);
+      const byId = new Map((existingRows ?? []).map((r) => [r.external_id, r]));
+      const COMPARE_KEYS = ['name_id', 'name_en', 'category', 'merchant', 'url', 'image', 'is_active'];
+      const changed = rows.filter((r) => {
+        const e = byId.get(r.external_id);
+        if (!e) return true;
+        return COMPARE_KEYS.some((k) => (e[k] ?? null) !== (r[k] ?? null));
+      });
+      console.error(`  ${changed.length}/${rows.length} new or changed, skipping ${rows.length - changed.length} identical (saves sequence burns)`);
+      for (let i = 0; i < changed.length; i += 50) {
+        const batch = changed.slice(i, i + 50);
         const { error } = await supabase.from('affiliate_products').upsert(batch, { onConflict: 'external_id' });
         if (error) throw new Error(`Supabase upsert batch ${i}: ${error.message}`);
-        console.error(`  upserted ${i + batch.length}/${rows.length}`);
+        console.error(`  upserted ${i + batch.length}/${changed.length}`);
       }
       // Soft-delete: mark missing as inactive
       const remoteIds = new Set(rows.map((r) => r.external_id));
@@ -189,11 +208,17 @@ async function main() {
       console.error('Supabase sync done.');
     } catch (e) {
       console.error(`Supabase sync failed (file still written): ${e.message}`);
+      syncFailed = true;
     }
   } else {
     // Surface as a visible annotation so the stale-DB issue is no longer silent.
     console.log('::warning::Supabase env (SUPABASE_URL, SUPABASE_SECRET_KEY) not set — skipped DB sync (file-only). affiliate_products table will go stale until secrets are added.');
     console.error('Supabase env not set — skipping DB sync (file-only).');
+    syncFailed = true;
+  }
+  if (syncFailed) {
+    console.error('DB sync did not complete — exiting non-zero so CI fails loudly instead of committing file-only data.');
+    process.exit(1);
   }
 }
 
