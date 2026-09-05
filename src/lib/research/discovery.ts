@@ -247,7 +247,7 @@ export async function runDiscovery(
   }
 
   const parsed = await runOnce(input, 0.5);
-  let allTopics = parsed.topics;
+  const allTopics = parsed.topics;
   let searchSummary = parsed.searchSummary;
 
   // Second-pass (cap 1x, reuse chunk search yang sama — tanpa cost Tavily ekstra):
