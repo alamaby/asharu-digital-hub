@@ -414,6 +414,16 @@
         "reselectRethink": "Reselect & Rethink",
         "reselectRethinkHint": "Pick another product → LLM rewrites 1 insertion reply naturally (loop until satisfied)",
         "swapHint": "Swap product without changing text (quick swap)",
+        "statusWorkingSwap": "Swapping product to {name}…",
+        "statusWorkingRegen": "LLM is rewriting the insertion for {name} — may take ~30s…",
+        "statusWorkingRemove": "Removing affiliate product…",
+        "statusSuccessSwap": "Product {name} attached (quick swap).",
+        "statusSuccessRegen": "Product {name} attached — insertion rewritten (Reselect & Rethink).",
+        "statusSuccessRemove": "Affiliate product removed.",
+        "statusErrorRateLimit": "Trying too often — wait a moment then try again.",
+        "statusErrorNotFound": "Product or draft not found — refresh the page then try again.",
+        "statusErrorDefault": "Action failed — try again.",
+        "statusTechDetails": "Technical details",
         "pickAndGenerate": "Pick Product & Generate",
         "randomBridgeTitle": "Random from 20 newest (bridging)"
       }

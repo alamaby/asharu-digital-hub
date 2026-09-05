@@ -29,7 +29,7 @@ function escapeIlike(s: string): string {
 interface Props {
   draftId: string;
   currentProductId?: string;
-  onSelect: (productId: string) => void;
+  onSelect: (productId: string, productName?: string) => void;
   onClose: () => void;
 }
 
@@ -158,12 +158,12 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose }: 
                 const isCurrent = p.id === currentProductId;
                 return (
                   <li key={p.id}>
-                    <button
-                      type="button"
-                      disabled={isCurrent}
-                      onClick={() => onSelect(p.id)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
-                    >
+                      <button
+                        type="button"
+                        disabled={isCurrent}
+                        onClick={() => onSelect(p.id, p.name_id)}
+                        className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-ink">
                           {p.name_id}

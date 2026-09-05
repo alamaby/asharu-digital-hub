@@ -414,6 +414,16 @@
         "reselectRethink": "Reselect & Rethink",
         "reselectRethinkHint": "Pilih produk lain → LLM tulis ulang 1 reply sisipan secara natural (loop sampai cocok)",
         "swapHint": "Ganti produk tanpa ubah teks (swap cepat)",
+        "statusWorkingSwap": "Mengganti produk ke {name}…",
+        "statusWorkingRegen": "LLM menulis ulang sisipan untuk {name} — bisa ~30 detik…",
+        "statusWorkingRemove": "Menghapus produk afiliasi…",
+        "statusSuccessSwap": "Produk {name} terpasang (Ganti Produk).",
+        "statusSuccessRegen": "Produk {name} terpasang — sisipan ditulis ulang (Reselect & Rethink).",
+        "statusSuccessRemove": "Produk afiliasi dihapus.",
+        "statusErrorRateLimit": "Terlalu sering mencoba — tunggu sebentar lalu coba lagi.",
+        "statusErrorNotFound": "Produk atau draf tidak ditemukan — refresh halaman lalu coba lagi.",
+        "statusErrorDefault": "Aksi gagal — coba lagi.",
+        "statusTechDetails": "Detail teknis",
         "pickAndGenerate": "Pilih Produk & Generate",
         "randomBridgeTitle": "Dipilih random dari 20 terbaru (bridging)"
       }

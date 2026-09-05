@@ -45,50 +45,82 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<'regen' | 'swap'>('regen');
   const [busy, setBusy] = useState<'swap' | 'remove' | 'regen' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<
+    | { kind: 'working' | 'success'; action: 'swap' | 'regen' | 'remove'; productName?: string }
+    | null
+  >(null);
+  const [error, setError] = useState<{ message: string; technical?: string } | null>(null);
+
+  function friendlyError(raw: string): { message: string; technical?: string } {
+    if (raw.startsWith('rate_limit')) {
+      return { message: t('statusErrorRateLimit'), technical: raw };
+    }
+    if (/not found/i.test(raw)) {
+      return { message: t('statusErrorNotFound'), technical: raw };
+    }
+    return { message: t('statusErrorDefault'), technical: raw };
+  }
+
+  async function onSwap(productId: string, productName?: string) {
+    setBusy('swap');
+    setError(null);
+    setNotice({ kind: 'working', action: 'swap', productName });
+    setPickerOpen(false);
+    const result = await swapAffiliateProduct(draftId, productId);
+    setBusy(null);
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setNotice({ kind: 'success', action: 'swap', productName });
+      startTransition(() => router.refresh());
+    }
+  }
+
+  async function onRegen(productId: string, productName?: string) {
+    setBusy('regen');
+    setError(null);
+    setNotice({ kind: 'working', action: 'regen', productName });
+    setPickerOpen(false);
+    const result = await regenerateAffiliateInsertion(draftId, productId, regenModelId ? { modelId: regenModelId } : undefined);
+    setBusy(null);
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setRegenProviderId('');
+      setRegenModelId('');
+      setNotice({ kind: 'success', action: 'regen', productName });
+      startTransition(() => router.refresh());
+    }
+  }
+
+  function handleSelect(productId: string, productName?: string) {
+    if (pickerMode === 'swap') onSwap(productId, productName);
+    else onRegen(productId, productName);
+  }
+
+  async function onRemove() {
+    const currentName = injection?.product_name_id ?? injection?.friendly_code;
+    setBusy('remove');
+    setError(null);
+    setNotice({ kind: 'working', action: 'remove', productName: currentName });
+    const result = await removeAffiliateInjection(draftId);
+    setBusy(null);
+    if (!result.success) {
+      setNotice(null);
+      setError(friendlyError(result.error ?? 'failed'));
+    } else {
+      setNotice({ kind: 'success', action: 'remove', productName: currentName });
+      startTransition(() => router.refresh());
+    }
+  }
 
   const band = relevanceBand(matchScore);
   const isFallback = Boolean((injection?.match_signals as Record<string, unknown> | undefined)?.fallback_random);
   const [regenProviderId, setRegenProviderId] = useState('');
   const [regenModelId, setRegenModelId] = useState('');
   const filteredRegenModels = regenProviderId ? regenModels.filter((m) => m.provider_id === regenProviderId) : [];
-  async function onSwap(productId: string) {
-    setBusy('swap');
-    setError(null);
-    setPickerOpen(false);
-    const result = await swapAffiliateProduct(draftId, productId);
-    setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
-  }
-
-  async function onRegen(productId: string) {
-    setBusy('regen');
-    setError(null);
-    setPickerOpen(false);
-    const result = await regenerateAffiliateInsertion(draftId, productId, regenModelId ? { modelId: regenModelId } : undefined);
-    setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else {
-      setRegenProviderId('');
-      setRegenModelId('');
-      startTransition(() => router.refresh());
-    }
-  }
-
-  function handleSelect(productId: string) {
-    if (pickerMode === 'swap') onSwap(productId);
-    else onRegen(productId);
-  }
-
-  async function onRemove() {
-    setBusy('remove');
-    setError(null);
-    const result = await removeAffiliateInjection(draftId);
-    setBusy(null);
-    if (!result.success) setError(result.error ?? 'failed');
-    else startTransition(() => router.refresh());
-  }
 
   return (
     <section className="mt-4 rounded-xl border border-line bg-background p-4">
@@ -108,10 +140,46 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
         </div>
       </div>
 
-      {error ? (
-        <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
-          {error}
+      {notice ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+            notice.kind === 'working' ? 'bg-blue-50 text-blue-900' : 'bg-emerald-50 text-emerald-900'
+          }`}
+        >
+          {notice.kind === 'working' ? (
+            <svg viewBox="0 0 20 20" fill="none" className="size-4 shrink-0 animate-spin" aria-hidden>
+              <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+              <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <span aria-hidden className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">✓</span>
+          )}
+          {notice.kind === 'working'
+            ? notice.action === 'regen'
+              ? t('statusWorkingRegen', { name: notice.productName ?? '—' })
+              : notice.action === 'swap'
+                ? t('statusWorkingSwap', { name: notice.productName ?? '—' })
+                : t('statusWorkingRemove')
+            : notice.action === 'regen'
+              ? t('statusSuccessRegen', { name: notice.productName ?? '—' })
+              : notice.action === 'swap'
+                ? t('statusSuccessSwap', { name: notice.productName ?? '—' })
+                : t('statusSuccessRemove')}
         </p>
+      ) : null}
+
+      {error ? (
+        <div role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p>{error.message}</p>
+          {error.technical ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-red-700 underline">{t('statusTechDetails')}</summary>
+              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-red-100/60 p-2">{error.technical.slice(0, 1000)}</pre>
+            </details>
+          ) : null}
+        </div>
       ) : null}
 
       {injection ? (
