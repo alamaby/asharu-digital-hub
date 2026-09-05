@@ -35,6 +35,33 @@ export function auditThreadLength(
   return issues;
 }
 
+const EMOJI_RE = /\p{Extended_Pictographic}/u;
+
+/** True bila teks mengandung minimal 1 emoji. */
+export function hasEmoji(text: string): boolean {
+  return EMOJI_RE.test(text ?? '');
+}
+
+export interface EmojiGap {
+  post: number;
+  lang: 'id' | 'en';
+}
+
+/** Post yang tidak mengandung emoji sama sekali (aturan: 1-2 emoji per post). */
+export function auditThreadEmoji(thread: {
+  main: { id: string; en: string };
+  replies: { id: string; en: string }[];
+}): EmojiGap[] {
+  const gaps: EmojiGap[] = [];
+  const posts = [thread.main, ...thread.replies];
+  posts.forEach((p, i) => {
+    (['id', 'en'] as const).forEach((lang) => {
+      if (!EMOJI_RE.test(p[lang] ?? '')) gaps.push({ post: i, lang });
+    });
+  });
+  return gaps;
+}
+
 export const threadSchema = z.object({
   main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
   replies: z

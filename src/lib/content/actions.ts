@@ -1139,7 +1139,7 @@ export async function regenerateAffiliateInsertion(
 
     const { buildSingleReplyRewritePrompt } = await import('@/lib/llm/prompt');
     const { runLLMCompletion } = await import('@/lib/llm/completion');
-    const { replacePlaceholders, sanitizeThreadText } = await import('@/lib/research/thread');
+    const { replacePlaceholders, sanitizeThreadText, hasEmoji } = await import('@/lib/research/thread');
 
     // Resolve regen model: opts.modelId > session fallback > stage default > global
     let regenModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
@@ -1201,6 +1201,39 @@ export async function regenerateAffiliateInsertion(
 
     // P0-3: sanitize CJK + preserve LLM bridging text
     rewritten = { id: sanitizeThreadText(rewritten.id), en: sanitizeThreadText(rewritten.en) };
+
+    // Audit emoji reply hasil rewrite: kosong → 1x repair; masih kosong → simpan + tandai.
+    let regenEmojiMissing = false;
+    if (!hasEmoji(rewritten.id) || !hasEmoji(rewritten.en)) {
+      const retryEmoji = await runLLMCompletion(supabase, {
+        requestId: null,
+        sessionId: resolvedSessionId,
+        stage: 'regen_affiliate',
+        providerId: regenModel.providerId,
+        modelUuid: regenModel.modelUuid,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: `${user}\n\nPENTING: reply ini TIDAK mengandung emoji. Tulis ulang reply yang SAMA dengan tambahan 1-2 emoji relevan (jangan ganti kata dengan emoji, patuhi HARD LIMIT char), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
+        ],
+        temperature: 0.3,
+        maxTokens: 600
+      }).catch(() => null);
+      const retryRaw = retryEmoji
+        ? retryEmoji.output.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+        : '';
+      let retryParsed: { id: string; en: string } | null = null;
+      try {
+        const p = JSON.parse(retryRaw) as { id?: string; en?: string };
+        if (typeof p.id === 'string' && typeof p.en === 'string' && p.id.trim() && p.en.trim()) {
+          retryParsed = { id: sanitizeThreadText(p.id.trim()), en: sanitizeThreadText(p.en.trim()) };
+        }
+      } catch { /* keep original */ }
+      if (retryParsed && hasEmoji(retryParsed.id) && hasEmoji(retryParsed.en)) {
+        rewritten = retryParsed;
+      } else {
+        regenEmojiMissing = !hasEmoji(rewritten.id) || !hasEmoji(rewritten.en);
+      }
+    }
 
     const PLACEHOLDER = '{{PRODUCT_URL}}';
     // Preserve field: detect which field LLM used; if none, inject into primary field (id)
@@ -1289,7 +1322,7 @@ export async function regenerateAffiliateInsertion(
         provider_id: providerId,
         model_id: llmResult.model,
         last_regen_model_id: regenModel.modelUuid,
-        llm_meta: { provider: llmResult.providerSlug, model: llmResult.model, latency_ms: llmResult.latencyMs, key_hash: llmResult.keyHash, stage: 'regen_affiliate', target_index: boundedTarget, fallback: (llmResult as { fallback?: boolean }).fallback ?? false }
+        llm_meta: { provider: llmResult.providerSlug, model: llmResult.model, latency_ms: llmResult.latencyMs, key_hash: llmResult.keyHash, stage: 'regen_affiliate', target_index: boundedTarget, fallback: (llmResult as { fallback?: boolean }).fallback ?? false, emoji_missing: regenEmojiMissing }
       } as unknown as Record<string, unknown>)
       .eq('id', draftId);
     if (updateError) return { success: false, error: updateError.message };

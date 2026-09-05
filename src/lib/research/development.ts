@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
-import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, auditThreadEmoji, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -360,6 +360,50 @@ async function generateAndInsertDraft(
     ? replacePlaceholders(working, affiliate.product.url)
     : working;
 
+  // Audit emoji: tiap post (id + en) wajib 1-2 emoji relevan. Kosong → 1x repair;
+  // masih kosong → simpan + tandai (konsisten kebijakan over-limit).
+  let emojiGaps = auditThreadEmoji(finalThread);
+  if (emojiGaps.length > 0) {
+    const gapDesc = emojiGaps
+      .slice(0, 8)
+      .map((g) => `post-${g.post} ${g.lang}`)
+      .join(', ');
+    const retryEmoji = await runLLMCompletion(supabase, {
+      requestId: null,
+      sessionId,
+      stage: 'developing',
+      providerId: devModel.providerId,
+      modelUuid: devModel.modelUuid,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `${user}\n\nPENTING: post berikut TIDAK mengandung emoji: ${gapDesc}. Tulis ulang thread yang SAMA dengan tambahan 1-2 emoji relevan per post tersebut (jangan ganti kata dengan emoji, patuhi HARD LIMIT char), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
+      ],
+      temperature: 0.3,
+      maxTokens: 3200
+    }).catch(() => null);
+    const parsedEmoji = retryEmoji ? parseThread(retryEmoji.output.text) : null;
+    if (parsedEmoji) {
+      let we = parsedEmoji;
+      if (affiliate) {
+        const repositioned = repositionPlaceholder(parsedEmoji, 'middle');
+        we = repositioned.thread;
+        resolvedPostIndex = repositioned.postIndex;
+      }
+      finalThread = affiliate ? replacePlaceholders(we, affiliate.product.url) : we;
+      activeLlm = retryEmoji;
+      emojiGaps = auditThreadEmoji(finalThread);
+    }
+  }
+  const emojiMissing = emojiGaps.length > 0;
+  if (emojiMissing) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'warn',
+      message: `topic ${topicId} × ${platform.slug}: ${emojiGaps.length} post tanpa emoji (${emojiGaps.slice(0, 6).map((g) => `post-${g.post} ${g.lang}`).join(', ')}) — draf disimpan dengan tanda`
+    });
+  }
+
   // Validasi panjang terhadap batas platform (teks final, URL asli).
   // Over → 1x retry-shorten; masih over → simpan + tandai (jangan gagal sunyi).
   let lengthIssues = auditThreadLength(finalThread, platform.maxChars);
@@ -446,7 +490,9 @@ async function generateAndInsertDraft(
       platform: platform.slug,
       max_chars: platform.maxChars,
       over_limit: overLimit,
-      length_audit: lengthIssues
+      length_audit: lengthIssues,
+      emoji_missing: emojiMissing,
+      emoji_gaps: emojiGaps
     },
     affiliate_match_score: affiliate?.matchScore ?? null,
     affiliate_match_signals: affiliate
@@ -468,7 +514,7 @@ async function generateAndInsertDraft(
     stage: 'developing',
     level: 'info',
     message: affiliate
-      ? `draft generated [${platform.slug}] with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}`
+      ? `draft generated [${platform.slug}] with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}${emojiMissing ? ' EMOJI-MISSING' : ''}`
       : `draft generated [${platform.slug}] without affiliate (empty pool)`
   });
 }

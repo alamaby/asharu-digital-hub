@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CopyButton } from './CopyButton';
 import { AffiliateProductCard } from './AffiliateProductCard';
@@ -13,7 +13,7 @@ interface Draft {
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
   affiliate_injections: { id?: string; friendly_code: string; url: string; post_index: number; match_score?: number; match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number }; product_name_id?: string; product_name_en?: string; product_image?: string; product_category?: string; product_merchant?: string }[];
   status: string;
-  llm_meta?: { provider: string; model: string; max_chars?: number | null; over_limit?: boolean | null; length_audit?: { post: number; lang: string; chars: number; max: number }[] | null };
+  llm_meta?: { provider: string; model: string; max_chars?: number | null; over_limit?: boolean | null; length_audit?: { post: number; lang: string; chars: number; max: number }[] | null; emoji_missing?: boolean | null };
   affiliate_match_score?: number | null;
   research_topic_id?: string | null;
   platform_slug?: string | null;
@@ -23,17 +23,27 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
   const [lang, setLang] = useState<'id' | 'en'>('id');
-  const [editing, setEditing] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<'approved' | 'rejected' | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Sync dari server (mis. setelah reselect/regen + router.refresh()): prop
+  // baru = data baru. Tanpa ini state basi dan user harus refresh manual.
+  const prevInitial = useRef(initial);
+  if (prevInitial.current !== initial) {
+    prevInitial.current = initial;
+    setDraft(initial);
+    setEditingIdx(null);
+  }
 
   const injections = draft.affiliate_injections[0];
   const allPosts = [draft.generated_thread.main, ...draft.generated_thread.replies];
   const platformSlug = draft.platform_slug ?? 'all';
   const maxChars = draft.llm_meta?.max_chars ?? null;
   const overLimit = Boolean(draft.llm_meta?.over_limit);
+  const emojiMissing = Boolean(draft.llm_meta?.emoji_missing);
 
   async function updateStatus(status: 'approved' | 'rejected') {
     const supabase = createSupabaseBrowser();
@@ -55,22 +65,31 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
     }
   }
 
-  async function saveEdit() {
+  async function saveEdit(idx: number) {
     setSaving(true);
     const supabase = createSupabaseBrowser();
     if (!supabase) {
       setSaving(false);
       return;
     }
-    // For MVP, edit only main post id/en (simple)
-    const newThread = { ...draft.generated_thread, main: { ...draft.generated_thread.main, [lang]: editText } };
+    // Edit per post (0 = main, 1..n = replies), bukan hanya main post.
+    const posts = [draft.generated_thread.main, ...draft.generated_thread.replies];
+    const target = posts[idx];
+    if (!target) {
+      setSaving(false);
+      return;
+    }
+    const updated = { ...target, [lang]: editText };
+    const newThread = idx === 0
+      ? { ...draft.generated_thread, main: updated }
+      : { ...draft.generated_thread, replies: draft.generated_thread.replies.map((r, i) => (i === idx - 1 ? updated : r)) };
     const { error } = await supabase
       .from('content_drafts')
       .update({ generated_thread: newThread as unknown as string })
       .eq('id', draft.id);
     if (!error) {
       setDraft({ ...draft, generated_thread: newThread });
-      setEditing(false);
+      setEditingIdx(null);
     }
     setSaving(false);
   }
@@ -96,6 +115,12 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
       {overLimit ? (
         <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
           {t('charOverLimit')}
+        </p>
+      ) : null}
+
+      {emojiMissing ? (
+        <p role="status" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {t('emojiMissingNote')}
         </p>
       ) : null}
 
@@ -136,10 +161,31 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                       {len}/{maxChars}
                     </span>
                   ) : null}
+                  {editingIdx === idx ? (
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(idx)}
+                      disabled={saving}
+                      className="btn-primary px-2 py-1 text-[11px] disabled:opacity-60"
+                    >
+                      {saving ? '...' : t('save')}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditText(text);
+                        setEditingIdx(idx);
+                      }}
+                      className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary"
+                    >
+                      {t('edit')}
+                    </button>
+                  )}
                   <CopyButton text={text} />
                 </span>
               </div>
-              {editing && idx === 0 ? (
+              {editingIdx === idx ? (
                 <textarea
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
@@ -166,32 +212,6 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <CopyButton text={threadText} label={t('copyAllFor', { platform: platformSlug })} />
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => {
-              setEditText(lang === 'id' ? draft.generated_thread.main.id : draft.generated_thread.main.en);
-              setEditing(true);
-            }}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:border-primary"
-          >
-            {t('edit')}
-          </button>
-        ) : (
-          <button type="button" onClick={saveEdit} disabled={saving} className="btn-primary flex items-center gap-1 px-3 py-1.5 text-xs">
-            {saving ? (
-              <>
-                <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>
-                  <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-                  <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-                <span>...</span>
-              </>
-            ) : (
-              'Simpan'
-            )}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => updateStatus('approved')}

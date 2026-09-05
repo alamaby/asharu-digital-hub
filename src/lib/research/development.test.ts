@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -409,5 +409,29 @@ describe('auditThreadLength', () => {
 
   it('exposes tick budget constant', () => {
     expect(DEVELOP_PAIRS_PER_TICK).toBe(6);
+  });
+});
+
+describe('auditThreadEmoji', () => {
+  it('detects emoji presence', () => {
+    expect(hasEmoji('mantap 🔥')).toBe(true);
+    expect(hasEmoji('polos tanpa gambar')).toBe(false);
+  });
+
+  it('flags posts without emoji per lang', () => {
+    const gaps = auditThreadEmoji({
+      main: { id: 'halo 🌟', en: 'plain hello' },
+      replies: [{ id: 'ok', en: 'fine 🎉' }]
+    });
+    expect(gaps).toEqual([
+      { post: 0, lang: 'en' },
+      { post: 1, lang: 'id' }
+    ]);
+  });
+
+  it('returns empty when all posts have emoji', () => {
+    expect(
+      auditThreadEmoji({ main: { id: 'a 🛒', en: 'b 📦' }, replies: [] })
+    ).toEqual([]);
   });
 });
