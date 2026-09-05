@@ -7,6 +7,34 @@ import type { ThreadGeneration } from '@/lib/llm/types';
 // Ubah di satu tempat ini + migrasi DB bila perlu menaikkan lagi.
 export const MAX_THREAD_REPLIES_DB = 10;
 
+// Maks pasangan (topik × platform) per tick developing agar cron maxDuration
+// 300 dtk tidak timeout (1 pasangan ≈ ≤2 LLM call + retry-shorten).
+export const DEVELOP_PAIRS_PER_TICK = 6;
+
+export interface LengthIssue {
+  post: number;
+  lang: 'id' | 'en';
+  chars: number;
+  max: number;
+}
+
+/** Audit panjang tiap post (id + en, URL final) terhadap batas platform. */
+export function auditThreadLength(
+  thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] },
+  maxChars: number | null
+): LengthIssue[] {
+  if (maxChars == null) return [];
+  const issues: LengthIssue[] = [];
+  const posts = [thread.main, ...thread.replies];
+  posts.forEach((p, i) => {
+    (['id', 'en'] as const).forEach((lang) => {
+      const len = (p[lang] ?? '').length;
+      if (len > maxChars) issues.push({ post: i, lang, chars: len, max: maxChars });
+    });
+  });
+  return issues;
+}
+
 export const threadSchema = z.object({
   main: z.object({ id: z.string().min(1), en: z.string().min(1) }),
   replies: z

@@ -13,9 +13,10 @@ interface Draft {
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
   affiliate_injections: { id?: string; friendly_code: string; url: string; post_index: number; match_score?: number; match_signals?: { category_match?: boolean; keyword_overlap?: number; scored_from_pool_size?: number }; product_name_id?: string; product_name_en?: string; product_image?: string; product_category?: string; product_merchant?: string }[];
   status: string;
-  llm_meta?: { provider: string; model: string };
+  llm_meta?: { provider: string; model: string; max_chars?: number | null; over_limit?: boolean | null; length_audit?: { post: number; lang: string; chars: number; max: number }[] | null };
   affiliate_match_score?: number | null;
   research_topic_id?: string | null;
+  platform_slug?: string | null;
 }
 
 export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [] }: { draft: Draft; regenProviders?: { id: string; slug: string; display_name: string }[]; regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] }) {
@@ -30,6 +31,9 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
 
   const injections = draft.affiliate_injections[0];
   const allPosts = [draft.generated_thread.main, ...draft.generated_thread.replies];
+  const platformSlug = draft.platform_slug ?? 'all';
+  const maxChars = draft.llm_meta?.max_chars ?? null;
+  const overLimit = Boolean(draft.llm_meta?.over_limit);
 
   async function updateStatus(status: 'approved' | 'rejected') {
     const supabase = createSupabaseBrowser();
@@ -83,8 +87,17 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
         <span className="chip bg-primary/10 text-primary">
           {t('productChip', { code: injections?.friendly_code?.replace('ASH-', '') ?? '?' })}
         </span>
+        <span className="chip border border-line bg-surface text-ink" title={maxChars ? t('platformMaxHint', { max: maxChars }) : undefined}>
+          {platformSlug}{maxChars ? ` · ≤${maxChars}` : ''}
+        </span>
         <span className="text-xs text-ink-muted">{draft.llm_meta?.provider} · {draft.llm_meta?.model}</span>
       </div>
+
+      {overLimit ? (
+        <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+          {t('charOverLimit')}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex gap-2">
         <button
@@ -110,11 +123,21 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           const label = idx === 0 ? t('postMain') : t('reply', { n: idx });
           const text = lang === 'id' ? post.id : post.en;
           const isInjected = injections?.post_index === idx;
+          const len = text.length;
+          const over = maxChars != null && len > maxChars;
+          const near = maxChars != null && !over && len >= Math.floor(maxChars * 0.9);
           return (
             <div key={idx} className={isInjected ? 'rounded-lg border border-primary/30 bg-primary/5 p-3' : 'rounded-lg border border-line bg-background p-3'}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-ink">{label} {isInjected ? '· ASH-' + injections.friendly_code.replace('ASH-','') : ''}</span>
-                <CopyButton text={text} />
+                <span className="flex items-center gap-2">
+                  {maxChars != null ? (
+                    <span className={`text-[11px] tabular-nums ${over ? 'font-semibold text-red-700' : near ? 'text-amber-700' : 'text-ink-muted'}`} title={over ? t('charOverLimitPost', { chars: len, max: maxChars }) : t('charCountHint', { chars: len, max: maxChars })}>
+                      {len}/{maxChars}
+                    </span>
+                  ) : null}
+                  <CopyButton text={text} />
+                </span>
               </div>
               {editing && idx === 0 ? (
                 <textarea
@@ -142,7 +165,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <CopyButton text={threadText} label={t('copyAll')} />
+        <CopyButton text={threadText} label={t('copyAllFor', { platform: platformSlug })} />
         {!editing ? (
           <button
             type="button"

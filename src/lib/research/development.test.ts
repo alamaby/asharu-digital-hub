@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_THREAD_REPLIES_DB, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -382,5 +382,32 @@ describe('affiliate opener rule', () => {
       product
     );
     expect(system).not.toContain('90% of max');
+  });
+});
+
+describe('auditThreadLength', () => {
+  const t = (mainLen: number, replyLen: number) => ({
+    main: { id: 'x'.repeat(mainLen), en: 'y'.repeat(mainLen) },
+    replies: [{ id: 'x'.repeat(replyLen), en: 'y'.repeat(replyLen) }]
+  });
+
+  it('returns no issues when all posts fit', () => {
+    expect(auditThreadLength(t(100, 200), 280)).toEqual([]);
+  });
+
+  it('flags id and en separately with post index', () => {
+    const issues = auditThreadLength(
+      { main: { id: 'x'.repeat(300), en: 'ok' }, replies: [] },
+      280
+    );
+    expect(issues).toEqual([{ post: 0, lang: 'id', chars: 300, max: 280 }]);
+  });
+
+  it('skips audit when maxChars is null', () => {
+    expect(auditThreadLength(t(70000, 70000), null)).toEqual([]);
+  });
+
+  it('exposes tick budget constant', () => {
+    expect(DEVELOP_PAIRS_PER_TICK).toBe(6);
   });
 });

@@ -83,32 +83,12 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
   if (sp.status !== 'all') query = query.eq('status', sp.status);
   if (sp.provider !== 'all') query = query.eq('llm_meta->>provider' as never, sp.provider as never);
   if (since) query = query.gte('created_at', since);
-
-  // Platform filter via research session join — two-step
-  let platformFilteredIds: Set<string> | null = null;
-  if (sp.platform !== 'all') {
-    const { data: platSessions } = await supabase.from('content_research_sessions').select('id').eq('platform_slug', sp.platform);
-    const platSessionIds = new Set(((platSessions ?? []) as { id: string }[]).map((r) => r.id));
-    // Also fetch legacy platform via content_requests for drafts without research_topic_id? For now filter by session ids only
-    if (platSessionIds.size > 0) {
-      const { data: topicRows } = await supabase.from('content_research_topics').select('id, session_id').in('session_id', [...platSessionIds]);
-      const topicIds = new Set(((topicRows ?? []) as { id: string }[]).map((r) => r.id));
-      // If filtering by platform, we will post-filter drafts by research_topic_id or request_id membership
-      platformFilteredIds = new Set([...platSessionIds, ...topicIds]);
-    } else {
-      platformFilteredIds = new Set();
-    }
-  }
+  // Platform filter langsung via kolom draf (migrasi 20260906000004).
+  // Draf agnostik warisan (platform_slug 'all'/null) hanya muncul saat filter 'all'.
+  if (sp.platform !== 'all') query = query.eq('platform_slug', sp.platform);
 
   const { data: draftsRaw, count, error: draftsError } = await query;
   let drafts = (draftsRaw ?? []) as unknown as DraftListCardImport[];
-  if (platformFilteredIds !== null) {
-    drafts = drafts.filter((d) => {
-      const rt = (d as unknown as { research_topic_id?: string | null; request_id?: string | null }).research_topic_id;
-      const rq = (d as unknown as { request_id?: string | null }).request_id;
-      return (rt && platformFilteredIds!.has(rt)) || (rq && platformFilteredIds!.has(rq));
-    });
-  }
   if (draftsError) {
     // fallback to unfiltered if jsonb filter fails
     const { data: fallback } = await supabase.from('content_drafts').select('*').order('created_at', { ascending: false }).limit(PAGE_SIZE);

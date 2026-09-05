@@ -157,7 +157,7 @@ export async function advanceStage(
         return { status: 'awaiting_selection', advanced: false };
       }
       case 'developing': {
-        await runDevelopment(supabase, sessionId, session.developing_model_id ?? null);
+        const remaining = await runDevelopment(supabase, sessionId, session.developing_model_id ?? null);
         // runDevelopment may have set status='failed' when no shortlisted topics;
         // in that case don't claim completed — re-read current status.
         const { data: afterDev } = await supabase
@@ -167,6 +167,9 @@ export async function advanceStage(
           .single();
         const cur = (afterDev as { status: ResearchStatus } | null)?.status;
         if (cur === 'failed') return { status: 'failed', advanced: false };
+        // Chunking: masih ada pasangan (topik × platform) → tetap developing,
+        // cron tick berikutnya (guard 5 mnt) melanjutkan otomatis.
+        if (remaining > 0) return { status: 'developing', advanced: false };
         const moved = await atomicTransition(supabase, sessionId, 'developing', 'completed');
         if (!moved) {
           // If transition didn't apply, status already changed (e.g. to failed) — surface it.

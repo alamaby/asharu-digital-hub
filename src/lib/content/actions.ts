@@ -100,7 +100,9 @@ export async function createContentRequest(formData: FormData): Promise<ActionRe
 
 const researchSchema = z.object({
   topic: z.string().min(10).max(500),
-  platform: z.string().min(1),
+  // Legacy single platform (generateIdea hint + old clients). The form now
+  // sends repeated `platforms` fields; parsed separately via getAll().
+  platform: z.string().min(1).optional(),
   tone: z.enum(['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif']),
   targetCategory: z.enum(['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others']).optional(),
   audience: z.string().min(3).max(200),
@@ -234,16 +236,43 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   // 'all' means platform-agnostic — skip FK check and store NULL.
   // content_research_sessions.platform_slug is nullable; downstream pipeline
   // branches on platform === 'all' (or null) to use platform-agnostic prompts.
-  const isAllPlatforms = data.platform === 'all';
+  // Multi-checkbox form sends repeated `platforms` fields (getAll — fromEntries
+  // would keep only the last). 1 choice → legacy single path; N > 1 →
+  // platform_slug NULL + platform_slugs.
+  const multiPlatforms = [...new Set(formData.getAll('platforms').map((v) => String(v)))].filter(
+    (s) => s && s !== 'all'
+  );
+  let singlePlatform = data.platform;
+  let platformSlugs: string[] = [];
+  if (multiPlatforms.length > 0) {
+    const { data: activePlatforms } = await supabase
+      .from('platforms')
+      .select('slug')
+      .eq('is_active', true);
+    const valid = new Set(((activePlatforms ?? []) as { slug: string }[]).map((p) => p.slug));
+    const unknown = multiPlatforms.filter((s) => !valid.has(s));
+    if (unknown.length > 0) {
+      return { success: false, fieldErrors: { platforms: `Platform tidak valid: ${unknown.join(', ')}` }, error: 'validation' };
+    }
+    if (multiPlatforms.length === 1) {
+      singlePlatform = multiPlatforms[0];
+    } else {
+      singlePlatform = undefined;
+      platformSlugs = multiPlatforms;
+    }
+  }
+  const isAllPlatforms = !singlePlatform || singlePlatform === 'all';
   if (!isAllPlatforms) {
     const { data: platform } = await supabase
       .from('platforms')
       .select('slug')
-      .eq('slug', data.platform)
+      .eq('slug', singlePlatform!)
       .maybeSingle();
     if (!platform) {
       return { success: false, fieldErrors: { platform: 'Platform tidak valid' }, error: 'validation' };
     }
+  } else if (multiPlatforms.length === 0 && !singlePlatform) {
+    return { success: false, fieldErrors: { platforms: 'Pilih minimal 1 platform' }, error: 'validation' };
   }
 
   // created_by is the signed-in user if any; null for anonymous submit.
@@ -267,7 +296,8 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       secondary_location: data.secondaryLocation ?? null,
       audience_age: data.audienceAge ?? data.audience,
       audience_interests: splitCsv(data.audienceInterests),
-      platform_slug: isAllPlatforms ? null : data.platform,
+      platform_slug: isAllPlatforms ? null : singlePlatform!,
+      platform_slugs: platformSlugs,
       tone: data.tone,
       account_goal: data.accountGoal ?? data.purpose,
       allowed_categories: splitCsv(data.allowedCategories),

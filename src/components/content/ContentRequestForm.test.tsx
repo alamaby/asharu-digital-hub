@@ -9,7 +9,8 @@ describe('ContentRequestForm', () => {
   it('renders all required fields and honeypot', () => {
     renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} categories={mockCategories} />);
     expect(screen.getByLabelText(/Topik/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Platform/)).toBeInTheDocument();
+    expect(screen.getByText('Platform', { selector: 'legend' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Threads/ })).toBeChecked();
     expect(screen.getByLabelText(/Nada/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Audiens/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Buat Draf/ })).toBeInTheDocument();
@@ -17,8 +18,9 @@ describe('ContentRequestForm', () => {
     expect(document.querySelector('input[name="website"]')).toBeInTheDocument();
   });
 
-  it('has accessible required markers', () => {
-    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'twitter', display_name: 'Twitter' }]} categories={mockCategories} />);
-    expect(screen.getAllByText('*').length).toBeGreaterThanOrEqual(5);
+  it('renders platform checkboxes default-checked and validates min one', () => {
+    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }, { slug: 'twitter', display_name: 'Twitter' }]} categories={mockCategories} />);
+    expect(screen.getByRole('checkbox', { name: /Threads/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Twitter/ })).toBeChecked();
   });
 });

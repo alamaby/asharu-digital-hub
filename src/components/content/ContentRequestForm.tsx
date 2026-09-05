@@ -33,7 +33,8 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
 
   // Controlled fields so generateIdea can fill them
   const [topic, setTopic] = useState('');
-  const [platform, setPlatform] = useState('all');
+  const realPlatforms = platforms.filter((p) => p.slug !== 'all');
+  const [selPlatforms, setSelPlatforms] = useState<string[]>(() => realPlatforms.map((p) => p.slug));
   const [tone, setTone] = useState('casual');
   const [language, setLanguage] = useState('both');
   const [targetCategory, setTargetCategory] = useState('');
@@ -69,7 +70,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
     startIdeaTransition(async () => {
       // Collect all current field states as hints so the idea varies with input
       const fd = new FormData();
-      fd.set('platform', platform);
+      fd.set('platform', selPlatforms.length === 1 ? selPlatforms[0]! : 'all');
       fd.set('tone', tone);
       fd.set('language', language);
       if (topic) fd.set('topic', topic);
@@ -101,7 +102,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       }
       const i = res.idea;
       if (i.topic) setTopic(i.topic);
-      if (i.platform && platforms.some((p) => p.slug === i.platform)) setPlatform(i.platform!);
+      if (i.platform && platforms.some((p) => p.slug === i.platform)) setSelPlatforms([i.platform!]);
       if (i.tone) setTone(i.tone!);
       if (i.language) setLanguage(i.language!);
       if (i.targetCategory) setTargetCategory(i.targetCategory!);
@@ -125,6 +126,11 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (selPlatforms.length === 0) {
+      setStatus('error');
+      setFieldErrors({ platforms: t('platformMinOne') });
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     if (isAdmin) {
       if (genModelId) formData.set('ideaGenerationModelId', genModelId);
@@ -152,6 +158,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       formRef.current?.reset();
       // reset controlled states
       setTopic('');
+      setSelPlatforms(realPlatforms.map((p) => p.slug));
       setAudience('');
       setPurpose('');
       setKeywords('');
@@ -302,25 +309,57 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="platform" className="block text-sm font-medium text-ink">
-            {t('platform')} <span className="text-red-600">*</span>
-          </label>
-          <select
-            id="platform"
-            name="platform"
-            required
-            disabled={pending || ideaGenerating}
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <option value="all">{t('platformAll')}</option>
-            {platforms.map((p) => (
-              <option key={p.slug} value={p.slug}>
-                {p.display_name}
-              </option>
-            ))}
-          </select>
+          <fieldset>
+            <legend className="block text-sm font-medium text-ink">
+              {t('platform')} <span className="text-red-600">*</span>
+            </legend>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelPlatforms(realPlatforms.map((p) => p.slug))}
+                disabled={pending || ideaGenerating}
+                className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted hover:border-primary disabled:opacity-60"
+              >
+                {t('selectAll')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelPlatforms([])}
+                disabled={pending || ideaGenerating}
+                className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted hover:border-primary disabled:opacity-60"
+              >
+                {t('clearAll')}
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+              {realPlatforms.map((p) => (
+                <label key={p.slug} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink has-checked:border-primary">
+                  <input
+                    type="checkbox"
+                    name="platforms"
+                    value={p.slug}
+                    checked={selPlatforms.includes(p.slug)}
+                    disabled={pending || ideaGenerating}
+                    onChange={(e) => {
+                      setSelPlatforms((prev) =>
+                        e.target.checked ? [...prev, p.slug] : prev.filter((s) => s !== p.slug)
+                      );
+                    }}
+                    className="size-4 accent-[var(--color-primary)]"
+                  />
+                  {p.display_name}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-ink-muted">
+              {selPlatforms.length === 0
+                ? t('platformMinOne')
+                : t('platformCountHint', { count: selPlatforms.length })}
+            </p>
+            {fieldErrors.platforms ? (
+              <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.platforms}</p>
+            ) : null}
+          </fieldset>
         </div>
 
         <div>
@@ -492,7 +531,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
           <div className="space-y-4 border-t border-line px-4 py-4">
             <p className="text-xs text-ink-muted">{t('advancedIntro')}</p>
 
-            {(platform === 'threads' || platform === 'twitter') ? (
+            {(selPlatforms.includes('threads') || selPlatforms.includes('twitter')) ? (
               <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3">
                 <label htmlFor="targetReplyCount" className="block text-xs font-medium text-primary">
                   {t('targetReplyCount')} <span className="text-ink-muted">{t('targetReplyCountHint')}</span>

@@ -33,10 +33,9 @@ export default async function KontenBaruPage({ params }: PageProps) {
   const t = await getTranslations({ locale, namespace: 'content.form' });
   const tNav = await getTranslations({ locale, namespace: 'content.form' });
 
-  // Synthesize an "all platforms" option (slug='all') so users can request a
-  // platform-agnostic draft. The form sends 'all' and the server stores NULL
-  // in content_research_sessions.platform_slug (already nullable).
-  const allPlatformsOption = { slug: 'all', display_name: t('platformAll') };
+  // Platform checkbox list: only real active platforms. The form defaults to
+  // all-checked (equivalent to the old "Semua Platform") and stores explicit
+  // platform_slugs for multi-choice.
 
   // Fetch platforms for select — fallback to hardcoded if Supabase not configured
   let platforms: { slug: string; display_name: string }[] = [
@@ -83,8 +82,7 @@ export default async function KontenBaruPage({ params }: PageProps) {
     }
   }
 
-  // Prepend the synthetic "all" option.
-  platforms = [allPlatformsOption, ...platforms];
+  // (No synthetic "all" option: checkboxes cover all platforms.)
 
   // Admin-only: fetch llm providers/models for per-stage overrides
   let llmProviders: { id: string; slug: string; display_name: string }[] = [];

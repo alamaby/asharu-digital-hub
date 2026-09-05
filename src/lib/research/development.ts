@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
-import { MAX_THREAD_REPLIES_DB, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -18,21 +18,72 @@ interface ShortlistedTopic {
 // Reply affiliate dihitung terpisah agar percakapan konten tetap detail (min 6) di luar sisipan produk.
 export const CONTENT_REPLIES = 6;
 export const TOTAL_REPLIES = CONTENT_REPLIES + 1;
+export { DEVELOP_PAIRS_PER_TICK };
+export type { LengthIssue };
+
+export interface TargetPlatform {
+  slug: string;
+  maxChars: number | null;
+}
+
+/**
+ * Resolver tunggal daftar platform target sesi (sumber kebenaran ganda legacy):
+ * platform_slugs (multi baru) > platform_slug (tunggal) > ekspansi semua aktif.
+ * 'all'/null lama = ekspansi semua platform aktif.
+ */
+export async function resolveTargetPlatforms(
+  supabase: SupabaseClient,
+  sess: { platform_slug: string | null; platform_slugs?: string[] | null }
+): Promise<TargetPlatform[]> {
+  const multi = (sess.platform_slugs ?? []).filter(Boolean);
+  if (multi.length > 0) {
+    const { data } = await supabase
+      .from('platforms')
+      .select('slug, max_chars')
+      .in('slug', multi)
+      .eq('is_active', true);
+    const rows = (data ?? []) as { slug: string; max_chars: number | null }[];
+    const bySlug = new Map(rows.map((r) => [r.slug, r]));
+    return multi
+      .filter((s) => bySlug.has(s))
+      .map((s) => ({ slug: s, maxChars: bySlug.get(s)!.max_chars }));
+  }
+  if (sess.platform_slug) {
+    const { data: platformRow } = await supabase
+      .from('platforms')
+      .select('slug, max_chars')
+      .eq('slug', sess.platform_slug)
+      .maybeSingle();
+    const row = platformRow as { slug: string; max_chars: number | null } | null;
+    if (row) return [{ slug: row.slug, maxChars: row.max_chars }];
+  }
+  const { data } = await supabase
+    .from('platforms')
+    .select('slug, max_chars')
+    .eq('is_active', true)
+    .neq('slug', 'all')
+    .order('slug', { ascending: true });
+  return ((data ?? []) as { slug: string; max_chars: number | null }[]).map((r) => ({
+    slug: r.slug,
+    maxChars: r.max_chars
+  }));
+}
 
 export async function runDevelopment(
   supabase: SupabaseClient,
   sessionId: string,
   pinnedModelId?: string | null
-): Promise<void> {
+): Promise<number> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select('id, platform_slug, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
+    .select('id, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
   const sess = session as {
     id: string;
     platform_slug: string | null;
+    platform_slugs: string[] | null;
     tone: string | null;
     account_goal: string | null;
     audience_age: string | null;
@@ -51,75 +102,67 @@ export async function runDevelopment(
       .from('content_research_sessions')
       .update({ status: 'failed', error_message: 'no shortlisted topics' })
       .eq('id', sessionId);
-    return;
+    return 0;
   }
   const allTopics = topics as ShortlistedTopic[];
 
-  const platformSlug = sess.platform_slug ?? 'all';
-  let maxChars: number | null = null;
-  if (platformSlug === 'all') {
-    // Platform-agnostic: use the strictest limit across active platforms so the
-    // generated draft is safe to repost on any platform (e.g. Twitter 280).
-    const { data: minRow } = await supabase
-      .from('platforms')
-      .select('max_chars')
-      .eq('is_active', true)
-      .not('max_chars', 'is', null)
-      .order('max_chars', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    maxChars = (minRow as { max_chars: number | null } | null)?.max_chars ?? 280;
-  } else {
-    const { data: platformRow } = await supabase
-      .from('platforms')
-      .select('max_chars')
-      .eq('slug', platformSlug)
-      .maybeSingle();
-    maxChars = (platformRow as { max_chars: number | null } | null)?.max_chars ?? null;
-  }
-  const platform = {
-    slug: platformSlug,
-    maxChars
-  };
+  const targets = await resolveTargetPlatforms(supabase, sess);
+  if (targets.length === 0) throw new Error('no active target platforms');
 
-  // Idempotency: skip topics that already have a draft so cron re-picks and
-  // inline retries don't produce duplicates.
+  // Idempotency per pasangan (topik × platform) agar cron re-pick dan
+  // inline retry tidak memproduksi duplikat.
   const topicIds = allTopics.map((t) => t.id);
   const { data: existingDrafts } = await supabase
     .from('content_drafts')
-    .select('research_topic_id')
+    .select('research_topic_id, platform_slug')
     .in('research_topic_id', topicIds);
-  const doneTopicIds = new Set(
-    ((existingDrafts ?? []) as { research_topic_id: string | null }[])
-      .map((d) => d.research_topic_id)
-      .filter((v): v is string => Boolean(v))
+  const donePairs = new Set(
+    ((existingDrafts ?? []) as { research_topic_id: string | null; platform_slug: string | null }[])
+      .map((d) => `${d.research_topic_id}|${d.platform_slug ?? 'all'}`)
+      .filter((v) => !v.startsWith('null|'))
   );
-  const pendingTopics = allTopics.filter((t) => !doneTopicIds.has(t.id));
+  const pendingPairs: { topic: ShortlistedTopic; platform: TargetPlatform }[] = [];
+  for (const topic of allTopics) {
+    for (const platform of targets) {
+      if (!donePairs.has(`${topic.id}|${platform.slug}`)) {
+        pendingPairs.push({ topic, platform });
+      }
+    }
+  }
 
-  if (pendingTopics.length === 0) {
+  if (pendingPairs.length === 0) {
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'developing',
       level: 'info',
-      message: `all ${allTopics.length} shortlisted topics already have drafts; nothing to do`
+      message: `all ${allTopics.length} shortlisted topics already have drafts for ${targets.length} platform(s); nothing to do`
     });
-    return;
+    return 0;
   }
 
-  for (const topic of pendingTopics) {
-    // Select affiliate per-topic: strict scoring first, fallback random dari 20 terbaru jika tidak cocok.
-    const affiliate = await selectAffiliateWithRandomFallback(supabase, {
-      topic: topic.topic,
-      category: topic.category,
-      unique_angle: topic.unique_angle,
-      key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
-      hooks: Array.isArray(topic.hooks)
-        ? (topic.hooks as Array<{ type: string; text: string }>)
-        : undefined
-    });
+  // Chunking: kerjakan maksimal N pasangan per tick agar tidak timeout.
+  const batch = pendingPairs.slice(0, DEVELOP_PAIRS_PER_TICK);
+  const affiliateCache = new Map<string, SelectedAffiliate | null>();
 
-    // Per-topic guard: 1 topik gagal (mis. thread parse failed) tidak boleh
-    // menggagalkan seluruh sesi — kumpulkan error, lanjut ke topik berikut.
+  for (const { topic, platform } of batch) {
+    // Affiliate dipilih 1× per topik lalu dipakai ulang lintas platform.
+    if (!affiliateCache.has(topic.id)) {
+      affiliateCache.set(
+        topic.id,
+        await selectAffiliateWithRandomFallback(supabase, {
+          topic: topic.topic,
+          category: topic.category,
+          unique_angle: topic.unique_angle,
+          key_facts: Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : undefined,
+          hooks: Array.isArray(topic.hooks)
+            ? (topic.hooks as Array<{ type: string; text: string }>)
+            : undefined
+        })
+      );
+    }
+    const affiliate = affiliateCache.get(topic.id) ?? null;
+
+    // Per-pasangan guard: 1 pasangan gagal tidak boleh menggagalkan sisanya.
     try {
       await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId);
     } catch (e) {
@@ -128,29 +171,39 @@ export async function runDevelopment(
         session_id: sessionId,
         stage: 'developing',
         level: 'warn',
-        message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) skipped: ${message} — lanjut ke topik berikut`
+        message: `topic "${topic.topic.slice(0, 80)}" (${topic.id}) × ${platform.slug} skipped: ${message} — lanjut ke pasangan berikut`
       });
     }
   }
 
-  // Jika SEMUA topik pending gagal, tandai failed agar admin tahu.
-  // Basis: hanya pendingTopics (topik yang dicoba run ini), bukan allTopics.
+  // Jika SEMUA pasangan batch gagal, tandai failed agar admin tahu.
+  const batchKeys = batch.map(({ topic, platform }) => `${topic.id}|${platform.slug}`);
   const { data: afterDrafts } = await supabase
     .from('content_drafts')
-    .select('research_topic_id')
-    .in('research_topic_id', pendingTopics.map((t) => t.id));
+    .select('research_topic_id, platform_slug')
+    .in('research_topic_id', topicIds);
   const afterDone = new Set(
-    ((afterDrafts ?? []) as { research_topic_id: string | null }[])
-      .map((d) => d.research_topic_id)
-      .filter((v): v is string => Boolean(v))
+    ((afterDrafts ?? []) as { research_topic_id: string | null; platform_slug: string | null }[])
+      .map((d) => `${d.research_topic_id}|${d.platform_slug ?? 'all'}`)
   );
-  const newDraftCount = pendingTopics.filter((t) => afterDone.has(t.id)).length;
+  const newDraftCount = batchKeys.filter((k) => afterDone.has(k)).length;
   if (newDraftCount <= 0) {
     await supabase
       .from('content_research_sessions')
-      .update({ status: 'failed', error_message: `developing: ${pendingTopics.length} topik gagal (lihat log warn per-topik)` })
+      .update({ status: 'failed', error_message: `developing: ${batch.length} pasangan gagal (lihat log warn per-pasangan)` })
       .eq('id', sessionId);
+    return 0;
   }
+  const remaining = pendingPairs.length - newDraftCount;
+  if (remaining > 0) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'info',
+      message: `developing progress: ${pendingPairs.length - remaining}/${pendingPairs.length} pasangan selesai (${remaining} tersisa, lanjut tick berikut)`
+    });
+  }
+  return remaining;
 }
 
 async function generateAndInsertDraft(
@@ -303,9 +356,53 @@ async function generateAndInsertDraft(
   }
 
   // Replace placeholders only when an affiliate was selected.
-  const replaced = affiliate
+  let finalThread = affiliate
     ? replacePlaceholders(working, affiliate.product.url)
     : working;
+
+  // Validasi panjang terhadap batas platform (teks final, URL asli).
+  // Over → 1x retry-shorten; masih over → simpan + tandai (jangan gagal sunyi).
+  let lengthIssues = auditThreadLength(finalThread, platform.maxChars);
+  if (lengthIssues.length > 0) {
+    const overDesc = lengthIssues
+      .slice(0, 6)
+      .map((o) => `post-${o.post} ${o.lang} (${o.chars}/${o.max})`)
+      .join(', ');
+    const retryShort = await runLLMCompletion(supabase, {
+      requestId: null,
+      sessionId,
+      stage: 'developing',
+      providerId: devModel.providerId,
+      modelUuid: devModel.modelUuid,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `${user}\n\nPENTING: post berikut MELEBIHI batas maksimum platform: ${overDesc}. Tulis ulang thread yang SAMA tetapi pendekkan post tersebut hingga ≤ batas (HARD LIMIT), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
+      ],
+      temperature: 0.3,
+      maxTokens: 3200
+    }).catch(() => null);
+    const parsedShort = retryShort ? parseThread(retryShort.output.text) : null;
+    if (parsedShort) {
+      let ws = parsedShort;
+      if (affiliate) {
+        const repositioned = repositionPlaceholder(parsedShort, 'middle');
+        ws = repositioned.thread;
+        resolvedPostIndex = repositioned.postIndex;
+      }
+      finalThread = affiliate ? replacePlaceholders(ws, affiliate.product.url) : ws;
+      activeLlm = retryShort;
+      lengthIssues = auditThreadLength(finalThread, platform.maxChars);
+    }
+  }
+  const overLimit = lengthIssues.length > 0;
+  if (overLimit) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'warn',
+      message: `topic ${topicId} × ${platform.slug}: ${lengthIssues.length} post melebihi ${platform.maxChars} char (${lengthIssues.slice(0, 4).map((o) => `post-${o.post} ${o.lang} ${o.chars}`).join(', ')}) — draf disimpan dengan tanda, edit sebelum posting`
+    });
+  }
 
   // Look up provider_id from slug (for the foreign key).
   const { data: providerRow } = await supabase
@@ -337,14 +434,19 @@ async function generateAndInsertDraft(
     provider_id: providerId,
     model_id: resolvedLlm.model,
     research_topic_id: topicId,
-    generated_thread: replaced as unknown as Record<string, unknown>,
+    platform_slug: platform.slug,
+    generated_thread: finalThread as unknown as Record<string, unknown>,
     affiliate_injections: injection as unknown as Record<string, unknown>[],
     status: 'needs_review',
     llm_meta: {
       provider: resolvedLlm.providerSlug,
       model: resolvedLlm.model,
       latency_ms: resolvedLlm.latencyMs,
-      key_hash: resolvedLlm.keyHash
+      key_hash: resolvedLlm.keyHash,
+      platform: platform.slug,
+      max_chars: platform.maxChars,
+      over_limit: overLimit,
+      length_audit: lengthIssues
     },
     affiliate_match_score: affiliate?.matchScore ?? null,
     affiliate_match_signals: affiliate
@@ -366,7 +468,7 @@ async function generateAndInsertDraft(
     stage: 'developing',
     level: 'info',
     message: affiliate
-      ? `draft generated with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})`
-      : 'draft generated without affiliate (empty pool)'
+      ? `draft generated [${platform.slug}] with affiliate ${affiliate.product.friendly_code} (match ${affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}`
+      : `draft generated [${platform.slug}] without affiliate (empty pool)`
   });
 }

@@ -47,6 +47,7 @@ type TopicRow = {
 type DraftRow = {
   id: string;
   research_topic_id: string | null;
+  platform_slug: string | null;
   generated_thread: { main: { id: string; en: string } };
   affiliate_injections: Array<{ id: string; friendly_code: string; post_index: number }>;
   affiliate_match_score: number | null;
@@ -128,11 +129,11 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   if (topicIds.length > 0) {
     const { data: byTopic } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
       .in('research_topic_id', topicIds);
     const { data: byRequest } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
       .eq('request_id', sessionId);
     const merged = new Map<string, DraftRow>();
     for (const d of [...((byTopic ?? []) as DraftRow[]), ...((byRequest ?? []) as DraftRow[])]) merged.set(d.id, d);
@@ -140,7 +141,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
   } else {
     const { data: drafts } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
       .eq('request_id', sessionId);
     draftList = (drafts ?? []) as DraftRow[];
   }
@@ -393,7 +394,9 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           <p className="text-sm text-ink-muted">{t('noTopics')}</p>
         ) : (
           <ol className="space-y-2">
-            {list.map((tp) => (
+            {list.map((tp) => {
+              const plats = draftList.filter((d) => d.research_topic_id === tp.id).map((d) => d.platform_slug ?? 'all');
+              return (
               <li key={tp.id}>
                 <Link
                   href={{
@@ -408,6 +411,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
                     </p>
                     <p className="text-xs text-ink-muted">
                       {tp.category ?? '-'} · verify: {tp.verification_status} · status: {tp.status}
+                      {plats.length > 0 ? ` · draf: ${plats.join(', ')}` : ' · draf: -'}
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-ink">
@@ -415,7 +419,8 @@ export default async function ResearchSessionPage({ params }: PageProps) {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ol>
         )}
       </section>
