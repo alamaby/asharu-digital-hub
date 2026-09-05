@@ -429,6 +429,9 @@ export async function generateIdea(formData: FormData): Promise<GenerateIdeaResu
   const allowedCategoriesHint = pick(raw.allowedCategories);
   const excludedCategoriesHint = pick(raw.excludedCategories);
   const pastedUrls = extractUrls(`${raw.topic ?? ''} ${raw.keywords ?? ''} ${raw.purpose ?? ''}`);
+  // Mekanisme dua: produk terpilih menjadi bahan ide (hint LLM saja —
+  // sesi buat-ulang tetap validasi ID produk ke DB).
+  const ideaProducts = formData.getAll('ideaProduct').map((v) => String(v).trim()).filter(Boolean);
 
   // Variety seed: tiap klik harus menghasilkan ide BERBEDA meski hint sama.
   const varietySeed = `${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffff).toString(16)}`;
@@ -477,9 +480,10 @@ WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
   "allowedCategories": "kategori diperbolehkan pisah koma",
   "excludedCategories": "kategori dihindari pisah koma"
 }
-Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"); JANGAN mengulang ide umum yang sudah sering dipakai — variasikan sudut, audiens, dan kategori. Hormati hint user yang sudah diisi (jangan ubah maknanya, pertajam). Bahasa output ${languageHint}.`;
+Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"); JANGAN mengulang ide umum yang sudah sering dipakai — variasikan sudut, audiens, dan kategori. Hormati hint user yang sudah diisi (jangan ubah maknanya, pertajam). Bahasa output ${languageHint}.${ideaProducts.length > 0 ? ' Topik/angle/audience/keywords WAJIB dibangun di sekitar PRODUK TETAP di bawah agar sisipan produk natural; jangan klaim fitur, harga, atau manfaat di luar nama produk yang diberikan.' : ''}`;
   const hintLines = [
     `platform=${platformHint}`,
+    ideaProducts.length > 0 ? `PRODUK TETAP (bangun topik di sekitar produk ini)=${ideaProducts.join(' | ')}` : null,
     toneHint ? `tone=${toneHint}` : null,
     `language=${languageHint}`,
     topicHint ? `topik existing (JANGAN ulangi, buat sudut BERBEDA)=${topicHint}` : null,

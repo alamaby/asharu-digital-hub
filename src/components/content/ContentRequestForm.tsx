@@ -28,6 +28,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [ideaGenerating, setIdeaGenerating] = useState(false);
   const [ideaApplied, setIdeaApplied] = useState(false);
+  const [ideaCoverage, setIdeaCoverage] = useState<{ filled: number; total: number; missing: string[] } | null>(null);
   const [ideaError, setIdeaError] = useState<string | null>(null);
   const [, startIdeaTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -38,7 +39,9 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
   const [selPlatforms, setSelPlatforms] = useState<string[]>(() => realPlatforms.map((p) => p.slug));
   // Mekanisme riset: 'satu' topik-dulu | 'dua' produk-dulu (1-2 produk tetap).
   const [mechanism, setMechanism] = useState<'satu' | 'dua'>('satu');
-  const [mechProducts, setMechProducts] = useState<{ id: string; name: string }[]>([]);
+  const [mechProducts, setMechProducts] = useState<
+    { id: string; name: string; image?: string; category?: string; merchant?: string; url?: string }[]
+  >([]);
   const [mechPickerOpen, setMechPickerOpen] = useState(false);
   const [tone, setTone] = useState('casual');
   const [language, setLanguage] = useState('both');
@@ -71,11 +74,21 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
   function handleGenerateIdea() {
     setIdeaError(null);
     setIdeaApplied(false);
+    setIdeaCoverage(null);
     setIdeaGenerating(true);
     startIdeaTransition(async () => {
       // Collect all current field states as hints so the idea varies with input
       const fd = new FormData();
       fd.set('platform', selPlatforms.length === 1 ? selPlatforms[0]! : 'all');
+      // Mekanisme dua: produk terpilih menjadi bahan ide LLM.
+      if (mechanism === 'dua') {
+        for (const p of mechProducts) {
+          fd.append(
+            'ideaProduct',
+            `${p.name}${p.category ? ` [${p.category}]` : ''}${p.merchant ? ` — ${p.merchant}` : ''}`
+          );
+        }
+      }
       fd.set('tone', tone);
       fd.set('language', language);
       if (topic) fd.set('topic', topic);
@@ -125,6 +138,24 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       if (i.excludedCategories !== undefined) setExcludedCategories(i.excludedCategories!);
       setShowAdvanced(true);
       setIdeaApplied(true);
+      // Banner kelengkapan: hitung field yang diisi LLM dari 17 kunci ide.
+      const ideaRecord = i as unknown as Record<string, unknown>;
+      const allKeys = ['topic', 'platform', 'tone', 'language', 'targetCategory', 'audience', 'ctaStyle', 'purpose', 'constraints', 'keywords', 'targetLocation', 'secondaryLocation', 'audienceAge', 'audienceInterests', 'accountGoal', 'allowedCategories', 'excludedCategories'];
+      const missing = allKeys.filter((k) => {
+        const v = ideaRecord[k];
+        return v === undefined || (typeof v === 'string' && v.trim() === '');
+      });
+      setIdeaCoverage({
+        filled: allKeys.length - missing.length,
+        total: allKeys.length,
+        missing: missing.map((k) => {
+          try {
+            return t(k);
+          } catch {
+            return k;
+          }
+        })
+      });
       setFieldErrors({});
     });
   }
@@ -171,6 +202,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       setSelPlatforms(realPlatforms.map((p) => p.slug));
       setMechanism('satu');
       setMechProducts([]);
+      setIdeaCoverage(null);
       setAudience('');
       setPurpose('');
       setKeywords('');
@@ -267,59 +299,6 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
 
       <div>
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="topic" className="block text-sm font-medium text-ink">
-            {t('topic')} <span className="text-red-600">*</span>
-          </label>
-          <button
-            type="button"
-            onClick={handleGenerateIdea}
-            disabled={ideaGenerating || pending}
-            aria-busy={ideaGenerating}
-            className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {ideaGenerating ? (
-              <>
-                <svg viewBox="0 0 20 20" fill="none" className="size-3.5 animate-spin" aria-hidden>
-                  <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
-                  <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-                <span>{t('generating')}</span>
-              </>
-            ) : (
-              <>
-                <span aria-hidden>✦</span>
-                <span>{t('generateIdea')}</span>
-              </>
-            )}
-          </button>
-        </div>
-        <textarea
-          id="topic"
-          name="topic"
-          required
-          rows={3}
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder={t('topicPlaceholder')}
-          disabled={pending || ideaGenerating}
-          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-        />
-        {fieldErrors.topic ? <p className="mt-1 text-xs text-red-600">{fieldErrors.topic}</p> : null}
-        {ideaApplied ? (
-          <p role="status" aria-live="polite" className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-            {t('ideaApplied')}
-          </p>
-        ) : null}
-        {ideaError ? (
-          <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
-            {ideaError}
-          </p>
-        ) : null}
-        <p className="mt-1 text-xs text-ink-muted">{t('generateIdeaHint')}</p>
-      </div>
-
-      <div>
         <fieldset>
           <legend className="block text-sm font-medium text-ink">
             {t('mechanism')} <span className="text-red-600">*</span>
@@ -363,10 +342,37 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
               <input key={p.id} type="hidden" name="productIds" value={p.id} />
             ))}
             {mechProducts.length > 0 ? (
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {mechProducts.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm text-ink">
-                    <span className="truncate">{p.name}</span>
+                  <li key={p.id} className="flex items-center gap-3 rounded-lg border border-line bg-background p-2">
+                    {p.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        className="size-12 shrink-0 rounded-lg border border-line object-cover"
+                      />
+                    ) : null}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink">{p.name}</span>
+                      <span className="block truncate text-xs text-ink-muted">
+                        {[p.category, p.merchant].filter(Boolean).join(' · ')}
+                      </span>
+                      {p.url ? (
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-primary underline"
+                        >
+                          {t('viewProduct')} ↗
+                        </a>
+                      ) : null}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setMechProducts((prev) => prev.filter((x) => x.id !== p.id))}
@@ -414,6 +420,67 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
             ) : null}
           </div>
         ) : null}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="topic" className="block text-sm font-medium text-ink">
+            {t('topic')} <span className="text-red-600">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={handleGenerateIdea}
+            disabled={ideaGenerating || pending}
+            aria-busy={ideaGenerating}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {ideaGenerating ? (
+              <>
+                <svg viewBox="0 0 20 20" fill="none" className="size-3.5 animate-spin" aria-hidden>
+                  <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+                  <path d="M18 10a8 8 0 00-8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                <span>{t('generating')}</span>
+              </>
+            ) : (
+              <>
+                <span aria-hidden>✦</span>
+                <span>{t('generateIdea')}</span>
+              </>
+            )}
+          </button>
+        </div>
+        <textarea
+          id="topic"
+          name="topic"
+          required
+          rows={3}
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder={t('topicPlaceholder')}
+          disabled={pending || ideaGenerating}
+          className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+        />
+        {fieldErrors.topic ? <p className="mt-1 text-xs text-red-600">{fieldErrors.topic}</p> : null}
+        {ideaApplied ? (
+          <p role="status" aria-live="polite" className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            {t('ideaApplied')}
+          </p>
+        ) : null}
+        {ideaCoverage ? (
+          <div role="status" aria-live="polite" className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            <p>{t('ideaCompleteness', { filled: ideaCoverage.filled, total: ideaCoverage.total })}</p>
+            {ideaCoverage.missing.length > 0 ? (
+              <p className="mt-1 text-blue-800">{t('ideaMissingFields')}: {ideaCoverage.missing.join(', ')}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {ideaError ? (
+          <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+            {ideaError}
+          </p>
+        ) : null}
+        <p className="mt-1 text-xs text-ink-muted">{t('generateIdeaHint')}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

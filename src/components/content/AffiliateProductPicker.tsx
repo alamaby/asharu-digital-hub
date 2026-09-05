@@ -15,6 +15,15 @@ interface Product {
   image: string;
 }
 
+export interface PickerSelection {
+  id: string;
+  name: string;
+  image: string;
+  category: string;
+  merchant: string;
+  url: string;
+}
+
 const LATEST_LIMIT = 20;
 const SEARCH_LIMIT = 30;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -35,7 +44,7 @@ interface Props {
   multi?: boolean;
   maxSelect?: number;
   initialSelectedIds?: string[];
-  onConfirmSelect?: (items: { id: string; name: string }[]) => void;
+  onConfirmSelect?: (items: PickerSelection[]) => void;
 }
 
 export function AffiliateProductPicker({ currentProductId, onSelect, onClose, multi = false, maxSelect = 2, initialSelectedIds = [], onConfirmSelect }: Props) {
@@ -231,11 +240,22 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
             <button
               type="button"
               disabled={multiSelected.size === 0}
-              onClick={() =>
+              onClick={() => {
+                const byId = new Map(products.map((p) => [p.id, p]));
                 onConfirmSelect?.(
-                  [...multiSelected.entries()].map(([id, name]) => ({ id, name }))
-                )
-              }
+                  [...multiSelected.keys()].map((id) => {
+                    const p = byId.get(id);
+                    return {
+                      id,
+                      name: p?.name_id ?? multiSelected.get(id) ?? id,
+                      image: p?.image ?? '',
+                      category: p?.category ?? '',
+                      merchant: p?.merchant ?? '',
+                      url: p?.url ?? ''
+                    };
+                  })
+                );
+              }}
               className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t('pickerConfirm')}

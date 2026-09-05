@@ -29,4 +29,11 @@ describe('ContentRequestForm', () => {
     expect(screen.getByRole('radio', { name: /Mekanisme 1/ })).toBeChecked();
     expect(screen.queryByText(/Belum ada produk dipilih/)).not.toBeInTheDocument();
   });
+
+  it('orders mechanism before topic in the form', () => {
+    renderWithMessages(<ContentRequestForm platforms={[{ slug: 'threads', display_name: 'Threads' }]} categories={mockCategories} />);
+    const legend = screen.getByText('Mekanisme riset', { selector: 'legend' });
+    const topic = screen.getByLabelText('Topik / angle *');
+    expect(legend.compareDocumentPosition(topic) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
