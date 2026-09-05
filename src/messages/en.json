@@ -381,6 +381,8 @@
       "loading": "Loading drafts...",
       "backToList": "Back to draft list",
       "notFound": "Draft not found.",
+      "viewSourceResearch": "View source research",
+      "researchLink": "Research",
       "productChip": "Product ASH-{code}",
       "postMain": "Main Post",
       "reply": "Reply {n}",

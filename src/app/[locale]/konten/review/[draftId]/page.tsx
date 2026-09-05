@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { createSupabaseService } from '@/lib/supabase/server';
+import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
@@ -119,6 +120,17 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
   const tz = await getDisplayTimezone();
 
+  // Link ke riset sumber via research_topic_id (draf legacy tanpa topik → disembunyikan).
+  let sourceSessionId: string | null = null;
+  if (d.research_topic_id) {
+    const { data: topicRow } = await supabase!
+      .from('content_research_topics')
+      .select('session_id')
+      .eq('id', d.research_topic_id)
+      .maybeSingle();
+    sourceSessionId = (topicRow as { session_id: string | null } | null)?.session_id ?? null;
+  }
+
   // For regen_affiliate picker: fetch active providers/models (admin only, service client)
   let regenProviders: { id: string; slug: string; display_name: string }[] = [];
   let regenModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
@@ -131,16 +143,29 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between gap-2">
+    <div>
+      <AdminTopBar />
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={{ pathname: '/konten/review' }} className="text-sm text-primary hover:underline">
           ← {t('backToList')}
         </Link>
-        <span className="text-xs text-ink-muted">{formatDateTime(draft.created_at as string, locale, tz)}</span>
+        <div className="flex items-center gap-3">
+          {sourceSessionId ? (
+            <Link
+              href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId: sourceSessionId } }}
+              className="text-sm text-primary hover:underline"
+            >
+              {t('viewSourceResearch')} →
+            </Link>
+          ) : null}
+          <span className="text-xs text-ink-muted">{formatDateTime(draft.created_at as string, locale, tz)}</span>
+        </div>
       </div>
 
       <div className="mt-4">
         <ContentDraftCard draft={{ ...d, affiliate_injections: enrichedInjections }} regenProviders={regenProviders} regenModels={regenModels} />
+      </div>
       </div>
     </div>
   );

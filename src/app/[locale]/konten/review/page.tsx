@@ -102,6 +102,23 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
   const { data: platOpts } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
   const platformOptions = (platOpts ?? []) as { slug: string; display_name: string }[];
 
+  // Map research_topic_id → session_id untuk link riset sumber per kartu (1 query).
+  const visibleTopicIds = [...new Set(
+    drafts
+      .map((d) => (d as unknown as { research_topic_id?: string | null }).research_topic_id)
+      .filter((v): v is string => Boolean(v))
+  )];
+  let topicSessionMap: Record<string, string> = {};
+  if (visibleTopicIds.length > 0) {
+    const { data: topicRows } = await supabase
+      .from('content_research_topics')
+      .select('id, session_id')
+      .in('id', visibleTopicIds);
+    topicSessionMap = Object.fromEntries(
+      ((topicRows ?? []) as { id: string; session_id: string }[]).map((r) => [r.id, r.session_id])
+    );
+  }
+
   return (
     <div>
       <AdminTopBar />
@@ -109,7 +126,7 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
         <p className="mt-2 text-sm text-ink-muted">{t('realtime')}</p>
 
-        <ReviewListClient drafts={drafts as never} platforms={platformOptions} filters={sp} page={sp.page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} locale={locale} error={draftsError?.message ?? null} />
+        <ReviewListClient drafts={drafts as never} topicSessionMap={topicSessionMap} platforms={platformOptions} filters={sp} page={sp.page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} locale={locale} error={draftsError?.message ?? null} />
       </div>
     </div>
   );

@@ -381,6 +381,8 @@
       "loading": "Memuat draf...",
       "backToList": "Kembali ke daftar draf",
       "notFound": "Draf tidak ditemukan.",
+      "viewSourceResearch": "Lihat riset sumber",
+      "researchLink": "Riset",
       "productChip": "Produk ASH-{code}",
       "postMain": "Post Utama",
       "reply": "Balasan {n}",

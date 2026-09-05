@@ -6,7 +6,8 @@ import { Link as I18nLink, usePathname, useRouter } from '@/i18n/navigation';
 import NextLink from 'next/link';
 
 interface Props {
-  drafts: Array<{ id: string; status: string; created_at: string; generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] }; affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[]; llm_meta?: { provider: string; model: string } }>;
+  drafts: Array<{ id: string; status: string; created_at: string; research_topic_id?: string | null; generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] }; affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[]; llm_meta?: { provider: string; model: string } }>;
+  topicSessionMap: Record<string, string>;
   platforms: { slug: string; display_name: string }[];
   filters: { status: string; provider: string; platform: string; date: string; sort: string; page: number };
   page: number;
@@ -17,7 +18,7 @@ interface Props {
   error: string | null;
 }
 
-export function ReviewListClient({ drafts, platforms, filters, page, totalPages, totalCount, locale, error }: Props) {
+export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, page, totalPages, totalCount, locale, error }: Props) {
   const t = useTranslations('content.review');
   const pathname = usePathname();
   const router = useRouter();
@@ -107,22 +108,34 @@ export function ReviewListClient({ drafts, platforms, filters, page, totalPages,
           drafts.map((d) => {
             const snippet = d.generated_thread.main.id.slice(0, 120);
             const inj = d.affiliate_injections[0];
+            const sessionId = (d.research_topic_id && topicSessionMap[d.research_topic_id]) || null;
             return (
-              <NextLink
-                key={d.id}
-                href={`/${locale}/konten/review/${d.id}`}
-                className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center rounded-full border bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{d.status}</span>
-                  <span className="text-xs text-ink-muted">{new Date(d.created_at).toLocaleString(locale)}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-sm text-ink">{snippet}</p>
-                <div className="mt-2 flex items-center gap-2 text-xs text-ink-muted">
-                  {inj ? <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">ASH-{inj.friendly_code.replace('ASH-', '')}</span> : null}
-                  {d.llm_meta ? <span>{d.llm_meta.provider} · {d.llm_meta.model}</span> : null}
-                </div>
-              </NextLink>
+              <div key={d.id}>
+                <NextLink
+                  href={`/${locale}/konten/review/${d.id}`}
+                  className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="inline-flex items-center rounded-full border bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{d.status}</span>
+                    <span className="text-xs text-ink-muted">{new Date(d.created_at).toLocaleString(locale)}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm text-ink">{snippet}</p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-ink-muted">
+                    {inj ? <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">ASH-{inj.friendly_code.replace('ASH-', '')}</span> : null}
+                    {d.llm_meta ? <span>{d.llm_meta.provider} · {d.llm_meta.model}</span> : null}
+                  </div>
+                </NextLink>
+                {sessionId ? (
+                  <div className="mt-1 text-right">
+                    <I18nLink
+                      href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId } }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {t('researchLink')} →
+                    </I18nLink>
+                  </div>
+                ) : null}
+              </div>
             );
           })
         )}
