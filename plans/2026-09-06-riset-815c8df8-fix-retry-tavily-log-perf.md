@@ -26,6 +26,7 @@ Perbaiki gagal discovery-empty pada sesi 815c8df8, beri user cara ulang riset ga
 - [x] T5 Log search generik (search_call_logs: provider_slug/operation/queries/latency/result/error/payload/summary)
 - [x] T6 Menu LLM log lengkap (tab LLM/Search + kolom total/finish/fallback + detail sesi)
 - [x] T7 Perf lengkap (total_tokens/finish_reason/is_fallback + index session/stage)
+- [x] T9 Skor 0 sunyi + LLM (0): scoring maxTokens/parser/validasi-ID/throw-jujur, verification sama, RLS admin read llm_call_logs, gemini total
 - [ ] T8 Verifikasi sesi 815c8df8 via tombol Ulangi (butuh user klik; sesi anon created_by null → hanya admin bisa retry)
 
 ## Risks
@@ -38,6 +39,7 @@ Perbaiki gagal discovery-empty pada sesi 815c8df8, beri user cara ulang riset ga
 ## Progress Log
 
 - 2026-09-06 — Diagnosis + implementasi selesai; typecheck/lint/263 tests hijau; migrasi search_logs_llm_perf + research_owner_retry applied production.
+- 2026-09-06 — Follow-up: skor 0 = scoring LLM output terpotong (tanpa maxTokens + regex greedy → parse [] sunyi); LLM (0) = RLS no_read blokir user-JWT di detail admin. Fix: maxTokens scoring 4000/verifying 2000, parser brace-matched + validasi ID + throw jujur, policy llm_call_logs_admin_read, gemini total. Gate hijau (typecheck/lint/52 tests). Data sesi ini tidak di-backfill (breakdown #3 terpotong).
 - 2026-09-06 — Menunggu verifikasi E2E: klik Ulangi pada sesi gagal (admin untuk sesi anon).
 
 ## Notes

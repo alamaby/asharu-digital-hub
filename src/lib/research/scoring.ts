@@ -87,15 +87,29 @@ export async function runScoring(
       { role: 'system', content: system },
       { role: 'user', content: user }
     ],
-    temperature: 0.2
+    temperature: 0.2,
+    // Hasil 3+ topik × 10 field breakdown ≈ panjang; tanpa batas eksplisit
+    // output bisa terpotong → parse gagal → skor 0 sunyi (kasus 815c8df8).
+    maxTokens: 4000
   });
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
     stage: 'scoring',
     level: 'info',
-    message: `scoring LLM raw (first 2000 chars): ${result.output.text.slice(0, 2000)}`
+    message: `scoring LLM raw (${result.output.text.length} chars, first 2000 chars): ${result.output.text.slice(0, 2000)}`
   });
   const parsed = parseScoringOutput(result.output.text, topics as TopicForScoring[]);
+  if (parsed.length === 0) {
+    // Gagal jujur: jangan lanjut dengan skor 0 sunyi (admin shortlist buta).
+    // Orchestrator menandai failed → bisa resume (topik tetap ada).
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'scoring',
+      level: 'error',
+      message: `scoring LLM returned no valid scores (${result.output.text.length} chars). Cek log LLM raw output, lalu resume.`
+    });
+    throw new Error('Scoring LLM tidak mengembalikan skor valid (0 topik). Coba resume setelah cek model.');
+  }
   for (const item of parsed) {
     if (!item.topic_id) continue;
     const final = computeFinalScore(item.score_breakdown);
@@ -105,7 +119,8 @@ export async function runScoring(
         score_breakdown: { ...item.score_breakdown, final_score: final },
         final_score: final
       })
-      .eq('id', item.topic_id);
+      .eq('id', item.topic_id)
+      .eq('session_id', sessionId);
   }
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
@@ -152,22 +167,55 @@ function serializeTopics(topics: TopicForScoring[]): {
 }
 
 function parseScoringOutput(text: string, candidates: TopicForScoring[]): ScoringLLMOutput['results'] {
-  const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+  const trimmed = text
+    .replace(/^[\s\S]*?```(?:json)?\s*/i, (m) => (m.includes('```') ? '' : m))
+    .replace(/```[\s\S]*$/i, '')
+    .trim();
+  if (!trimmed) return [];
   let data: ScoringLLMOutput;
   try {
     data = JSON.parse(trimmed) as ScoringLLMOutput;
   } catch {
-    const m = trimmed.match(/\{[\s\S]*\}/);
-    if (!m) return [];
+    // Regex greedy /\{[\s\S]*\}/ gagal untuk output terpotong (kurung tak
+    // seimbang) — ambil blok JSON terbesar yang brace-nya seimbang.
+    const extracted = extractLargestJson(trimmed);
+    if (!extracted) return [];
     try {
-      data = JSON.parse(m[0]) as ScoringLLMOutput;
+      data = JSON.parse(extracted) as ScoringLLMOutput;
     } catch {
       return [];
     }
   }
+  const validIds = new Set(candidates.map((c) => c.id));
   const results = data.results ?? [];
-  return results.map((r, i) => ({
+  const mapped = results.map((r, i) => ({
     ...r,
     topic_id: r.topic_id ?? candidates[i]?.id
   }));
+  // Tolak ID halusinasi (tidak ada di kandidat) agar tidak update baris asing;
+  // skor parsial tetap dipakai untuk ID yang valid.
+  return mapped.filter((r) => r.topic_id && validIds.has(r.topic_id));
+}
+
+/** Ambil blok JSON terbesar (brace-matched) agar output terpotong/prefix reasoning tidak merusak parse. */
+function extractLargestJson(s: string): string | null {
+  let best: string | null = null;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        const cand = s.slice(start, i + 1);
+        if (!best || cand.length > best.length) best = cand;
+        start = -1;
+      }
+      if (depth < 0) depth = 0;
+    }
+  }
+  return best;
 }

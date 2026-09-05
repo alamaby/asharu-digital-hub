@@ -59,7 +59,8 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
       { role: 'system', content: system },
       { role: 'user', content: user }
     ],
-    temperature: 0.2
+    temperature: 0.2,
+    maxTokens: 2000
   });
   const parsed = parseVerificationOutput(result.output.text, candidates);
   if (parsed.length === 0) {
@@ -82,7 +83,8 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
     await supabase
       .from('content_research_topics')
       .update({ verification_status: status })
-      .eq('id', v.topic_id);
+      .eq('id', v.topic_id)
+      .eq('session_id', sessionId);
   }
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
@@ -93,23 +95,53 @@ export async function runVerification(supabase: SupabaseClient, sessionId: strin
 }
 
 function parseVerificationOutput(text: string, candidates: TopicCandidate[]): VerificationOutputItem[] {
-  const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+  const trimmed = text
+    .replace(/^[\s\S]*?```(?:json)?\s*/i, (m) => (m.includes('```') ? '' : m))
+    .replace(/```[\s\S]*$/i, '')
+    .trim();
+  if (!trimmed) return [];
   let data: VerificationLLMOutput;
   try {
     data = JSON.parse(trimmed) as VerificationLLMOutput;
   } catch {
-    const m = trimmed.match(/\{[\s\S]*\}/);
-    if (!m) return [];
+    const extracted = extractLargestJson(trimmed);
+    if (!extracted) return [];
     try {
-      data = JSON.parse(m[0]) as VerificationLLMOutput;
+      data = JSON.parse(extracted) as VerificationLLMOutput;
     } catch {
       return [];
     }
   }
   const results = data.results ?? [];
+  const validIds = new Set(candidates.map((c) => c.id));
   // If LLM didn't include topic_id, map by index
-  return results.map((r, i) => ({
-    ...r,
-    topic_id: r.topic_id ?? candidates[i]?.id
-  }));
+  return results
+    .map((r, i) => ({
+      ...r,
+      topic_id: r.topic_id ?? candidates[i]?.id
+    }))
+    .filter((r) => r.topic_id && validIds.has(r.topic_id));
+}
+
+/** Ambil blok JSON terbesar (brace-matched) agar output terpotong tidak merusak parse. */
+function extractLargestJson(s: string): string | null {
+  let best: string | null = null;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        const cand = s.slice(start, i + 1);
+        if (!best || cand.length > best.length) best = cand;
+        start = -1;
+      }
+      if (depth < 0) depth = 0;
+    }
+  }
+  return best;
 }
