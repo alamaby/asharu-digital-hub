@@ -50,6 +50,7 @@ Last updated: 2026-09-06 00:00 (local time)
 
 ## Recent Entries
 
+- [105839-threads-auto-post-queue.md](2026-09-06/105839-threads-auto-post-queue.md) — Auto-post Threads @asharu.id: antrean terjadwal, full-text chain, config-by-table (social_*), worker + OAuth + /admin/sosial; migrasi committed (belum applied prod); Fase 0 Meta App = user action; 283 tests hijau, pushed.
 - [2026-09-06 000000-riset-815c8df8-empty-fallback-searchlog-retry.md](2026-09-06/000000-riset-815c8df8-empty-fallback-searchlog-retry.md) — Fix 815c8df8: empty-LLM guard + auto-fallback + self-retry owner + search_call_logs generik + kolom perf; migrasi applied; gate hijau.
 - [2026-09-06 173000-riset-815c8df8-skor-nol-llm-nol.md](2026-09-06/173000-riset-815c8df8-skor-nol-llm-nol.md) — Follow-up 815c8df8: skor 0 = scoring terpotong + parse sunyi (fix: maxTokens/parser/throw jujur); LLM (0) = RLS no_read (fix: policy admin read); gate hijau, tanpa backfill.
 - [2026-09-06 175000-affiliate-picker-full-search.md](2026-09-06/175000-affiliate-picker-full-search.md) — Picker afiliasi: daftar awal tetap 20 terbaru, search keyword query semua produk (ilike + limit 30 + debounce); gate hijau, tanpa migrasi.
