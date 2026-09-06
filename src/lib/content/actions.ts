@@ -873,11 +873,13 @@ export async function advanceToDevelopment(
       return { success: false, error: 'no shortlisted topics' };
     }
     // Conditional update so we don't accidentally advance a non-pending session.
+    // current_stage_started_at di-backdate agar cron (guard 5 mnt) langsung
+    // memungut sesi ini — UI tidak menunggu LLM, backend lanjut via cron.
     const { data, error } = await supabase
       .from('content_research_sessions')
       .update({
         status: 'developing',
-        current_stage_started_at: new Date().toISOString(),
+        current_stage_started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
@@ -887,17 +889,12 @@ export async function advanceToDevelopment(
     if (error) return { success: false, error: error.message };
     if (!data) return { success: false, error: 'session not in awaiting_selection' };
 
-    // Inline-run the development stage so the admin sees the draft within
-    // ~30-60s instead of waiting up to 10 minutes for the pg_cron tick. The
-    // cron stays as a safety net for stuck sessions; the back-dated
-    // current_stage_started_at above already lets cron re-pick if this inline
-    // call times out or throws. Errors here are surfaced but do not roll back
-    // the transition — cron will retry.
-    try {
-      const { advanceStage } = await import('@/lib/research/orchestrator'); await advanceStage(supabase, sessionId);
-    } catch (e) {
-      return { success: true, error: `stage transitioned but inline run failed: ${e instanceof Error ? e.message : String(e)}` };
-    }
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'info',
+      message: 'admin advanced to developing — backend melanjutkan via cron (6 pasangan per tick)'
+    });
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
