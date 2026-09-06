@@ -74,8 +74,9 @@ export async function GET(request: NextRequest) {
       .eq('vault_secret_name', 'threads_access_token_asharu_id');
     if (updError) throw new Error(updError.message);
 
-    const site = env.siteUrl;
-    return NextResponse.redirect(`${site}/id/admin/sosial?oauth=ok&user=${userId}`);
+    // Kembali ke origin pemanggil (localhost saat seeding lokal, asharu.id di prod).
+    const origin = request.nextUrl.origin;
+    return NextResponse.redirect(`${origin}/id/admin/sosial?oauth=ok&user=${userId}`);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: message }, { status: 502 });

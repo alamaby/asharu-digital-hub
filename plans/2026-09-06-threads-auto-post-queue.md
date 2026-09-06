@@ -51,6 +51,8 @@ Keputusan user: trigger = antrean terjadwal; bahasa = pilih saat approve; cakupa
 
 - 2026-09-06 12:00:00 — Plan dibuat (keputusan: queue terjadwal, lang override, full-text chain, Meta App belum ada).
 - 2026-09-06 12:00:00 — Mulai Fase 1: migrasi + lib + worker.
+- 2026-09-06 10:58:00 — Fase 1 selesai + push (submodule `464797b`, parent `8d9d638`); 283 tests hijau. Callback OAuth dipoles (redirect ikut origin).
+- 2026-09-06 11:05:00 — Fase 0 lanjut: `THREADS_APP_ID` + `THREADS_APP_SECRET` terverifikasi terisi di `.env.local` (nilai tak pernah di-print); authorize URL dibuat untuk redirect prod `https://asharu.id/api/social/oauth/callback`. Blocker: migrasi belum applied di prod + secret belum di Vercel env.
 
 ## Notes
 
