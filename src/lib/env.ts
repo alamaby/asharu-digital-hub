@@ -88,6 +88,18 @@ const tavilyApiKeySchema = z.preprocess(
     .optional()
 );
 
+// Threads (Meta) — static app credentials only (Fase 0). The rotating
+// long-lived user token lives in Supabase Vault, never in env.
+const threadsAppIdSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().min(5, 'Threads App ID looks too short').optional()
+);
+const threadsAppSecretSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().min(10, 'Threads App Secret looks too short').optional()
+);
+const threadsRedirectUriSchema = z.preprocess(emptyToUndefined, httpsUrl.optional());
+
 const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: siteUrlSchema,
   NEXT_PUBLIC_GA_MEASUREMENT_ID: gaMeasurementIdSchema,
@@ -101,7 +113,10 @@ const envSchema = z.object({
   // Deprecated alias — will be removed after 2025-12. Prefer SUPABASE_SECRET_KEY.
   SUPABASE_SERVICE_ROLE_KEY: supabaseSecretKeySchema,
   CRON_SECRET: cronSecretSchema,
-  TAVILY_API_KEY: tavilyApiKeySchema
+  TAVILY_API_KEY: tavilyApiKeySchema,
+  THREADS_APP_ID: threadsAppIdSchema,
+  THREADS_APP_SECRET: threadsAppSecretSchema,
+  THREADS_REDIRECT_URI: threadsRedirectUriSchema
 });
 
 export interface ParsedEnv {
@@ -119,6 +134,9 @@ export interface ParsedEnv {
   supabaseServiceRoleKey?: string;
   cronSecret?: string;
   tavilyApiKey?: string;
+  threadsAppId?: string;
+  threadsAppSecret?: string;
+  threadsRedirectUri?: string;
   hasSupabase: boolean;
 }
 
@@ -155,6 +173,9 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     supabaseServiceRoleKey: secretKey,
     cronSecret: result.data.CRON_SECRET,
     tavilyApiKey: result.data.TAVILY_API_KEY,
+    threadsAppId: result.data.THREADS_APP_ID,
+    threadsAppSecret: result.data.THREADS_APP_SECRET,
+    threadsRedirectUri: result.data.THREADS_REDIRECT_URI,
     hasSupabase: Boolean(
       result.data.NEXT_PUBLIC_SUPABASE_URL && publishableKey
     )
