@@ -80,16 +80,16 @@ export default async function ResearchListPage({ params, searchParams }: PagePro
   const allowedPlatforms = new Set(platformOptions.map((p) => p.slug));
   const platform = sp.platform !== 'all' && allowedPlatforms.has(sp.platform) ? sp.platform : 'all';
 
-  let query = supabase.from('content_research_sessions').select('id, status, topic, target_location, platform_slug, created_at, error_message', { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
+  let query = supabase.from('content_research_sessions').select('id, status, topic, target_location, platform_slug, platform_slugs, created_at, error_message', { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
   if (sp.status !== 'all') query = query.eq('status', sp.status);
   if (platform !== 'all') {
     if (platform === 'all_null') query = query.is('platform_slug', null);
-    else query = query.eq('platform_slug', platform);
+    else query = query.or(`platform_slug.eq.${platform},platform_slugs.cs.{${platform}}`);
   }
   if (since) query = query.gte('created_at', since);
 
   const { data: sessions, error: sessionsError, count } = await query;
-  const list = (sessions ?? []) as Array<{ id: string; status: string; topic: string | null; target_location: string | null; platform_slug: string | null; created_at: string; error_message: string | null }>;
+  const list = (sessions ?? []) as Array<{ id: string; status: string; topic: string | null; target_location: string | null; platform_slug: string | null; platform_slugs: string[] | null; created_at: string; error_message: string | null }>;
   const totalCount = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 

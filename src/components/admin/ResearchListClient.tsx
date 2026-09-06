@@ -17,7 +17,7 @@ const STATUS_BG: Record<string, string> = {
 };
 
 interface Props {
-  sessions: Array<{ id: string; status: string; topic: string | null; target_location: string | null; platform_slug: string | null; created_at: string; error_message: string | null }>;
+  sessions: Array<{ id: string; status: string; topic: string | null; target_location: string | null; platform_slug: string | null; platform_slugs?: string[] | null; created_at: string; error_message: string | null }>;
   sessionsError: string | null;
   platforms: { slug: string; display_name: string }[];
   filters: { status: string; platform: string; date: string; sort: string; page: number };
@@ -120,7 +120,7 @@ export function ResearchListClient({ sessions, sessionsError, platforms, filters
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink">{s.topic ?? s.target_location ?? t('sessionLabel', { id: s.id.slice(0, 8) })}</p>
                   <p className="text-xs text-ink-muted">
-                    {s.platform_slug ?? t('platformAll')} · {formatDateTime(s.created_at, locale as never, timeZone)} · {s.target_location ?? '-'}
+                    {(s.platform_slugs && s.platform_slugs.length > 0 ? s.platform_slugs.join(', ') : s.platform_slug) ?? t('platformAll')} · {formatDateTime(s.created_at, locale as never, timeZone)} · {s.target_location ?? '-'}
                   </p>
                   {s.error_message ? <p className="truncate text-xs text-red-600">{s.error_message.slice(0, 80)}</p> : null}
                 </div>

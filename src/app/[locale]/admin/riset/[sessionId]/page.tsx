@@ -150,6 +150,16 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
   const list = (topics ?? []) as TopicRow[];
 
+  // Label platform sesi: platform_slugs (multi/checklist) > platform_slug
+  // tunggal > 'all'. Sesi lama (keduanya null) = Semua Platform (agnostik).
+  const platformSlugs = ((s as { platform_slugs?: string[] | null }).platform_slugs ?? []).filter(Boolean);
+  const sessionPlatformLabel =
+    platformSlugs.length > 0
+      ? platformSlugs.join(', ')
+      : s.platform_slug && s.platform_slug !== 'all'
+        ? s.platform_slug
+        : t('platformAll');
+
   // Produk tetap mekanisme dua (product-first) untuk badge header.
   let fixedProducts: { id: string; friendly_code: string; name_id: string }[] = [];
   const isDua = (s.mechanism ?? 'satu') === 'dua';
@@ -219,10 +229,10 @@ export default async function ResearchSessionPage({ params }: PageProps) {
 
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {s.topic ?? s.target_location ?? (s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
+          {s.topic ?? s.target_location ?? (platformSlugs.length > 0 ? platformSlugs.join(', ') : s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')) ?? t('sessionLabel', { id: s.id.slice(0, 8) })}
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {s.platform_slug && s.platform_slug !== 'all' ? s.platform_slug : t('platformAll')} · {t('languageLabel')}: {s.language ?? '—'} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}
+          {t('statusLabel')}: <span className="font-semibold">{s.status}</span> · {t('platformLabel')}: {sessionPlatformLabel} · {t('languageLabel')}: {s.language ?? '—'} · {t('createdLabel')}: {formatDateTime(s.created_at, locale, timeZone)}{s.status === 'completed' && s.updated_at ? ` · ${t('completedLabel')}: ${formatDateTime(s.updated_at, locale, timeZone)}` : ''}
         </p>
         {isDua ? (
           <p className="mt-2 text-sm text-ink">
@@ -382,17 +392,25 @@ export default async function ResearchSessionPage({ params }: PageProps) {
           </div>
           {draftList.map((d) => {
             const injection = d.affiliate_injections[0];
+            const matchText = d.affiliate_match_score === null || d.affiliate_match_score === undefined
+              ? t('fixedProduct')
+              : `match ${d.affiliate_match_score}`;
             return (
               <Link
                 key={d.id}
                 href={{ pathname: '/konten/review/[draftId]', params: { draftId: d.id } }}
                 className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
               >
-                <p className="text-sm font-medium text-ink">
-                  {d.generated_thread.main.id.slice(0, 120)}...
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {d.platform_slug ?? 'all'}
+                  </span>
+                  <span className="text-sm font-medium text-ink">
+                    {d.generated_thread.main.id.slice(0, 120)}...
+                  </span>
+                </div>
                 <p className="mt-1 text-xs text-ink-muted">
-                  {t('productLabel')}: {injection?.friendly_code ?? '-'} · match {d.affiliate_match_score ?? '-'} · status {d.status}
+                  {t('productLabel')}: {injection?.friendly_code ?? '-'} · {matchText} · status {d.status}
                 </p>
               </Link>
             );
