@@ -263,6 +263,14 @@ describe('repositionPlaceholder', () => {
     expect(postIndex).toBe(4);
   });
 
+  it('leaves placeholder within ±1 of target alone (kasus 679b2494: index 2 vs target 3)', () => {
+    const t = mk(7, 2); // LLM taruh di replies[2] = Balasan 3
+    const { thread: out, postIndex } = repositionPlaceholder(t, 'middle');
+    expect(out.replies[2]!.id).toContain(P); // tidak dipindah
+    expect(out.replies[3]!.id).not.toContain(P);
+    expect(postIndex).toBe(3);
+  });
+
   it('repositioned affiliate reply starts with opener', () => {
     const t = mk(4, -1);
     const { thread: out } = repositionPlaceholder(t, 'middle');
@@ -382,6 +390,25 @@ describe('affiliate opener rule', () => {
       product
     );
     expect(system).not.toContain('90% of max');
+  });
+
+  it('small caps get tiered length rule (twitter 280 → 70%, short sentences)', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'twitter', maxChars: 280 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('±70% of max 280');
+    expect(system).toContain('Shorter is better than over-limit');
+    expect(system).not.toContain('3-5 sentences');
+  });
+
+  it('affiliate placement names the exact reply and forbids split', () => {
+    const { system } = buildThreadPrompt(
+      { topic: 't', platform: { slug: 'threads', maxChars: 500 }, tone: 'casual', audience: 'umum', ctaStyle: 'soft_sell', purpose: 'p', language: 'both', targetReplyCount: 7 },
+      product
+    );
+    expect(system).toContain('BALASAN 4');
+    expect(system).toContain('TIDAK BOLEH terpisah');
   });
 });
 

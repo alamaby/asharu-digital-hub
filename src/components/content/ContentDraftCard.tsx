@@ -196,14 +196,16 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">{text}</p>
               )}
               {injections && isInjected ? (
-                <a
-                  href={injections.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="mt-1 block break-words text-xs text-primary underline"
-                >
-                  {injections.url} ↗
-                </a>
+                text.includes(injections.url) ? null : (
+                  <a
+                    href={injections.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-1 block break-words text-xs text-primary underline"
+                  >
+                    {injections.url} ↗
+                  </a>
+                )
               ) : null}
             </div>
           );

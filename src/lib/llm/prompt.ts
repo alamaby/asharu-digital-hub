@@ -49,6 +49,13 @@ export const AFFILIATE_URL_RESERVE_CHARS = 30;
 
 function lengthTargetRule(maxChars: number | null): string | null {
   if (!maxChars || maxChars < 100) return null;
+  // Cap kecil (mis. twitter 280): 3-5 kalimat substantif hampir pasti
+  // melebihi batas bila dipaksa ≥90%. Tier rendah: 2-3 kalimat pendek,
+  // lebih baik pendek daripada melebihi (kasus 165c29c2: twitter over semua).
+  if (maxChars <= 300) {
+    const target = Math.floor(maxChars * 0.7);
+    return `- LENGTH: each post (id and en separately) MUST be concise — 2-3 SHORT sentences, target ≥ ${target} chars (±70% of max ${maxChars}) and NEVER exceed ${maxChars}. Shorter is better than over-limit.`;
+  }
   const target = Math.floor(maxChars * 0.9);
   return `- LENGTH: each post (id and en separately) MUST be long and substantive — target ≥ ${target} chars (±90% of max ${maxChars}), as close to the limit as possible WITHOUT exceeding it. Each reply 3-5 sentences. Never write one-liners.`;
 }
@@ -93,11 +100,11 @@ export function buildThreadPrompt(
     EMOJI_RULE,
     urlBudgetRule(input.platform.maxChars),
     '- Tone, audience, CTA style, purpose, and constraints must be respected.',
-    '- AFFILIATE PLACEMENT: tempatkan {{PRODUCT_URL}} di reply TENGAH (atau kedua terakhir jika genap). DILARANG menempatkan {{PRODUCT_URL}} di main post.',
-    '- AFFILIATE STYLE: reply yang berisi {{PRODUCT_URL}} wajib dibungkus 1-2 kalimat basa-basi konversasional yang menjelaskan kenapa produk ini relevan dengan topik (natural soft-sell). DILARANG menaruh bare link tanpa konteks/kalimat pengantar.',
+    '- AFFILIATE PLACEMENT: tempatkan {{PRODUCT_URL}} di BALASAN 4 dari 7 balasan (reply index 3, yaitu reply ke-4 setelah 3 reply konten; BUKAN main post). DILARANG menempatkan {{PRODUCT_URL}} di main post atau reply lain.',
+    '- AFFILIATE STYLE: reply yang berisi {{PRODUCT_URL}} WAJIB memuat NAMA PRODUK (persis seperti di blok produk) + dibungkus 1-2 kalimat basa-basi konversasional yang menjelaskan kenapa produk ini relevan dengan topik (natural soft-sell). Nama produk dan link TIDAK BOLEH terpisah di reply berbeda. DILARANG menaruh bare link tanpa konteks/kalimat pengantar.',
     AFFILIATE_OPENER_RULE,
     ...(fallbackBridge ? [fallbackBridge] : []),
-    '- Inject EXACTLY 1 occurrence of {{PRODUCT_URL}}.',
+    '- Inject EXACTLY 1 occurrence of {{PRODUCT_URL}}, di reply yang sama dengan NAMA PRODUK.',
     '- BAHASA: Output HANYA huruf Latin, angka, tanda baca standar, dan emoji relevan. DILARANG karakter CJK/Chinese/Kanji/Hangul/Katakana/Hiragana. Tulis ID & EN dalam bahasa yang benar.',
     '- Jangan tinggalkan slot kata/nama kosong di kalimat (mis. "produk dari ___"). Nama produk diwakili link {{PRODUCT_URL}}; jangan buat kalimat dengan placeholder kosong.'
   ].join('\n');

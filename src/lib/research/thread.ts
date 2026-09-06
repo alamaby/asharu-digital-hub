@@ -123,6 +123,10 @@ function stripPlaceholder(s: string): string {
  * target reply text is a bare link (surrounding text < 20 chars), wraps the
  * placeholder in a conversational sentence.
  *
+ * Tolerance: placeholder already within ±1 of the target is left alone —
+ * LLM kini diinstruksikan reply eksak (Balasan 4 = index 3) sehingga koreksi
+ * destruktif (kasus 679b2494: nama tertinggal, link pindah) tidak terjadi.
+ *
  * Returns the repositioned thread plus the resolved post_index (0 = main,
  * k+1 = reply[k]) so callers can record accurate metadata.
  */
@@ -148,6 +152,14 @@ export function repositionPlaceholder(
   const targetPost: 'main' | `reply-${number}` = `reply-${targetIdx}`;
   if (loc.post === targetPost) {
     return { thread, postIndex: targetIdx + 1 };
+  }
+  // Toleransi ±1: reply LLM index 2 vs target 3 = Balasan 4 yang dimaksud
+  // (LLM menghitung tanpa main). Pindah destruktif hanya bila jauh.
+  if (loc.post !== 'main') {
+    const locIdx = Number((loc.post as string).split('-')[1]);
+    if (Number.isFinite(locIdx) && Math.abs(locIdx - targetIdx) <= 1) {
+      return { thread, postIndex: locIdx + 1 };
+    }
   }
 
   const remove = (s: string) => stripPlaceholder(s);

@@ -481,7 +481,7 @@ async function generateAndInsertDraft(
       modelUuid: devModel.modelUuid,
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: `${user}\n\nPENTING: post berikut MELEBIHI batas maksimum platform: ${overDesc}. Tulis ulang thread yang SAMA tetapi pendekkan post tersebut hingga ≤ batas (HARD LIMIT), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
+        { role: 'user', content: `${user}\n\nPENTING: post berikut MELEBIHI batas maksimum platform: ${overDesc}. Tulis ulang thread yang SAMA tetapi pendekkan post tersebut hingga ≤ batas. Aturan override untuk retry ini: HARD LIMIT MENANG atas target panjang — potong kalimat/napas per post (boleh 2 kalimat pendek), JANGAN korbankan fakta/CTA/nama produk/URL/emoji/struktur JSON. Tetap: 1 placeholder di reply yang sama dengan NAMA PRODUK.` }
       ],
       temperature: 0.3,
       maxTokens: 3200
