@@ -49,6 +49,7 @@ Keputusan user: trigger = auto + regenerate manual; prompt = stage LLM khusus; s
 - 2026-09-06 12:15:00 — Revisi: referensi albot + docs CF/Gemini/Pollinations; tambah Pollinations setelah Cloudflare; kunci model Bynara 2.1 + urutan fallback.
 - 2026-09-06 12:20:00 — Koreksi user: Gemini → `gemini-3.1-flash-lite-image`; multi-key backup per provider.
 - 2026-09-06 12:25:00 — Masuk Build Mode; mulai Fase 1 (working tree bersih, sesi social idle + committed).
+- 2026-09-06 — Tambahan user: style `ugc-pov` (UGC, cahaya seadanya, kamera mediocre, POV pertama) via `20260907000005`, applied production; picker + worker otomatis ikut tanpa ubah kode.
 
 ## Notes
 
