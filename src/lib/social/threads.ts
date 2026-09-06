@@ -51,8 +51,28 @@ export async function createTextContainer(
   return data.id;
 }
 
-export async function publishContainer(
+/**
+ * IMAGE container (aditif untuk lampiran visualisasi draft).
+ * image_url wajib HTTPS publik (Storage draft-images). text opsional.
+ * Bila container IMAGE gagal, caller fallback ke TEXT agar thread tetap terkirim.
+ */
+export async function createImageContainer(
   fetchImpl: FetchImpl,
+  params: { threadsUserId: string; token: string; imageUrl: string; text?: string; replyToId?: string }
+): Promise<string> {
+  const body: Record<string, unknown> = { media_type: 'IMAGE', image_url: params.imageUrl };
+  if (params.text) body.text = params.text;
+  if (params.replyToId) body.reply_to_id = params.replyToId;
+  const data = (await postJson(
+    fetchImpl,
+    `${GRAPH_HOST}/${params.threadsUserId}/threads`,
+    params.token,
+    body
+  )) as { id: string };
+  return data.id;
+}
+
+export async function publishContainer(  fetchImpl: FetchImpl,
   params: { threadsUserId: string; token: string; creationId: string }
 ): Promise<string> {
   const data = (await postJson(
@@ -64,12 +84,30 @@ export async function publishContainer(
   return data.id;
 }
 
-/** Publish 1 teks (container → publish). */
-export async function publishSingleText(
+/**
+ * Publish 1 post (container → publish). Bila imageUrl diisi, coba IMAGE dulu;
+ * gagal → fallback TEXT agar thread tetap terkirim (aditif, perilaku lama utuh).
+ */
+export async function publishSinglePost(
   fetchImpl: FetchImpl,
-  params: { threadsUserId: string; token: string; text: string; replyToId?: string }
+  params: { threadsUserId: string; token: string; text: string; imageUrl?: string | null; replyToId?: string }
 ): Promise<ThreadsPublishResult> {
-  const containerId = await createTextContainer(fetchImpl, params);
+  let containerId: string;
+  if (params.imageUrl) {
+    try {
+      containerId = await createImageContainer(fetchImpl, {
+        threadsUserId: params.threadsUserId,
+        token: params.token,
+        imageUrl: params.imageUrl,
+        text: params.text,
+        replyToId: params.replyToId
+      });
+    } catch {
+      containerId = await createTextContainer(fetchImpl, params);
+    }
+  } else {
+    containerId = await createTextContainer(fetchImpl, params);
+  }
   const mediaId = await publishContainer(fetchImpl, {
     threadsUserId: params.threadsUserId,
     token: params.token,
@@ -78,8 +116,17 @@ export async function publishSingleText(
   return { containerId, mediaId };
 }
 
+/** Publish 1 teks (container → publish). */
+export async function publishSingleText(
+  fetchImpl: FetchImpl,
+  params: { threadsUserId: string; token: string; text: string; replyToId?: string }
+): Promise<ThreadsPublishResult> {
+  return publishSinglePost(fetchImpl, params);
+}
+
 /**
  * Publish full thread berurutan: opener dulu, tiap reply me-reply parent.
+ * `images` opsional sejajar `texts` (index 0 = opener). Tanpa images → perilaku TEXT lama.
  * `onPost` dipanggil per post sukses (untuk audit logs per post_index).
  * Berhenti (throw) di post gagal pertama agar worker bisa resume dari index terakhir.
  */
@@ -89,6 +136,7 @@ export async function publishThreadChain(
     threadsUserId: string;
     token: string;
     texts: string[];
+    images?: (string | null | undefined)[];
     startIndex?: number;
     parentMediaId?: string;
     onPost?: (index: number, result: ThreadsPublishResult) => void | Promise<void>;
@@ -99,10 +147,12 @@ export async function publishThreadChain(
   const start = params.startIndex ?? 0;
   for (let i = start; i < params.texts.length; i++) {
     const text = params.texts[i]!;
-    const result = await publishSingleText(fetchImpl, {
+    const imageUrl = params.images?.[i] ?? null;
+    const result = await publishSinglePost(fetchImpl, {
       threadsUserId: params.threadsUserId,
       token: params.token,
       text,
+      imageUrl,
       replyToId: parent
     });
     results.push(result);

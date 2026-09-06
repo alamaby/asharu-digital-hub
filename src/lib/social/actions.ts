@@ -61,6 +61,23 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
     .eq('id', draftId);
   if (approveError) throw new Error(approveError.message);
 
+  // Cover visualisasi terpilih (aditif): teruskan ke antrean sebagai lampiran opener.
+  let coverUrl: string | null = null;
+  const { data: draftSel } = await supabase
+    .from('content_drafts')
+    .select('selected_image_id')
+    .eq('id', draftId)
+    .maybeSingle();
+  const selId = (draftSel as { selected_image_id: string | null } | null)?.selected_image_id;
+  if (selId) {
+    const { data: img } = await supabase
+      .from('content_draft_images')
+      .select('public_url')
+      .eq('id', selId)
+      .maybeSingle();
+    coverUrl = ((img as { public_url: string | null } | null)?.public_url ?? null) || null;
+  }
+
   if (!cfg.auto_queue_on_approve) {
     revalidatePath('/konten/review');
     revalidatePath('/konten/review/[draftId]', 'page');
@@ -86,11 +103,19 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
       lang: finalLang,
       scheduled_at: scheduledAt.toISOString(),
       status: 'queued',
+      image_url: coverUrl,
       idempotency_key: buildIdempotencyKey(draftId, 'threads')
     },
     { onConflict: 'idempotency_key' }
   );
   if (queueError) throw new Error(queueError.message);
+  // Approve ulang tidak mengubah baris upsert yang sudah ada → sinkronkan image.
+  await supabase
+    .from('social_post_queue')
+    .update({ image_url: coverUrl })
+    .eq('draft_id', draftId)
+    .eq('platform_slug', 'threads')
+    .eq('status', 'queued');
 
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');

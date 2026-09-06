@@ -26,6 +26,7 @@ interface QueueItem {
   lang: 'id' | 'en';
   status: string;
   attempts: number;
+  image_url: string | null;
 }
 
 function isRetryable(message: string): boolean {
@@ -136,7 +137,7 @@ async function handle(request: NextRequest) {
   // Klaim 1 antrean jatuh tempo (idempoten, race-safe via status guard).
   const { data: due } = await supabase
     .from('social_post_queue')
-    .select('id, draft_id, platform_slug, account_id, lang, status, attempts')
+    .select('id, draft_id, platform_slug, account_id, lang, status, attempts, image_url')
     .eq('platform_slug', 'threads')
     .eq('status', 'queued')
     .lte('scheduled_at', new Date().toISOString())
@@ -184,6 +185,27 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'empty thread texts' }, { status: 500 });
   }
 
+  // Lampiran visualisasi (aditif): queue.image_url → fallback cover terpilih draf.
+  // Hanya opener (index 0) yang membawa image; replies tetap TEXT.
+  let openerImage: string | null = item.image_url ?? null;
+  if (!openerImage) {
+    const { data: draftSel } = await supabase
+      .from('content_drafts')
+      .select('selected_image_id')
+      .eq('id', item.draft_id)
+      .maybeSingle();
+    const selId = (draftSel as { selected_image_id: string | null } | null)?.selected_image_id;
+    if (selId) {
+      const { data: img } = await supabase
+        .from('content_draft_images')
+        .select('public_url')
+        .eq('id', selId)
+        .maybeSingle();
+      openerImage = ((img as { public_url: string | null } | null)?.public_url ?? null) || null;
+    }
+  }
+  const images = texts.map((_, i) => (i === 0 ? openerImage : null));
+
   // Resume: lanjut dari post_index terakhir yang published.
   const { data: publishedLogs } = await supabase
     .from('social_post_logs')
@@ -209,6 +231,7 @@ async function handle(request: NextRequest) {
       threadsUserId: account.threads_user_id,
       token,
       texts,
+      images,
       startIndex,
       parentMediaId,
       onPost: async (index, result) => {

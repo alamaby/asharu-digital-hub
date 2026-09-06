@@ -9,6 +9,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
+import { DraftImageCard } from '@/components/content/DraftImageCard';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 
@@ -134,12 +135,39 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   // For regen_affiliate picker: fetch active providers/models (admin only, service client)
   let regenProviders: { id: string; slug: string; display_name: string }[] = [];
   let regenModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
+  // For image picker: active image providers/models/styles + draft image history
+  let imageProviders: { id: string; slug: string; display_name: string }[] = [];
+  let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[] = [];
+  let imageStyles: { slug: string; display_name: string }[] = [];
+  let draftImages: {
+    id: string; draft_id: string; image_prompt: string; negative_prompt: string | null;
+    style_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
+    storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
+    status: 'pending' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
+    llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
+  }[] = [];
   const svc = createSupabaseService();
   if (svc) {
     const { data: provs } = await svc.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
     const { data: mods } = await svc.from('llm_models').select('id, provider_id, model_id, display_name, priority, config').eq('is_active', true).order('priority');
     if (provs) regenProviders = provs as typeof regenProviders;
     if (mods) regenModels = mods as typeof regenModels;
+    const { data: iprovs } = await svc.from('image_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
+    const { data: imods } = await svc
+      .from('image_models')
+      .select('id, provider_id, model_id, display_name, image_providers!inner(slug)')
+      .eq('is_active', true)
+      .order('priority');
+    const { data: istlyes } = await svc.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug');
+    const { data: dimgs } = await svc.from('content_draft_images').select('*').eq('draft_id', draftId).order('created_at', { ascending: false });
+    if (iprovs) imageProviders = iprovs as typeof imageProviders;
+    if (imods) {
+      imageModels = ((imods ?? []) as unknown as Array<{ id: string; provider_id: string; model_id: string; display_name: string; image_providers: { slug: string } }>).map(
+        ({ image_providers: p, ...m }) => ({ ...m, provider_slug: p.slug })
+      );
+    }
+    if (istlyes) imageStyles = istlyes as typeof imageStyles;
+    if (dimgs) draftImages = dimgs as typeof draftImages;
   }
 
   return (
@@ -165,6 +193,12 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
       <div className="mt-4">
         <ContentDraftCard draft={{ ...d, affiliate_injections: enrichedInjections }} regenProviders={regenProviders} regenModels={regenModels} />
+        <DraftImageCard
+          draftId={d.id}
+          initialImages={draftImages}
+          initialSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
+          options={{ providers: imageProviders, models: imageModels, styles: imageStyles }}
+        />
       </div>
       </div>
     </div>
