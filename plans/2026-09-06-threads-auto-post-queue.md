@@ -53,6 +53,7 @@ Keputusan user: trigger = antrean terjadwal; bahasa = pilih saat approve; cakupa
 - 2026-09-06 12:00:00 — Mulai Fase 1: migrasi + lib + worker.
 - 2026-09-06 10:58:00 — Fase 1 selesai + push (submodule `464797b`, parent `8d9d638`); 283 tests hijau. Callback OAuth dipoles (redirect ikut origin).
 - 2026-09-06 11:05:00 — Fase 0 lanjut: `THREADS_APP_ID` + `THREADS_APP_SECRET` terverifikasi terisi di `.env.local` (nilai tak pernah di-print); authorize URL dibuat untuk redirect prod `https://asharu.id/api/social/oauth/callback`. Blocker: migrasi belum applied di prod + secret belum di Vercel env.
+- 2026-09-06 11:20:00 — Prasyarat selesai (user). Step 6 block: OAuth `1349245 has not accepted the invite` — di Threads sudah accept tapi belum masuk Active website permissions. Riset: bug Meta yang luas (Invite tab kadang hanya tombol Remove, status Roles Pending, backend tak sync). Troubleshooting diserahkan ke user.
 
 ## Notes
 
