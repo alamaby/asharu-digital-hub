@@ -7,7 +7,7 @@ import { routing } from '@/i18n/routing';
 import { env } from '@/lib/env';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { pickClientMessages } from '@/lib/i18n/client-messages';
-import { getDisplayTimezone } from '@/lib/auth/timezone';
+import { DEFAULT_TIMEZONE } from '@/lib/utils/format';
 import type { Metadata } from 'next';
 import '../globals.css';
 import { JsonLd } from '@/components/ui/JsonLd';
@@ -57,8 +57,13 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   const messages = pickClientMessages(await getMessages());
 
-  // Resolve display timezone: user pref (profiles.timezone) -> device cookie -> Asia/Jakarta.
-  const timeZone = await getDisplayTimezone();
+  // Static default: user/device timezone resolution happens client-side
+  // (TimezoneSync). Reading request cookies here would opt every route into
+  // dynamic rendering, which streams <head> metadata via the Flight payload
+  // instead of literal <head> HTML — invisible to crawlers that skip JS
+  // (e.g. Meta domain verification). Pages needing the resolved timezone
+  // call getDisplayTimezone() themselves (see src/lib/auth/timezone.ts).
+  const timeZone = DEFAULT_TIMEZONE;
 
   return (
     <html lang={locale} className={inter.variable}>

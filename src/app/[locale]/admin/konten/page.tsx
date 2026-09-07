@@ -5,6 +5,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseService, createSupabaseServer } from '@/lib/supabase/server';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { KontenList } from '@/components/admin/KontenList';
 
@@ -163,6 +164,7 @@ export default async function AdminKontenPage({ params, searchParams }: PageProp
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const timeZone = await getDisplayTimezone();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -178,6 +180,8 @@ export default async function AdminKontenPage({ params, searchParams }: PageProp
         totalPages={totalPages}
         totalCount={totalCount}
         pageSize={PAGE_SIZE}
+        timeZone={timeZone}
+        locale={locale}
       />
     </div>
   );

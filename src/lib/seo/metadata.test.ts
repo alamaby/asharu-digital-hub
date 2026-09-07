@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMetadata } from './metadata';
+import { FACEBOOK_DOMAIN_VERIFICATION_TOKEN, buildMetadata } from './metadata';
 
 describe('buildMetadata', () => {
   const base = {
@@ -47,5 +47,13 @@ describe('buildMetadata', () => {
     const twitter = metadata.twitter as { card?: string };
     expect(twitter.card).toBe('summary_large_image');
     expect(metadata.robots).toEqual({ index: true, follow: true });
+  });
+
+  it('emits the Meta Business domain verification tag', () => {
+    const metadata = buildMetadata({ locale: 'id', path: '/', ...base });
+    expect(FACEBOOK_DOMAIN_VERIFICATION_TOKEN).toBe('wt9cbx9npb6njy0lcqrpe85dal7pmz');
+    expect(metadata.other).toMatchObject({
+      'facebook-domain-verification': 'wt9cbx9npb6njy0lcqrpe85dal7pmz'
+    });
   });
 });

@@ -1,0 +1,23 @@
+# Facebook Domain Verification — Tag Literal di `<head>` Statis
+
+- Task: sematkan meta-tag verifikasi Meta Business `wt9cbx9npb6njy0lcqrpe85dal7pmz` untuk `asharu.id` agar lolos syarat "tag statis di `<head>`" (bukan JS dinamis).
+- Key files:
+  - `src/lib/seo/metadata.ts` — konstanta `FACEBOOK_DOMAIN_VERIFICATION_TOKEN` + `other.facebook-domain-verification` di `buildMetadata()` (site-wide).
+  - `src/lib/seo/metadata.test.ts` — test token.
+  - `src/app/[locale]/layout.tsx` — HAPUS `getDisplayTimezone()`/`cookies()`; provider timezone = `DEFAULT_TIMEZONE` statis (SSG).
+  - `src/components/admin/KontenList.tsx` — terima `timeZone`+`locale` eksplisit, format via `formatDateTime` (ganti `useFormatter`).
+  - `src/app/[locale]/admin/konten/page.tsx` — resolve `getDisplayTimezone()` sendiri, teruskan ke `KontenList`.
+  - `plans/2026-09-07-facebook-domain-verification-plan.md` — plan + progress log.
+- Decisions:
+  - Token publik by-design → aman di-commit (bukan secret).
+  - Site-wide (bukan homepage-only) agar target redirect `/`→`/id` pasti mengandung tag.
+  - Helper injeksi middleware (`facebook-verification.ts`) DIBATALKAN: matcher tidak cover `/`, `/` redirect; rewrite HTML tidak viable di Next.
+  - Akar masalah: layout async + `cookies()` → dynamic render → metadata di-stream via Flight payload (byte ~71k) + hoist JS, `<head>` mentah hanya charset/viewport (lxml DOM parse: tag tak ada di head). Fix: layout statis → SSG → `id.html` tag literal byte 1632 < `</head>` 3070.
+- Assumptions/risks:
+  - Provider next-intl statis WIB; halaman admin dinamis tetap resolve user/device tz (`getDisplayTimezone()` dipertahankan untuk admin/review).
+  - `KontenList` first-visit non-WIB tampil WIB — sama seperti perilaku default sebelumnya.
+  - `/` 307 ke `/id`; bila crawler Meta tidak follow redirect, fallback verifikasi DNS TXT.
+  - Setelah deploy, hard-refresh/cache-bust sebelum klik Verify di Business Manager.
+- Blockers: tidak ada. Sisa user action: deploy Vercel prod → view-source `https://asharu.id/id` → klik Verify.
+- Verification: `npm run typecheck` ✓, `npm run lint` ✓, `npm test` 308/308 ✓, `next build` ✓ (`/id`+`/en` SSG, 29 routes); cek `.next/server/app/id.html` mentah: tag literal di `<head>` ✓.
+- Conventional Commit proposal: `feat(seo): facebook domain verification with static head`

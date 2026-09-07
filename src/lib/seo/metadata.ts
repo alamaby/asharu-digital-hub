@@ -13,6 +13,9 @@ export interface BuildMetadataInput {
   robots?: { index: boolean; follow: boolean };
 }
 
+/** Meta Business domain verification token for `asharu.id` (public by design). */
+export const FACEBOOK_DOMAIN_VERIFICATION_TOKEN = 'wt9cbx9npb6njy0lcqrpe85dal7pmz';
+
 export function buildMetadata({
   locale,
   path,
@@ -50,6 +53,9 @@ export function buildMetadata({
       title,
       description
     },
-    robots: robots ?? { index: true, follow: true }
+    robots: robots ?? { index: true, follow: true },
+    other: {
+      'facebook-domain-verification': FACEBOOK_DOMAIN_VERIFICATION_TOKEN
+    }
   };
 }

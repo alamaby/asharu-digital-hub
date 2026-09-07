@@ -1,8 +1,10 @@
 'use client';
 
 import { useTransition } from 'react';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
+import type { Locale } from '@/i18n/routing';
+import { formatDateTime } from '@/lib/utils/format';
 
 interface Platform {
   slug: string;
@@ -47,6 +49,9 @@ interface KontenListProps {
   totalPages: number;
   totalCount: number;
   pageSize: number;
+  /** Resolved display timezone (user pref -> device -> Asia/Jakarta). */
+  timeZone: string;
+  locale: Locale;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -77,17 +82,10 @@ function shortTopic(topic: string, max = 60): string {
   return topic.slice(0, max - 1) + '…';
 }
 
-function formatDate(iso: string, format: ReturnType<typeof useFormatter>): string {
-  try {
-    return format.dateTime(new Date(iso), {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
-  }
+function formatRowDate(iso: string, locale: Locale, timeZone: string): string {
+  const formatted = formatDateTime(iso, locale, timeZone);
+  // formatDateTime falls back to an ISO slice on error; guard garbage too.
+  return formatted || new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
 }
 
 export function KontenList({
@@ -98,10 +96,11 @@ export function KontenList({
   page,
   totalPages,
   totalCount,
-  pageSize
+  pageSize,
+  timeZone,
+  locale
 }: KontenListProps) {
   const t = useTranslations('admin.konten');
-  const format = useFormatter();
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -204,7 +203,7 @@ export function KontenList({
                 <td className="px-4 py-2"><StatusBadge status={r.status} /></td>
                 <td className="px-4 py-2 text-ink-muted">{r.target_category ?? '—'}</td>
                 <td className="px-4 py-2 text-ink-muted">—</td>
-                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(r.created_at, format)}</td>
+                <td className="px-4 py-2 text-xs text-ink-muted">{formatRowDate(r.created_at, locale, timeZone)}</td>
                 <td className="px-4 py-2">
                   <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary underline">
                     {t('viewDraft')}
@@ -223,7 +222,7 @@ export function KontenList({
                 <td className="px-4 py-2 text-ink-muted">
                   {d.llm_meta?.provider ?? '—'} {d.llm_meta?.model ? `· ${d.llm_meta.model}` : ''}
                 </td>
-                <td className="px-4 py-2 text-xs text-ink-muted">{formatDate(d.created_at, format)}</td>
+                <td className="px-4 py-2 text-xs text-ink-muted">{formatRowDate(d.created_at, locale, timeZone)}</td>
                 <td className="px-4 py-2">
                   <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary underline">
                     {t('viewDraft')}
@@ -253,7 +252,7 @@ export function KontenList({
                   <p className="text-sm font-medium text-ink">{shortTopic(r.topic, 100)}</p>
                   <StatusBadge status={r.status} />
                 </div>
-                <p className="mt-1 text-xs text-ink-muted">{r.platform_slug} · {formatDate(r.created_at, format)}</p>
+                <p className="mt-1 text-xs text-ink-muted">{r.platform_slug} · {formatRowDate(r.created_at, locale, timeZone)}</p>
                 <p className="mt-1 text-xs text-ink-muted">Kategori: {r.target_category ?? '—'} · attempts: {r.attempts}</p>
               </li>
             );
@@ -266,7 +265,7 @@ export function KontenList({
                 <StatusBadge status={d.status} />
               </div>
               <p className="mt-1 text-xs text-ink-muted">
-                {d.request?.platform_slug ?? '—'} · {formatDate(d.created_at, format)}
+                {d.request?.platform_slug ?? '—'} · {formatRowDate(d.created_at, locale, timeZone)}
               </p>
               <p className="mt-1 text-xs text-ink-muted">
                 {d.llm_meta?.provider ?? '—'} {d.llm_meta?.model ? `· ${d.llm_meta.model}` : ''}
