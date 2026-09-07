@@ -61,8 +61,10 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
     .eq('id', draftId);
   if (approveError) throw new Error(approveError.message);
 
-  // Cover visualisasi terpilih (aditif): teruskan ke antrean sebagai lampiran opener.
+  // Cover visualisasi terpilih (aditif): teruskan ke antrean sebagai lampiran.
+  // Plus peta per-index (reply non-afiliasi) bila ada.
   let coverUrl: string | null = null;
+  const perIndex: Record<string, string> = {};
   const { data: draftSel } = await supabase
     .from('content_drafts')
     .select('selected_image_id')
@@ -76,6 +78,14 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
       .eq('id', selId)
       .maybeSingle();
     coverUrl = ((img as { public_url: string | null } | null)?.public_url ?? null) || null;
+  }
+  const { data: selectedAll } = await supabase
+    .from('content_draft_images')
+    .select('post_index, public_url')
+    .eq('draft_id', draftId)
+    .eq('status', 'selected');
+  for (const r of ((selectedAll ?? []) as { post_index: number; public_url: string | null }[])) {
+    if (r.public_url) perIndex[String(r.post_index)] = r.public_url;
   }
 
   if (!cfg.auto_queue_on_approve) {
@@ -104,6 +114,7 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
       scheduled_at: scheduledAt.toISOString(),
       status: 'queued',
       image_url: coverUrl,
+      image_urls: perIndex,
       idempotency_key: buildIdempotencyKey(draftId, 'threads')
     },
     { onConflict: 'idempotency_key' }
@@ -112,7 +123,7 @@ export async function approveDraftAndQueue(draftId: string, lang: SocialLang = '
   // Approve ulang tidak mengubah baris upsert yang sudah ada → sinkronkan image.
   await supabase
     .from('social_post_queue')
-    .update({ image_url: coverUrl })
+    .update({ image_url: coverUrl, image_urls: perIndex })
     .eq('draft_id', draftId)
     .eq('platform_slug', 'threads')
     .eq('status', 'queued');

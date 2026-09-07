@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CopyButton } from './CopyButton';
 import { AffiliateProductCard } from './AffiliateProductCard';
+import { PostImageControl } from './PostImageControl';
 import { countPlaceholdersInThread } from '@/lib/llm/prompt';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
@@ -19,7 +20,15 @@ interface Draft {
   platform_slug?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [] }: { draft: Draft; regenProviders?: { id: string; slug: string; display_name: string }[]; regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] }) {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false }: {
+  draft: Draft;
+  regenProviders?: { id: string; slug: string; display_name: string }[];
+  regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
+  /** Selected image per post_index (dari server, tanpa secret). */
+  postImages?: { post_index: number; public_url: string }[];
+  /** True bila mode per-reply aktif (global/sesi/draf). */
+  perReplyEnabled?: boolean;
+}) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
   const [lang, setLang] = useState<'id' | 'en'>('id');
@@ -207,6 +216,15 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   </a>
                 )
               ) : null}
+              {idx === 0 ? null : (
+                <PostImageControl
+                  draftId={draft.id}
+                  postIndex={idx}
+                  imageUrl={postImages.find((p) => p.post_index === idx)?.public_url ?? null}
+                  isAffiliate={isInjected}
+                  perReplyEnabled={perReplyEnabled}
+                />
+              )}
             </div>
           );
         })}

@@ -23,14 +23,18 @@ const MAX_ATTEMPTS = 3;
 
 interface DraftRow {
   id: string;
-  generated_thread: { main?: { id?: string; en?: string } };
+  generated_thread: {
+    main?: { id?: string; en?: string };
+    replies?: { id?: string; en?: string }[];
+  };
   research_topic_id: string | null;
   status: string;
 }
 
 /**
- * Enqueue auto: draf needs_review/approved tertua yang belum punya image sama sekali
- * → 1 baris pending. Dipanggil worker tiap tick bila tidak ada pending.
+ * Enqueue auto cover (post_index=0): draf needs_review/approved tertua yang
+ * belum punya image cover sama sekali → 1 baris pending. Dipanggil worker tiap
+ * tick bila tidak ada pending. Per-reply TIDAK auto — hanya via tombol review.
  */
 export async function enqueueNextMissingImage(): Promise<string | null> {
   const supabase = getServiceClient();
@@ -45,11 +49,12 @@ export async function enqueueNextMissingImage(): Promise<string | null> {
     const { count } = await supabase
       .from('content_draft_images')
       .select('id', { count: 'exact', head: true })
-      .eq('draft_id', d.id);
+      .eq('draft_id', d.id)
+      .eq('post_index', 0);
     if ((count ?? 0) === 0) {
       const { data: created, error } = await supabase
         .from('content_draft_images')
-        .insert({ draft_id: d.id, image_prompt: '', provider_slug: '', model_id: '' })
+        .insert({ draft_id: d.id, post_index: 0, image_prompt: '', provider_slug: '', model_id: '' })
         .select('id')
         .single();
       if (!error && created) return (created as { id: string }).id;
@@ -198,11 +203,14 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
       await failImage(imageId, 'draft not found');
       return { imageId: null, error: 'draft not found' };
     }
-    const mainId = ctx.draft.generated_thread?.main?.id ?? '';
-    const mainEn = ctx.draft.generated_thread?.main?.en ?? '';
+    // Teks sumber prompt = post pada post_index itu (0 = main, 1..n = replies).
+    const posts = [ctx.draft.generated_thread?.main, ...(ctx.draft.generated_thread?.replies ?? [])];
+    const sourcePost = posts[row.post_index ?? 0];
+    const mainId = sourcePost?.id ?? '';
+    const mainEn = sourcePost?.en ?? '';
     if (!mainId && !mainEn) {
-      await failImage(imageId, 'draft thread empty');
-      return { imageId: null, error: 'draft thread empty' };
+      await failImage(imageId, `draft post ${row.post_index ?? 0} empty`);
+      return { imageId: null, error: `draft post ${row.post_index ?? 0} empty` };
     }
 
     const override = (row.llm_meta as { override?: { modelUuid?: string | null; styleSlug?: string | null } } | null)?.override;
@@ -254,12 +262,13 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
         const { storagePath, publicUrl } = await uploadDraftImage(row.draft_id, imageId, bytes, mime);
         await markImageModelUsage(modelRow.id);
 
-        // Tandai selected: turunkan selected lama → ready, lalu set baru.
+        // Tandai selected per post: turunkan selected lama di post_index sama → ready.
         const supabase = getServiceClient();
         await supabase
           .from('content_draft_images')
           .update({ status: 'ready', updated_at: new Date().toISOString() })
           .eq('draft_id', row.draft_id)
+          .eq('post_index', row.post_index ?? 0)
           .eq('status', 'selected');
         await supabase
           .from('content_draft_images')
@@ -280,7 +289,10 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
             updated_at: new Date().toISOString()
           })
           .eq('id', imageId);
-        await supabase.from('content_drafts').update({ selected_image_id: imageId }).eq('id', row.draft_id);
+        // Cover (post 0) tetap jadi selected_image_id draf agar social lama kompatibel.
+        if ((row.post_index ?? 0) === 0) {
+          await supabase.from('content_drafts').update({ selected_image_id: imageId }).eq('id', row.draft_id);
+        }
         return { imageId };
       } catch (e) {
         lastError = e;

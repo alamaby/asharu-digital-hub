@@ -140,12 +140,13 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[] = [];
   let imageStyles: { slug: string; display_name: string }[] = [];
   let draftImages: {
-    id: string; draft_id: string; image_prompt: string; negative_prompt: string | null;
+    id: string; draft_id: string; post_index: number; image_prompt: string; negative_prompt: string | null;
     style_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
     storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
     status: 'pending' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
     llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
   }[] = [];
+  let imageMode: string | null = null;
   const svc = createSupabaseService();
   if (svc) {
     const { data: provs } = await svc.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
@@ -160,6 +161,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       .order('priority');
     const { data: istlyes } = await svc.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug');
     const { data: dimgs } = await svc.from('content_draft_images').select('*').eq('draft_id', draftId).order('created_at', { ascending: false });
+    const { data: dmode } = await svc.from('content_drafts').select('image_mode').eq('id', draftId).maybeSingle();
+    if (dmode) imageMode = (dmode as { image_mode: string | null }).image_mode;
     if (iprovs) imageProviders = iprovs as typeof imageProviders;
     if (imods) {
       imageModels = ((imods ?? []) as unknown as Array<{ id: string; provider_id: string; model_id: string; display_name: string; image_providers: { slug: string } }>).map(
@@ -192,10 +195,18 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       </div>
 
       <div className="mt-4">
-        <ContentDraftCard draft={{ ...d, affiliate_injections: enrichedInjections }} regenProviders={regenProviders} regenModels={regenModels} />
+        <ContentDraftCard
+          draft={{ ...d, affiliate_injections: enrichedInjections }}
+          regenProviders={regenProviders}
+          regenModels={regenModels}
+          postImages={draftImages
+            .filter((i) => i.status === 'selected' && i.public_url)
+            .map((i) => ({ post_index: i.post_index, public_url: i.public_url as string }))}
+          perReplyEnabled={imageMode === 'per-reply-opt-in'}
+        />
         <DraftImageCard
           draftId={d.id}
-          initialImages={draftImages}
+          initialImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
           initialSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
           options={{ providers: imageProviders, models: imageModels, styles: imageStyles }}
         />

@@ -90,17 +90,22 @@ export interface ImageStylePreset {
   is_active: boolean;
 }
 
+export type ImageMode = 'cover-only' | 'per-reply-opt-in';
+
 export interface ImageGenDefaults {
   id: number;
   provider_id: string | null;
   model_id: string | null;
   style_slug: string | null;
   aspect: ImageAspect;
+  image_mode: ImageMode;
 }
 
 export interface DraftImageRow {
   id: string;
   draft_id: string;
+  /** 0 = main/cover, 1..n = replies (sejajar generated_thread). */
+  post_index: number;
   image_prompt: string;
   negative_prompt: string | null;
   style_slug: string | null;

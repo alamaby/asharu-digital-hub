@@ -27,10 +27,30 @@ interface QueueItem {
   status: string;
   attempts: number;
   image_url: string | null;
+  image_urls: Record<string, string> | null;
 }
 
 function isRetryable(message: string): boolean {
   return /429|rate|timeout|5\d\d|fetch failed|network/i.test(message);
+}
+
+/** Index post afiliasi draf (null bila tanpa injeksi) — reply ini skip image. */
+async function affiliatePostIndex(draftId: string): Promise<number | null> {
+  try {
+    const { createSupabaseService } = await import('@/lib/supabase/server');
+    const supabase = createSupabaseService();
+    if (!supabase) return null;
+    const { data } = await supabase
+      .from('content_drafts')
+      .select('affiliate_injections')
+      .eq('id', draftId)
+      .maybeSingle();
+    const idx = (data as { affiliate_injections?: { post_index?: number }[] } | null)
+      ?.affiliate_injections?.[0]?.post_index;
+    return typeof idx === 'number' ? idx : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -137,7 +157,7 @@ async function handle(request: NextRequest) {
   // Klaim 1 antrean jatuh tempo (idempoten, race-safe via status guard).
   const { data: due } = await supabase
     .from('social_post_queue')
-    .select('id, draft_id, platform_slug, account_id, lang, status, attempts, image_url')
+    .select('id, draft_id, platform_slug, account_id, lang, status, attempts, image_url, image_urls')
     .eq('platform_slug', 'threads')
     .eq('status', 'queued')
     .lte('scheduled_at', new Date().toISOString())
@@ -185,9 +205,11 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'empty thread texts' }, { status: 500 });
   }
 
-  // Lampiran visualisasi (aditif): queue.image_url → fallback cover terpilih draf.
-  // Hanya opener (index 0) yang membawa image; replies tetap TEXT.
-  let openerImage: string | null = item.image_url ?? null;
+  // Lampiran visualisasi per index (aditif): queue.image_urls → fallback cover.
+  // Reply afiliasi sengaja tanpa image (pakai gambar produk di teks/link preview).
+  // Post tanpa image tetap TEXT; IMAGE gagal → fallback TEXT di publishSinglePost.
+  const perIndex = (item.image_urls ?? {}) as Record<string, string>;
+  let openerImage: string | null = perIndex['0'] ?? item.image_url ?? null;
   if (!openerImage) {
     const { data: draftSel } = await supabase
       .from('content_drafts')
@@ -204,7 +226,22 @@ async function handle(request: NextRequest) {
       openerImage = ((img as { public_url: string | null } | null)?.public_url ?? null) || null;
     }
   }
-  const images = texts.map((_, i) => (i === 0 ? openerImage : null));
+  // Lengkapi index lain dari selected per post (bila queue.image_urls belum sinkron).
+  const { data: selectedAll } = await supabase
+    .from('content_draft_images')
+    .select('post_index, public_url')
+    .eq('draft_id', item.draft_id)
+    .eq('status', 'selected');
+  const selectedMap: Record<string, string> = {};
+  for (const r of ((selectedAll ?? []) as { post_index: number; public_url: string | null }[])) {
+    if (r.public_url) selectedMap[String(r.post_index)] = r.public_url;
+  }
+  const affiliateIdx = await affiliatePostIndex(item.draft_id);
+  const images = texts.map((_, i) => {
+    if (i === affiliateIdx) return null;
+    if (i === 0) return openerImage;
+    return perIndex[String(i)] ?? selectedMap[String(i)] ?? null;
+  });
 
   // Resume: lanjut dari post_index terakhir yang published.
   const { data: publishedLogs } = await supabase
