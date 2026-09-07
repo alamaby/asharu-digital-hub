@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-07 11:48 (local time)
+Last updated: 2026-09-07 12:55 (local time)
 
 ## Current State
 
@@ -50,6 +50,7 @@ Last updated: 2026-09-07 11:48 (local time)
 
 ## Recent Entries
 
+- [125500-riset-detail-panels-redesign.md](2026-09-07/125500-riset-detail-panels-redesign.md) — Redesign 3 panel detail riset: log clamp+expand+paginasi server, performa chart SVG/CSS + KPI token, parameter 3 kartu grup; 307 tests, build sukses.
 - [114842-riset-b8194a1f-skor-nol-display-fix.md](2026-09-07/114842-riset-b8194a1f-skor-nol-display-fix.md) — Riset b8194a1f: skor 0 = by-design mekanisme dua (verifying+scoring dilewati); fix display jujur (Tanpa skor + stepper Dilewati + hint shortlist), tanpa migrasi; gate hijau.
 - [193000-image-generation-five-providers.md](2026-09-06/193000-image-generation-five-providers.md) — Visualisasi otomatis pasca-development: 5 provider image (Pixazo→CF→Pollinations→Gemini 3.1-lite→Bynara 2.1), multi-key backup, stage image_prompt, worker + review + social IMAGE aditif; migrasi applied; 297 tests hijau, pushed.
 - [105839-threads-auto-post-queue.md](2026-09-06/105839-threads-auto-post-queue.md) — Auto-post Threads @asharu.id: antrean terjadwal, full-text chain, config-by-table (social_*), worker + OAuth + /admin/sosial; migrasi committed (belum applied prod); Fase 0 Meta App = user action; 283 tests hijau, pushed.

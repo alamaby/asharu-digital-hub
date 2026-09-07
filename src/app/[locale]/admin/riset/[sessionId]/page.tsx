@@ -11,13 +11,20 @@ import { ResearchSessionActions } from '@/components/admin/ResearchSessionAction
 import { RetrySessionButton } from '@/components/admin/RetrySessionButton';
 import { ResumeSessionButton } from '@/components/admin/ResumeSessionButton';
 import { ResearchStepper } from '@/components/admin/ResearchStepper';
+import { ResearchLogItem } from '@/components/admin/ResearchLogItem';
+import { ResearchPerfCharts } from '@/components/admin/ResearchPerfCharts';
+import { ResearchParams } from '@/components/admin/ResearchParams';
+import { summarizeLlmLogs, summarizeSearchLogs } from '@/lib/research/perf-summary';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
 import { previewAffiliateMatches } from '@/lib/research/affiliate';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
+  searchParams: Promise<{ logPage?: string; logSort?: string; logLevel?: string; logStage?: string }>;
 }
+
+const LOG_PAGE_SIZE = 10;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -54,8 +61,9 @@ type DraftRow = {
   status: string;
 };
 
-export default async function ResearchSessionPage({ params }: PageProps) {
+export default async function ResearchSessionPage({ params, searchParams }: PageProps) {
   const { locale: rawLocale, sessionId } = await params;
+  const sp = await searchParams;
   const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
   setRequestLocale(locale);
 
@@ -194,26 +202,39 @@ export default async function ResearchSessionPage({ params }: PageProps) {
     }
   }
 
-  const { data: logs } = await supabase
-    .from('content_research_logs')
-    .select('id, stage, level, message, created_at')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: false })
-    .limit(100);
-
   const { data: llmLogs } = await supabase
     .from('llm_call_logs')
     .select('provider_slug, model_id, stage, latency_ms, http_status, error, prompt_tokens, completion_tokens, total_tokens, finish_reason, is_fallback, created_at')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(30);
 
   const { data: searchLogs } = await supabase
     .from('search_call_logs')
     .select('provider_slug, operation, query_count, latency_ms, result_count, http_status, error, created_at')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(30);
+
+  const llmSummary = summarizeLlmLogs(((llmLogs ?? []) as unknown) as Parameters<typeof summarizeLlmLogs>[0]);
+  const searchSummary = summarizeSearchLogs(((searchLogs ?? []) as unknown) as Parameters<typeof summarizeSearchLogs>[0]);
+
+  // Log riset: filter + sorting + pagination via searchParams (pola /admin/llm/logs).
+  const logPage = Math.max(1, Number.parseInt(sp.logPage ?? '1', 10) || 1);
+  const logSortAsc = sp.logSort === 'oldest';
+  const logLevel = sp.logLevel ?? 'all';
+  const logStage = sp.logStage ?? 'all';
+  let logQuery = supabase.from('content_research_logs').select('id, stage, level, message, created_at', { count: 'exact' }).eq('session_id', sessionId);
+  if (logLevel !== 'all') logQuery = logQuery.eq('level', logLevel);
+  if (logStage !== 'all') logQuery = logQuery.eq('stage', logStage);
+  const logFrom = (logPage - 1) * LOG_PAGE_SIZE;
+  const { data: logs, count: logCount } = await logQuery
+    .order('created_at', { ascending: logSortAsc })
+    .order('id', { ascending: false })
+    .range(logFrom, logFrom + LOG_PAGE_SIZE - 1);
+  const logTotalPages = Math.max(1, Math.ceil((logCount ?? 0) / LOG_PAGE_SIZE));
+  const logStages = Array.from(new Set(((logs ?? []) as Array<{ stage: string }>).map((l) => l.stage))).sort();
+  const logQueryBase = { logSort: sp.logSort, logLevel: sp.logLevel, logStage: sp.logStage };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -252,95 +273,52 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         ) : null}
       </header>
 
-      <section className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-card">
-        <h2 className="text-sm font-semibold text-ink">{t('paramsHeading')}</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">Topic:</dt>
-            <dd className="text-ink">{s.topic ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">Bahasa:</dt>
-            <dd className="text-ink">{s.language ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">Kategori target:</dt>
-            <dd className="text-ink">{s.target_category ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">Audiens:</dt>
-            <dd className="text-ink">{s.audience ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">CTA:</dt>
-            <dd className="text-ink">{s.cta_style ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">Tujuan:</dt>
-            <dd className="text-ink">{s.purpose ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2 sm:col-span-2">
-            <dt className="font-medium text-ink-muted">Batasan:</dt>
-            <dd className="text-ink">{s.constraints ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2 sm:col-span-2">
-            <dt className="font-medium text-ink-muted">Keywords:</dt>
-            <dd className="text-ink">{s.keywords ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('toneLabel')}:</dt>
-            <dd className="text-ink">{s.tone ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('audienceAgeLabel')}:</dt>
-            <dd className="text-ink">{s.audience_age ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('audienceInterestsLabel')}:</dt>
-            <dd className="text-ink">{s.audience_interests && s.audience_interests.length > 0 ? s.audience_interests.join(', ') : '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('secondaryLocationLabel')}:</dt>
-            <dd className="text-ink">{s.secondary_location ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('accountGoalLabel')}:</dt>
-            <dd className="text-ink">{s.account_goal ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('allowedCategoriesLabel')}:</dt>
-            <dd className="text-ink">{s.allowed_categories && s.allowed_categories.length > 0 ? s.allowed_categories.join(', ') : '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('excludedCategoriesLabel')}:</dt>
-            <dd className="text-ink">{s.excluded_categories && s.excluded_categories.length > 0 ? s.excluded_categories.join(', ') : '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('freshnessHoursLabel')}:</dt>
-            <dd className="text-ink">{s.freshness_hours ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('minimumCandidatesLabel')}:</dt>
-            <dd className="text-ink">{s.minimum_candidates ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('minimumScoreLabel')}:</dt>
-            <dd className="text-ink">{s.minimum_score ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('requiredWinnersLabel')}:</dt>
-            <dd className="text-ink">{s.required_winners ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('maximumIterationsLabel')}:</dt>
-            <dd className="text-ink">{s.maximum_iterations ?? '—'}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-ink-muted">{t('targetReplyCountLabel')}:</dt>
-            <dd className="text-ink">{s.target_reply_count ?? '—'}</dd>
-          </div>
-        </dl>
-      </section>
+      <ResearchParams
+        s={{
+          topic: s.topic,
+          language: s.language,
+          target_category: s.target_category,
+          keywords: s.keywords,
+          platformLabel: sessionPlatformLabel,
+          audience: s.audience,
+          audience_age: s.audience_age,
+          audience_interests: s.audience_interests,
+          account_goal: s.account_goal,
+          purpose: s.purpose,
+          cta_style: s.cta_style,
+          tone: s.tone,
+          target_location: s.target_location,
+          secondary_location: s.secondary_location,
+          constraints: s.constraints,
+          allowed_categories: s.allowed_categories,
+          excluded_categories: s.excluded_categories,
+          freshness_hours: s.freshness_hours,
+          minimum_candidates: s.minimum_candidates,
+          minimum_score: s.minimum_score,
+          required_winners: s.required_winners,
+          maximum_iterations: s.maximum_iterations,
+          target_reply_count: s.target_reply_count,
+          toneLabel: t('toneLabel'),
+          audienceAgeLabel: t('audienceAgeLabel'),
+          audienceInterestsLabel: t('audienceInterestsLabel'),
+          secondaryLocationLabel: t('secondaryLocationLabel'),
+          accountGoalLabel: t('accountGoalLabel'),
+          allowedCategoriesLabel: t('allowedCategoriesLabel'),
+          excludedCategoriesLabel: t('excludedCategoriesLabel'),
+          freshnessHoursLabel: t('freshnessHoursLabel'),
+          minimumCandidatesLabel: t('minimumCandidatesLabel'),
+          minimumScoreLabel: t('minimumScoreLabel'),
+          requiredWinnersLabel: t('requiredWinnersLabel'),
+          maximumIterationsLabel: t('maximumIterationsLabel'),
+          targetReplyCountLabel: t('targetReplyCountLabel')
+        }}
+        labels={{
+          contentGroup: t('paramsContentGroup'),
+          audienceGroup: t('paramsAudienceGroup'),
+          controlGroup: t('paramsControlGroup'),
+          hiddenNote: t('paramsHidden')
+        }}
+      />
 
       <ResearchStepper
         status={s.status}
@@ -476,30 +454,57 @@ export default async function ResearchSessionPage({ params }: PageProps) {
       </section>
 
       <section className="mt-8 space-y-3">
-        <h2 className="text-lg font-semibold text-ink">Performa LLM & Search</h2>
-        <div className="grid gap-2 text-xs sm:grid-cols-2">
-          <div className="rounded-xl border border-line bg-surface p-3">
-            <p className="font-semibold text-ink">LLM terakhir ({(llmLogs ?? []).length})</p>
-            {((llmLogs ?? []) as Array<{ provider_slug: string; model_id: string; stage: string | null; latency_ms: number | null; http_status: number | null; error: string | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; finish_reason: string | null; is_fallback: boolean | null }>).map((l, i) => (
-              <p key={i} className="mt-1 text-ink-muted">
-                {l.provider_slug}/{l.model_id} · {l.stage ?? '-'} · {l.latency_ms ?? '-'}ms · {l.http_status ?? '-'}
-                {l.is_fallback ? ' · fallback' : ''} · p:{l.prompt_tokens ?? '-'} c:{l.completion_tokens ?? '-'} t:{l.total_tokens ?? '-'}
-                {l.finish_reason ? ` · ${l.finish_reason}` : ''}{l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
-              </p>
-            ))}
-            {(!llmLogs || llmLogs.length === 0) ? <p className="mt-1 text-ink-muted">Belum ada log LLM.</p> : null}
-          </div>
-          <div className="rounded-xl border border-line bg-surface p-3">
-            <p className="font-semibold text-ink">Search terakhir ({(searchLogs ?? []).length})</p>
-            {((searchLogs ?? []) as Array<{ provider_slug: string; operation: string; query_count: number | null; latency_ms: number | null; result_count: number | null; http_status: number | null; error: string | null }>).map((l, i) => (
-              <p key={i} className="mt-1 text-ink-muted">
-                {l.provider_slug}/{l.operation} · q:{l.query_count ?? '-'} · {l.latency_ms ?? '-'}ms · hasil:{l.result_count ?? '-'} · {l.http_status ?? '-'}
-                {l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
-              </p>
-            ))}
-            {(!searchLogs || searchLogs.length === 0) ? <p className="mt-1 text-ink-muted">Belum ada log search (riset lama).</p> : null}
-          </div>
-        </div>
+        <h2 className="text-lg font-semibold text-ink">{t('perfHeading')}</h2>
+        <ResearchPerfCharts
+          llm={llmSummary}
+          search={searchSummary}
+          locale={locale}
+          labels={{
+            llmHeading: t('perfLlm'),
+            searchHeading: t('perfSearch'),
+            calls: t('perfCalls'),
+            tokensIn: t('perfTokensIn'),
+            tokensOut: t('perfTokensOut'),
+            tokensTotal: t('perfTokensTotal'),
+            avgLatency: t('perfAvgLatency'),
+            errors: t('perfErrors'),
+            fallbacks: t('perfFallbacks'),
+            queries: t('perfQueries'),
+            results: t('perfResults'),
+            tokenPerCall: t('perfTokenPerCall'),
+            statusTitle: t('perfStatus'),
+            latencyPerCall: t('perfLatencyPerCall'),
+            resultsPerQuery: t('perfResultsPerQuery'),
+            empty: t('perfEmpty'),
+            ms: t('perfMs')
+          }}
+        />
+        {llmSummary.byCall.length > 0 || searchSummary.byCall.length > 0 ? (
+          <details className="rounded-xl border border-line bg-surface p-3">
+            <summary className="cursor-pointer text-xs font-medium text-primary">
+              LLM ({llmSummary.byCall.length}) · Search ({searchSummary.byCall.length})
+            </summary>
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              <div>
+                {llmSummary.byCall.map((l, i) => (
+                  <p key={i} className="mt-1 text-ink-muted">
+                    {l.label} · {l.stage} · {l.latencyMs ?? '-'}ms · {l.httpStatus ?? '-'}
+                    {l.fallback ? ' · fallback' : ''} · p:{l.prompt} c:{l.completion}
+                    {l.finishReason ? ` · ${l.finishReason}` : ''}{l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
+                  </p>
+                ))}
+              </div>
+              <div>
+                {searchSummary.byCall.map((l, i) => (
+                  <p key={i} className="mt-1 text-ink-muted">
+                    {l.label} · q:{l.queries} · hasil:{l.results} · {l.latencyMs ?? '-'}ms · {l.httpStatus ?? '-'}
+                    {l.error ? ` · ERR: ${l.error.slice(0, 120)}` : ''}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </details>
+        ) : null}
         <p className="text-xs text-ink-muted">
           Log lengkap: <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm', stage: 'discovering' } }} className="text-primary hover:underline">LLM</Link>
           {' · '}
@@ -507,25 +512,74 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         </p>
       </section>
 
-      <section className="mt-8 space-y-3">
+      <section id="logs" className="mt-8 scroll-mt-20 space-y-3">
         <h2 className="text-lg font-semibold text-ink">{t('logsHeading')}</h2>
+        <form method="get" action="#logs" className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface p-3">
+          <label className="text-[11px] font-medium text-ink-muted">
+            {t('logsFilterLevel')}
+            <select name="logLevel" defaultValue={logLevel} className="ml-1 rounded-lg border border-line bg-background px-2 py-1 text-xs">
+              <option value="all">{t('logsFilterAll')}</option>
+              <option value="info">info</option>
+              <option value="warn">warn</option>
+              <option value="error">error</option>
+            </select>
+          </label>
+          <label className="text-[11px] font-medium text-ink-muted">
+            {t('logsFilterStage')}
+            <select name="logStage" defaultValue={logStage} className="ml-1 rounded-lg border border-line bg-background px-2 py-1 text-xs">
+              <option value="all">{t('logsFilterAll')}</option>
+              {logStages.map((st) => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[11px] font-medium text-ink-muted">
+            Sort
+            <select name="logSort" defaultValue={logSortAsc ? 'oldest' : 'newest'} className="ml-1 rounded-lg border border-line bg-background px-2 py-1 text-xs">
+              <option value="newest">{t('logsSortNewest')}</option>
+              <option value="oldest">{t('logsSortOldest')}</option>
+            </select>
+          </label>
+          <button type="submit" className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white">Filter</button>
+        </form>
         {!logs || logs.length === 0 ? (
           <p className="text-sm text-ink-muted">{t('logsEmpty')}</p>
         ) : (
           <ol className="space-y-2">
             {(logs as Array<{ id: string; stage: string; level: string; message: string; created_at: string }>).map((lg) => (
-              <li
+              <ResearchLogItem
                 key={lg.id}
-                className={`rounded-xl border p-3 text-xs ${lg.level === 'error' ? 'border-red-200 bg-red-50 text-red-800' : lg.level === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-line bg-surface text-ink-muted'}`}
-              >
-                <p className="font-medium">
-                  [{lg.stage}] {lg.level} · {formatDateTimeSeconds(lg.created_at, locale, timeZone)}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-xs">{lg.message.slice(0, 600)}</p>
-              </li>
+                stage={lg.stage}
+                level={lg.level}
+                time={formatDateTimeSeconds(lg.created_at, locale, timeZone)}
+                message={lg.message}
+                expandLabel={t('logsExpand')}
+                collapseLabel={t('logsCollapse')}
+              />
             ))}
           </ol>
         )}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
+          <span>{t('logsPageInfo', { page: logPage, total: logTotalPages, count: logCount ?? 0 })}</span>
+          <div className="flex gap-2">
+            {logPage > 1 ? (
+              <Link
+                href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId }, query: { ...logQueryBase, logPage: String(logPage - 1) }, hash: 'logs' }}
+                className="rounded-lg border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:border-primary"
+              >
+                {t('logsPrev')}
+              </Link>
+            ) : null}
+            {logPage < logTotalPages ? (
+              <Link
+                href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId }, query: { ...logQueryBase, logPage: String(logPage + 1) }, hash: 'logs' }}
+                className="rounded-lg border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:border-primary"
+              >
+                {t('logsNext')}
+              </Link>
+            ) : null}
+          </div>
+        </div>
       </section>
     </div>
   );
