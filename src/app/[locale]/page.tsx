@@ -63,7 +63,7 @@ export default async function HomePage({ params }: HomePageProps) {
             {tHero('description')}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href="#online-stores" className="btn-primary">
+            <a href="#affiliate-products" className="btn-primary">
               {tHero('primaryCta')}
               <ArrowDown className="size-4" aria-hidden />
             </a>
@@ -76,43 +76,7 @@ export default async function HomePage({ params }: HomePageProps) {
       </section>
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* C. Online stores */}
-        <section
-          id="online-stores"
-          aria-labelledby="online-stores-heading"
-          className="scroll-mt-24 py-10"
-        >
-          <SectionHeading
-            id="online-stores-heading"
-            title={tHome('stores.heading')}
-            description={tHome('stores.description')}
-          />
-          <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {getVisibleShopLinks().map((shop) => (
-              <li key={shop.id} className="h-full">
-                <ShopCard shop={shop} linkPosition="home-stores" />
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* D. Social media */}
-        <section
-          id="social-media"
-          aria-labelledby="social-media-heading"
-          className="scroll-mt-24 py-10"
-        >
-          <SectionHeading
-            id="social-media-heading"
-            title={tHome('socials.heading')}
-            description={tHome('socials.description')}
-          />
-          <div className="mt-6">
-            <SocialLinksGrid links={getSocialLinks()} linkPosition="home-socials" />
-          </div>
-        </section>
-
-        {/* E. Featured affiliate products */}
+        {/* C. Featured affiliate products */}
         <section
           id="affiliate-products"
           aria-labelledby="affiliate-products-heading"
@@ -140,7 +104,7 @@ export default async function HomePage({ params }: HomePageProps) {
           </div>
         </section>
 
-        {/* F. Properties for sale / rent */}
+        {/* D. Properties for sale / rent */}
         <section
           id="properties"
           aria-labelledby="properties-heading"
@@ -162,6 +126,42 @@ export default async function HomePage({ params }: HomePageProps) {
               {tHome('properties.viewAll')}
               <ArrowRight className="size-4" aria-hidden />
             </Link>
+          </div>
+        </section>
+
+        {/* E. Online stores */}
+        <section
+          id="online-stores"
+          aria-labelledby="online-stores-heading"
+          className="scroll-mt-24 py-10"
+        >
+          <SectionHeading
+            id="online-stores-heading"
+            title={tHome('stores.heading')}
+            description={tHome('stores.description')}
+          />
+          <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {getVisibleShopLinks().map((shop) => (
+              <li key={shop.id} className="h-full">
+                <ShopCard shop={shop} linkPosition="home-stores" />
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* F. Social media */}
+        <section
+          id="social-media"
+          aria-labelledby="social-media-heading"
+          className="scroll-mt-24 py-10"
+        >
+          <SectionHeading
+            id="social-media-heading"
+            title={tHome('socials.heading')}
+            description={tHome('socials.description')}
+          />
+          <div className="mt-6">
+            <SocialLinksGrid links={getSocialLinks()} linkPosition="home-socials" />
           </div>
         </section>
 
