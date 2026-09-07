@@ -29,7 +29,9 @@ Setelah 1 cover auto dari post utama terbukti tampil (draft 243d6cad, Pixazo flu
 - [x] `ContentDraftCard` thumbnails per reply + `DraftImageCard` tetap cover
 - [x] Social route/actions kirim `image_urls[]`
 - [ ] Tests per-reply (enqueue/select/worker prompt dari post target)
-- [ ] Gate hijau + commit submodule dulu + push
+- [x] Gate hijau (typecheck + lint + 300 tests) + commit submodule dulu + push
+  - Submodule `0162d3d feat(image): per-reply post index plus image mode` (pushed).
+  - Parent `3cc11ed feat(image): opt-in per-reply visuals except affiliate` (pushed).
 
 ## Risks
 
@@ -41,6 +43,7 @@ Setelah 1 cover auto dari post utama terbukti tampil (draft 243d6cad, Pixazo flu
 ## Progress Log
 
 - 2026-09-07 09:40:00 — Plan perluasan dibuat (opt-in per-reply, skip afiliasi).
+- 2026-09-07 — Implementasi + push. Catatan: `image_mode` default `cover-only`, jadi tombol per-reply baru aktif setelah global/sesi/draf diset `per-reply-opt-in`.
 
 ## Notes
 
