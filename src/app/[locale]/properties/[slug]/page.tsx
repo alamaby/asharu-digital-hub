@@ -201,6 +201,20 @@ export default async function PropertyDetailPage({
         ) : (
           <p className="text-lg font-semibold text-primary">{t('contactForPrice')}</p>
         )}
+
+        {property.updatedAt ? (
+          <p className="text-xs text-ink-muted">
+            {tPage('updatedLabel', {
+              date: new Date(
+                `${property.updatedAt}T00:00:00+07:00`
+              ).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })
+            })}
+          </p>
+        ) : null}
       </header>
 
       {/* Contact CTAs */}
@@ -256,6 +270,18 @@ export default async function PropertyDetailPage({
           <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
           {t('occupiedNote')}
         </p>
+      ) : null}
+
+      {/* Location guide (hyperlocal SEO: Bojongsoang / Gedebage / Ciwastra) */}
+      {property.locationGuide ? (
+        <section aria-labelledby="location-guide-heading" className="mt-10">
+          <h2 id="location-guide-heading" className="text-xl font-semibold text-ink">
+            {tPage('locationGuideHeading')}
+          </h2>
+          <p className="mt-3 max-w-3xl leading-relaxed text-ink-muted">
+            {property.locationGuide[locale]}
+          </p>
+        </section>
       ) : null}
 
       {/* Gallery */}
@@ -380,6 +406,18 @@ export default async function PropertyDetailPage({
           </ul>
           <p className="mt-2 text-xs italic text-ink-muted">
             *{t('nearbyDisclaimer')}
+          </p>
+        </section>
+      ) : null}
+
+      {/* Buying guide (harga, KPR, survei) */}
+      {property.buyingGuide ? (
+        <section aria-labelledby="buying-guide-heading" className="mt-10">
+          <h2 id="buying-guide-heading" className="text-xl font-semibold text-ink">
+            {tPage('buyingGuideHeading')}
+          </h2>
+          <p className="mt-3 max-w-3xl leading-relaxed text-ink-muted">
+            {property.buyingGuide[locale]}
           </p>
         </section>
       ) : null}

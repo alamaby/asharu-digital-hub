@@ -202,6 +202,25 @@ export const propertySchema = z.object({
       })
     )
     .optional(),
+  /**
+   * Owner-verified last-update date (YYYY-MM-DD). Feeds the visible
+   * "Terakhir diperbarui" label, JSON-LD `datePosted`, and per-URL sitemap
+   * `lastModified` so freshness signals stay accurate per listing.
+   */
+  updatedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'updatedAt must be YYYY-MM-DD')
+    .optional(),
+  /**
+   * Long-form hyperlocal guide (lokasi + akses + commute). Rendered as its
+   * own H2 section on the detail page; keeps `description` short for meta.
+   */
+  locationGuide: localizedTextSchema.optional(),
+  /**
+   * Long-form transaction guide (harga + KPR + biaya + survei). Rendered as
+   * its own H2 section on the detail page.
+   */
+  buyingGuide: localizedTextSchema.optional(),
   contacts: z.array(contactSchema).optional(),
   mapsUrl: httpsUrl.optional(),
   disclaimers: z

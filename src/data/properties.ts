@@ -7,22 +7,22 @@ export const properties: Property[] = [
   {
     slug: 'dijual-rumah-kamarasan-bandung-timur',
     title: {
-      id: 'Rumah Siap Huni Kamarasan Residence, Bandung Timur',
-      en: 'Move-in-Ready House at Kamarasan Residence, East Bandung'
+      id: 'Dijual Rumah 3 Kamar Bojongsoang Dekat Gedebage — Kamarasan Residence Rp650jt',
+      en: '3-Bedroom House for Sale in Bojongsoang near Gedebage — Kamarasan Residence IDR 650M'
     },
     transactionType: 'sale',
     propertyType: 'house',
     location: {
-      id: 'Kamarasan Residence, Bandung Timur',
-      en: 'Kamarasan Residence, East Bandung'
+      id: 'Kamarasan, Bojongsoang — dekat Gedebage & Ciwastra',
+      en: 'Kamarasan, Bojongsoang — near Gedebage & Ciwastra'
     },
     landAreaSqm: 92,
     buildingAreaSqm: 75,
     bedrooms: 3,
     bathrooms: 2,
     description: {
-      id: 'Rumah 1 lantai siap huni untuk keluarga muda — LT 92 m², LB 75 m², 3 kamar tidur, 2 kamar mandi, tidak pernah banjir selama dihuni. Dekat Tol Gedebage & Stasiun Kereta Cepat Tegalluar.',
-      en: 'Move-in-ready single-storey home for young families — 92 m² land, 75 m² building, 3 bedrooms, 2 bathrooms, no flood history while occupied. Near Gedebage Toll Gate & the Tegalluar high-speed rail station.'
+      id: 'Dijual rumah 3 kamar di Buahbatu, Bojongsoang — 3 menit ke Ciwastra, 14 menit ke Tol Gedebage. LT 92 LB 75, SHM, bebas banjir, Rp650 juta nego. Langsung pemilik.',
+      en: '3-bedroom house for sale in Buahbatu, Bojongsoang — 3 min to Ciwastra, 14 min to Gedebage Toll. 92 sqm land, 75 sqm building, freehold, flood-free, IDR 650M negotiable. Direct owner.'
     },
     image:
       '/images/properties/dijual-rumah-kamarasan-bandung-timur/19.webp',
@@ -40,28 +40,28 @@ export const properties: Property[] = [
       en: 'Buahbatu Village, Bojongsoang District, Bandung Regency — on the Bandung city border'
     },
     gallery: [
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/19.webp', alt: { id: 'Tampak depan rumah', en: 'Front view of the house' }, width: 1400, height: 1050 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/20.webp', alt: { id: 'Sisi depan rumah', en: 'Front side of the house' }, width: 1400, height: 1050 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/21.webp', alt: { id: 'Tampilan depan bangunan', en: 'Front elevation of the building' }, width: 1400, height: 1050 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/22.webp', alt: { id: 'Fasad depan rumah', en: 'House front facade' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/23.webp', alt: { id: 'Eksterior depan rumah', en: 'Front exterior of the house' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/10.webp', alt: { id: 'Kamar tidur bagian depan rumah', en: 'Front bedroom of the house' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/19.webp', alt: { id: 'Rumah dijual Bojongsoang dekat Gedebage — tampak depan Kamarasan', en: 'House for sale in Bojongsoang near Gedebage — Kamarasan front view' }, width: 1400, height: 1050 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/20.webp', alt: { id: 'Sisi depan rumah 3 kamar di Kamarasan Bojongsoang', en: 'Front side of the 3-bedroom house in Kamarasan Bojongsoang' }, width: 1400, height: 1050 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/21.webp', alt: { id: 'Fasad rumah dijual dekat Ciwastra Bandung', en: 'Facade of the house for sale near Ciwastra Bandung' }, width: 1400, height: 1050 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/22.webp', alt: { id: 'Fasad depan rumah Kamarasan Residence', en: 'House front facade at Kamarasan Residence' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/23.webp', alt: { id: 'Eksterior depan rumah siap huni Bojongsoang', en: 'Front exterior of the move-in-ready house in Bojongsoang' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/10.webp', alt: { id: 'Kamar tidur depan rumah 3 kamar Kamarasan', en: 'Front bedroom of the 3-bedroom Kamarasan house' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/11.webp', alt: { id: 'Kamar depan dari sudut lain', en: 'Front bedroom from another angle' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/12.webp', alt: { id: 'Kamar tidur depan dengan jendela', en: 'Front bedroom with window' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/13.webp', alt: { id: 'Interior kamar depan', en: 'Front bedroom interior' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/14.webp', alt: { id: 'Kamar depan siap digunakan', en: 'Front bedroom, ready to use' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/16.webp', alt: { id: 'Ruang keluarga', en: 'Family room' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/16.webp', alt: { id: 'Ruang keluarga rumah Bojongsoang', en: 'Family room of the Bojongsoang house' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/17.webp', alt: { id: 'Ruang keluarga dari sudut lain', en: 'Family room from another angle' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/18.webp', alt: { id: 'Interior ruang keluarga', en: 'Family room interior' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/05.webp', alt: { id: 'Kamar tidur utama', en: 'Main bedroom' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/05.webp', alt: { id: 'Kamar tidur utama dengan kamar mandi dalam', en: 'Main bedroom with en-suite access' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/06.webp', alt: { id: 'Kamar utama dari sudut lain', en: 'Main bedroom from another angle' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/07.webp', alt: { id: 'Kamar utama dengan akses kamar mandi dalam', en: 'Main bedroom with en-suite access' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/08.webp', alt: { id: 'Interior kamar utama', en: 'Main bedroom interior' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/09.webp', alt: { id: 'Jendela kamar utama', en: 'Main bedroom window' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/03.webp', alt: { id: 'Kamar tidur tengah', en: 'Middle bedroom' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/03.webp', alt: { id: 'Kamar tidur ketiga rumah 3 kamar Bandung', en: 'Third bedroom of the 3-bedroom Bandung house' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/04.webp', alt: { id: 'Kamar tengah dari sudut lain', en: 'Middle bedroom from another angle' }, width: 1400, height: 1867 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/02.webp', alt: { id: 'Kamar mandi', en: 'Bathroom' }, width: 720, height: 1280 },
-      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/01.webp', alt: { id: 'Dapur', en: 'Kitchen' }, width: 1400, height: 1867 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/02.webp', alt: { id: 'Kamar mandi rumah Kamarasan', en: 'Bathroom of the Kamarasan house' }, width: 720, height: 1280 },
+      { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/01.webp', alt: { id: 'Dapur dengan kitchen set termasuk penjualan', en: 'Kitchen with included kitchen set' }, width: 1400, height: 1867 },
       { src: '/images/properties/dijual-rumah-kamarasan-bandung-timur/15.webp', alt: { id: 'Area laundry', en: 'Laundry area' }, width: 1400, height: 1867 }
     ],
     highlights: [
@@ -123,6 +123,7 @@ export const properties: Property[] = [
       }
     ],
     nearbyPlaces: [
+      { name: { id: 'Jl. Ciwastra', en: 'Jl. Ciwastra' }, travelTime: { id: '3 menit', en: '3 min' } },
       { name: { id: 'Griya Derwati', en: 'Griya Derwati' }, travelTime: { id: '6 menit', en: '6 min' } },
       { name: { id: 'RS Ibu Anak Harapan Bunda', en: 'Harapan Bunda Mother & Child Hospital' }, travelTime: { id: '9 menit', en: '9 min' } },
       { name: { id: 'Sekolah Terpadu Al Kenzie', en: 'Al Kenzie Integrated School' }, travelTime: { id: '9 menit', en: '9 min' } },
@@ -144,6 +145,87 @@ export const properties: Property[] = [
       { label: { id: 'Dokumen', en: 'Documents' }, value: { id: 'SHM · PBG/IMB tersedia · PBB tertib', en: 'Freehold (SHM) · PBG/IMB available · PBB up to date' } },
       { label: { id: 'Status KPR', en: 'Mortgage status' }, value: { id: 'Berjalan — dilunasi notaris saat deal', en: 'Active — settled via notary upon agreement' } },
       { label: { id: 'Termasuk penjualan', en: 'Included in sale' }, value: { id: 'Kitchen set, kompor tanam 3 tungku, cooking hood, toren 1.000 L, filter air, pompa submersible, antena TV digital, fixture permanen', en: 'Kitchen set, 3-burner built-in hob, cooking hood, 1,000 L water tower, water filter, submersible pump, digital TV antenna, permanent fixtures' } }
+    ],
+    updatedAt: '2026-09-08',
+    locationGuide: {
+      id: 'Rumah ini dijual di Kelurahan Buahbatu, Kecamatan Bojongsoang, Kabupaten Bandung — tepat di tepi perbatasan Kota Bandung. Secara administratif ini rumah dijual Bojongsoang, namun posisinya adalah alternatif paling dekat untuk pencari rumah dijual Gedebage dan dijual rumah Ciwastra: hanya sekitar 3 menit ke Jalan Ciwastra, 14 menit ke Tol Gedebage, 15 menit ke Summarecon Mall Bandung, dan 16 menit ke Stasiun Kereta Cepat Tegalluar. Keluarga yang bekerja di Gedebage, Ciwastra, Buahbatu, atau Tegalluar mendapat commute harian yang pendek tanpa membayar harga cluster Summarecon. Lingkungan Kamarasan Residence satu arah gerbang (one-way gate), keamanan dan CCTV 24 jam, jalan depan selebar 6 meter, dan tidak pernah banjir selama rumah dihuni — poin penting bagi pembeli rumah 3 kamar tidur di Bandung Timur.',
+      en: 'This house is for sale in Buahbatu Village, Bojongsoang District, Bandung Regency — right on the Bandung city border. Administratively a Bojongsoang listing, it is the closest alternative for Gedebage and Ciwastra buyers: about 3 minutes to Jl. Ciwastra, 14 minutes to the Gedebage Toll Gate, 15 minutes to Summarecon Mall Bandung, and 16 minutes to the Tegalluar high-speed rail station. Families working in Gedebage, Ciwastra, Buahbatu, or Tegalluar get a short daily commute without paying Summarecon cluster prices. Kamarasan Residence is a one-way-gate estate with 24-hour security and CCTV, a 6-metre front road, and no flood history while occupied — key points for 3-bedroom buyers in East Bandung.'
+    },
+    buyingGuide: {
+      id: 'Harga rumah ini Rp650 juta nego wajar, bisa tunai atau KPR, plus iuran lingkungan Rp125 ribu per bulan. KPR yang sedang berjalan dilunasi melalui notaris saat deal, dan biaya notaris, pajak, pelunasan KPR, serta balik nama dinegosiasikan terpisah — standar transaksi rumah dijual Bojongsoang SHM. Dokumen SHM, PBG/IMB tersedia, dan PBB tertib, sehingga proses KPR bank lebih mudah. Spesifikasinya rumah 1 lantai LT 92 m² LB 75 m² dengan 3 kamar tidur dan 2 kamar mandi (salah satunya kamar mandi dalam di kamar utama), dimensi 7 × 13,2 meter, hadap barat, carport 1 mobil sedalam 5 meter, listrik 2.200 VA, air sumur pompa submersible dengan toren 1.000 liter dan filter air. Yang termasuk penjualan: kitchen set, kompor tanam 3 tungku, cooking hood, toren, filter air, pompa submersible, antena TV digital, dan fixture permanen — rumah dijual tanpa perabot. Untuk survei, hubungi pemilik langsung via WhatsApp (tanpa perantara) dan sepakati jadwal; titik pasti dibagikan saat koordinasi lanjutan.',
+      en: 'The price is IDR 650 million (negotiable), payable in cash or by mortgage, plus a community fee of IDR 125K per month. The active mortgage is settled via notary upon agreement, and notary fees, taxes, mortgage settlement, and ownership transfer are negotiated separately — standard for a freehold Bojongsoang sale. Documents are freehold (SHM) with PBG/IMB available and PBB up to date, which simplifies bank mortgage approval. The spec is a single-storey 92 sqm / 75 sqm home with 3 bedrooms and 2 bathrooms (one en-suite in the main bedroom), 7 × 13.2 m dimensions, west-facing, a 5-metre-deep 1-car carport, 2,200 VA power, and pumped well water with a 1,000 L tower and filter. Included in the sale: kitchen set, 3-burner built-in hob, cooking hood, water tower, water filter, submersible pump, digital TV antenna, and permanent fixtures — sold unfurnished. To view the house, contact the owner directly via WhatsApp (no middleman) and agree a schedule; the exact pin is shared during follow-up coordination.'
+    },
+    faq: [
+      {
+        question: { id: 'Di mana lokasi tepat rumah Kamarasan ini?', en: 'Where exactly is this Kamarasan house?' },
+        answer: {
+          id: 'Di Kamarasan Residence, Kelurahan Buahbatu, Kecamatan Bojongsoang, Kabupaten Bandung — tepi perbatasan Kota Bandung. Secara administratif ini rumah dijual Bojongsoang, 3 menit ke Jl. Ciwastra dan 14 menit ke Tol Gedebage.',
+          en: 'At Kamarasan Residence, Buahbatu Village, Bojongsoang District, Bandung Regency — on the Bandung city border. Administratively a Bojongsoang listing, 3 minutes to Jl. Ciwastra and 14 minutes to the Gedebage Toll Gate.'
+        }
+      },
+      {
+        question: { id: 'Berapa jarak ke Gedebage dan Tol Gedebage?', en: 'How far is it to Gedebage and the Gedebage Toll Gate?' },
+        answer: {
+          id: 'Sekitar 14 menit ke Tol Gedebage kondisi normal, 15 menit ke Summarecon Mall Bandung, dan 16 menit ke Stasiun Kereta Cepat Tegalluar menurut estimasi Google Maps.',
+          en: 'About 14 minutes to the Gedebage Toll Gate in normal traffic, 15 minutes to Summarecon Mall Bandung, and 16 minutes to the Tegalluar high-speed rail station per Google Maps estimates.'
+        }
+      },
+      {
+        question: { id: 'Berapa jarak ke Ciwastra?', en: 'How far is it to Ciwastra?' },
+        answer: {
+          id: 'Sekitar 3 menit ke Jalan Ciwastra terdekat. Lokasinya cocok untuk pencari dijual rumah Ciwastra yang ingin hunian lebih tenang di sisi Bojongsoang.',
+          en: 'About 3 minutes to the nearest Jl. Ciwastra. It suits Ciwastra buyers looking for a quieter home on the Bojongsoang side.'
+        }
+      },
+      {
+        question: { id: 'Apakah rumah bebas banjir?', en: 'Is the house flood-free?' },
+        answer: {
+          id: 'Ya. Rumah tidak pernah mengalami banjir selama dihuni. Kawasan Kamarasan Residence memiliki sistem gerbang satu arah dan drainase lingkungan yang terawat.',
+          en: 'Yes. The house has never flooded while occupied. Kamarasan Residence runs a one-way gate system with maintained neighbourhood drainage.'
+        }
+      },
+      {
+        question: { id: 'Berapa kamar tidur dan luas rumahnya?', en: 'How many bedrooms and how large is the house?' },
+        answer: {
+          id: 'Rumah 1 lantai dengan 3 kamar tidur dan 2 kamar mandi (salah satunya kamar mandi dalam), LT 92 m², LB 75 m², dimensi 7 × 13,2 meter, hadap barat, carport 1 mobil sedalam 5 meter.',
+          en: 'A single-storey home with 3 bedrooms and 2 bathrooms (one en-suite), 92 sqm land, 75 sqm building, 7 × 13.2 m dimensions, west-facing, with a 5-metre-deep 1-car carport.'
+        }
+      },
+      {
+        question: { id: 'Berapa harga dan apakah bisa KPR?', en: 'What is the price and can I use a mortgage?' },
+        answer: {
+          id: 'Rp650 juta nego wajar, bisa tunai atau KPR. KPR yang sedang berjalan dilunasi melalui notaris saat deal; biaya notaris, pajak, dan balik nama dinegosiasikan terpisah. Iuran lingkungan Rp125 ribu per bulan.',
+          en: 'IDR 650 million (negotiable), cash or mortgage. The active mortgage is settled via notary upon agreement; notary fees, taxes, and transfer costs are negotiated separately. Community fee is IDR 125K per month.'
+        }
+      },
+      {
+        question: { id: 'Bagaimana kelengkapan dokumennya?', en: 'How complete are the documents?' },
+        answer: {
+          id: 'SHM, PBG/IMB tersedia, dan PBB tertib. Kelengkapan ini memudahkan pengajuan KPR bank dan proses balik nama di notaris.',
+          en: 'Freehold title (SHM), PBG/IMB available, and PBB up to date. This completeness simplifies bank mortgage applications and the notary transfer process.'
+        }
+      },
+      {
+        question: { id: 'Apa saja yang termasuk dalam penjualan?', en: 'What is included in the sale?' },
+        answer: {
+          id: 'Kitchen set, kompor tanam 3 tungku, cooking hood, toren 1.000 liter, filter air, pompa submersible, antena TV digital, dan fixture permanen. Rumah dijual tanpa perabot; perabot di foto tidak termasuk.',
+          en: 'Kitchen set, 3-burner built-in hob, cooking hood, 1,000 L water tower, water filter, submersible pump, digital TV antenna, and permanent fixtures. The house is sold unfurnished; furniture in photos is excluded.'
+        }
+      },
+      {
+        question: { id: 'Bagaimana listrik, air, dan fasilitas sekitar?', en: 'How are power, water, and nearby facilities?' },
+        answer: {
+          id: 'Listrik 2.200 VA, air sumur pompa submersible dengan toren 1.000 liter dan filter, jaringan IndiHome tersedia (belum aktif). Sekitar 200 meter ke Indomaret, 300 meter ke Yomart/ATM BCA dan apotek, 400 meter ke Alfamart; 20 meter ke Masjid Al-Ikhlas Kamarasan.',
+          en: '2,200 VA power, pumped well water with a 1,000 L tower and filter, IndiHome line available (not yet active). About 200 m to Indomaret, 300 m to Yomart/BCA ATM and pharmacy, 400 m to Alfamart; 20 m to Al-Ikhlas Kamarasan Mosque.'
+        }
+      },
+      {
+        question: { id: 'Bagaimana cara survei rumah ini?', en: 'How do I schedule a viewing?' },
+        answer: {
+          id: 'Hubungi pemilik langsung via WhatsApp 0813-2449-8379 atau 0899-6685-300 (tanpa perantara), sampaikan ketertarikan pada rumah Kamarasan Bojongsoang, lalu sepakati jadwal survei. Dijual langsung oleh pemilik.',
+          en: 'Contact the owner directly via WhatsApp 0813-2449-8379 or 0899-6685-300 (no middleman), mention the Kamarasan Bojongsoang house, then agree a viewing schedule. Sold directly by the owner.'
+        }
+      }
     ],
     contacts: [
       { display: '0813-2449-8379', international: '6281324498379' },

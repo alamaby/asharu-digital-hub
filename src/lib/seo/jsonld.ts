@@ -143,12 +143,34 @@ export function realEstateListingSchema(
       '@type': 'Place',
       address: {
         '@type': 'PostalAddress',
-        addressRegion: property.location[locale],
+        streetAddress:
+          property.addressFull?.[locale] ?? property.location[locale],
+        addressLocality:
+          property.slug === 'dijual-rumah-kamarasan-bandung-timur'
+            ? 'Bojongsoang, Bandung Regency'
+            : property.location[locale],
+        addressRegion: 'Jawa Barat',
         addressCountry: 'ID'
       }
     },
     additionalProperty
   };
+
+  if (property.bedrooms !== undefined) {
+    listing.numberOfRooms = property.bedrooms;
+  }
+
+  if (property.buildingAreaSqm !== undefined) {
+    listing.floorSize = {
+      '@type': 'QuantitativeValue',
+      value: property.buildingAreaSqm,
+      unitCode: 'MTK'
+    };
+  }
+
+  if (property.updatedAt) {
+    listing.datePosted = `${property.updatedAt}T00:00:00+07:00`;
+  }
 
   if (property.price?.amount !== undefined) {
     listing.offers = {

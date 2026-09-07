@@ -24,14 +24,29 @@ const staticPaths: SitemapEntry[] = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
+  const fallbackModified = new Date();
+  const propertyBySlug = new Map(
+    getPublishedProperties().map((property) => [property.slug, property])
+  );
 
-  return staticPaths.flatMap(({ path, params }) =>
-    routing.locales.map((locale) => ({
+  return staticPaths.flatMap(({ path, params }) => {
+    const slug = params?.slug;
+    const property = slug ? propertyBySlug.get(slug) : undefined;
+    const lastModified = property?.updatedAt
+      ? new Date(`${property.updatedAt}T00:00:00+07:00`)
+      : fallbackModified;
+    const priority =
+      path === '/'
+        ? 1
+        : slug === 'dijual-rumah-kamarasan-bandung-timur'
+          ? 0.9
+          : 0.7;
+
+    return routing.locales.map((locale) => ({
       url: `${env.siteUrl}${localizedPathname(path, locale as Locale, params)}`,
       lastModified,
       changeFrequency: 'weekly' as const,
-      priority: path === '/' ? 1 : 0.7,
+      priority,
       alternates: {
         languages: {
           id: `${env.siteUrl}${localizedPathname(path, 'id' as Locale, params)}`,
@@ -43,6 +58,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
           )}`
         }
       }
-    }))
-  );
+    }));
+  });
 }

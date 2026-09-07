@@ -209,6 +209,9 @@
     "listTitle": "Properties",
     "backToList": "Back to all properties",
     "specsHeading": "Specifications",
+    "locationGuideHeading": "Location & Nearby Access",
+    "buyingGuideHeading": "Price, Mortgage & Viewing",
+    "updatedLabel": "Last updated: {date}",
     "detailContactHeading": "Interested in this property?",
     "detailContactDescription": "Pricing, legal documents, and viewing schedules are discussed directly through our official contact."
   },
