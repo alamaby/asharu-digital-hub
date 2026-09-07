@@ -44,6 +44,7 @@ Setelah 1 cover auto dari post utama terbukti tampil (draft 243d6cad, Pixazo flu
 
 - 2026-09-07 09:40:00 — Plan perluasan dibuat (opt-in per-reply, skip afiliasi).
 - 2026-09-07 — Implementasi + push. Catatan: `image_mode` default `cover-only`, jadi tombol per-reply baru aktif setelah global/sesi/draf diset `per-reply-opt-in`.
+- 2026-09-07 — Lanjutan: picker model/style per-reply (`PostImageControl` + override), panel cover pindah ke dalam thread antara post utama dan balasan 1 (`572a7cf`, pushed).
 
 ## Notes
 
