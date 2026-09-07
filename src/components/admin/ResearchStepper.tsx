@@ -57,6 +57,7 @@ export function ResearchStepper({
   logs,
   locale,
   timeZone,
+  skippedStages,
   t
 }: {
   status: string;
@@ -65,10 +66,12 @@ export function ResearchStepper({
   logs: StepperLog[];
   locale: string;
   timeZone: string;
+  skippedStages?: string[];
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const { label } = getStepperTexts(t);
   const isFailed = status === 'failed';
+  const skipped = new Set(skippedStages ?? []);
 
   // Opsi B: agregasi MIN(created_at) per stage dari logs
   const logTimeByStage = new Map<string, string>();
@@ -142,13 +145,16 @@ export function ResearchStepper({
           const isActive = idx === activeIndex;
           const isErrorNode = isFailed && isActive;
           const isAwaiting = step === 'awaiting_selection';
+          const isSkipped = skipped.has(step);
           const Icon = STEP_ICON[step] ?? Clock;
-          const timeIso = getTimeForStep(step, idx);
-          const isFuture = idx > activeIndex && !isFailed;
+          const timeIso = isSkipped ? null : getTimeForStep(step, idx);
+          const isFuture = idx > activeIndex && !isFailed && !isSkipped;
 
-          // warna node: tetap amber untuk awaiting_selection (sesuai STATUS_BG)
+          // warna node: tetap amber untuk awaiting_selection (sesuai STATUS_BG);
+          // tahap yang dilewati (mekanisme dua) tampil redup + label Dilewati.
           let nodeCls = 'bg-surface border-line text-ink-muted';
-          if (isErrorNode) nodeCls = 'bg-red-50 border-red-300 text-red-700';
+          if (isSkipped) nodeCls = 'bg-surface border-dashed border-line text-ink-muted opacity-60';
+          else if (isErrorNode) nodeCls = 'bg-red-50 border-red-300 text-red-700';
           else if (isActive && isAwaiting) nodeCls = 'bg-amber-50 border-amber-300 text-amber-800';
           else if (isActive) nodeCls = 'bg-primary/10 border-primary text-primary';
           else if (isDone && isAwaiting) nodeCls = 'bg-amber-500 border-amber-500 text-white';
@@ -179,7 +185,11 @@ export function ResearchStepper({
               <p className={`mt-2 text-center text-xs font-medium leading-tight ${isActive ? 'text-ink' : isDone ? 'text-primary' : 'text-ink-muted'}`}>
                 {label(step)}
               </p>
-              {timeIso ? (
+              {isSkipped ? (
+                <p className="mt-0.5 text-center text-[10px] leading-tight text-ink-muted">
+                  {t('stepper.skipped')}
+                </p>
+              ) : timeIso ? (
                 <p className="mt-0.5 text-center text-[10px] leading-tight text-ink-muted">
                   {t('stepper.executedAt', { time: formatTime(timeIso, locale, timeZone) })}
                 </p>

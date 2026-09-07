@@ -32,6 +32,8 @@ interface Props {
   sessionId: string;
   topics: TopicItem[];
   affiliatePreviews?: Record<string, AffiliatePreview> | null;
+  /** Mekanisme dua: verifying+scoring dilewati → skor disembunyikan (tanpa skor). */
+  isDua?: boolean;
 }
 
 const BAND_LABEL: Record<AffiliateBand, { id: string; en: string }> = {
@@ -47,7 +49,7 @@ const BAND_CLASS: Record<AffiliateBand, string> = {
   none: 'bg-red-50 text-red-800 border-red-200'
 };
 
-export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }: Props) {
+export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, isDua }: Props) {
   const t = useTranslations('admin.research');
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -139,7 +141,7 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
           {t('shortlistCount', { count: shortlistedCount })}
         </p>
       </div>
-      <p className="text-sm text-ink-muted">{t('shortlistIntro')}</p>
+      <p className="text-sm text-ink-muted">{t(isDua ? 'shortlistIntroDua' : 'shortlistIntro')}</p>
 
       {(() => {
         const unmatched = affiliatePreviews
@@ -231,7 +233,7 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews }:
                   #{tp.rank ?? '-'} · {tp.topic}
                 </p>
                 <p className="text-xs text-ink-muted">
-                  {tp.category ?? '-'} · score {tp.final_score?.toFixed(1) ?? '-'} · {tp.status}
+                  {tp.category ?? '-'} · {isDua ? t('scoreNone') : `score ${tp.final_score?.toFixed(1) ?? '-'}`} · {tp.status}
                 </p>
               </label>
               {band ? (

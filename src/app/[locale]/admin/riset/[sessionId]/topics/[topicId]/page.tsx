@@ -67,7 +67,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
 
   const { data: topic } = await supabase
     .from('content_research_topics')
-    .select('id, rank, topic, category, why_now, audience_relevance, key_facts, unique_angle, hooks, recommended_format, recommended_platform, potential_risk, verification_status, sources, score_breakdown, final_score, status')
+    .select('id, rank, topic, category, why_now, audience_relevance, key_facts, unique_angle, hooks, recommended_format, recommended_platform, potential_risk, verification_status, sources, score_breakdown, final_score, status, session_id')
     .eq('id', topicId)
     .maybeSingle();
 
@@ -97,12 +97,21 @@ export default async function TopicDetailPage({ params }: PageProps) {
     score_breakdown: ScoreBreakdown | null;
     final_score: number | null;
     status: string;
+    session_id: string;
   };
 
   const hooks = Array.isArray(tp.hooks) ? (tp.hooks as HookItem[]) : [];
   const sources = Array.isArray(tp.sources) ? (tp.sources as SourceItem[]) : [];
   const facts = Array.isArray(tp.key_facts) ? (tp.key_facts as string[]) : [];
   const breakdown = tp.score_breakdown;
+
+  // Mekanisme dua melewati verifying+scoring → skor 0 = tanpa skor, bukan nilai.
+  const { data: parentSession } = await supabase
+    .from('content_research_sessions')
+    .select('mechanism')
+    .eq('id', tp.session_id)
+    .maybeSingle();
+  const isDua = (parentSession as { mechanism: string | null } | null)?.mechanism === 'dua';
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 space-y-6">
@@ -121,7 +130,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
           #{tp.rank ?? '-'} · {tp.topic}
         </h1>
         <p className="mt-1 text-sm text-ink-muted">
-          {tp.category ?? '-'} · {t('finalScore')}: <span className="font-semibold">{tp.final_score?.toFixed(1) ?? '-'}</span> · {tp.status} · verify: {tp.verification_status}
+          {tp.category ?? '-'} · {t('finalScore')}: <span className="font-semibold">{isDua ? t('scoreNone') : (tp.final_score?.toFixed(1) ?? '-')}</span> · {tp.status} · verify: {isDua ? '-' : tp.verification_status}
         </p>
       </header>
 
@@ -171,7 +180,12 @@ export default async function TopicDetailPage({ params }: PageProps) {
         </section>
       ) : null}
 
-      {breakdown ? (
+      {isDua ? (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{t('scoreBreakdown')}</h2>
+          <p className="mt-1 text-sm text-ink-muted">{t('scoreSkippedDua')}</p>
+        </section>
+      ) : breakdown ? (
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{t('scoreBreakdown')}</h2>
           <dl className="mt-1 grid grid-cols-2 gap-1 text-sm sm:grid-cols-4">

@@ -349,6 +349,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
         logs={(logs ?? []) as Array<{ stage: string; level: string; created_at: string }>}
         locale={locale}
         timeZone={timeZone}
+        skippedStages={isDua ? ['verifying', 'scoring'] : []}
         t={(key, params) => {
           try {
             // next-intl t supports params as second arg
@@ -371,6 +372,7 @@ export default async function ResearchSessionPage({ params }: PageProps) {
       {s.status === 'awaiting_selection' && draftList.length === 0 ? (
         <ResearchSessionActions
           sessionId={sessionId}
+          isDua={isDua}
           topics={list.map((t) => ({
             id: t.id,
             rank: t.rank,
@@ -459,7 +461,11 @@ export default async function ResearchSessionPage({ params }: PageProps) {
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-ink">
-                    {tp.final_score !== null ? tp.final_score.toFixed(1) : '-'}
+                    {isDua ? (
+                      <span className="text-xs font-medium text-ink-muted">{t('scoreNone')}</span>
+                    ) : (
+                      tp.final_score !== null ? tp.final_score.toFixed(1) : '-'
+                    )}
                   </span>
                 </Link>
               </li>
