@@ -162,7 +162,19 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     const { data: istlyes } = await svc.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug');
     const { data: dimgs } = await svc.from('content_draft_images').select('*').eq('draft_id', draftId).order('created_at', { ascending: false });
     const { data: dmode } = await svc.from('content_drafts').select('image_mode').eq('id', draftId).maybeSingle();
-    if (dmode) imageMode = (dmode as { image_mode: string | null }).image_mode;
+    const draftMode = (dmode as { image_mode: string | null } | null)?.image_mode ?? null;
+    // Resolusi mode draf → sesi → global (sama seperti worker).
+    let sessionMode: string | null = null;
+    if (!draftMode && sourceSessionId) {
+      const { data: smode } = await svc.from('content_research_sessions').select('image_mode').eq('id', sourceSessionId).maybeSingle();
+      sessionMode = (smode as { image_mode: string | null } | null)?.image_mode ?? null;
+    }
+    let globalMode: string | null = null;
+    if (!draftMode && !sessionMode) {
+      const { data: gmode } = await svc.from('image_gen_defaults').select('image_mode').eq('id', 1).maybeSingle();
+      globalMode = (gmode as { image_mode: string } | null)?.image_mode ?? null;
+    }
+    imageMode = draftMode ?? sessionMode ?? globalMode;
     if (iprovs) imageProviders = iprovs as typeof imageProviders;
     if (imods) {
       imageModels = ((imods ?? []) as unknown as Array<{ id: string; provider_id: string; model_id: string; display_name: string; image_providers: { slug: string } }>).map(

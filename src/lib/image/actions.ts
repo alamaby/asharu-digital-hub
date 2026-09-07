@@ -88,34 +88,18 @@ export async function generatePostImage(
 }
 
 async function isPerReplyEnabled(d: { image_mode: string | null; research_topic_id: string | null }): Promise<boolean> {
-  if (d.image_mode === 'per-reply-opt-in') return true;
-  if (d.image_mode === 'cover-only') return false;
+  const { isPerReplyMode } = await import('./config');
   const supabase = createSupabaseService();
-  if (!supabase || !d.research_topic_id) {
-    const { data } = await supabase
-      ?.from('image_gen_defaults')
-      .select('image_mode')
-      .eq('id', 1)
-      .maybeSingle() ?? { data: null };
-    return (data as { image_mode: string } | null)?.image_mode === 'per-reply-opt-in';
-  }
-  const { data: topic } = await supabase
-    .from('content_research_topics')
-    .select('session_id')
-    .eq('id', d.research_topic_id)
-    .maybeSingle();
-  const sessionId = (topic as { session_id: string } | null)?.session_id;
-  if (sessionId) {
-    const { data: session } = await supabase
-      .from('content_research_sessions')
-      .select('image_mode')
-      .eq('id', sessionId)
+  let sessionId: string | null = null;
+  if (supabase && d.research_topic_id && !d.image_mode) {
+    const { data: topic } = await supabase
+      .from('content_research_topics')
+      .select('session_id')
+      .eq('id', d.research_topic_id)
       .maybeSingle();
-    const mode = (session as { image_mode: string | null } | null)?.image_mode;
-    if (mode) return mode === 'per-reply-opt-in';
+    sessionId = (topic as { session_id: string } | null)?.session_id ?? null;
   }
-  const { data } = await supabase.from('image_gen_defaults').select('image_mode').eq('id', 1).maybeSingle();
-  return (data as { image_mode: string } | null)?.image_mode === 'per-reply-opt-in';
+  return isPerReplyMode({ draftMode: d.image_mode, sessionId });
 }
 
 /** Pilih 1 image sebagai selected untuk post itu (cover = post 0 untuk social). */

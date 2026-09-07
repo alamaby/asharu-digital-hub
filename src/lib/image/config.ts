@@ -19,6 +19,7 @@ export interface ResolvedImageTarget {
 interface SessionImageOverride {
   image_model_id: string | null;
   image_style_slug: string | null;
+  image_mode: string | null;
 }
 
 async function activeProviders(): Promise<ImageProviderRow[]> {
@@ -82,7 +83,7 @@ async function getSessionOverride(sessionId: string | null | undefined): Promise
   const supabase = getServiceClient();
   const { data } = await supabase
     .from('content_research_sessions')
-    .select('image_model_id, image_style_slug')
+    .select('image_model_id, image_style_slug, image_mode')
     .eq('id', sessionId)
     .maybeSingle();
   return (data as SessionImageOverride | null) ?? null;
@@ -150,7 +151,19 @@ export async function resolveImageTarget(options: {
 }
 
 /** Daftar provider + model aktif untuk picker review (tanpa secret). */
-export async function listActiveImageOptions(): Promise<{
+export async function isPerReplyMode(options: {
+  draftMode?: string | null;
+  sessionId?: string | null;
+}): Promise<boolean> {
+  if (options.draftMode === 'per-reply-opt-in') return true;
+  if (options.draftMode === 'cover-only') return false;
+  const session = await getSessionOverride(options.sessionId);
+  if (session?.image_mode) return session.image_mode === 'per-reply-opt-in';
+  const defaults = await getGenDefaults();
+  return defaults?.image_mode === 'per-reply-opt-in';
+}
+
+/** Daftar provider + model aktif untuk picker review (tanpa secret). */export async function listActiveImageOptions(): Promise<{
   providers: ImageProviderRow[];
   models: (ImageModelRow & { provider_slug: ImageProviderSlug })[];
   styles: ImageStylePreset[];
