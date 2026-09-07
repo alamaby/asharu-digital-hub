@@ -6,7 +6,7 @@ import { GeminiImageAdapter } from './providers/gemini';
 import { BynaraImageAdapter } from './providers/bynara';
 import { ImageHttpError } from './types';
 import { isHttpsUrl, base64ToBytes } from './providers/base';
-import { buildImagePromptMessages, parseImagePrompt } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, detectPainKeywords } from './prompt';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -136,13 +136,71 @@ describe('image_prompt builder/parser', () => {
   it('builds bilingual prompt + parses JSON with fence', () => {
     const { system, user } = buildImagePromptMessages({ mainId: 'panci lengket', mainEn: 'sticky pan' });
     expect(system).toContain('JSON ONLY');
+    expect(system).toContain('visual_strategy');
     expect(user).toContain('sticky pan');
-    const parsed = parseImagePrompt('```json\n{"image_prompt": "sticky frying pan close-up", "negative_prompt": "no text"}\n```');
+    const parsed = parseImagePrompt('```json\n{"visual_strategy": "before", "hook_keywords": ["lengket"], "contradiction_check": "shows sticky", "justification": "pain hook", "image_prompt": "sticky frying pan close-up", "negative_prompt": "no text"}\n```');
     expect(parsed.image_prompt).toBe('sticky frying pan close-up');
     expect(parsed.negative_prompt).toBe('no text');
+    expect(parsed.reasoning.visual_strategy).toBe('before');
   });
   it('rejects missing image_prompt', () => {
     expect(() => parseImagePrompt('{"foo": 1}')).toThrow(/image_prompt/);
     expect(() => parseImagePrompt('no json here')).toThrow();
+  });
+  it('defaults missing strategy to after', () => {
+    const parsed = parseImagePrompt('{"image_prompt": "sunset field"}');
+    expect(parsed.reasoning.visual_strategy).toBe('after');
+  });
+});
+
+describe('image_prompt contradiction gate (6d9658e9)', () => {
+  const source = 'Tahukah kamu? 7 dari 10 anak kos merasa ruangannya sempit dan berantakan.';
+  it('detects pain keywords ID', () => {
+    expect(detectPainKeywords(source)).toEqual(expect.arrayContaining(['sempit', 'berantakan']));
+  });
+  it('rejects After visual for pain hook', () => {
+    const gate = validateImagePromptContradiction(
+      {
+        image_prompt: 'A cozy minimalist dorm corner, neat, organized, spacious atmosphere',
+        reasoning: { visual_strategy: 'after', hook_keywords: [], contradiction_check: '', justification: '' }
+      },
+      source
+    );
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.join(' ')).toMatch(/before/);
+  });
+  it('rejects before visual containing After words', () => {
+    const gate = validateImagePromptContradiction(
+      {
+        image_prompt: 'A cramped messy dorm corner, neat and organized shelves',
+        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit'], contradiction_check: '', justification: '' }
+      },
+      source
+    );
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.join(' ')).toMatch(/After words/);
+  });
+  it('rejects before negative that bans pain words', () => {
+    const gate = validateImagePromptContradiction(
+      {
+        image_prompt: 'A cramped messy dorm corner with piled clothes, narrow angle',
+        negative_prompt: 'text, watermark, messy, cramped space',
+        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit'], contradiction_check: '', justification: '' }
+      },
+      source
+    );
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.join(' ')).toMatch(/negative_prompt/);
+  });
+  it('accepts valid before visual', () => {
+    const gate = validateImagePromptContradiction(
+      {
+        image_prompt: 'A cramped messy small student dorm corner with clothes piled on narrow bed, dim cluttered space',
+        negative_prompt: 'text, watermark, logo, faces, neat, spacious',
+        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit', 'berantakan'], contradiction_check: 'shows cramped/messy, forbids neat/spacious', justification: 'pain hook needs pain visual' }
+      },
+      source
+    );
+    expect(gate.ok).toBe(true);
   });
 });

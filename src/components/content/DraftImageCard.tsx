@@ -177,6 +177,13 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
                   {img.style_slug ? ` · ${img.style_slug}` : ''}
                 </span>
                 <p className="mt-1 line-clamp-2 text-ink">{img.image_prompt || 'Menunggu worker…'}</p>
+                {img.reasoning?.visual_strategy ? (
+                  <p className="mt-1 text-ink-muted">
+                    Strategi: {img.reasoning.visual_strategy}
+                    {img.reasoning.hook_keywords?.length ? ` · hook: ${img.reasoning.hook_keywords.join(', ')}` : ''}
+                    {img.reasoning.justification ? ` — ${img.reasoning.justification}` : ''}
+                  </p>
+                ) : null}
                 {img.status === 'failed' && img.last_error ? (
                   <p className="mt-1 text-red-700">Error: {img.last_error}</p>
                 ) : null}

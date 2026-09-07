@@ -9,7 +9,7 @@ import {
   markImageModelUsage,
   resolveImageTarget
 } from './config';
-import { buildImagePromptMessages, parseImagePrompt } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
 import { ImageHttpError } from './types';
 import type {
@@ -98,6 +98,8 @@ async function loadDraftContext(draftId: string): Promise<{
   draft: DraftRow;
   sessionId: string | null;
   topicTitle: string | null;
+  keyFacts: string[];
+  uniqueAngle: string | null;
 } | null> {
   const supabase = getServiceClient();
   const { data: draft } = await supabase
@@ -108,15 +110,38 @@ async function loadDraftContext(draftId: string): Promise<{
   if (!draft) return null;
   const d = draft as DraftRow;
   if (!d.research_topic_id) {
-    return { draft: d, sessionId: null, topicTitle: null };
+    return { draft: d, sessionId: null, topicTitle: null, keyFacts: [], uniqueAngle: null };
   }
   const { data: topic } = await supabase
     .from('content_research_topics')
-    .select('session_id, topic, key_facts')
+    .select('session_id, topic, key_facts, unique_angle')
     .eq('id', d.research_topic_id)
     .maybeSingle();
-  const t = topic as { session_id: string; topic: string; key_facts: string[] } | null;
-  return { draft: d, sessionId: t?.session_id ?? null, topicTitle: t?.topic ?? null };
+  const t = topic as { session_id: string; topic: string; key_facts: unknown; unique_angle: string | null } | null;
+  return {
+    draft: d,
+    sessionId: t?.session_id ?? null,
+    topicTitle: t?.topic ?? null,
+    keyFacts: Array.isArray(t?.key_facts) ? (t.key_facts as string[]).filter((f) => typeof f === 'string') : [],
+    uniqueAngle: t?.unique_angle ?? null
+  };
+}
+
+interface ImagePromptLLMResult {
+  prompt: string;
+  negative?: string;
+  reasoning: Record<string, unknown>;
+  llmMeta: Record<string, unknown>;
+}
+
+function summarizeThread(replies: { id?: string; en?: string }[] | undefined): string {
+  const list = replies ?? [];
+  // Cuplikan: reply pertama + terakhir (arah + penutup), potong agar hemat token.
+  const picks = [list[0]?.id, list[list.length - 1]?.id].filter(Boolean) as string[];
+  return picks
+    .map((t) => t.slice(0, 200))
+    .join(' | ')
+    .slice(0, 600);
 }
 
 async function runImagePromptLLM(
@@ -124,33 +149,72 @@ async function runImagePromptLLM(
   mainEn: string,
   topicTitle: string | null,
   sessionId: string | null,
-  styleSuffix: string | null
-): Promise<{ prompt: string; negative?: string; llmMeta: Record<string, unknown> }> {
+  styleSuffix: string | null,
+  extra?: {
+    keyFacts?: string[];
+    uniqueAngle?: string | null;
+    threadSnippet?: string;
+    postIndex?: number;
+  }
+): Promise<ImagePromptLLMResult> {
   const supabase = getServiceClient();
-  const { system, user } = buildImagePromptMessages({
+  const baseInput = {
     mainId,
     mainEn,
     topic: topicTitle ?? undefined,
+    keyFacts: extra?.keyFacts,
+    uniqueAngle: extra?.uniqueAngle ?? undefined,
+    threadSnippet: extra?.threadSnippet,
+    postIndex: extra?.postIndex,
     styleSuffix: styleSuffix ?? undefined
-  });
-  const { providerId, modelUuid } = await resolveStageModel('image_prompt', undefined);
-  const { output, providerSlug, model } = await runLLMCompletion(supabase, {
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ],
-    temperature: 0.7,
-    maxTokens: 300,
-    providerId,
-    modelUuid,
-    sessionId,
-    stage: 'image_prompt'
-  });
-  const parsed = parseImagePrompt(output.text);
+  };
+  const attempt = async (temperature: number, retryNote?: string) => {
+    const { system, user } = buildImagePromptMessages(baseInput);
+    const { providerId, modelUuid } = await resolveStageModel('image_prompt', undefined);
+    const { output, providerSlug, model } = await runLLMCompletion(supabase, {
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: retryNote ? `${user}\n\nPENTING: output sebelumnya gagal gate kontradiksi (${retryNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
+      ],
+      temperature,
+      maxTokens: 500,
+      providerId,
+      modelUuid,
+      sessionId,
+      stage: 'image_prompt'
+    });
+    return { parsed: parseImagePrompt(output.text), providerSlug, model };
+  };
+
+  const sourceText = `${mainId} ${mainEn}`;
+  const first = await attempt(0.7);
+  let gate = validateImagePromptContradiction(
+    { image_prompt: first.parsed.image_prompt, negative_prompt: first.parsed.negative_prompt, reasoning: first.parsed.reasoning },
+    sourceText
+  );
+  let chosen = first;
+  let gateNotes: string[] = [];
+  if (!gate.ok) {
+    // 1x retry suhu rendah untuk disiplin Before.
+    gateNotes = gate.reasons;
+    const second = await attempt(0.3, gate.reasons.join('; '));
+    gate = validateImagePromptContradiction(
+      { image_prompt: second.parsed.image_prompt, negative_prompt: second.parsed.negative_prompt, reasoning: second.parsed.reasoning },
+      sourceText
+    );
+    if (gate.ok) {
+      chosen = second;
+      gateNotes = [];
+    } else {
+      // Gagal jujur: jangan kirim prompt kontradiktif ke provider.
+      throw new Error(`image_prompt gate: ${[...gateNotes, ...gate.reasons].join(' | ').slice(0, 300)}`);
+    }
+  }
   return {
-    prompt: parsed.image_prompt,
-    negative: parsed.negative_prompt,
-    llmMeta: { provider: providerSlug, model, stage: 'image_prompt' }
+    prompt: chosen.parsed.image_prompt,
+    negative: chosen.parsed.negative_prompt,
+    reasoning: { ...chosen.parsed.reasoning, gate_passed: true, gate_retried: gateNotes.length > 0 },
+    llmMeta: { provider: chosen.providerSlug, model: chosen.model, stage: 'image_prompt' }
   };
 }
 
@@ -223,10 +287,18 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
     let imagePrompt = row.image_prompt?.trim() || '';
     let negative = row.negative_prompt ?? undefined;
     let promptMeta: Record<string, unknown> = {};
+    let reasoning: Record<string, unknown> | null =
+      (row as { reasoning?: Record<string, unknown> | null }).reasoning ?? null;
     if (!imagePrompt) {
-      const llm = await runImagePromptLLM(mainId, mainEn, ctx.topicTitle, ctx.sessionId, target.style?.prompt_suffix ?? null);
+      const llm = await runImagePromptLLM(mainId, mainEn, ctx.topicTitle, ctx.sessionId, target.style?.prompt_suffix ?? null, {
+        keyFacts: ctx.keyFacts,
+        uniqueAngle: ctx.uniqueAngle,
+        threadSnippet: summarizeThread(ctx.draft.generated_thread?.replies),
+        postIndex: row.post_index ?? 0
+      });
       imagePrompt = llm.prompt;
       negative = llm.negative;
+      reasoning = llm.reasoning;
       promptMeta = llm.llmMeta;
     }
     const styleSuffix = target.style?.prompt_suffix?.trim() || '';
@@ -276,6 +348,7 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
             status: 'selected',
             image_prompt: imagePrompt,
             negative_prompt: negative ?? null,
+            reasoning,
             style_slug: target.style?.slug ?? row.style_slug,
             provider_slug: provider.slug,
             model_id: modelRow.model_id,

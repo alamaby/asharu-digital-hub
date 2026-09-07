@@ -140,6 +140,10 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   let imageStyles: { slug: string; display_name: string }[] = [];
   let draftImages: {
     id: string; draft_id: string; post_index: number; image_prompt: string; negative_prompt: string | null;
+    reasoning: {
+      visual_strategy?: string; hook_keywords?: string[]; contradiction_check?: string;
+      justification?: string; gate_passed?: boolean; gate_retried?: boolean;
+    } | null;
     style_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
     storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
     status: 'pending' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;

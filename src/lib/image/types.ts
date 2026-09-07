@@ -108,6 +108,15 @@ export interface DraftImageRow {
   post_index: number;
   image_prompt: string;
   negative_prompt: string | null;
+  /** Reasoning LLM: visual_strategy + hook_keywords + contradiction_check + justification. */
+  reasoning: {
+    visual_strategy?: string;
+    hook_keywords?: string[];
+    contradiction_check?: string;
+    justification?: string;
+    gate_passed?: boolean;
+    gate_retried?: boolean;
+  } | null;
   style_slug: string | null;
   provider_slug: string;
   model_id: string;
