@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { generateDraftImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
-interface ImageOption {
+export interface ImageOption {
   providers: { id: string; slug: string; display_name: string }[];
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
@@ -15,6 +15,8 @@ interface Props {
   initialImages: DraftImageRow[];
   initialSelectedId: string | null;
   options: ImageOption;
+  /** True bila dirender di dalam thread (margin ringkas, tanpa mt-6). */
+  compact?: boolean;
 }
 
 function statusBadge(status: string) {
@@ -27,7 +29,7 @@ function statusBadge(status: string) {
   return map[status] ?? 'bg-surface text-ink-muted';
 }
 
-export function DraftImageCard({ draftId, initialImages, initialSelectedId, options }: Props) {
+export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false }: Props) {
   const [images, setImages] = useState<DraftImageRow[]>(initialImages);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
@@ -41,8 +43,10 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     startTransition(async () => {
       try {
         const rows = await listDraftImages(draftId);
-        setImages(rows);
-        const sel = rows.find((r) => r.status === 'selected') ?? null;
+        // Panel ini hanya mengelola cover (post 0); baris per-reply difilter.
+        const cover = rows.filter((r) => (r.post_index ?? 0) === 0);
+        setImages(cover);
+        const sel = cover.find((r) => r.status === 'selected') ?? null;
         setSelectedId(sel?.id ?? null);
         setNotice('Diperbarui.');
       } catch (e) {
@@ -61,7 +65,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         });
         setNotice('Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil.');
         const rows = await listDraftImages(draftId);
-        setImages(rows);
+        setImages(rows.filter((r) => (r.post_index ?? 0) === 0));
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
@@ -75,7 +79,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         await selectDraftImage(draftId, imageId);
         setSelectedId(imageId);
         const rows = await listDraftImages(draftId);
-        setImages(rows);
+        setImages(rows.filter((r) => (r.post_index ?? 0) === 0));
         setNotice('Cover dipilih — jadi lampiran review & antrean social.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Pilih gagal.');
@@ -84,7 +88,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   }
 
   return (
-    <section aria-label="Visualisasi pendukung" className="mt-6 rounded-xl border border-line bg-surface p-4">
+    <section aria-label="Visualisasi pendukung" className={`${compact ? 'mt-4' : 'mt-6'} rounded-xl border border-line bg-surface p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Visualisasi pendukung</h2>
         <button

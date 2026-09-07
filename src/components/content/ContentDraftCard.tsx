@@ -1,10 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CopyButton } from './CopyButton';
 import { AffiliateProductCard } from './AffiliateProductCard';
 import { PostImageControl } from './PostImageControl';
+import { DraftImageCard, type ImageOption } from './DraftImageCard';
+import type { DraftImageRow } from '@/lib/image/types';
 import { countPlaceholdersInThread } from '@/lib/llm/prompt';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
 
@@ -20,7 +22,7 @@ interface Draft {
   platform_slug?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [] } }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
@@ -28,6 +30,10 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   postImages?: { post_index: number; public_url: string }[];
   /** True bila mode per-reply aktif (global/sesi/draf). */
   perReplyEnabled?: boolean;
+  /** History cover (post 0) untuk panel di antara post utama dan balasan 1. */
+  coverImages?: DraftImageRow[];
+  coverSelectedId?: string | null;
+  imageOptions?: ImageOption;
 }) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
@@ -161,7 +167,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           const over = maxChars != null && len > maxChars;
           const near = maxChars != null && !over && len >= Math.floor(maxChars * 0.9);
           return (
-            <div key={idx} className={isInjected ? 'rounded-lg border border-primary/30 bg-primary/5 p-3' : 'rounded-lg border border-line bg-background p-3'}>
+            <Fragment key={idx}>
+            <div className={isInjected ? 'rounded-lg border border-primary/30 bg-primary/5 p-3' : 'rounded-lg border border-line bg-background p-3'}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-ink">{label} {isInjected ? '· ASH-' + injections.friendly_code.replace('ASH-','') : ''}</span>
                 <span className="flex items-center gap-2">
@@ -223,9 +230,20 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   imageUrl={postImages.find((p) => p.post_index === idx)?.public_url ?? null}
                   isAffiliate={isInjected}
                   perReplyEnabled={perReplyEnabled}
+                  options={{ models: imageOptions.models, styles: imageOptions.styles }}
                 />
               )}
             </div>
+            {idx === 0 ? (
+              <DraftImageCard
+                draftId={draft.id}
+                initialImages={coverImages}
+                initialSelectedId={coverSelectedId}
+                options={imageOptions}
+                compact
+              />
+            ) : null}
+            </Fragment>
           );
         })}
       </div>

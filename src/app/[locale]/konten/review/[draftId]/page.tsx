@@ -9,7 +9,6 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
-import { DraftImageCard } from '@/components/content/DraftImageCard';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 
@@ -215,12 +214,9 @@ export default async function ReviewDetailPage({ params }: PageProps) {
             .filter((i) => i.status === 'selected' && i.public_url)
             .map((i) => ({ post_index: i.post_index, public_url: i.public_url as string }))}
           perReplyEnabled={imageMode === 'per-reply-opt-in'}
-        />
-        <DraftImageCard
-          draftId={d.id}
-          initialImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
-          initialSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
-          options={{ providers: imageProviders, models: imageModels, styles: imageStyles }}
+          coverImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
+          coverSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
+          imageOptions={{ providers: imageProviders, models: imageModels, styles: imageStyles }}
         />
       </div>
       </div>
