@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-07 14:10 (local time)
+Last updated: 2026-09-07 17:35 (local time)
 
 ## Current State
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-07 14:10 (local time)
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; content factory = dinamis.
 - **Halaman publik:** `/id` & `/en` (home urutan: afiliasi → properti → toko → medsos → matematika + carousel afiliasi 6 produk, 7 Sep), produk (~201 dari scraper), properti (+detail), tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
 - **Halaman admin (1 Sep):** `/id/admin` (dashboard: queue, review count, research placeholder, recent drafts [link ke /konten/review], quick actions), `/id/admin/konten` (list filter+sort+paginate dengan useTransition spinner, i18n `admin` namespace included di client bundle; **7 Sep: terima `timeZone`+`locale` eksplisit dari page, format via `formatDateTime` — ganti `useFormatter`**), `/id/konten/baru` (form dengan success state inline: 2 link — "Lihat draf" & "Buat lagi"; back nav ke Dasbor), `/id/konten/review` (drafts). Nav admin items hanya muncul saat login+admin (server-side, no flicker). Error.tsx & loading.tsx di /admin & /konten/review.
-- **SEO (7 Sep):** Meta Business domain verification `wt9cbx9npb6njy0lcqrpe85dal7pmz` site-wide via `buildMetadata()`; **locale layout dilepas dari `cookies()`** (provider tz = `Asia/Jakarta` statis) agar `/id`+`/en` SSG penuh dan tag literal di `<head>` mentah (crawler-tanpa-JS). [USER ACTION] Deploy prod → view-source `https://asharu.id/id` → klik Verify di Business Manager.
+- **SEO (7 Sep):** Meta Business domain verification `wt9cbx9npb6njy0lcqrpe85dal7pmz` site-wide via `buildMetadata()`; **locale layout dilepas dari `cookies()`** (provider tz = `Asia/Jakarta` statis) agar `/id`+`/en` SSG penuh dan tag literal di `<head>` mentah (crawler-tanpa-JS). [USER ACTION] Deploy prod → view-source `https://asharu.id/id` → klik Verify di Business Manager. **Hyperlocal Kamarasan (7 Sep, `640b4d0`):** title/H1 ber-keyword Bojongsoang–Gedebage–Ciwastra, `locationGuide`+`buyingGuide`, FAQ 10 + `FAQPage`, `PostalAddress` Bojongsoang + `datePosted`, sitemap per-properti (prioritas 0.9); gate hijau 314 tests, pushed. [USER ACTION] GSC request indexing + pantau 4 keyword cluster.
 - **Content factory:** `/konten/baru` (form + collapsible "Pengaturan Riset Lanjutan", anon, rate limit 5/jam/IP + honeypot → `createResearchSession`), `/admin/riset` (list sesi + status badge), `/admin/riset/[sessionId]` (topics + shortlist/reject/advance), `/admin/riset/[sessionId]/topics/[topicId]` (detail), `/konten/review` (admin, copy per-post, approve/reject, **AffiliateProductCard** badge relevansi + Ganti/Hapus), `/masuk` (magic link `token_hash`), `/api/content/process` (research orchestrator, maxDuration 300), `/api/content/process-legacy` (content_requests lama, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault. Search: Tavily (key di **Vault** `tavily_api_key`, baca via `vault_decrypt_secret_by_name` RPC; env `TAVILY_API_KEY` fallback dev; seed via `scripts/seed-tavily-key.mjs`). Cron: `asharu-content-research` (*/5) + `asharu-content-legacy` (*/5), Bearer-from-Vault `asharu_cron_secret`. Per-stage LLM: `llm_stage_defaults` (6 stage, admin RLS) + per-session `*_model_id` overrides + `last_regen_model_id` audit.
 - **Analytics:** GA4 consent-gated opt-in; event kustom + `page_view` + `view_property`.
 - **Keamanan:** CSP ketat (`unsafe-inline` script trade-off terdokumentasi, `unsafe-eval` dev-only), HSTS, frame-ancestors none; env divalidasi Zod fail-fast.
@@ -51,6 +51,8 @@ Last updated: 2026-09-07 14:10 (local time)
 
 ## Recent Entries
 
+- [173000-kamarasan-seo-hyperlocal.md](2026-09-07/173000-kamarasan-seo-hyperlocal.md) — SEO hyperlocal Kamarasan: title/H1 Bojongsoang–Gedebage–Ciwastra (3 mnt), locationGuide+buyingGuide, FAQ 10 + FAQPage, PostalAddress + datePosted, sitemap per-properti; gate hijau (314 tests), pushed `640b4d0`.
+- [163000-image-prompt-reasoning-before.md](2026-09-07/163000-image-prompt-reasoning-before.md) — Image prompt reasoning: default Before untuk pain-hook + gate kontradiksi + kolom reasoning jsonb; gate hijau (314 tests), pushed.
 - [141500-homepage-section-reorder.md](2026-09-07/141500-homepage-section-reorder.md) — Reorder section beranda: afiliasi → properti → toko → medsos → matematika; hero CTA → `#affiliate-products`; gate hijau (308 tests).
 - [134500-facebook-domain-verification.md](2026-09-07/134500-facebook-domain-verification.md) — Verifikasi domain Meta: token site-wide + layout statis (lepas cookies) agar tag literal di `<head>`; gate hijau, siap deploy + klik Verify.
 - [125500-riset-detail-panels-redesign.md](2026-09-07/125500-riset-detail-panels-redesign.md) — Redesign 3 panel detail riset: log clamp+expand+paginasi server, performa chart SVG/CSS + KPI token, parameter 3 kartu grup; 307 tests, build sukses.
@@ -68,31 +70,6 @@ Last updated: 2026-09-07 14:10 (local time)
 - [2026-09-06 230500-research-mechanism-two.md](2026-09-06/230500-research-mechanism-two.md) — Mekanisme 2 product-first: migrasi mechanism/session_products/product_id, cabang discovering→shortlist→developing, produk tetap 2-draf, form radio+picker; 271 tests hijau.
 - [2026-09-07 060000-mechanism-two-form-idea.md](2026-09-07/060000-mechanism-two-form-idea.md) — Mekanisme 2 form: kartu produk + mekanisme teratas + ide berbasis produk + banner N/17; 272 tests hijau.
 - [2026-09-07 084500-riset-detail-display-fixes.md](2026-09-07/084500-riset-detail-display-fixes.md) — Detail riset 165c29c2: languageLabel + platform_slugs + Selesai + badge platform draf + label produk tetap; 272 tests hijau.
-- [2026-09-07 092000-twitter-length-affiliate-split.md](2026-09-07/092000-twitter-length-affiliate-split.md) — Fix 679b2494: LENGTH tier cap-kecil + placement BALASAN 4 eksak + toleransi ±1 + dedup anchor; 275 tests hijau.
-- [2026-09-07 103000-instant-advance-cron-development.md](2026-09-07/103000-instant-advance-cron-development.md) — Advance instan: hapus inline-run, backdate agar cron memungut, banner jujur; 275 tests hijau.
-- [2026-09-06 210000-scrape-friendly-code-collision.md](2026-09-06/210000-scrape-friendly-code-collision.md) — Scrape file-only: lpad potong kode ≥1000 → tabrakan; fix trigger width-safe + resync, backfill 9 (ASH-214..222, 221/221), fail-loud + drift guard; gate hijau.
-- [2026-09-05 144500-llm-model-cloudflare.md](2026-09-05/144500-llm-model-cloudflare.md) — Resync `llm_models` cloudflare: 10 unik aktif (reasoning false), `llama-3.1-8b` nonaktif; migrasi applied production; gate hijau.
-- [2026-09-05 125500-llm-model-resync.md](2026-09-05/125500-llm-model-resync.md) — Resync `llm_models`: 7 Bynara + 9 OpenRouter aktif, sisanya `is_active=false`; migrasi applied production; 263 tests + gate hijau.
-- [2026-09-05 072149-riset-4e03bde2-thread-shape-fix.md](2026-09-05/072149-riset-4e03bde2-thread-shape-fix.md) — Fix riset 4e03bde2/f7c91699: thread_shape ≤5→≤10 (migrasi applied production) + discovery second-pass + guard developing. 263 tests, 2 sesi backfill developing.
-- [2026-09-04 204000-supabase-migration-sync.md](2026-09-04/204000-supabase-migration-sync.md) — Supabase migration sync: drift restore (research_target_reply_count + research_cron_5min) + per-stage LLM (llm_stage_defaults + review fixes) + processor_cron_bearer no-op repair. 3 apply_migration, 25/25 synced.
-- [2026-09-02 102000-content-pipeline-4stage.md](2026-09-02/102000-content-pipeline-4stage.md) — Content pipeline 4-tahap (Discovery→Verification→Scoring→Development) + Tavily search + affiliate top-20 scoring + admin riset pages + affiliate card review. 199 tests.
-- [2026-09-01 162500-admin-list-i18n-loading-fix.md](2026-09-01/162500-admin-list-i18n-loading-fix.md) — Fix i18n keys literal di list page (admin namespace missing di CLIENT_MESSAGE_NAMESPACES) + loading feedback (useFormStatus → useTransition).
-- [2026-09-01 144500-admin-ux-polish-and-digest-fix.md](2026-09-01/144500-admin-ux-polish-and-digest-fix.md) — Fix digest 2948654141 (`usePathname` di KontenList server) + polish UX: success state, loading skeletons, error boundaries, approve/reject optimistic, useFormStatus/useTransition spinners.
-- [2026-09-01 123000-admin-quick-wins.md](2026-09-01/123000-admin-quick-wins.md) — Admin quick wins: dashboard `/admin`, list `/admin/konten`, admin nav, post-login → /admin, profiles.is_admin single source of truth (P2 #12 closed).
-- [2026-08-31 100500-magic-link-token-hash-flow.md](2026-08-31/100500-magic-link-token-hash-flow.md) — magic-link `token_hash` flow: template embed TokenHash → exchange `verifyOtp` (no PKCE cookie); pushed; [USER STEP] Dashboard prod template.
-- [2026-08-31 094000-fase2-p1-llm-key-retry-hardening.md](2026-08-31/094000-fase2-p1-llm-key-retry-hardening.md) — Fase 2 P1: lock get_llm_key, key pool classification (401/403/429 only), retry cap 3→failed + attempts, Gemini key→header; DB applied+verified via MCP asharu; pushed.
-- [2026-08-31 080400-p0-processor-cron-auth-fix.md](2026-08-31/080400-p0-processor-cron-auth-fix.md) — fix P0: endpoint Bearer-only + pg_cron baca secret dari Vault.
-- [2026-08-30 214500-content-factory-audit.md](2026-08-30/214500-content-factory-audit.md) — audit keamanan/konsistensi: 2 P0, 5 P1, 5 P2, 7 P3.
-- [2026-08-30 214400-content-factory-hardening.md](2026-08-30/214400-content-factory-hardening.md) — vault RPC, cloudflare, model ids, magic-link exchange, pg_cron (29–30 Agu).
-- [2026-08-30 214300-content-factory-implementation.md](2026-08-30/214300-content-factory-implementation.md) — content factory fase 1–3 end-to-end (28–29 Agu).
-- [2026-08-30 214200-affiliate-carousel-scraper.md](2026-08-30/214200-affiliate-carousel-scraper.md) — carousel home + scraper Linktree + 201 produk (27 Agu).
-- [2026-08-26 123000-math-section.md](2026-08-26/123000-math-section.md) — section Belajar Matematika linking to math.asharu.id.
-- [2026-08-26 090500-lighthouse-perf-seo-fixes.md](2026-08-26/090500-lighthouse-perf-seo-fixes.md) — perf/SEO fixes dari audit LH.
-- [2026-08-25 124500-property-review-fixes.md](2026-08-25/124500-property-review-fixes.md) — 7 temuan review properti + ads.txt.
-- [2026-08-25 121000-property-migration.md](2026-08-25/121000-property-migration.md) — 3 listing riil migrated.
-- [2026-08-25 111000-shopee-review-fixes.md](2026-08-25/111000-shopee-review-fixes.md) — identitas riil Shopee + accessible name.
-- [2026-08-25 104500-shopee-store-integration.md](2026-08-25/104500-shopee-store-integration.md) — Shopee riil: kanonis + affiliate fallback.
-- [2026-08-24 131000-asharu-code-review-fixes.md](2026-08-24/131000-asharu-code-review-fixes.md) — remediasi 9 temuan review.
 
 ## Legacy Archive
 
