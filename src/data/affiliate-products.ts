@@ -7,6 +7,46 @@ import type { AffiliateProduct } from './schemas';
 
 export const affiliateProducts: AffiliateProduct[] = [
   {
+    id: 'affiliate-42084244',
+    name: { id: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo', en: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo' },
+    category: 'others',
+    description: { id: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo', en: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/9zxZAWxm5N',
+    image: '/images/products/affiliate/42084244-3034891347d8.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42083635',
+    name: { id: 'Masker KN95 Pro 5Ply Isi 50 Pcs Warna Earloop SR', en: 'Masker KN95 Pro 5Ply Isi 50 Pcs Warna Earloop SR' },
+    category: 'others',
+    description: { id: 'Masker KN95 Pro 5Ply Isi 50 Pcs Warna Earloop SR', en: 'Masker KN95 Pro 5Ply Isi 50 Pcs Warna Earloop SR' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4fw2nuCHTt',
+    image: '/images/products/affiliate/42083635-3c2aa090f7f7.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42083554',
+    name: { id: 'MASKER KN95 5PLY EARLOOP ICARE ONECARE CHASA DISPOSABLE MASK KN 95 5 PLY', en: 'MASKER KN95 5PLY EARLOOP ICARE ONECARE CHASA DISPOSABLE MASK KN 95 5 PLY' },
+    category: 'others',
+    description: { id: 'MASKER KN95 5PLY EARLOOP ICARE ONECARE CHASA DISPOSABLE MASK KN 95 5 PLY', en: 'MASKER KN95 5PLY EARLOOP ICARE ONECARE CHASA DISPOSABLE MASK KN 95 5 PLY' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/1LfapjfEoY',
+    image: '/images/products/affiliate/42083554-9b1f6fcabe6b.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42083528',
+    name: { id: 'Masker KN95 Earloop Pro Isi 50 Pcs', en: 'Masker KN95 Earloop Pro Isi 50 Pcs' },
+    category: 'others',
+    description: { id: 'Masker KN95 Earloop Pro Isi 50 Pcs', en: 'Masker KN95 Earloop Pro Isi 50 Pcs' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/1qbrQbptC7',
+    image: '/images/products/affiliate/42083528-7a8ab187833e.webp',
+    featured: true
+  },
+  {
     id: 'affiliate-41926248',
     name: { id: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru', en: 'Mesin Sealer Mini Portable 2 in 1 – USB Rechargeable, Penyegel Plastik untuk Makanan, Model Baru' },
     category: 'electronics',
@@ -34,7 +74,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4qFOnXl5Sr',
     image: '/images/products/affiliate/41914578-8a43792ae97f.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914572',
@@ -44,7 +84,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/50YozpOijf',
     image: '/images/products/affiliate/41914572-20f783cf547d.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914559',
@@ -54,7 +94,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/7VG9yOfeZ4',
     image: '/images/products/affiliate/41914559-49cf37ea759f.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914525',
@@ -64,7 +104,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9AONxLcCko',
     image: '/images/products/affiliate/41914525-b528ca044eda.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914496',
