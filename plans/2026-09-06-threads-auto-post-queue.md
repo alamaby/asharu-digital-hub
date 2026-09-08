@@ -56,6 +56,7 @@ Keputusan user: trigger = antrean terjadwal; bahasa = pilih saat approve; cakupa
 - 2026-09-06 11:20:00 — Prasyarat selesai (user). Step 6 block: OAuth `1349245 has not accepted the invite` — di Threads sudah accept tapi belum masuk Active website permissions. Riset: bug Meta yang luas (Invite tab kadang hanya tombol Remove, status Roles Pending, backend tak sync). Troubleshooting diserahkan ke user.
 - 2026-09-06 11:30:00 — Screenshot user konfirmasi bug Meta: Roles = Threads Tester `asharu.id` benar; tab Invites di aplikasi mobile HANYA tombol Remove (tanpa Accept); tab Active kosong. Jalur: coba Accept via threads.com web → bila tetap tak ada, remove + re-invite → terakhir recreate app / App Review + Live.
 - 2026-09-06 11:35:00 — Web juga hanya tombol Remove (tanpa Accept). Keputusan: buat ulang Meta app dari nol (reset bersih). Sisi kode tak perlu diubah (App ID/Secret murni env). Setelah app baru + invite diterima, saya generate authorize URL baru + verifikasi.
+- 2026-09-06 11:45:00 — App baru `Asharu Digital` dibuat, tester diundang. Invite di web PUNYA tombol Accept (bug tombol-hilang tidak terjadi di app baru). User klik Accept → dialog konfirmasi → tombol Accept/Decline hilang jadi Remove, TAPI entri tidak pindah ke tab Active (masih kosong). Diagnosis: accept tercatat di UI tapi backend Meta belum sync (kasus forum 2026). Next: user ganti kredensial baru ke .env.local + Vercel + redeploy, tunggu propagasi, saya generate authorize URL baru (client_id baru) sebagai probe OAuth.
 
 ## Notes
 
