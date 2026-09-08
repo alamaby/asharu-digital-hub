@@ -178,7 +178,7 @@ export async function upsertStageDefault(formData: FormData) {
   const supabase = await requireAdmin();
   const stage = String(formData.get('stage') ?? '').trim();
   const modelId = String(formData.get('model_id') ?? '').trim();
-  const valid = ['idea_generation', 'discovering', 'verifying', 'scoring', 'developing', 'regen_affiliate'];
+  const valid = ['idea_generation', 'discovering', 'verifying', 'scoring', 'developing', 'regen_affiliate', 'image_prompt', 'enhance_image_prompt'];
   if (!valid.includes(stage)) throw new Error('stage tidak valid');
   const { data: { user } } = await supabase.auth.getUser();
   if (!modelId) {

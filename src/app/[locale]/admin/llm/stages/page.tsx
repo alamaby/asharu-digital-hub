@@ -30,7 +30,9 @@ export default async function StageDefaultsPage({ params }: { params: Promise<{ 
     verifying: t('stageLabel.verifying'),
     scoring: t('stageLabel.scoring'),
     developing: t('stageLabel.developing'),
-    regen_affiliate: t('stageLabel.regen_affiliate')
+    regen_affiliate: t('stageLabel.regen_affiliate'),
+    image_prompt: t('stageLabel.image_prompt'),
+    enhance_image_prompt: t('stageLabel.enhance_image_prompt')
   };
   const modelById = new Map((models ?? []).map((m: { id: string }) => [m.id, m]));
   const providerById = new Map((providers ?? []).map((p: { id: string }) => [p.id, p]));

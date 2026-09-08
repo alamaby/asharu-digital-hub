@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { generatePostImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
+import { enhanceImagePrompt, generatePostImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
 export interface ReplyImageOption {
@@ -29,6 +29,9 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
   const [styleSlug, setStyleSlug] = useState('');
   const [promptDraft, setPromptDraft] = useState('');
   const [negativeDraft, setNegativeDraft] = useState('');
+  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -42,6 +45,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
       return;
     }
     setNotice('Menyiapkan generate...');
+    setProposed(null);
     startTransition(async () => {
       try {
         await generatePostImage(draftId, postIndex, {
@@ -55,6 +59,34 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
     });
+  }
+
+  async function handleEnhance() {
+    const p = promptDraft.trim();
+    if (!p || p.length < 10) {
+      setNotice('Isi image prompt dulu (≥10 karakter) — enhance hanya untuk polish draf yang sudah ada.');
+      return;
+    }
+    setIsEnhancing(true);
+    setNotice('Memperhalus prompt...');
+    try {
+      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null);
+      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
+      setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
+    } catch (e) {
+      setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : 'Enhance gagal.');
+    } finally {
+      setIsEnhancing(false);
+    }
+  }
+
+  function acceptProposed() {
+    if (!proposed) return;
+    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft });
+    setPromptDraft(proposed.prompt);
+    setNegativeDraft(proposed.negative ?? '');
+    setNotice('Usulan diterima — cek prompt, lalu Regenerate bila siap.');
+    setProposed(null);
   }
 
   async function refreshOne() {
@@ -185,11 +217,20 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         </div>
       ) : null}
       {postIndex > 0 && perReplyEnabled ? (
-        <div className="mt-1 flex gap-2">
+        <div className="mt-1 flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={handleEnhance}
+            disabled={isPending || isEnhancing || !promptDraft.trim() || promptDraft.trim().length < 10}
+            className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
+            title={!promptDraft.trim() ? 'Isi prompt dulu (≥10 karakter)' : 'Polish prompt + negative via LLM'}
+          >
+            {isEnhancing ? 'Memperhalus...' : 'Sempurnakan'}
+          </button>
           <button
             type="button"
             onClick={enqueue}
-            disabled={isPending}
+            disabled={isPending || isEnhancing}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
           >
             {isPending ? 'Memproses...' : url ? 'Regenerate visual' : 'Generate visual'}
@@ -197,11 +238,47 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
           <button
             type="button"
             onClick={pickLatestReady}
-            disabled={isPending}
+            disabled={isPending || isEnhancing}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink hover:border-primary disabled:opacity-50"
           >
             Pilih hasil terbaru
           </button>
+        </div>
+      ) : null}
+      {proposed ? (
+        <div className="mt-1 rounded-md border border-amber-300 bg-amber-50/40 p-2 text-[11px]">
+          <p className="font-semibold text-amber-900">Side-by-side usulan</p>
+          <div className="mt-1 grid gap-2 md:grid-cols-2">
+            <div className="rounded border border-line bg-surface p-1.5">
+              <p className="text-[10px] font-semibold text-ink-muted">Draf Anda</p>
+              <p className="mt-0.5 text-ink">{promptDraft || '—'}</p>
+              <p className="mt-1 text-ink-muted">Negative: {negativeDraft || '—'}</p>
+            </div>
+            <div className="rounded border border-primary/30 bg-primary/10 p-1.5">
+              <p className="text-[10px] font-semibold text-primary">Usulan LLM</p>
+              <p className="mt-0.5 text-ink">{proposed.prompt}</p>
+              <p className="mt-1 text-ink-muted">Negative: {proposed.negative || '—'}</p>
+              {proposed.reasoning ? (
+                <p className="mt-1 text-ink-muted">
+                  Strategi: {proposed.reasoning.visual_strategy}
+                  {proposed.reasoning.justification ? ` — ${proposed.reasoning.justification}` : ''}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-1 flex gap-1">
+            <button type="button" onClick={acceptProposed} className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-white">
+              Terima
+            </button>
+            <button type="button" onClick={() => setProposed(null)} className="rounded border border-line bg-surface px-2 py-1 text-[11px]">
+              Batal
+            </button>
+            {prevPrompt ? (
+              <button type="button" onClick={() => { setPromptDraft(prevPrompt.prompt); setNegativeDraft(prevPrompt.negative); setPrevPrompt(null); setNotice('Dikembalikan ke draf sebelumnya.'); }} className="text-[11px] text-ink-muted hover:text-primary">
+                Urungkan
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {notice ? (

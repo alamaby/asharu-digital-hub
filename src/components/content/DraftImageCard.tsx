@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { generateDraftImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
+import { enhanceImagePrompt, generateDraftImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
 export interface ImageOption {
@@ -36,6 +36,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   const [styleSlug, setStyleSlug] = useState('');
   const [promptDraft, setPromptDraft] = useState('');
   const [negativeDraft, setNegativeDraft] = useState('');
+  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -68,6 +71,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       return;
     }
     setNotice('Menyiapkan generate...');
+    setProposed(null);
     startTransition(async () => {
       try {
         await generateDraftImage(draftId, {
@@ -83,6 +87,34 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
     });
+  }
+
+  async function handleEnhance() {
+    const p = promptDraft.trim();
+    if (!p || p.length < 10) {
+      setNotice('Isi image prompt dulu (≥10 karakter) — enhance hanya untuk polish draf yang sudah ada.');
+      return;
+    }
+    setIsEnhancing(true);
+    setNotice('Memperhalus prompt...');
+    try {
+      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null);
+      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
+      setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
+    } catch (e) {
+      setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : 'Enhance gagal.');
+    } finally {
+      setIsEnhancing(false);
+    }
+  }
+
+  function acceptProposed() {
+    if (!proposed) return;
+    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft });
+    setPromptDraft(proposed.prompt);
+    setNegativeDraft(proposed.negative ?? '');
+    setNotice('Usulan diterima — cek prompt, lalu Regenerate bila siap.');
+    setProposed(null);
   }
 
   function select(imageId: string) {
@@ -192,17 +224,67 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           <span className="text-[11px] text-ink-muted">{negativeDraft.length}/300</span>
         </label>
       </div>
-      <div className="mt-2">
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleEnhance}
+          disabled={isPending || isEnhancing || !promptDraft.trim() || promptDraft.trim().length < 10}
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary disabled:opacity-50"
+          title={!promptDraft.trim() ? 'Isi prompt dulu (≥10 karakter)' : 'Polish prompt + negative via LLM'}
+        >
+          {isEnhancing ? 'Memperhalus...' : 'Sempurnakan'}
+        </button>
         <button
           type="button"
           onClick={enqueue}
-          disabled={isPending}
+          disabled={isPending || isEnhancing}
           className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? 'Memproses...' : images.length > 0 ? 'Regenerate' : 'Generate ilustrasi'}
         </button>
-        <span className="ml-2 text-[11px] text-ink-muted">Edit prompt + negative, lalu Regenerate — disimpan sebagai custom.</span>
+        <span className="ml-2 text-[11px] text-ink-muted">Sempurnakan = side-by-side (prompt+negative) → Terima/Batal → Regenerate.</span>
       </div>
+
+      {proposed ? (
+        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/40 p-3 text-xs">
+          <p className="font-semibold text-amber-900">Side-by-side — usulan LLM</p>
+          <div className="mt-2 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-line bg-surface p-2">
+              <p className="text-[11px] font-semibold text-ink-muted">Draf Anda</p>
+              <p className="mt-1 text-ink">{promptDraft || '—'}</p>
+              <p className="mt-2 text-ink-muted">Negative: {negativeDraft || '—'}</p>
+            </div>
+            <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+              <p className="text-[11px] font-semibold text-primary">Usulan LLM</p>
+              <p className="mt-1 text-ink">{proposed.prompt}</p>
+              <p className="mt-2 text-ink-muted">Negative: {proposed.negative || '—'}</p>
+              {proposed.reasoning ? (
+                <p className="mt-1 text-ink-muted">
+                  Strategi: {proposed.reasoning.visual_strategy}
+                  {proposed.reasoning.justification ? ` — ${proposed.reasoning.justification}` : ''}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={acceptProposed} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
+              Terima
+            </button>
+            <button type="button" onClick={() => setProposed(null)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs">
+              Batal
+            </button>
+            {prevPrompt ? (
+              <button
+                type="button"
+                onClick={() => { setPromptDraft(prevPrompt.prompt); setNegativeDraft(prevPrompt.negative); setPrevPrompt(null); setNotice('Dikembalikan ke draf sebelumnya.'); }}
+                className="text-xs text-ink-muted hover:text-primary"
+              >
+                Urungkan
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {images.length > 0 ? (
         <ul className="mt-4 space-y-2">

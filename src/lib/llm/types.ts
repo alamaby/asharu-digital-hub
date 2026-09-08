@@ -1,7 +1,7 @@
 export type ProviderSlug = 'naraya' | 'openrouter' | 'gemini' | 'cloudflare';
 
-/** 7 LLM stages that support per-stage provider→model pinning */
-export type LLMStage = 'idea_generation' | 'discovering' | 'verifying' | 'scoring' | 'developing' | 'regen_affiliate' | 'image_prompt';
+/** 8 LLM stages that support per-stage provider→model pinning */
+export type LLMStage = 'idea_generation' | 'discovering' | 'verifying' | 'scoring' | 'developing' | 'regen_affiliate' | 'image_prompt' | 'enhance_image_prompt';
 export const LLM_STAGES: readonly LLMStage[] = [
   'idea_generation',
   'discovering',
@@ -9,7 +9,8 @@ export const LLM_STAGES: readonly LLMStage[] = [
   'scoring',
   'developing',
   'regen_affiliate',
-  'image_prompt'
+  'image_prompt',
+  'enhance_image_prompt'
 ] as const;
 
 /**
