@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-07 17:35 (local time)
+Last updated: 2026-09-08 08:29 (local time)
 
 ## Current State
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-07 17:35 (local time)
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 3.4 + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; content factory = dinamis.
 - **Halaman publik:** `/id` & `/en` (home urutan: afiliasi → properti → toko → medsos → matematika + carousel afiliasi 6 produk, 7 Sep), produk (~201 dari scraper), properti (+detail), tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
 - **Halaman admin (1 Sep):** `/id/admin` (dashboard: queue, review count, research placeholder, recent drafts [link ke /konten/review], quick actions), `/id/admin/konten` (list filter+sort+paginate dengan useTransition spinner, i18n `admin` namespace included di client bundle; **7 Sep: terima `timeZone`+`locale` eksplisit dari page, format via `formatDateTime` — ganti `useFormatter`**), `/id/konten/baru` (form dengan success state inline: 2 link — "Lihat draf" & "Buat lagi"; back nav ke Dasbor), `/id/konten/review` (drafts). Nav admin items hanya muncul saat login+admin (server-side, no flicker). Error.tsx & loading.tsx di /admin & /konten/review.
+- **SEO (8 Sep):** Bing Webmaster verification `public/BingSiteAuth.xml` (`002E5C66...`, commit `a45947c`, pushed; tersaji di root via `public/`, bypass i18n). [USER ACTION] Tunggu deploy Vercel → cek `https://asharu.id/BingSiteAuth.xml` → klik Verify di Bing Webmaster Tools.
 - **SEO (7 Sep):** Meta Business domain verification `wt9cbx9npb6njy0lcqrpe85dal7pmz` site-wide via `buildMetadata()`; **locale layout dilepas dari `cookies()`** (provider tz = `Asia/Jakarta` statis) agar `/id`+`/en` SSG penuh dan tag literal di `<head>` mentah (crawler-tanpa-JS). [USER ACTION] Deploy prod → view-source `https://asharu.id/id` → klik Verify di Business Manager. **Hyperlocal Kamarasan (7 Sep, `640b4d0`):** title/H1 ber-keyword Bojongsoang–Gedebage–Ciwastra, `locationGuide`+`buyingGuide`, FAQ 10 + `FAQPage`, `PostalAddress` Bojongsoang + `datePosted`, sitemap per-properti (prioritas 0.9); gate hijau 314 tests, pushed. [USER ACTION] GSC request indexing + pantau 4 keyword cluster.
 - **Content factory:** `/konten/baru` (form + collapsible "Pengaturan Riset Lanjutan", anon, rate limit 5/jam/IP + honeypot → `createResearchSession`), `/admin/riset` (list sesi + status badge), `/admin/riset/[sessionId]` (topics + shortlist/reject/advance), `/admin/riset/[sessionId]/topics/[topicId]` (detail), `/konten/review` (admin, copy per-post, approve/reject, **AffiliateProductCard** badge relevansi + Ganti/Hapus), `/masuk` (magic link `token_hash`), `/api/content/process` (research orchestrator, maxDuration 300), `/api/content/process-legacy` (content_requests lama, maxDuration 60). Provider: naraya(10) → openrouter(20) → gemini(30) → cloudflare(40); key di Vault. Search: Tavily (key di **Vault** `tavily_api_key`, baca via `vault_decrypt_secret_by_name` RPC; env `TAVILY_API_KEY` fallback dev; seed via `scripts/seed-tavily-key.mjs`). Cron: `asharu-content-research` (*/5) + `asharu-content-legacy` (*/5), Bearer-from-Vault `asharu_cron_secret`. Per-stage LLM: `llm_stage_defaults` (6 stage, admin RLS) + per-session `*_model_id` overrides + `last_regen_model_id` audit.
 - **Analytics:** GA4 consent-gated opt-in; event kustom + `page_view` + `view_property`.
@@ -51,6 +52,7 @@ Last updated: 2026-09-07 17:35 (local time)
 
 ## Recent Entries
 
+- [082900-bing-webmaster-verification.md](2026-09-08/082900-bing-webmaster-verification.md) — Verifikasi Bing Webmaster: `public/BingSiteAuth.xml` di root, gate hijau, pushed `a45947c`; [USER ACTION] tunggu deploy → cek prod → klik Verify.
 - [173000-kamarasan-seo-hyperlocal.md](2026-09-07/173000-kamarasan-seo-hyperlocal.md) — SEO hyperlocal Kamarasan: title/H1 Bojongsoang–Gedebage–Ciwastra (3 mnt), locationGuide+buyingGuide, FAQ 10 + FAQPage, PostalAddress + datePosted, sitemap per-properti; gate hijau (314 tests), pushed `640b4d0`.
 - [163000-image-prompt-reasoning-before.md](2026-09-07/163000-image-prompt-reasoning-before.md) — Image prompt reasoning: default Before untuk pain-hook + gate kontradiksi + kolom reasoning jsonb; gate hijau (314 tests), pushed.
 - [141500-homepage-section-reorder.md](2026-09-07/141500-homepage-section-reorder.md) — Reorder section beranda: afiliasi → properti → toko → medsos → matematika; hero CTA → `#affiliate-products`; gate hijau (308 tests).
