@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import {
@@ -60,8 +60,13 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
   >(null);
   const [error, setError] = useState<{ message: string; technical?: string } | null>(null);
   const [, startTransition] = useTransition();
+  const [localTopics, setLocalTopics] = useState<TopicItem[]>(topics);
 
-  const shortlistedCount = topics.filter((tp) => tp.status === 'shortlisted').length;
+  useEffect(() => {
+    setLocalTopics(topics);
+  }, [topics]);
+
+  const shortlistedCount = localTopics.filter((tp) => tp.status === 'shortlisted').length;
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -73,8 +78,11 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
   }
 
   function friendlyError(raw: string): { message: string; technical?: string } {
-    if (/no shortlisted topics/i.test(raw)) {
-      return { message: t('statusErrorNoShortlist'), technical: raw };
+    if (/no shortlisted topics|no rows shortlisted|only .* topics updated/i.test(raw)) {
+      return { message: raw.includes('mismatch') || raw.includes('refresh') ? raw : t('statusErrorNoShortlist'), technical: raw };
+    }
+    if (/no topics selected|no rows rejected/i.test(raw)) {
+      return { message: raw, technical: raw };
     }
     if (/not in awaiting_selection|not failed|retryable/i.test(raw)) {
       return { message: t('statusErrorStaleState'), technical: raw };
@@ -84,16 +92,19 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
 
   async function onShortlist() {
     if (selected.size === 0) return;
-    const n = selected.size;
+    const ids = Array.from(selected);
+    const n = ids.length;
     setBusy('shortlist');
     setError(null);
     setNotice({ kind: 'working', action: 'shortlist', count: n });
-    const result = await shortlistTopics(sessionId, Array.from(selected));
+    const result = await shortlistTopics(sessionId, ids);
     setBusy(null);
     if (!result.success) {
       setNotice(null);
       setError(friendlyError(result.error ?? 'failed'));
     } else {
+      const idSet = new Set(ids);
+      setLocalTopics((prev) => prev.map((tp) => (idSet.has(tp.id) ? { ...tp, status: 'shortlisted' } : tp)));
       setSelected(new Set());
       setNotice({ kind: 'success', action: 'shortlist', count: n });
       startTransition(() => router.refresh());
@@ -102,16 +113,19 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
 
   async function onReject() {
     if (selected.size === 0) return;
-    const n = selected.size;
+    const ids = Array.from(selected);
+    const n = ids.length;
     setBusy('reject');
     setError(null);
     setNotice({ kind: 'working', action: 'reject', count: n });
-    const result = await rejectTopics(sessionId, Array.from(selected));
+    const result = await rejectTopics(sessionId, ids);
     setBusy(null);
     if (!result.success) {
       setNotice(null);
       setError(friendlyError(result.error ?? 'failed'));
     } else {
+      const idSet = new Set(ids);
+      setLocalTopics((prev) => prev.map((tp) => (idSet.has(tp.id) ? { ...tp, status: 'rejected' } : tp)));
       setSelected(new Set());
       setNotice({ kind: 'success', action: 'reject', count: n });
       startTransition(() => router.refresh());
@@ -145,7 +159,7 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
 
       {(() => {
         const unmatched = affiliatePreviews
-          ? topics.filter((tp) => {
+          ? localTopics.filter((tp) => {
               const pv = affiliatePreviews[tp.id];
               return pv && !pv.matched;
             })
@@ -215,22 +229,29 @@ export function ResearchSessionActions({ sessionId, topics, affiliatePreviews, i
       ) : null}
 
       <ul className="space-y-2">
-        {topics.map((tp) => {
+        {localTopics.map((tp) => {
           const pv = affiliatePreviews?.[tp.id];
           const band: AffiliateBand | null = pv ? pv.band : null;
+          const isShortlisted = tp.status === 'shortlisted';
+          const isRejected = tp.status === 'rejected';
           return (
-            <li key={tp.id} className="flex items-center gap-2 rounded-xl border border-line bg-surface p-3">
+            <li
+              key={tp.id}
+              className={`flex items-center gap-2 rounded-xl border p-3 ${isShortlisted ? 'border-emerald-300 bg-emerald-50/40' : isRejected ? 'border-red-200 bg-red-50/30 opacity-75' : 'border-line bg-surface'}`}
+            >
               <input
                 id={`topic-${tp.id}`}
                 type="checkbox"
-                checked={selected.has(tp.id) || tp.status === 'shortlisted'}
+                checked={selected.has(tp.id)}
                 onChange={() => toggle(tp.id)}
-                disabled={busy !== null}
-                className="size-4 rounded border-line text-primary focus:ring-2 focus:ring-primary/20"
+                disabled={busy !== null || isShortlisted || isRejected}
+                className="size-4 rounded border-line text-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
               />
-              <label htmlFor={`topic-${tp.id}`} className="flex-1 cursor-pointer">
+              <label htmlFor={`topic-${tp.id}`} className={`flex-1 ${isShortlisted || isRejected ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 <p className="text-sm font-medium text-ink">
                   #{tp.rank ?? '-'} · {tp.topic}
+                  {isShortlisted ? <span className="ml-2 inline-flex rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">shortlisted</span> : null}
+                  {isRejected ? <span className="ml-2 inline-flex rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">rejected</span> : null}
                 </p>
                 <p className="text-xs text-ink-muted">
                   {tp.category ?? '-'} · {isDua ? t('scoreNone') : `score ${tp.final_score?.toFixed(1) ?? '-'}`} · {tp.status}

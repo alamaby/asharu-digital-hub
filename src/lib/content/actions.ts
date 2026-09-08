@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
@@ -814,18 +815,27 @@ export async function shortlistTopics(
     if (topicIds.length === 0) {
       return { success: false, error: 'no topics selected' };
     }
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('content_research_topics')
       .update({ status: 'shortlisted' })
       .eq('session_id', sessionId)
-      .in('id', topicIds);
+      .in('id', topicIds)
+      .select('id');
     if (error) return { success: false, error: error.message };
+    const rows = (data ?? []) as { id: string }[];
+    if (rows.length === 0) {
+      return { success: false, error: 'no rows shortlisted — id/session mismatch (pilih ulang & refresh halaman)' };
+    }
+    if (rows.length !== topicIds.length) {
+      return { success: false, error: `only ${rows.length}/${topicIds.length} topics updated — refresh & coba lagi` };
+    }
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'awaiting_selection',
       level: 'info',
-      message: `admin shortlisted ${topicIds.length} topic(s)`
+      message: `admin shortlisted ${rows.length} topic(s)`
     });
+    revalidatePath(`/admin/riset/${sessionId}`);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
@@ -841,12 +851,21 @@ export async function rejectTopics(
     if (topicIds.length === 0) {
       return { success: false, error: 'no topics selected' };
     }
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('content_research_topics')
       .update({ status: 'rejected' })
       .eq('session_id', sessionId)
-      .in('id', topicIds);
+      .in('id', topicIds)
+      .select('id');
     if (error) return { success: false, error: error.message };
+    const rows = (data ?? []) as { id: string }[];
+    if (rows.length === 0) {
+      return { success: false, error: 'no rows rejected — id/session mismatch (refresh halaman)' };
+    }
+    if (rows.length !== topicIds.length) {
+      return { success: false, error: `only ${rows.length}/${topicIds.length} topics rejected — refresh & coba lagi` };
+    }
+    revalidatePath(`/admin/riset/${sessionId}`);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
@@ -895,6 +914,7 @@ export async function advanceToDevelopment(
       level: 'info',
       message: 'admin advanced to developing — backend melanjutkan via cron (6 pasangan per tick)'
     });
+    revalidatePath(`/admin/riset/${sessionId}`);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };
