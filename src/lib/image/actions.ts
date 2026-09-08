@@ -27,10 +27,11 @@ export async function listDraftImages(draftId: string): Promise<DraftImageRow[]>
 /**
  * Enqueue generate cover (post 0, auto prompt via LLM) atau regenerate dengan
  * override manual. Worker cron memproses antrean; tidak blocking.
+ * imagePrompt/negativePrompt: bila diisi user, dipakai verbatim (≤500/300) oleh worker.
  */
 export async function generateDraftImage(
   draftId: string,
-  override?: { modelUuid?: string | null; styleSlug?: string | null }
+  override?: { modelUuid?: string | null; styleSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
 ): Promise<{ imageId: string }> {
   return generatePostImage(draftId, 0, override);
 }
@@ -43,11 +44,14 @@ export async function generateDraftImage(
 export async function generatePostImage(
   draftId: string,
   postIndex: number,
-  override?: { modelUuid?: string | null; styleSlug?: string | null }
+  override?: { modelUuid?: string | null; styleSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
 ): Promise<{ imageId: string }> {
   const supabase = await requireAdmin();
   if (!draftId) throw new Error('draftId required');
   if (!Number.isInteger(postIndex) || postIndex < 0) throw new Error('postIndex must be >= 0');
+  const customPrompt = override?.imagePrompt?.trim().slice(0, 500) ?? '';
+  const customNegative = override?.negativePrompt?.trim().slice(0, 300) ?? '';
+  if (customPrompt && customPrompt.length < 10) throw new Error('image prompt minimal 10 karakter (EN, ≤60 kata)');
   const { data: draft } = await supabase
     .from('content_drafts')
     .select('id, generated_thread, affiliate_injections, image_mode, research_topic_id')
@@ -69,14 +73,17 @@ export async function generatePostImage(
   if (postIndex > 0 && !(await isPerReplyEnabled(d))) {
     throw new Error('mode per-reply belum aktif (image_gen_defaults / sesi / draf)');
   }
+  const hasCustom = Boolean(customPrompt);
   const { data: created, error } = await supabase
     .from('content_draft_images')
     .insert({
       draft_id: draftId,
       post_index: postIndex,
-      image_prompt: '',
+      image_prompt: hasCustom ? customPrompt : '',
+      negative_prompt: hasCustom ? (customNegative || null) : null,
       provider_slug: '',
       model_id: '',
+      reasoning: hasCustom ? { visual_strategy: 'custom', justification: 'user_edited' } : null,
       llm_meta: override ? { override } : {}
     })
     .select('id')

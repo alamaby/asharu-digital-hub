@@ -283,13 +283,24 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
       draftOverride: override ?? null
     });
 
-    // Prompt: pakai yang sudah ada (regenerate simpan prompt) atau generate via LLM.
+    // Prompt: pakai yang sudah ada (regenerate simpan prompt / custom edit) atau generate via LLM.
     let imagePrompt = row.image_prompt?.trim() || '';
     let negative = row.negative_prompt ?? undefined;
     let promptMeta: Record<string, unknown> = {};
     let reasoning: Record<string, unknown> | null =
       (row as { reasoning?: Record<string, unknown> | null }).reasoning ?? null;
-    if (!imagePrompt) {
+    const isCustom = Boolean(imagePrompt) && (reasoning as { visual_strategy?: string } | null)?.visual_strategy === 'custom';
+    if (isCustom) {
+      const gate = validateImagePromptContradiction(
+        { image_prompt: imagePrompt, negative_prompt: negative ?? undefined, reasoning: reasoning as unknown as { visual_strategy: 'before' | 'after' | 'bridge'; hook_keywords: string[]; contradiction_check: string; justification: string } },
+        `${mainId} ${mainEn}`
+      );
+      if (!gate.ok) {
+        await failImage(imageId, `custom prompt gate: ${gate.reasons.join(' | ').slice(0, 300)}`);
+        return { imageId: null, error: gate.reasons.join(' | ') };
+      }
+      // Simpan reasoning custom apa adanya (dari actions); worker tidak generate ulang.
+    } else if (!imagePrompt) {
       const llm = await runImagePromptLLM(mainId, mainEn, ctx.topicTitle, ctx.sessionId, target.style?.prompt_suffix ?? null, {
         keyFacts: ctx.keyFacts,
         uniqueAngle: ctx.uniqueAngle,

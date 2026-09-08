@@ -27,20 +27,30 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
   const [url, setUrl] = useState<string | null>(imageUrl);
   const [modelUuid, setModelUuid] = useState('');
   const [styleSlug, setStyleSlug] = useState('');
+  const [promptDraft, setPromptDraft] = useState('');
+  const [negativeDraft, setNegativeDraft] = useState('');
   const [imgBroken, setImgBroken] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   if (isAffiliate) return null;
 
   function enqueue() {
-    setNotice('Menyiapkan generate…');
+    const p = promptDraft.trim();
+    const n = negativeDraft.trim();
+    if (p && p.length < 10) {
+      setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
+      return;
+    }
+    setNotice('Menyiapkan generate...');
     startTransition(async () => {
       try {
         await generatePostImage(draftId, postIndex, {
           modelUuid: modelUuid || null,
-          styleSlug: styleSlug || null
+          styleSlug: styleSlug || null,
+          imagePrompt: p || null,
+          negativePrompt: n || null
         });
-        setNotice('Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil.');
+        setNotice('Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil. Prompt edit custom.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
@@ -54,6 +64,9 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         const sel = rows.find((r) => (r.post_index ?? 0) === postIndex && r.status === 'selected') ?? null;
         setUrl(sel?.public_url ?? null);
         setImgBroken(false);
+        const latest = rows.filter((r) => (r.post_index ?? 0) === postIndex).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+        if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
+        if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         setNotice(sel ? 'Diperbarui.' : 'Belum ada visualisasi untuk post ini.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Refresh gagal.');
@@ -114,7 +127,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         </p>
       )}
       {postIndex > 0 && perReplyEnabled ? (
-        <div className="mt-1 grid gap-1 sm:grid-cols-2">
+        <div className="mt-1 grid gap-1">
           <label className="text-[11px]">
             <span className="mb-0.5 block text-ink-muted">Model (opsional)</span>
             <select
@@ -145,6 +158,30 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
               ))}
             </select>
           </label>
+          <label className="text-[11px]">
+            <span className="mb-0.5 block text-ink-muted">Image prompt (EN, ≤500 — edit lalu Regenerate)</span>
+            <textarea
+              value={promptDraft}
+              onChange={(e) => setPromptDraft(e.target.value)}
+              maxLength={500}
+              rows={2}
+              placeholder="Contoh: tidy bedroom after declutter, soft light..."
+              className="w-full rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
+            />
+            <span className="text-[10px] text-ink-muted">{promptDraft.length}/500</span>
+          </label>
+          <label className="text-[11px]">
+            <span className="mb-0.5 block text-ink-muted">Negative prompt (opsional, ≤300)</span>
+            <textarea
+              value={negativeDraft}
+              onChange={(e) => setNegativeDraft(e.target.value)}
+              maxLength={300}
+              rows={1}
+              placeholder="blurry, low quality"
+              className="w-full rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
+            />
+            <span className="text-[10px] text-ink-muted">{negativeDraft.length}/300</span>
+          </label>
         </div>
       ) : null}
       {postIndex > 0 && perReplyEnabled ? (
@@ -155,7 +192,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
             disabled={isPending}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
           >
-            {isPending ? 'Memproses…' : url ? 'Regenerate visual' : 'Generate visual'}
+            {isPending ? 'Memproses...' : url ? 'Regenerate visual' : 'Generate visual'}
           </button>
           <button
             type="button"

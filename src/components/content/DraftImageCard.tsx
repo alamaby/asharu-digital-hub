@@ -34,6 +34,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
   const [styleSlug, setStyleSlug] = useState('');
+  const [promptDraft, setPromptDraft] = useState('');
+  const [negativeDraft, setNegativeDraft] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -48,6 +50,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         setImages(cover);
         const sel = cover.find((r) => r.status === 'selected') ?? null;
         setSelectedId(sel?.id ?? null);
+        const latest = [...cover].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+        if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
+        if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         setNotice('Diperbarui.');
       } catch (e) {
         setNotice(e instanceof Error ? e.message : 'Refresh gagal.');
@@ -56,14 +61,22 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   }
 
   function enqueue() {
-    setNotice('Menyiapkan generate…');
+    const p = promptDraft.trim();
+    const n = negativeDraft.trim();
+    if (p && p.length < 10) {
+      setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
+      return;
+    }
+    setNotice('Menyiapkan generate...');
     startTransition(async () => {
       try {
         await generateDraftImage(draftId, {
           modelUuid: modelUuid || null,
-          styleSlug: styleSlug || null
+          styleSlug: styleSlug || null,
+          imagePrompt: p || null,
+          negativePrompt: n || null
         });
-        setNotice('Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil.');
+        setNotice('Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil. Prompt edit tersimpan sebagai visual_strategy=custom.');
         const rows = await listDraftImages(draftId);
         setImages(rows.filter((r) => (r.post_index ?? 0) === 0));
       } catch (e) {
@@ -153,6 +166,32 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           </select>
         </label>
       </div>
+      <div className="mt-3 grid gap-2">
+        <label className="text-xs">
+          <span className="mb-1 block text-ink-muted">Image prompt (EN, ≤500 char / ≤60 kata — edit lalu Regenerate; style suffix ditambah otomatis)</span>
+          <textarea
+            value={promptDraft}
+            onChange={(e) => setPromptDraft(e.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="Contoh: cozy minimalist bedroom before organizing, warm light..."
+            className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm"
+          />
+          <span className="text-[11px] text-ink-muted">{promptDraft.length}/500{promptDraft ? ` · ${promptDraft.split(/\s+/).filter(Boolean).length} kata` : ''}</span>
+        </label>
+        <label className="text-xs">
+          <span className="mb-1 block text-ink-muted">Negative prompt (opsional, ≤300 char)</span>
+          <textarea
+            value={negativeDraft}
+            onChange={(e) => setNegativeDraft(e.target.value)}
+            maxLength={300}
+            rows={2}
+            placeholder="Contoh: blurry, low quality"
+            className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm"
+          />
+          <span className="text-[11px] text-ink-muted">{negativeDraft.length}/300</span>
+        </label>
+      </div>
       <div className="mt-2">
         <button
           type="button"
@@ -160,8 +199,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           disabled={isPending}
           className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
-          {isPending ? 'Memproses…' : images.length > 0 ? 'Regenerate' : 'Generate ilustrasi'}
+          {isPending ? 'Memproses...' : images.length > 0 ? 'Regenerate' : 'Generate ilustrasi'}
         </button>
+        <span className="ml-2 text-[11px] text-ink-muted">Edit prompt + negative, lalu Regenerate — disimpan sebagai custom.</span>
       </div>
 
       {images.length > 0 ? (
@@ -177,6 +217,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
                   {img.style_slug ? ` · ${img.style_slug}` : ''}
                 </span>
                 <p className="mt-1 line-clamp-2 text-ink">{img.image_prompt || 'Menunggu worker…'}</p>
+                {(img as { negative_prompt?: string | null }).negative_prompt ? (
+                  <p className="mt-1 text-ink-muted">Negative: {(img as { negative_prompt?: string | null }).negative_prompt}</p>
+                ) : null}
                 {img.reasoning?.visual_strategy ? (
                   <p className="mt-1 text-ink-muted">
                     Strategi: {img.reasoning.visual_strategy}

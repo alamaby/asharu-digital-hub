@@ -534,7 +534,7 @@ async function generateAndInsertDraft(
       ]
     : [];
 
-  const { error: draftError } = await supabase.from('content_drafts').insert({
+  const { data: createdDraft, error: draftError } = await supabase.from('content_drafts').insert({
     request_id: sessionId,
     provider_id: providerId,
     model_id: resolvedLlm.model,
@@ -560,15 +560,43 @@ async function generateAndInsertDraft(
     affiliate_match_signals: affiliate
       ? (affiliate.signals as unknown as Record<string, unknown>)
       : null
-  });
-  if (draftError) {
+  }).select('id').single();
+  if (draftError || !createdDraft) {
+    const msg = draftError?.message ?? 'draft insert returned no id';
     await supabase.from('content_research_logs').insert({
       session_id: sessionId,
       stage: 'developing',
       level: 'error',
-      message: `draft insert failed: ${draftError.message}`
+      message: `draft insert failed: ${msg}`
     });
-    throw new Error(`draft insert failed: ${draftError.message}`);
+    throw new Error(`draft insert failed: ${msg}`);
+  }
+  const newDraftId = (createdDraft as { id: string }).id;
+
+  // Eventual cover: enqueue 1 pending post_index=0 agar worker cron (*/5)
+  // memproses otomatis tanpa tunggu lazy scan. Idempoten via count guard.
+  try {
+    const { count } = await supabase
+      .from('content_draft_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('draft_id', newDraftId)
+      .eq('post_index', 0);
+    if ((count ?? 0) === 0) {
+      await supabase.from('content_draft_images').insert({
+        draft_id: newDraftId,
+        post_index: 0,
+        image_prompt: '',
+        provider_slug: '',
+        model_id: ''
+      });
+    }
+  } catch (e) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'image_enqueue',
+      level: 'warn',
+      message: `image enqueue cover failed for draft ${newDraftId}: ${e instanceof Error ? e.message : String(e)}`
+    });
   }
 
   await supabase.from('content_research_logs').insert({
