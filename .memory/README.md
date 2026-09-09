@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-09 16:10 (local time)
+Last updated: 2026-09-09 17:38 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-09 16:10 (local time)
 
 ## Recent Entries
 
+- [174000-riset-detail-3-fixes.md](2026-09-09/174000-riset-detail-3-fixes.md) — Detail sesi riset: card produk tetap mekanis-2 (gambar+nama+link) + metrik anti-overlap (grid 2/3 kolom + wrap) + draf sortir server-side + paginasi 5/halaman; 333 tests hijau.
 - [161000-research-templates-6-pilihan.md](2026-09-09/161000-research-templates-6-pilihan.md) — Template riset: katalog DB 6 pilihan (opsional, default Bebas) mengarahkan discovery + development + Generate Idea; badge detail sesi; migrasi submodule `967191d`; 328 tests hijau (migrasi production belum).
 - [154500-bing-index-plus-maps-pin.md](2026-09-09/154500-bing-index-plus-maps-pin.md) — Bing "Discovered but not crawled" = normal situs baru (robots/sitemap live OK) → user klik Request indexing; Maps pin owner + section embed peta Kamarasan (CSP frame-src Google); gate hijau 324 tests, pushed `53b8289`.
 - [145500-image-prompt-reasoning-only-tanpa-before.md](2026-09-09/145500-image-prompt-reasoning-only-tanpa-before.md) — Image prompt: hapus strategi before (gate jadi sanity ringan) + cover auto reasoning-only (`prompt_ready`, tanpa auto-generate, user cek dulu) + enhance wajib tambah missed detail; migrasi submodule `f5bca60`; 324 tests hijau.
@@ -71,7 +72,6 @@ Last updated: 2026-09-09 16:10 (local time)
 - [2026-09-06 175000-affiliate-picker-full-search.md](2026-09-06/175000-affiliate-picker-full-search.md) — Picker afiliasi: daftar awal tetap 20 terbaru, search keyword query semua produk (ilike + limit 30 + debounce); gate hijau, tanpa migrasi.
 - [2026-09-06 182500-affiliate-card-feedback.md](2026-09-06/182500-affiliate-card-feedback.md) — Card afiliasi: banner working/success per aksi + nama produk, error ramah + detail teknis; gate hijau, murni UI.
 - [2026-09-06 191500-draft-per-topic-per-platform.md](2026-09-06/191500-draft-per-topic-per-platform.md) — 1 draf/topik/platform: migrasi platform_slug draf + platform_slugs sesi, loop developing + chunking, audit panjang + retry-shorten, form checkbox, badge/counter/salin-per-platform; 267 tests hijau.
-- [2026-09-06 200000-review-nav-source-research.md](2026-09-06/200000-review-nav-source-research.md) — Review: AdminTopBar di detail + link riset sumber di list dan detail; gate hijau, tanpa migrasi.
 
 ## Legacy Archive
 

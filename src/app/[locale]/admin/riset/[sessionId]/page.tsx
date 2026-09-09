@@ -14,14 +14,16 @@ import { ResearchStepper } from '@/components/admin/ResearchStepper';
 import { ResearchLogItem } from '@/components/admin/ResearchLogItem';
 import { ResearchPerfCharts } from '@/components/admin/ResearchPerfCharts';
 import { ResearchParams } from '@/components/admin/ResearchParams';
+import { FixedProductCard } from '@/components/admin/FixedProductCard';
 import { summarizeLlmLogs, summarizeSearchLogs } from '@/lib/research/perf-summary';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
 import { previewAffiliateMatches } from '@/lib/research/affiliate';
+import { sortDrafts, paginateDrafts, DRAFT_PAGE_SIZE } from '@/lib/research/draft-list';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
-  searchParams: Promise<{ logPage?: string; logSort?: string; logLevel?: string; logStage?: string }>;
+  searchParams: Promise<{ logPage?: string; logSort?: string; logLevel?: string; logStage?: string; draftSort?: string; draftPage?: string }>;
 }
 
 const LOG_PAGE_SIZE = 10;
@@ -59,6 +61,7 @@ type DraftRow = {
   affiliate_injections: Array<{ id: string; friendly_code: string; post_index: number }>;
   affiliate_match_score: number | null;
   status: string;
+  created_at: string;
 };
 
 export default async function ResearchSessionPage({ params, searchParams }: PageProps) {
@@ -140,11 +143,11 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
   if (topicIds.length > 0) {
     const { data: byTopic } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status, created_at')
       .in('research_topic_id', topicIds);
     const { data: byRequest } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status, created_at')
       .eq('request_id', sessionId);
     const merged = new Map<string, DraftRow>();
     for (const d of [...((byTopic ?? []) as DraftRow[]), ...((byRequest ?? []) as DraftRow[])]) merged.set(d.id, d);
@@ -152,10 +155,17 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
   } else {
     const { data: drafts } = await supabase
       .from('content_drafts')
-      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status')
+      .select('id, research_topic_id, platform_slug, generated_thread, affiliate_injections, affiliate_match_score, status, created_at')
       .eq('request_id', sessionId);
     draftList = (drafts ?? []) as DraftRow[];
   }
+
+  // Draf: sortir + pagination via searchParams (default terbaru, 5/halaman).
+  const draftSort = sp.draftSort ?? 'newest';
+  const draftPageParam = Math.max(1, Number.parseInt(sp.draftPage ?? '1', 10) || 1);
+  const sortedDrafts = sortDrafts(draftList, draftSort);
+  const { pageItems: pagedDrafts, page: draftPage, totalPages: draftTotalPages } = paginateDrafts(sortedDrafts, draftPageParam, DRAFT_PAGE_SIZE);
+  const draftQueryBase = { logSort: sp.logSort, logLevel: sp.logLevel, logStage: sp.logStage, logPage: sp.logPage, draftSort: sp.draftSort };
 
   const list = (topics ?? []) as TopicRow[];
 
@@ -169,18 +179,18 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
         ? s.platform_slug
         : t('platformAll');
 
-  // Produk tetap mekanisme dua (product-first) untuk badge header.
-  let fixedProducts: { id: string; friendly_code: string; name_id: string }[] = [];
+  // Produk tetap mekanisme dua (product-first) untuk card produk.
+  let fixedProducts: { id: string; friendly_code: string; name_id: string; image: string | null; category: string | null; merchant: string | null; url: string | null }[] = [];
   const isDua = (s.mechanism ?? 'satu') === 'dua';
   if (isDua) {
     const { data: sp } = await supabase
       .from('content_research_session_products')
-      .select('product:affiliate_products(id, friendly_code, name_id)')
+      .select('product:affiliate_products(id, friendly_code, name_id, image, category, merchant, url)')
       .eq('session_id', sessionId)
       .order('position', { ascending: true });
     fixedProducts = ((sp ?? []) as { product: unknown }[])
-      .map((r) => r.product as { id: string; friendly_code: string; name_id: string } | null)
-      .filter((p): p is { id: string; friendly_code: string; name_id: string } => Boolean(p?.id));
+      .map((r) => r.product as { id: string; friendly_code: string; name_id: string; image: string | null; category: string | null; merchant: string | null; url: string | null } | null)
+      .filter((p): p is { id: string; friendly_code: string; name_id: string; image: string | null; category: string | null; merchant: string | null; url: string | null } => Boolean(p?.id));
   }
 
   // Template riset pilihan user (opsional) untuk badge header.
@@ -245,7 +255,7 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
     .range(logFrom, logFrom + LOG_PAGE_SIZE - 1);
   const logTotalPages = Math.max(1, Math.ceil((logCount ?? 0) / LOG_PAGE_SIZE));
   const logStages = Array.from(new Set(((logs ?? []) as Array<{ stage: string }>).map((l) => l.stage))).sort();
-  const logQueryBase = { logSort: sp.logSort, logLevel: sp.logLevel, logStage: sp.logStage };
+  const logQueryBase = { logSort: sp.logSort, logLevel: sp.logLevel, logStage: sp.logStage, draftSort: sp.draftSort, draftPage: sp.draftPage };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -269,11 +279,6 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
         {isDua ? (
           <p className="mt-2 text-sm text-ink">
             <span className="mr-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Mekanisme 2 · produk dulu</span>
-            {fixedProducts.map((p) => (
-              <span key={p.id} className="mr-1 inline-flex items-center rounded-full border border-line bg-surface px-2 py-0.5 text-xs text-ink" title={p.name_id}>
-                ASH-{p.friendly_code.replace('ASH-', '')}
-              </span>
-            ))}
           </p>
         ) : null}
         {templateName ? (
@@ -288,6 +293,8 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
           </p>
         ) : null}
       </header>
+
+      {isDua ? <FixedProductCard title={t('fixedProductsTitle')} products={fixedProducts} /> : null}
 
       <ResearchParams
         s={{
@@ -379,14 +386,30 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
           affiliatePreviews={affiliatePreviews ? Object.fromEntries(affiliatePreviews) : null}
         />
       ) : draftList.length > 0 ? (
-        <section className="mt-8 space-y-3">
+        <section id="drafts" className="mt-8 scroll-mt-20 space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <h2 className="text-lg font-semibold text-ink">{t('draftsHeading')}</h2>
             <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary hover:underline">
               {t('viewAllReview')} →
             </Link>
           </div>
-          {draftList.map((d) => {
+          <form method="get" action="#drafts" className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface p-3">
+            <input type="hidden" name="logSort" value={sp.logSort ?? ''} />
+            <input type="hidden" name="logLevel" value={sp.logLevel ?? ''} />
+            <input type="hidden" name="logStage" value={sp.logStage ?? ''} />
+            <input type="hidden" name="logPage" value={sp.logPage ?? ''} />
+            <label className="text-[11px] font-medium text-ink-muted">
+              Sort
+              <select name="draftSort" defaultValue={draftSort} className="ml-1 rounded-lg border border-line bg-background px-2 py-1 text-xs">
+                <option value="newest">{t('draftsSortNewest')}</option>
+                <option value="oldest">{t('draftsSortOldest')}</option>
+                <option value="platform">{t('draftsSortPlatform')}</option>
+                <option value="status">{t('draftsSortStatus')}</option>
+              </select>
+            </label>
+            <button type="submit" className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white">Filter</button>
+          </form>
+          {pagedDrafts.map((d) => {
             const injection = d.affiliate_injections[0];
             const matchText = d.affiliate_match_score === null || d.affiliate_match_score === undefined
               ? t('fixedProduct')
@@ -411,6 +434,27 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
               </Link>
             );
           })}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
+            <span>{t('draftsPageInfo', { page: draftPage, total: draftTotalPages, count: draftList.length })}</span>
+            <div className="flex gap-2">
+              {draftPage > 1 ? (
+                <Link
+                  href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId }, query: { ...draftQueryBase, draftPage: String(draftPage - 1) }, hash: 'drafts' }}
+                  className="rounded-lg border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:border-primary"
+                >
+                  {t('draftsPrev')}
+                </Link>
+              ) : null}
+              {draftPage < draftTotalPages ? (
+                <Link
+                  href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId }, query: { ...draftQueryBase, draftPage: String(draftPage + 1) }, hash: 'drafts' }}
+                  className="rounded-lg border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:border-primary"
+                >
+                  {t('draftsNext')}
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </section>
       ) : (
         <div className="mt-8 rounded-xl border border-dashed border-line bg-surface p-6 text-center">
@@ -531,6 +575,8 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
       <section id="logs" className="mt-8 scroll-mt-20 space-y-3">
         <h2 className="text-lg font-semibold text-ink">{t('logsHeading')}</h2>
         <form method="get" action="#logs" className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface p-3">
+          <input type="hidden" name="draftSort" value={sp.draftSort ?? ''} />
+          <input type="hidden" name="draftPage" value={sp.draftPage ?? ''} />
           <label className="text-[11px] font-medium text-ink-muted">
             {t('logsFilterLevel')}
             <select name="logLevel" defaultValue={logLevel} className="ml-1 rounded-lg border border-line bg-background px-2 py-1 text-xs">

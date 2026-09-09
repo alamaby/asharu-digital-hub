@@ -140,13 +140,14 @@ export function ResearchParams({ s, labels }: { s: SessionParams; labels: Labels
           <span className="flex flex-wrap gap-1">{(s.excluded_categories as string[]).map((x) => <Chip key={x}>{x}</Chip>)}</span>
         </Row>
       ) : null}
-      <div className="grid grid-cols-3 gap-1.5 pt-1 sm:grid-cols-6 lg:grid-cols-3 xl:grid-cols-6">
-        {show(s.freshness_hours) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.freshnessHoursLabel}</p><p className="mt-1"><Badge>{String(s.freshness_hours)}</Badge></p></div> : null}
-        {show(s.minimum_candidates) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.minimumCandidatesLabel}</p><p className="mt-1"><Badge>{String(s.minimum_candidates)}</Badge></p></div> : null}
-        {show(s.minimum_score) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.minimumScoreLabel}</p><p className="mt-1"><Badge>{String(s.minimum_score)}</Badge></p></div> : null}
-        {show(s.required_winners) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.requiredWinnersLabel}</p><p className="mt-1"><Badge>{String(s.required_winners)}</Badge></p></div> : null}
-        {show(s.maximum_iterations) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.maximumIterationsLabel}</p><p className="mt-1"><Badge>{String(s.maximum_iterations)}</Badge></p></div> : null}
-        {show(s.target_reply_count) ? <div><p className="text-[10px] uppercase tracking-wide text-ink-muted">{s.targetReplyCountLabel}</p><p className="mt-1"><Badge>{String(s.target_reply_count)}</Badge></p></div> : null}
+      {/* Metrik: 2 kolom agar label panjang tidak tumpang tindih di card sempit. */}
+      <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-3">
+        {show(s.freshness_hours) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.freshnessHoursLabel}</p><p className="mt-1"><Badge>{String(s.freshness_hours)}</Badge></p></div> : null}
+        {show(s.minimum_candidates) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.minimumCandidatesLabel}</p><p className="mt-1"><Badge>{String(s.minimum_candidates)}</Badge></p></div> : null}
+        {show(s.minimum_score) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.minimumScoreLabel}</p><p className="mt-1"><Badge>{String(s.minimum_score)}</Badge></p></div> : null}
+        {show(s.required_winners) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.requiredWinnersLabel}</p><p className="mt-1"><Badge>{String(s.required_winners)}</Badge></p></div> : null}
+        {show(s.maximum_iterations) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.maximumIterationsLabel}</p><p className="mt-1"><Badge>{String(s.maximum_iterations)}</Badge></p></div> : null}
+        {show(s.target_reply_count) ? <div className="min-w-0"><p className="break-words text-[10px] uppercase leading-tight tracking-wide text-ink-muted">{s.targetReplyCountLabel}</p><p className="mt-1"><Badge>{String(s.target_reply_count)}</Badge></p></div> : null}
       </div>
     </>
   );
