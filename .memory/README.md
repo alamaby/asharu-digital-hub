@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-08 08:29 (local time)
+Last updated: 2026-09-07 09:15 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-08 08:29 (local time)
 
 ## Recent Entries
 
+- [091500-threads-semi-auto-approve-queue.md](2026-09-07/091500-threads-semi-auto-approve-queue.md) — Threads semi-otomatis: approve via server action + enqueue idempoten + badge antrean + tandai-posted manual (/admin/sosial); blokir OAuth 24 jam (Active kosong) → full-otomatis plan C; 315 tests hijau.
 - [082900-bing-webmaster-verification.md](2026-09-08/082900-bing-webmaster-verification.md) — Verifikasi Bing Webmaster: `public/BingSiteAuth.xml` di root, gate hijau, pushed `a45947c`; [USER ACTION] tunggu deploy → cek prod → klik Verify.
 - [173000-kamarasan-seo-hyperlocal.md](2026-09-07/173000-kamarasan-seo-hyperlocal.md) — SEO hyperlocal Kamarasan: title/H1 Bojongsoang–Gedebage–Ciwastra (3 mnt), locationGuide+buyingGuide, FAQ 10 + FAQPage, PostalAddress + datePosted, sitemap per-properti; gate hijau (314 tests), pushed `640b4d0`.
 - [163000-image-prompt-reasoning-before.md](2026-09-07/163000-image-prompt-reasoning-before.md) — Image prompt reasoning: default Before untuk pain-hook + gate kontradiksi + kolom reasoning jsonb; gate hijau (314 tests), pushed.
