@@ -5,6 +5,7 @@ import { runDiscovery } from './discovery';
 import { runVerification } from './verification';
 import { runScoring } from './scoring';
 import { runDevelopment } from './development';
+import { getResearchTemplateHint } from './templates';
 
 interface ResearchSessionRow {
   id: string;
@@ -40,11 +41,14 @@ interface ResearchSessionRow {
   purpose: string | null;
   constraints: string | null;
   keywords: string | null;
+  // Template riset pilihan user (nullable slug → Bebas)
+  template_slug: string | null;
 }
 
 function buildDiscoveryInput(
   row: ResearchSessionRow,
-  fixedProducts?: Array<{ name: string; category?: string | null; merchant?: string | null }>
+  fixedProducts?: Array<{ name: string; category?: string | null; merchant?: string | null }>,
+  templateDiscoveryHint?: string | null
 ) {
   // Derive allowed categories dynamically from target_category + keywords when empty
   let allowed = row.allowed_categories ?? [];
@@ -74,7 +78,8 @@ function buildDiscoveryInput(
     ctaStyle: row.cta_style ?? null,
     constraints: row.constraints ?? null,
     requiredWinners: row.required_winners ?? 3,
-    fixedProducts
+    fixedProducts,
+    templateDiscoveryHint: templateDiscoveryHint ?? null
   };
 }
 
@@ -145,7 +150,7 @@ export async function advanceStage(
 ): Promise<{ status: ResearchStatus; advanced: boolean }> {
   const { data: row, error } = await supabase
     .from('content_research_sessions')
-    .select('id, status, mechanism, target_location, secondary_location, audience_age, audience_interests, platform_slug, platform_slugs, tone, account_goal, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, idea_generation_model_id, discovering_model_id, verifying_model_id, scoring_model_id, developing_model_id, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, mechanism, target_location, secondary_location, audience_age, audience_interests, platform_slug, platform_slugs, tone, account_goal, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, idea_generation_model_id, discovering_model_id, verifying_model_id, scoring_model_id, developing_model_id, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, template_slug, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .single();
   if (error || !row) {
@@ -169,12 +174,14 @@ export async function advanceStage(
         // awaiting_selection (verifying + scoring dilewati).
         const isDua = session.mechanism === 'dua';
         const fixed = isDua ? await fetchFixedProducts(supabase, sessionId) : [];
+        const templateHint = await getResearchTemplateHint(supabase, session.template_slug ?? null);
         const result = await runDiscovery(
           supabase,
           sessionId,
           buildDiscoveryInput(
             session,
-            fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant }))
+            fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant })),
+            templateHint?.discovery_hint ?? null
           ),
           session.discovering_model_id ?? null
         );
@@ -265,12 +272,14 @@ async function runStage(
   if (stage === 'discovering') {
     const isDua = session.mechanism === 'dua';
     const fixed = isDua ? await fetchFixedProducts(supabase, sessionId) : [];
+    const templateHint = await getResearchTemplateHint(supabase, session.template_slug ?? null);
     const result = await runDiscovery(
       supabase,
       sessionId,
       buildDiscoveryInput(
         session,
-        fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant }))
+        fixed.map((p) => ({ name: p.name_id, category: p.category, merchant: p.merchant })),
+        templateHint?.discovery_hint ?? null
       ),
       session.discovering_model_id ?? null
     );

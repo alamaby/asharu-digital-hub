@@ -24,6 +24,8 @@ export interface DiscoveryInput {
   ctaStyle?: string | null;
   constraints?: string | null;
   requiredWinners?: number | null;
+  // Template riset pilihan user (opsional): arahkan topik agar cocok strukturnya.
+  templateDiscoveryHint?: string | null;
   // Second-pass retry: kategori/freshness dilonggarkan, boleh derivasi niche
   // dari hint user bila search tidak mengandungnya (fix 4e03bde2: 1 topik).
   isRetryPass?: boolean;
@@ -89,6 +91,7 @@ export function buildDiscoveryPrompt(input: DiscoveryInput, searchResults: Searc
   const purposeLine = input.purpose ? `Purpose: ${input.purpose}` : null;
   const ctaLine = input.ctaStyle ? `CTA style: ${input.ctaStyle}` : null;
   const constraintsLine = input.constraints ? `Batasan: ${input.constraints}` : null;
+  const templateLine = input.templateDiscoveryHint ? `TEMPLATE RISET (topik harus cocok dengan struktur ini): ${input.templateDiscoveryHint}` : null;
   const system = `Anda adalah Social Media Trend Researcher dan Content Strategist untuk audiens Indonesia.
 
 TUGAS UTAMA
@@ -122,6 +125,7 @@ ${keywordsLine ?? ''}
 ${purposeLine ?? ''}
 ${ctaLine ?? ''}
 ${constraintsLine ?? ''}
+${templateLine ?? ''}
 Kategori yang diperbolehkan: ${input.allowedCategories.join(', ') || (input.targetCategory ? input.targetCategory : '(semua — derivasi dari targetCategory/keywords)')}
 Kategori yang harus dihindari: ${input.excludedCategories.join(', ') || '(tidak ada)'}
 ${input.fixedProducts && input.fixedProducts.length > 0 ? `PRODUK TETAP (mekanisme product-first — konten akhir WAJIB menyisipkan produk ini secara natural):

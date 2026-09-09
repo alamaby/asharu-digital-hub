@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-09 15:45 (local time)
+Last updated: 2026-09-09 16:10 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-09 15:45 (local time)
 
 ## Recent Entries
 
+- [161000-research-templates-6-pilihan.md](2026-09-09/161000-research-templates-6-pilihan.md) — Template riset: katalog DB 6 pilihan (opsional, default Bebas) mengarahkan discovery + development + Generate Idea; badge detail sesi; migrasi submodule `967191d`; 328 tests hijau (migrasi production belum).
 - [154500-bing-index-plus-maps-pin.md](2026-09-09/154500-bing-index-plus-maps-pin.md) — Bing "Discovered but not crawled" = normal situs baru (robots/sitemap live OK) → user klik Request indexing; Maps pin owner + section embed peta Kamarasan (CSP frame-src Google); gate hijau 324 tests, pushed `53b8289`.
 - [145500-image-prompt-reasoning-only-tanpa-before.md](2026-09-09/145500-image-prompt-reasoning-only-tanpa-before.md) — Image prompt: hapus strategi before (gate jadi sanity ringan) + cover auto reasoning-only (`prompt_ready`, tanpa auto-generate, user cek dulu) + enhance wajib tambah missed detail; migrasi submodule `f5bca60`; 324 tests hijau.
 - [125036-fix-regenerate-image-style-override.md](2026-09-09/125036-fix-regenerate-image-style-override.md) — Fix regenerate draf pakai pilihan Style: `resolveImageTarget` sebelumnya hanya baca `styleSlug` saat model terpin (Auto → selalu photorealistic); kini prioritas manual > sesi > global di semua cabang + enhance hint + rehydrate dropdown; 324 tests hijau.
@@ -71,7 +72,6 @@ Last updated: 2026-09-09 15:45 (local time)
 - [2026-09-06 182500-affiliate-card-feedback.md](2026-09-06/182500-affiliate-card-feedback.md) — Card afiliasi: banner working/success per aksi + nama produk, error ramah + detail teknis; gate hijau, murni UI.
 - [2026-09-06 191500-draft-per-topic-per-platform.md](2026-09-06/191500-draft-per-topic-per-platform.md) — 1 draf/topik/platform: migrasi platform_slug draf + platform_slugs sesi, loop developing + chunking, audit panjang + retry-shorten, form checkbox, badge/counter/salin-per-platform; 267 tests hijau.
 - [2026-09-06 200000-review-nav-source-research.md](2026-09-06/200000-review-nav-source-research.md) — Review: AdminTopBar di detail + link riset sumber di list dan detail; gate hijau, tanpa migrasi.
-- [2026-09-06 204500-shortlist-advance-feedback.md](2026-09-06/204500-shortlist-advance-feedback.md) — Shortlist/advance: banner working/success + jumlah, spinner tombol, error ramah + teknis, catatan progres batch; gate hijau, murni UI.
 
 ## Legacy Archive
 

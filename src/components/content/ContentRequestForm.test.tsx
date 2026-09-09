@@ -36,4 +36,17 @@ describe('ContentRequestForm', () => {
     const topic = screen.getByLabelText('Topik / angle *');
     expect(legend.compareDocumentPosition(topic) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('renders template picker defaulting to Bebas', () => {
+    renderWithMessages(
+      <ContentRequestForm
+        platforms={[{ slug: 'threads', display_name: 'Threads' }]}
+        categories={mockCategories}
+        templates={[{ slug: 'problem-solution', display_name: 'Problem–Solution', description: 'Masalah → Solusi' }]}
+      />
+    );
+    expect(screen.getByText('Template riset', { selector: 'legend' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Bebas/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Problem–Solution/ })).not.toBeChecked();
+  });
 });

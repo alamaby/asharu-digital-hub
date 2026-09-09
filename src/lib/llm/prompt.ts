@@ -14,6 +14,8 @@ export interface ThreadPromptInput {
   keyFacts?: string[] | null;
   uniqueAngle?: string | null;
   isFallbackRandom?: boolean;
+  /** Struktur template riset pilihan user (opsional, dari research_templates). */
+  templateStructure?: string | null;
 }
 
 export interface AffiliateProductForPrompt {
@@ -86,6 +88,10 @@ export function buildThreadPrompt(
 
   const lengthRule = lengthTargetRule(input.platform.maxChars);
 
+  const templateRule = input.templateStructure
+    ? `- TEMPLATE STRUKTUR (WAJIB diikuti — atur urutan main + reply-reply sesuai alur ini): ${input.templateStructure}`
+    : null;
+
   const system = [
     'You are a senior copywriter for Asharu (asharu.id), bilingual ID+EN, helpful and authentic.',
     'You write short-form content for Threads/Twitter/Instagram/TikTok/LinkedIn/Facebook.',
@@ -95,6 +101,7 @@ export function buildThreadPrompt(
     '- MAIN POST: 2-3 kalimat yang padat dan mendekati batas karakter. Buka dengan hook KUAT (angka mengejutkan, pertanyaan provokatif, atau klaim kontra-intuitif) yang memaksa reader berhenti scroll dan membuka thread. Jangan taruh seluruh detail/fakta di main — main hanya pengantar yang bikin penasaran.',
     `- DISTRIBUSI KONTEN: detail, fakta, tips, dan sub-angle HARUS didistribusikan ke reply-reply secara bertahap (satu poin per reply). Jangan ringkas semua di main.`,
     replyRule,
+    ...(templateRule ? [templateRule] : []),
     '- Each post must respect max_chars for the platform (HARD LIMIT — never exceed).',
     ...(lengthRule ? [lengthRule] : []),
     EMOJI_RULE,

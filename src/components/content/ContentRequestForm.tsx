@@ -13,12 +13,13 @@ interface LlmModelOpt { id: string; provider_id: string; model_id: string; displ
 interface ContentRequestFormProps {
   platforms: { slug: string; display_name: string }[];
   categories: { slug: string; display_name: string }[];
+  templates?: { slug: string; display_name: string; description: string }[];
   llmProviders?: LlmProviderOpt[];
   llmModels?: LlmModelOpt[];
   isAdmin?: boolean;
 }
 
-export function ContentRequestForm({ platforms, categories, llmProviders = [], llmModels = [], isAdmin = false }: ContentRequestFormProps) {
+export function ContentRequestForm({ platforms, categories, templates = [], llmProviders = [], llmModels = [], isAdmin = false }: ContentRequestFormProps) {
   const t = useTranslations('content.form');
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -39,6 +40,8 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
   const [selPlatforms, setSelPlatforms] = useState<string[]>(() => realPlatforms.map((p) => p.slug));
   // Mekanisme riset: 'satu' topik-dulu | 'dua' produk-dulu (1-2 produk tetap).
   const [mechanism, setMechanism] = useState<'satu' | 'dua'>('satu');
+  // Template riset opsional: '' = Bebas (tanpa struktur khusus).
+  const [template, setTemplate] = useState('');
   const [mechProducts, setMechProducts] = useState<
     { id: string; name: string; image?: string; category?: string; merchant?: string; url?: string }[]
   >([]);
@@ -91,6 +94,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       }
       fd.set('tone', tone);
       fd.set('language', language);
+      if (template) fd.set('template', template);
       if (topic) fd.set('topic', topic);
       if (targetCategory) fd.set('targetCategory', targetCategory);
       if (audience) fd.set('audience', audience);
@@ -201,6 +205,7 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
       setTopic('');
       setSelPlatforms(realPlatforms.map((p) => p.slug));
       setMechanism('satu');
+      setTemplate('');
       setMechProducts([]);
       setIdeaCoverage(null);
       setAudience('');
@@ -419,6 +424,54 @@ export function ContentRequestForm({ platforms, categories, llmProviders = [], l
               />
             ) : null}
           </div>
+        ) : null}
+      </div>
+
+      <div>
+        <fieldset>
+          <legend className="block text-sm font-medium text-ink">
+            {t('template')}
+          </legend>
+          <p className="mt-1 text-xs text-ink-muted">{t('templateHint')}</p>
+          <div className="mt-2 space-y-1">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink has-checked:border-primary">
+              <input
+                type="radio"
+                name="template"
+                value=""
+                checked={template === ''}
+                disabled={pending || ideaGenerating}
+                onChange={() => setTemplate('')}
+                className="mt-1 size-4"
+              />
+              <span>
+                <span className="block font-medium">{t('templateFree')}</span>
+                <span className="block text-xs text-ink-muted">{t('templateFreeHint')}</span>
+              </span>
+            </label>
+            {templates.map((tpl) => (
+              <label key={tpl.slug} className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink has-checked:border-primary">
+                <input
+                  type="radio"
+                  name="template"
+                  value={tpl.slug}
+                  checked={template === tpl.slug}
+                  disabled={pending || ideaGenerating}
+                  onChange={() => setTemplate(tpl.slug)}
+                  className="mt-1 size-4"
+                />
+                <span>
+                  <span className="block font-medium">{tpl.display_name}</span>
+                  {tpl.description ? (
+                    <span className="block text-xs text-ink-muted">{tpl.description}</span>
+                  ) : null}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {fieldErrors.template ? (
+          <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.template}</p>
         ) : null}
       </div>
 

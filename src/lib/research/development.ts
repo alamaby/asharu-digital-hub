@@ -81,7 +81,7 @@ export async function runDevelopment(
 ): Promise<number> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select('id, mechanism, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count')
+    .select('id, mechanism, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count, template_slug')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
@@ -94,8 +94,14 @@ export async function runDevelopment(
     account_goal: string | null;
     audience_age: string | null;
     target_reply_count: number | null;
+    template_slug: string | null;
   };
   const isDua = sess.mechanism === 'dua';
+
+  // Template riset pilihan user (opsional): struktur thread mengikuti hint-nya.
+  const { getResearchTemplateHint } = await import('./templates');
+  const templateRow = await getResearchTemplateHint(supabase, sess.template_slug ?? null);
+  const templateStructure = templateRow?.development_hint ?? null;
 
   const { data: topics, error: topicError } = await supabase
     .from('content_research_topics')
@@ -222,7 +228,7 @@ export async function runDevelopment(
 
     // Per-pasangan guard: 1 pasangan gagal tidak boleh menggagalkan sisanya.
     try {
-      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId, isDua ? productId : null);
+      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId, isDua ? productId : null, templateStructure);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await supabase.from('content_research_logs').insert({
@@ -275,7 +281,8 @@ async function generateAndInsertDraft(
   topic: ShortlistedTopic,
   affiliate: SelectedAffiliate | null,
   pinnedModelId?: string | null,
-  fixedProductId?: string | null
+  fixedProductId?: string | null,
+  templateStructure?: string | null
 ): Promise<void> {
   const tone = sess.tone ?? 'casual';
   const audience = sess.audience_age ?? 'umum';
@@ -321,7 +328,8 @@ async function generateAndInsertDraft(
       hooks: topicHooks,
       keyFacts: topicKeyFacts,
       uniqueAngle: topic.unique_angle,
-      isFallbackRandom
+      isFallbackRandom,
+      templateStructure: templateStructure ?? null
     },
     promptProduct
   );

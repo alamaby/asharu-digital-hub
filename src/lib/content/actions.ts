@@ -7,6 +7,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { extractUrls } from '@/lib/utils/urls';
+import { RESEARCH_TEMPLATE_SLUGS, getResearchTemplateHint } from '@/lib/research/templates';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -107,6 +108,8 @@ const researchSchema = z.object({
   // Mekanisme riset: 'satu' topik-dulu | 'dua' produk-dulu. Produk tetap
   // (`productIds`, 1-2) dibaca via getAll — fromEntries hanya simpan terakhir.
   mechanism: z.enum(['satu', 'dua']).optional(),
+  // Template riset opsional ('' = Bebas, dinormalisasi ke undefined).
+  template: z.enum(RESEARCH_TEMPLATE_SLUGS).optional(),
   tone: z.enum(['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif']),
   targetCategory: z.enum(['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others']).optional(),
   audience: z.string().min(3).max(200),
@@ -166,6 +169,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
   }
 
   normalizeEmpty(raw, 'targetCategory');
+  if (raw.template === '') raw.template = undefined as unknown as string;
   for (const k of [
     'constraints',
     'keywords',
@@ -299,6 +303,16 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     }
   }
 
+  // Template riset: opsional; bila diisi harus slug aktif di research_templates.
+  let templateSlug: string | null = null;
+  if (data.template) {
+    const tpl = await getResearchTemplateHint(supabase, data.template);
+    if (!tpl) {
+      return { success: false, fieldErrors: { template: 'Template tidak valid atau nonaktif' }, error: 'validation' };
+    }
+    templateSlug = tpl.slug;
+  }
+
   // created_by is the signed-in user if any; null for anonymous submit.
   const {
     data: { user }
@@ -309,6 +323,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     .insert({
       status: 'pending',
       mechanism,
+      template_slug: templateSlug,
       topic: data.topic,
       language: data.language,
       target_category: data.targetCategory ?? null,
@@ -429,6 +444,15 @@ export async function generateIdea(formData: FormData): Promise<GenerateIdeaResu
   const accountGoalHint = pick(raw.accountGoal);
   const allowedCategoriesHint = pick(raw.allowedCategories);
   const excludedCategoriesHint = pick(raw.excludedCategories);
+  // Template riset pilihan user (opsional): ide harus cocok dengan strukturnya.
+  const templateHint = pick(raw.template);
+  let templateLine: string | null = null;
+  if (templateHint) {
+    try {
+      const tpl = await getResearchTemplateHint(getServiceClient(), templateHint);
+      if (tpl) templateLine = `Template riset pilihan user: ${tpl.display_name} — ${tpl.description}. Bangun topik/angle/audience/keywords agar cocok diformat dengan struktur template ini.`;
+    } catch { templateLine = null; }
+  }
   const pastedUrls = extractUrls(`${raw.topic ?? ''} ${raw.keywords ?? ''} ${raw.purpose ?? ''}`);
   // Mekanisme dua: produk terpilih menjadi bahan ide (hint LLM saja —
   // sesi buat-ulang tetap validasi ID produk ke DB).
@@ -481,7 +505,7 @@ WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
   "allowedCategories": "kategori diperbolehkan pisah koma",
   "excludedCategories": "kategori dihindari pisah koma"
 }
-Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"); JANGAN mengulang ide umum yang sudah sering dipakai — variasikan sudut, audiens, dan kategori. Hormati hint user yang sudah diisi (jangan ubah maknanya, pertajam). Bahasa output ${languageHint}.${ideaProducts.length > 0 ? ' Topik/angle/audience/keywords WAJIB dibangun di sekitar PRODUK TETAP di bawah agar sisipan produk natural; jangan klaim fitur, harga, atau manfaat di luar nama produk yang diberikan.' : ''}`;
+Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"); JANGAN mengulang ide umum yang sudah sering dipakai — variasikan sudut, audiens, dan kategori. Hormati hint user yang sudah diisi (jangan ubah maknanya, pertajam). Bahasa output ${languageHint}.${ideaProducts.length > 0 ? ' Topik/angle/audience/keywords WAJIB dibangun di sekitar PRODUK TETAP di bawah agar sisipan produk natural; jangan klaim fitur, harga, atau manfaat di luar nama produk yang diberikan.' : ''}${templateLine ? ` ${templateLine}` : ''}`;
   const hintLines = [
     `platform=${platformHint}`,
     ideaProducts.length > 0 ? `PRODUK TETAP (bangun topik di sekitar produk ini)=${ideaProducts.join(' | ')}` : null,

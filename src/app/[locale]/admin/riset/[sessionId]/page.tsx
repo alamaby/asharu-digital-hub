@@ -81,7 +81,7 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
 
   const { data: session } = await supabase
     .from('content_research_sessions')
-    .select('id, status, mechanism, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, target_location, secondary_location, platform_slug, platform_slugs, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, error_message, created_at, current_stage_started_at, updated_at')
+    .select('id, status, mechanism, topic, language, target_category, audience, cta_style, purpose, constraints, keywords, target_location, secondary_location, platform_slug, platform_slugs, audience_age, audience_interests, account_goal, tone, allowed_categories, excluded_categories, freshness_hours, minimum_candidates, minimum_score, required_winners, maximum_iterations, target_reply_count, template_slug, error_message, created_at, current_stage_started_at, updated_at')
     .eq('id', sessionId)
     .maybeSingle();
 
@@ -121,6 +121,7 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
     required_winners: number | null;
     maximum_iterations: number | null;
     target_reply_count: number | null;
+    template_slug: string | null;
     error_message: string | null;
     created_at: string;
     current_stage_started_at: string | null;
@@ -182,6 +183,16 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
       .filter((p): p is { id: string; friendly_code: string; name_id: string } => Boolean(p?.id));
   }
 
+  // Template riset pilihan user (opsional) untuk badge header.
+  let templateName: string | null = null;
+  if (s.template_slug) {
+    const { data: tpl } = await supabase
+      .from('research_templates')
+      .select('display_name')
+      .eq('slug', s.template_slug)
+      .maybeSingle();
+    templateName = (tpl as { display_name: string } | null)?.display_name ?? s.template_slug;
+  }
   // At awaiting_selection, preview affiliate match per topic so the admin
   // sees which topics will generate a draft without an affiliate (pool
   // mismatch) before shortlisting — and can add a relevant product or pick a
@@ -263,6 +274,11 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
                 ASH-{p.friendly_code.replace('ASH-', '')}
               </span>
             ))}
+          </p>
+        ) : null}
+        {templateName ? (
+          <p className="mt-2 text-sm text-ink">
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Template: {templateName}</span>
           </p>
         ) : null}
         {s.topic ? <p className="mt-2 text-sm text-ink">Topik: {s.topic}</p> : null}
