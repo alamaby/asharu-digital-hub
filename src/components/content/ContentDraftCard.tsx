@@ -9,6 +9,13 @@ import { DraftImageCard, type ImageOption } from './DraftImageCard';
 import type { DraftImageRow } from '@/lib/image/types';
 import { countPlaceholdersInThread } from '@/lib/llm/prompt';
 import { createSupabaseBrowser } from '@/lib/supabase/client';
+import { approveDraftAndQueue } from '@/lib/social/actions';
+
+export interface DraftQueueInfo {
+  status: string;
+  scheduled_at: string;
+  posted_url: string | null;
+}
 
 interface Draft {
   id: string;
@@ -22,7 +29,7 @@ interface Draft {
   platform_slug?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [] } }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [] }, queue = null }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
@@ -34,15 +41,19 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   coverImages?: DraftImageRow[];
   coverSelectedId?: string | null;
   imageOptions?: ImageOption;
+  /** Info antrean posting (dari server, null bila belum terjadwal). */
+  queue?: DraftQueueInfo | null;
 }) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
+  const [queueInfo, setQueueInfo] = useState(queue);
   const [lang, setLang] = useState<'id' | 'en'>('id');
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<'approved' | 'rejected' | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [queueNote, setQueueNote] = useState<string | null>(null);
 
   // Sync dari server (mis. setelah reselect/regen + router.refresh()): prop
   // baru = data baru. Tanpa ini state basi dan user harus refresh manual.
@@ -51,6 +62,11 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
     prevInitial.current = initial;
     setDraft(initial);
     setEditingIdx(null);
+  }
+  const prevQueue = useRef(queue);
+  if (prevQueue.current !== queue) {
+    prevQueue.current = queue;
+    setQueueInfo(queue);
   }
 
   const injections = draft.affiliate_injections[0];
@@ -61,22 +77,45 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   const emojiMissing = Boolean(draft.llm_meta?.emoji_missing);
 
   async function updateStatus(status: 'approved' | 'rejected') {
-    const supabase = createSupabaseBrowser();
-    if (!supabase) return;
     const previousStatus = draft.status;
     setStatusUpdating(status);
     setStatusError(null);
-    // Optimistic update
+    setQueueNote(null);
+    if (status === 'rejected') {
+      // Tolak tetap update langsung (tidak masuk antrean).
+      const supabase = createSupabaseBrowser();
+      if (!supabase) {
+        setStatusUpdating(null);
+        return;
+      }
+      setDraft({ ...draft, status });
+      const { error } = await supabase
+        .from('content_drafts')
+        .update({ status })
+        .eq('id', draft.id);
+      setStatusUpdating(null);
+      if (error) {
+        setDraft({ ...draft, status: previousStatus });
+        setStatusError(error.message);
+      }
+      return;
+    }
+    // Approve via server action: update status + enqueue idempoten (bahasa aktif).
+    // Optimistic update; rollback bila server action gagal.
     setDraft({ ...draft, status });
-    const { error } = await supabase
-      .from('content_drafts')
-      .update({ status })
-      .eq('id', draft.id);
-    setStatusUpdating(null);
-    if (error) {
-      // Rollback
+    try {
+      const result = await approveDraftAndQueue(draft.id, lang);
+      if (result.queued && result.scheduledAt) {
+        setQueueInfo({ status: 'queued', scheduled_at: result.scheduledAt, posted_url: null });
+        setQueueNote(t('approveQueued', { when: new Date(result.scheduledAt).toLocaleString() }));
+      } else {
+        setQueueNote(t('approveNoQueue'));
+      }
+    } catch (e) {
       setDraft({ ...draft, status: previousStatus });
-      setStatusError(error.message);
+      setStatusError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStatusUpdating(null);
     }
   }
 
@@ -293,6 +332,33 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
       {statusError ? (
         <p role="alert" className="mt-2 text-xs text-red-700">
           {statusError}
+        </p>
+      ) : null}
+
+      {queueNote ? (
+        <p role="status" className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
+          {queueNote}
+        </p>
+      ) : null}
+
+      {draft.status === 'approved' ? (
+        <p className="mt-2 text-xs text-ink-muted">{t('approveQueueNote')}</p>
+      ) : null}
+
+      {queueInfo ? (
+        <p className="mt-1 text-xs text-ink-muted">
+          {t('queueBadge', {
+            status: queueInfo.status,
+            when: new Date(queueInfo.scheduled_at).toLocaleString()
+          })}
+          {queueInfo.posted_url ? (
+            <>
+              {' · '}
+              <a href={queueInfo.posted_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                {queueInfo.posted_url}
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
 

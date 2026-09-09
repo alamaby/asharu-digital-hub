@@ -199,3 +199,38 @@ export async function cancelSocialQueue(queueId: string) {
   if (error) throw new Error(error.message);
   revalidatePath('/admin/sosial');
 }
+
+/**
+ * Tandai antrean sebagai sudah diposting manual (semi-otomatis).
+ * Dipakai saat OAuth Meta masih blokir: admin salin thread via CopyButton,
+ * paste di aplikasi Threads, lalu tandai di sini beserta URL postingannya.
+ * Idempoten: hanya baris queued/posting/failed yang bisa ditandai.
+ */
+export async function markQueuePosted(queueId: string, formData: FormData) {
+  const supabase = await requireAdmin();
+  const url = String(formData.get('postedUrl') ?? '').trim();
+  if (!url) throw new Error('postedUrl required');
+  if (!/^https:\/\/www\.threads\.com\//.test(url)) {
+    throw new Error('postedUrl must be a threads.com URL');
+  }
+  const { data: row } = await supabase
+    .from('social_post_queue')
+    .select('id, status')
+    .eq('id', queueId)
+    .maybeSingle();
+  const status = (row as { status?: string } | null)?.status;
+  if (!row || (status !== 'queued' && status !== 'posting' && status !== 'failed')) {
+    throw new Error('queue not found or already finalized');
+  }
+  const { error } = await supabase
+    .from('social_post_queue')
+    .update({
+      status: 'posted',
+      posted_at: new Date().toISOString(),
+      posted_url: url,
+      last_error: null
+    })
+    .eq('id', queueId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/admin/sosial');
+}

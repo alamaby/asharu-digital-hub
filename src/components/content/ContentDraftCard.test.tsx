@@ -27,4 +27,14 @@ describe('ContentDraftCard', () => {
     renderWithMessages(<ContentDraftCard draft={draft} />);
     expect(screen.getAllByRole('button', { name: /Salin/ }).length).toBeGreaterThanOrEqual(2);
   });
+
+  it('shows the queue badge when queue info is provided', () => {
+    renderWithMessages(
+      <ContentDraftCard
+        draft={{ ...draft, status: 'approved' }}
+        queue={{ status: 'queued', scheduled_at: '2026-09-07T10:00:00+07:00', posted_url: null }}
+      />
+    );
+    expect(screen.getByText(/Antrean: queued/).textContent).toMatch(/Antrean/);
+  });
 });

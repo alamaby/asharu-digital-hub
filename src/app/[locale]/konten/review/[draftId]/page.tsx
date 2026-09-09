@@ -150,6 +150,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
   }[] = [];
   let imageMode: string | null = null;
+  let queueInfo: { status: string; scheduled_at: string; posted_url: string | null } | null = null;
   const svc = createSupabaseService();
   if (svc) {
     const { data: provs } = await svc.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
@@ -186,6 +187,15 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     }
     if (istlyes) imageStyles = istlyes as typeof imageStyles;
     if (dimgs) draftImages = dimgs as typeof draftImages;
+    // Info antrean posting untuk badge di kartu (semi-otomatis: kelihatan walau worker off).
+    const { data: qrow } = await svc
+      .from('social_post_queue')
+      .select('status, scheduled_at, posted_url')
+      .eq('draft_id', draftId)
+      .eq('platform_slug', 'threads')
+      .maybeSingle();
+    const q = (qrow as { status: string; scheduled_at: string; posted_url: string | null } | null) ?? null;
+    if (q) queueInfo = q;
   }
 
   return (
@@ -214,6 +224,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           draft={{ ...d, affiliate_injections: enrichedInjections }}
           regenProviders={regenProviders}
           regenModels={regenModels}
+          queue={queueInfo}
           postImages={draftImages
             .filter((i) => i.status === 'selected' && i.public_url)
             .map((i) => ({ post_index: i.post_index, public_url: i.public_url as string }))}

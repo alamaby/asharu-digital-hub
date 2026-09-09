@@ -28,16 +28,17 @@ Keputusan user: trigger = antrean terjadwal; bahasa = pilih saat approve; cakupa
 ## Tasks
 
 - [x] Riset alur approve + Threads API + pola config-by-table
-- [ ] Fase 0: Meta App + OAuth + seed Vault (user, panduan di Notes)
-- [ ] Migrasi `20260907000001_social_auto_post.sql` (4 tabel + RLS + seed)
-- [ ] `src/lib/social/{config,threads,queue}.ts` + unit tests
-- [ ] Env Zod + `.env.example` (THREADS_APP_ID/SECRET/REDIRECT_URI)
-- [ ] `scripts/seed-threads-token.mjs`
-- [ ] Route `/api/social/post` (cron worker) + `/api/social/oauth/callback`
-- [ ] Server actions `approveDraftAndQueue`, `updateSocialConfig`, `retry/cancelQueue`
-- [ ] Halaman `/admin/sosial` + badge queue di review
-- [ ] pg_cron `asharu-social-poster */5` + `asharu-social-refresh daily` (migrasi)
-- [ ] Gate hijau + commit/push (submodule dulu bila migrasi)
+- [x] Fase 0: Meta App + OAuth (BLOKIR 24 jam: invite accept tak sync ke Active, Roles kosong → full-otomatis DITUNDA, OAuth jadi plan C via App Review + Live)
+- [x] Semi-otomatis (UNBLOCK): approve via server action + enqueue idempoten + badge antrean + salin per-post + tandai posted manual + URL
+- [x] Migrasi `20260907000001_social_auto_post.sql` (4 tabel + RLS + seed)
+- [x] `src/lib/social/{config,threads,queue}.ts` + unit tests
+- [x] Env Zod + `.env.example` (THREADS_APP_ID/SECRET/REDIRECT_URI)
+- [x] `scripts/seed-threads-token.mjs`
+- [x] Route `/api/social/post` (cron worker) + `/api/social/oauth/callback`
+- [x] Server actions `approveDraftAndQueue`, `updateSocialConfig`, `retry/cancelQueue`, `markQueuePosted`
+- [x] Halaman `/admin/sosial` + badge queue di review
+- [x] pg_cron `asharu-social-poster */5` (migrasi)
+- [x] Gate hijau (typecheck/lint/315 tests) — commit/push semi-otomatis pending
 
 ## Risks
 
@@ -57,6 +58,8 @@ Keputusan user: trigger = antrean terjadwal; bahasa = pilih saat approve; cakupa
 - 2026-09-06 11:30:00 — Screenshot user konfirmasi bug Meta: Roles = Threads Tester `asharu.id` benar; tab Invites di aplikasi mobile HANYA tombol Remove (tanpa Accept); tab Active kosong. Jalur: coba Accept via threads.com web → bila tetap tak ada, remove + re-invite → terakhir recreate app / App Review + Live.
 - 2026-09-06 11:35:00 — Web juga hanya tombol Remove (tanpa Accept). Keputusan: buat ulang Meta app dari nol (reset bersih). Sisi kode tak perlu diubah (App ID/Secret murni env). Setelah app baru + invite diterima, saya generate authorize URL baru + verifikasi.
 - 2026-09-06 11:45:00 — App baru `Asharu Digital` dibuat, tester diundang. Invite di web PUNYA tombol Accept (bug tombol-hilang tidak terjadi di app baru). User klik Accept → dialog konfirmasi → tombol Accept/Decline hilang jadi Remove, TAPI entri tidak pindah ke tab Active (masih kosong). Diagnosis: accept tercatat di UI tapi backend Meta belum sync (kasus forum 2026). Next: user ganti kredensial baru ke .env.local + Vercel + redeploy, tunggu propagasi, saya generate authorize URL baru (client_id baru) sebagai probe OAuth.
+- 2026-09-07 — 24 jam berlalu, invite tetap tak sync: Roles status kosong (dulu Pending), tab Active kosong. Keputusan: FULL-OTOMATIS DITUNDA, pipeline di-unblock via SEMI-OTOMATIS: approve via server action `approveDraftAndQueue` (otomatis enqueue + badge antrean di review), salin per-post via CopyButton yang ada, tandai posted manual via `markQueuePosted` + URL di /admin/sosial. OAuth Meta jadi plan C (App Review + Live, perlu verifikasi bisnis).
+- 2026-09-07 — Semi-otomatis diimplementasi: perbaikan `ContentDraftCard` (approve via server action + bahasa aktif + badge antrean + catatan jadwal), fetch antrean di halaman review, form tandai-posted + URL di admin sosial; gate hijau 315 tests.
 
 ## Notes
 

@@ -417,6 +417,10 @@
       "save": "Simpan",
       "approve": "Setujui",
       "reject": "Tolak",
+      "approveQueueNote": "Menyetujui akan menjadwalkan posting otomatis.",
+      "approveQueued": "Disetujui — terjadwal {when}.",
+      "approveNoQueue": "Disetujui (auto-queue nonaktif).",
+      "queueBadge": "Antrean: {status} · {when}",
       "realtime": "Memperbarui otomatis",
       "affiliate": {
         "title": "Produk Afiliasi",

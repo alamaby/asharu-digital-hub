@@ -9,6 +9,7 @@ import { createSupabaseService } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import {
   cancelSocialQueue,
+  markQueuePosted,
   retrySocialQueue,
   toggleSocialAccount,
   updateSocialConfig
@@ -197,6 +198,23 @@ export default async function SocialAdminPage({
                   <a href={q.posted_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-primary hover:underline">
                     Lihat postingan →
                   </a>
+                ) : null}
+                {q.status === 'queued' || q.status === 'posting' || q.status === 'failed' ? (
+                  <form action={markQueuePosted.bind(null, q.id)} className="mt-2 flex flex-wrap items-center gap-2">
+                    <label htmlFor={`posted-url-${q.id}`} className="sr-only">URL postingan Threads</label>
+                    <input
+                      id={`posted-url-${q.id}`}
+                      name="postedUrl"
+                      type="url"
+                      required
+                      pattern="https://www\.threads\.com/.*"
+                      placeholder="https://www.threads.com/@asharu.id/post/..."
+                      className="min-w-[240px] flex-1 rounded-lg border border-line bg-background px-2 py-1.5 text-xs"
+                    />
+                    <button type="submit" className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800">
+                      Tandai sudah diposting
+                    </button>
+                  </form>
                 ) : null}
               </div>
               <div className="flex gap-2">

@@ -417,6 +417,10 @@
       "save": "Save",
       "approve": "Approve",
       "reject": "Reject",
+      "approveQueueNote": "Approving will schedule auto-posting.",
+      "approveQueued": "Approved — scheduled {when}.",
+      "approveNoQueue": "Approved (auto-queue off).",
+      "queueBadge": "Queue: {status} · {when}",
       "realtime": "Auto-refreshing",
       "affiliate": {
         "title": "Affiliate Product",
