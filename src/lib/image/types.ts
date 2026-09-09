@@ -4,7 +4,7 @@ export type ImageProviderSlug = 'pixazo' | 'cloudflare' | 'pollinations' | 'gemi
 
 export type ImageAspect = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
 
-export type DraftImageStatus = 'pending' | 'ready' | 'failed' | 'selected';
+export type DraftImageStatus = 'pending' | 'prompt_ready' | 'ready' | 'failed' | 'selected';
 
 /**
  * HTTP-level failure dari provider image (non-2xx). Status dibawa agar
@@ -108,7 +108,7 @@ export interface DraftImageRow {
   post_index: number;
   image_prompt: string;
   negative_prompt: string | null;
-  /** Reasoning LLM: visual_strategy + hook_keywords + contradiction_check + justification. */
+  /** Reasoning LLM: visual_strategy (after/bridge/custom) + hook_keywords + contradiction_check + justification. */
   reasoning: {
     visual_strategy?: string;
     hook_keywords?: string[];

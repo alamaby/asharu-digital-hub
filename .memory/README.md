@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-09 12:50 (local time)
+Last updated: 2026-09-09 14:55 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-09 12:50 (local time)
 
 ## Recent Entries
 
+- [145500-image-prompt-reasoning-only-tanpa-before.md](2026-09-09/145500-image-prompt-reasoning-only-tanpa-before.md) — Image prompt: hapus strategi before (gate jadi sanity ringan) + cover auto reasoning-only (`prompt_ready`, tanpa auto-generate, user cek dulu) + enhance wajib tambah missed detail; migrasi submodule `f5bca60`; 324 tests hijau.
 - [125036-fix-regenerate-image-style-override.md](2026-09-09/125036-fix-regenerate-image-style-override.md) — Fix regenerate draf pakai pilihan Style: `resolveImageTarget` sebelumnya hanya baca `styleSlug` saat model terpin (Auto → selalu photorealistic); kini prioritas manual > sesi > global di semua cabang + enhance hint + rehydrate dropdown; 324 tests hijau.
 - [091500-threads-semi-auto-approve-queue.md](2026-09-07/091500-threads-semi-auto-approve-queue.md) — Threads semi-otomatis: approve via server action + enqueue idempoten + badge antrean + tandai-posted manual (/admin/sosial); blokir OAuth 24 jam (Active kosong) → full-otomatis plan C; 315 tests hijau.
 - [082900-bing-webmaster-verification.md](2026-09-08/082900-bing-webmaster-verification.md) — Verifikasi Bing Webmaster: `public/BingSiteAuth.xml` di root, gate hijau, pushed `a45947c`; [USER ACTION] tunggu deploy → cek prod → klik Verify.
@@ -72,7 +73,6 @@ Last updated: 2026-09-09 12:50 (local time)
 - [2026-09-06 204500-shortlist-advance-feedback.md](2026-09-06/204500-shortlist-advance-feedback.md) — Shortlist/advance: banner working/success + jumlah, spinner tombol, error ramah + teknis, catatan progres batch; gate hijau, murni UI.
 - [2026-09-06 223000-draft-emoji-edit-regen-refresh.md](2026-09-06/223000-draft-emoji-edit-regen-refresh.md) — Draf bf11143d: audit+repair emoji (generate+regen), sunting per post, sync state pasca-refresh; 270 tests hijau.
 - [2026-09-06 230500-research-mechanism-two.md](2026-09-06/230500-research-mechanism-two.md) — Mekanisme 2 product-first: migrasi mechanism/session_products/product_id, cabang discovering→shortlist→developing, produk tetap 2-draf, form radio+picker; 271 tests hijau.
-- [2026-09-07 060000-mechanism-two-form-idea.md](2026-09-07/060000-mechanism-two-form-idea.md) — Mekanisme 2 form: kartu produk + mekanisme teratas + ide berbasis produk + banner N/17; 272 tests hijau.
 
 ## Legacy Archive
 

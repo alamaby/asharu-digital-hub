@@ -1,6 +1,7 @@
 /** Prompt builder stage image_prompt — LLM memikirkan visualisasi dari post utama. */
 
-export type VisualStrategy = 'before' | 'after' | 'bridge';
+/** Strategi visual: after = ilustrasi langsung/aspirasional; bridge = objek curiosity-gap. */
+export type VisualStrategy = 'after' | 'bridge';
 
 export interface ImagePromptInput {
   /** Post utama bilingual (opener thread). */
@@ -30,54 +31,6 @@ export interface ImagePromptOutput {
   reasoning: ImageReasoning;
 }
 
-/** Kata pain ID/EN — bila muncul di source post, strategi default = before. */
-export const PAIN_KEYWORDS = [
-  'sempit',
-  'berantakan',
-  'sumpek',
-  'sesak',
-  'cramped',
-  'messy',
-  'mess',
-  'cluttered',
-  'clutter'
-] as const;
-
-/** Kata After yang DILARANG di image_prompt saat strategy=before. */
-export const AFTER_WORDS_BANNED_UNDER_BEFORE = [
-  'neat',
-  'organized',
-  'organised',
-  'tidy',
-  'spacious',
-  'beautifully styled'
-] as const;
-
-/** Kata pain EN yang wajib tercermin minimal satu di image_prompt saat before. */
-export const PAIN_REFLECTION_EN = [
-  'cramped',
-  'messy',
-  'mess',
-  'clutter',
-  'narrow',
-  'crowded',
-  'piled',
-  'disorganized',
-  'untidy',
-  'small'
-] as const;
-
-function includesWord(haystack: string, word: string): boolean {
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
-}
-
-/** Deteksi kata pain di teks sumber (ID/EN, case-insensitive, word-boundary). */
-export function detectPainKeywords(text: string): string[] {
-  const src = text ?? '';
-  return (PAIN_KEYWORDS as readonly string[]).filter((w) => includesWord(src, w));
-}
-
 export function buildImagePromptMessages(input: ImagePromptInput): {
   system: string;
   user: string;
@@ -85,18 +38,16 @@ export function buildImagePromptMessages(input: ImagePromptInput): {
   const system = [
     'You are a senior visual designer for Asharu social content.',
     'Given the opening post of a thread, design ONE supporting illustration.',
-    'First REASON explicitly about hook-type vs visual, then output the visual.',
+    'First REASON explicitly about the post vs visual, then output the visual.',
     'Rules:',
-    '- Output JSON ONLY: {"visual_strategy": "before|after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
+    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
     '- image_prompt: single scene in English, ≤60 words, concrete objects/action/setting.',
     '- Derive the scene from the post (e.g. sticky pan with stuck food for a non-stick cookware post).',
-    '- visual_strategy: BEFORE = depict the pain/problem stated in the hook (cramped, messy); AFTER = depict the solved/aspirational state; BRIDGE = curiosity-gap object (tape measure, empty dead corner).',
-    '- DEFAULT: if the source post contains pain keywords (sempit/berantakan/cramped/messy/cluttered), visual_strategy MUST be "before". NEVER answer a pain hook with an After visual.',
-    '- BEFORE rules: image_prompt MUST show a relatable cramped/messy corner (relatable messy, NOT filthy/disgusting) and MUST contain at least one pain-reflection word (cramped, messy, clutter, narrow, crowded, piled, disorganized, untidy, small). MUST NOT contain neat/organized/tidy/spacious/beautifully styled. negative_prompt MUST NOT ban cramped/messy/mess/clutter/sempit/berantakan.',
-    '- AFTER rules: only when the source post is aspirational/solution with NO pain hook.',
-    '- hook_keywords: pain words found in the source post (ID/EN verbatim, [] if none).',
-    '- contradiction_check: one sentence stating what the prompt shows vs forbids (e.g. "prompt shows cramped/messy, forbids neat/organized/spacious").',
-    '- justification: one sentence why this strategy fits the hook.',
+    '- visual_strategy: AFTER = direct/aspirational illustration of the post; BRIDGE = curiosity-gap object (tape measure, empty dead corner).',
+    '- DETAIL COMPLETENESS: every concrete detail in the source post (setting/location, objects, clothing, people, weather/atmosphere, time of day) MUST appear in image_prompt in some form. If you omit any explicit detail, the output is WRONG.',
+    '- hook_keywords: key visual nouns from the source post (max 10, [] if none).',
+    '- contradiction_check: one sentence stating what the prompt shows vs forbids.',
+    '- justification: one sentence why this visual fits the post.',
     '- No people faces in close-up unless the post demands it; prefer objects/scenes.',
     '- No text, no watermark, no logo in the image (negative_prompt must repeat this).',
     '- No violent, sexual, or political content.'
@@ -137,10 +88,9 @@ export function parseImagePrompt(text: string): ImagePromptOutput {
   if (typeof parsed.image_prompt !== 'string' || !parsed.image_prompt.trim()) {
     throw new Error('image_prompt: missing image_prompt string');
   }
+  // 'before' hanya legacy (data lama) → dinormalisasi ke 'after'.
   const strategy =
-    parsed.visual_strategy === 'before' ||
-    parsed.visual_strategy === 'after' ||
-    parsed.visual_strategy === 'bridge'
+    parsed.visual_strategy === 'after' || parsed.visual_strategy === 'bridge'
       ? parsed.visual_strategy
       : 'after';
   const hookKeywords = Array.isArray(parsed.hook_keywords)
@@ -168,46 +118,31 @@ export interface ImagePromptGateResult {
 }
 
 /**
- * Gate deterministik sebelum prompt dikirim ke provider image.
- * - Pain hook (sempit/berantakan/...) wajib strategy=before.
- * - strategy=before: image_prompt dilarang memuat kata After, wajib memuat
- *   minimal satu kata refleksi pain, negative dilarang mem-ban kata pain.
+ * Gate ringan sebelum prompt dikirim ke provider image.
+ * Strategi 'before' dihapus (user bisa edit prompt manual) — gate hanya
+ * memastikan prompt/negative terisi wajar dan strategi valid
+ * (after/bridge/custom). Legacy 'before' dari data lama tetap lolos.
  */
 export function validateImagePromptContradiction(
   output: ImagePromptOutput,
-  sourceText: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _sourceText: string
 ): ImagePromptGateResult {
   const reasons: string[] = [];
-  const pains = detectPainKeywords(sourceText);
-  const prompt = output.image_prompt ?? '';
-  const negative = output.negative_prompt ?? '';
+  const prompt = output.image_prompt?.trim() ?? '';
+  const negative = output.negative_prompt?.trim() ?? '';
   const strategy = output.reasoning.visual_strategy;
-
-  if (pains.length > 0 && strategy !== 'before') {
-    reasons.push(`pain hook (${pains.join('/')}) requires visual_strategy=before, got ${strategy}`);
+  if (prompt.length < 10) {
+    reasons.push('image_prompt minimal 10 karakter');
   }
-  if (strategy === 'before') {
-    const banned = (AFTER_WORDS_BANNED_UNDER_BEFORE as readonly string[]).filter((w) =>
-      includesWord(prompt, w)
-    );
-    if (banned.length > 0) {
-      reasons.push(`before visual must not contain After words: ${banned.join(', ')}`);
-    }
-    const reflected = (PAIN_REFLECTION_EN as readonly string[]).some((w) => includesWord(prompt, w));
-    if (!reflected) {
-      reasons.push('before visual must reflect pain with one of: cramped/messy/clutter/narrow/crowded/piled/disorganized/untidy/small');
-    }
-    const bannedPainInNegative = [
-      'cramped',
-      'messy',
-      'mess',
-      'clutter',
-      'sempit',
-      'berantakan'
-    ].filter((w) => includesWord(negative, w));
-    if (bannedPainInNegative.length > 0) {
-      reasons.push(`before negative_prompt must not ban pain words: ${bannedPainInNegative.join(', ')}`);
-    }
+  if (prompt.length > 500) {
+    reasons.push('image_prompt maksimal 500 karakter');
+  }
+  if (negative.length > 300) {
+    reasons.push('negative_prompt maksimal 300 karakter');
+  }
+  if (!['after', 'bridge', 'custom', 'before'].includes(strategy)) {
+    reasons.push(`visual_strategy tidak dikenal: ${strategy}`);
   }
   return { ok: reasons.length === 0, reasons };
 }
@@ -230,14 +165,13 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     'You are a senior visual designer for Asharu social content — POLISH mode.',
     'The user already drafted an image_prompt (and maybe negative_prompt) for supporting illustration. Your job: POLISH it into a better prompt — NOT rewrite to a generic scene.',
     'Preserve intent, correct English, make it single scene, concrete objects/action/setting, ≤60 words.',
-    'First REASON about hook-type vs visual, then output the polished visual.',
+    'First REASON about the post vs visual, then output the polished visual.',
     'Rules:',
-    '- Output JSON ONLY: {"visual_strategy": "before|after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
+    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
     '- image_prompt: polished English, ≤60 words (hard limit), concrete, no text/watermark/logo.',
     '- Negative: polish too (no text, no watermark, no logo), ≤300 chars.',
-    '- visual_strategy: BEFORE = pain/problem hook (cramped, messy); AFTER = solved/aspirational; BRIDGE = curiosity-gap object.',
-    '- DEFAULT: if source post has pain keywords (sempit/berantakan/cramped/messy/cluttered), strategy MUST be "before".',
-    '- BEFORE rules: image_prompt MUST show cramped/messy corner + pain-reflection word (cramped/messy/clutter/narrow/crowded/piled/disorganized/untidy/small). MUST NOT have neat/organized/tidy/spacious. negative MUST NOT ban pain words.',
+    '- visual_strategy: AFTER = direct/aspirational illustration of the post; BRIDGE = curiosity-gap object.',
+    '- MISSED-DETAIL COMPLETION: compare the user draft against the source post. ADD every concrete visual detail from the source post that the draft missed (setting/location, objects, clothing, people, weather/atmosphere, time of day). NEVER drop details already in the draft — only add the missing ones. If the draft already covers everything, polish wording only.',
     '- CRITICAL PRESERVATION: User draft may be in Indonesian — translate to English FAITHFULLY and keep EVERY explicit detail. Do NOT drop or generalize:',
     '  * clothing (e.g. "pakaian fitted" → "fitted clothing/outfit"),',
     '  * camera angle/shot (e.g. "angle agak menyamping bawah" → "slightly low three-quarter side angle, eye-level from below"),',

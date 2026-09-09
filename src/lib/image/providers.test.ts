@@ -6,7 +6,7 @@ import { GeminiImageAdapter } from './providers/gemini';
 import { BynaraImageAdapter } from './providers/bynara';
 import { ImageHttpError } from './types';
 import { isHttpsUrl, base64ToBytes } from './providers/base';
-import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, detectPainKeywords } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction } from './prompt';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -137,11 +137,13 @@ describe('image_prompt builder/parser', () => {
     const { system, user } = buildImagePromptMessages({ mainId: 'panci lengket', mainEn: 'sticky pan' });
     expect(system).toContain('JSON ONLY');
     expect(system).toContain('visual_strategy');
+    expect(system).toContain('DETAIL COMPLETENESS');
+    expect(system).not.toContain('BEFORE');
     expect(user).toContain('sticky pan');
-    const parsed = parseImagePrompt('```json\n{"visual_strategy": "before", "hook_keywords": ["lengket"], "contradiction_check": "shows sticky", "justification": "pain hook", "image_prompt": "sticky frying pan close-up", "negative_prompt": "no text"}\n```');
+    const parsed = parseImagePrompt('```json\n{"visual_strategy": "after", "hook_keywords": ["lengket"], "contradiction_check": "shows sticky", "justification": "direct illustration", "image_prompt": "sticky frying pan close-up", "negative_prompt": "no text"}\n```');
     expect(parsed.image_prompt).toBe('sticky frying pan close-up');
     expect(parsed.negative_prompt).toBe('no text');
-    expect(parsed.reasoning.visual_strategy).toBe('before');
+    expect(parsed.reasoning.visual_strategy).toBe('after');
   });
   it('rejects missing image_prompt', () => {
     expect(() => parseImagePrompt('{"foo": 1}')).toThrow(/image_prompt/);
@@ -151,55 +153,58 @@ describe('image_prompt builder/parser', () => {
     const parsed = parseImagePrompt('{"image_prompt": "sunset field"}');
     expect(parsed.reasoning.visual_strategy).toBe('after');
   });
+  it('normalizes legacy before strategy to after', () => {
+    const parsed = parseImagePrompt('{"visual_strategy": "before", "image_prompt": "messy dorm corner"}');
+    expect(parsed.reasoning.visual_strategy).toBe('after');
+  });
 });
 
-describe('image_prompt contradiction gate (6d9658e9)', () => {
-  const source = 'Tahukah kamu? 7 dari 10 anak kos merasa ruangannya sempit dan berantakan.';
-  it('detects pain keywords ID', () => {
-    expect(detectPainKeywords(source)).toEqual(expect.arrayContaining(['sempit', 'berantakan']));
-  });
-  it('rejects After visual for pain hook', () => {
+describe('image_prompt gate (tanpa before)', () => {
+  it('rejects too-short prompt', () => {
     const gate = validateImagePromptContradiction(
       {
-        image_prompt: 'A cozy minimalist dorm corner, neat, organized, spacious atmosphere',
+        image_prompt: 'cat',
         reasoning: { visual_strategy: 'after', hook_keywords: [], contradiction_check: '', justification: '' }
       },
-      source
+      'source'
     );
     expect(gate.ok).toBe(false);
-    expect(gate.reasons.join(' ')).toMatch(/before/);
+    expect(gate.reasons.join(' ')).toMatch(/10 karakter/);
   });
-  it('rejects before visual containing After words', () => {
+  it('rejects unknown strategy', () => {
     const gate = validateImagePromptContradiction(
       {
-        image_prompt: 'A cramped messy dorm corner, neat and organized shelves',
-        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit'], contradiction_check: '', justification: '' }
+        image_prompt: 'A cozy minimalist dorm corner with warm light',
+        reasoning: { visual_strategy: 'surreal', hook_keywords: [], contradiction_check: '', justification: '' } as unknown as {
+          visual_strategy: 'after'; hook_keywords: string[]; contradiction_check: string; justification: string;
+        }
       },
-      source
+      'source'
     );
     expect(gate.ok).toBe(false);
-    expect(gate.reasons.join(' ')).toMatch(/After words/);
+    expect(gate.reasons.join(' ')).toMatch(/tidak dikenal/);
   });
-  it('rejects before negative that bans pain words', () => {
+  it('accepts valid after visual', () => {
     const gate = validateImagePromptContradiction(
       {
-        image_prompt: 'A cramped messy dorm corner with piled clothes, narrow angle',
-        negative_prompt: 'text, watermark, messy, cramped space',
-        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit'], contradiction_check: '', justification: '' }
+        image_prompt: 'A cozy minimalist dorm corner with warm light and tidy desk',
+        negative_prompt: 'text, watermark, logo',
+        reasoning: { visual_strategy: 'after', hook_keywords: ['dorm'], contradiction_check: 'shows tidy desk', justification: 'direct illustration' }
       },
-      source
+      'source'
     );
-    expect(gate.ok).toBe(false);
-    expect(gate.reasons.join(' ')).toMatch(/negative_prompt/);
+    expect(gate.ok).toBe(true);
   });
-  it('accepts valid before visual', () => {
+  it('accepts user-edited custom prompt', () => {
     const gate = validateImagePromptContradiction(
       {
-        image_prompt: 'A cramped messy small student dorm corner with clothes piled on narrow bed, dim cluttered space',
-        negative_prompt: 'text, watermark, logo, faces, neat, spacious',
-        reasoning: { visual_strategy: 'before', hook_keywords: ['sempit', 'berantakan'], contradiction_check: 'shows cramped/messy, forbids neat/spacious', justification: 'pain hook needs pain visual' }
+        image_prompt: 'Medium shot of a young woman outside a simple house in Bandung, hazy volcanic ash',
+        negative_prompt: 'text, watermark, logo',
+        reasoning: { visual_strategy: 'custom', hook_keywords: [], contradiction_check: '', justification: 'user_edited' } as unknown as {
+          visual_strategy: 'after'; hook_keywords: string[]; contradiction_check: string; justification: string;
+        }
       },
-      source
+      'source'
     );
     expect(gate.ok).toBe(true);
   });

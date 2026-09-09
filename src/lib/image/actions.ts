@@ -25,9 +25,11 @@ export async function listDraftImages(draftId: string): Promise<DraftImageRow[]>
 }
 
 /**
- * Enqueue generate cover (post 0, auto prompt via LLM) atau regenerate dengan
- * override manual. Worker cron memproses antrean; tidak blocking.
- * imagePrompt/negativePrompt: bila diisi user, dipakai verbatim (≤500/300) oleh worker.
+ * Enqueue generate cover (post 0) atau regenerate dengan override manual.
+ * Worker cron memproses antrean; tidak blocking.
+ * - imagePrompt diisi (user sudah cek/edit): worker langsung generate image.
+ * - imagePrompt kosong: worker hanya menyiapkan draf prompt otomatis
+ *   (status prompt_ready) TANPA generate — user cek/edit dulu lalu Generate.
  */
 export async function generateDraftImage(
   draftId: string,

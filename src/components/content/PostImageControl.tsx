@@ -44,7 +44,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
       setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
       return;
     }
-    setNotice('Menyiapkan generate...');
+    setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
       try {
@@ -54,7 +54,9 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
           imagePrompt: p || null,
           negativePrompt: n || null
         });
-        setNotice('Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil. Prompt edit custom.');
+        setNotice(p
+          ? 'Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil. Prompt edit custom.'
+          : 'Masuk antrean reasoning. Worker menyiapkan draf prompt (tanpa generate) — refresh untuk cek prompt.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
@@ -100,7 +102,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
-        setNotice(sel ? 'Diperbarui.' : 'Belum ada visualisasi untuk post ini.');
+        setNotice(sel ? 'Diperbarui.' : latest?.status === 'prompt_ready' ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.' : 'Belum ada visualisasi untuk post ini.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Refresh gagal.');
       }

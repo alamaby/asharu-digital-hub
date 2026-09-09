@@ -146,7 +146,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     } | null;
     style_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
     storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
-    status: 'pending' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
+    status: 'pending' | 'prompt_ready' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
     llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
   }[] = [];
   let imageMode: string | null = null;

@@ -10,6 +10,7 @@ import {
   resolveImageTarget
 } from './config';
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction } from './prompt';
+import type { ImageReasoning } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
 import { ImageHttpError } from './types';
 import type {
@@ -33,8 +34,10 @@ interface DraftRow {
 
 /**
  * Enqueue auto cover (post_index=0): draf needs_review/approved tertua yang
- * belum punya image cover sama sekali → 1 baris pending. Dipanggil worker tiap
- * tick bila tidak ada pending. Per-reply TIDAK auto — hanya via tombol review.
+ * belum punya image cover sama sekali → 1 baris pending. Worker mengubahnya
+ * jadi draf prompt (status prompt_ready) — reasoning otomatis TANPA generate
+ * image, agar user cek/edit prompt dulu di review. Per-reply TIDAK auto —
+ * hanya via tombol review.
  */
 export async function enqueueNextMissingImage(): Promise<string | null> {
   const supabase = getServiceClient();
@@ -174,7 +177,7 @@ async function runImagePromptLLM(
     const { output, providerSlug, model } = await runLLMCompletion(supabase, {
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: retryNote ? `${user}\n\nPENTING: output sebelumnya gagal gate kontradiksi (${retryNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
+        { role: 'user', content: retryNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${retryNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
       ],
       temperature,
       maxTokens: 500,
@@ -195,7 +198,7 @@ async function runImagePromptLLM(
   let chosen = first;
   let gateNotes: string[] = [];
   if (!gate.ok) {
-    // 1x retry suhu rendah untuk disiplin Before.
+    // 1x retry suhu rendah.
     gateNotes = gate.reasons;
     const second = await attempt(0.3, gate.reasons.join('; '));
     gate = validateImagePromptContradiction(
@@ -247,8 +250,11 @@ async function defaultModel(providerId: string, preferredModelId?: string): Prom
 }
 
 /**
- * Proses 1 image: klaim → konteks draf → resolve target → LLM image_prompt →
- * generate (provider waterfall) → upload Storage → selected.
+ * Proses 1 image: klaim → konteks draf → resolve target →
+ * - prompt kosong: reasoning LLM saja → simpan draf prompt (prompt_ready),
+ *   TANPA generate image (user cek/edit dulu di review, lalu Generate);
+ * - prompt terisi (custom user / hasil review): generate via provider
+ *   waterfall → upload Storage → selected.
  * Kembalikan image id bila sukses, null bila tidak ada kerja / gagal jujur.
  */
 export async function processOneImage(): Promise<{ imageId: string | null; error?: string }> {
@@ -283,16 +289,16 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
       draftOverride: override ?? null
     });
 
-    // Prompt: pakai yang sudah ada (regenerate simpan prompt / custom edit) atau generate via LLM.
-    let imagePrompt = row.image_prompt?.trim() || '';
-    let negative = row.negative_prompt ?? undefined;
-    let promptMeta: Record<string, unknown> = {};
-    let reasoning: Record<string, unknown> | null =
+    // Prompt: pakai yang sudah ada (regenerate simpan prompt / custom edit) atau reasoning-only bila kosong.
+    const imagePrompt = row.image_prompt?.trim() || '';
+    const negative = row.negative_prompt ?? undefined;
+    const promptMeta: Record<string, unknown> = {};
+    const reasoning: Record<string, unknown> | null =
       (row as { reasoning?: Record<string, unknown> | null }).reasoning ?? null;
     const isCustom = Boolean(imagePrompt) && (reasoning as { visual_strategy?: string } | null)?.visual_strategy === 'custom';
     if (isCustom) {
       const gate = validateImagePromptContradiction(
-        { image_prompt: imagePrompt, negative_prompt: negative ?? undefined, reasoning: reasoning as unknown as { visual_strategy: 'before' | 'after' | 'bridge'; hook_keywords: string[]; contradiction_check: string; justification: string } },
+        { image_prompt: imagePrompt, negative_prompt: negative ?? undefined, reasoning: reasoning as unknown as ImageReasoning },
         `${mainId} ${mainEn}`
       );
       if (!gate.ok) {
@@ -301,16 +307,28 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
       }
       // Simpan reasoning custom apa adanya (dari actions); worker tidak generate ulang.
     } else if (!imagePrompt) {
+      // Reasoning-only: siapkan draf prompt otomatis TANPA render image.
       const llm = await runImagePromptLLM(mainId, mainEn, ctx.topicTitle, ctx.sessionId, target.style?.prompt_suffix ?? null, {
         keyFacts: ctx.keyFacts,
         uniqueAngle: ctx.uniqueAngle,
         threadSnippet: summarizeThread(ctx.draft.generated_thread?.replies),
         postIndex: row.post_index ?? 0
       });
-      imagePrompt = llm.prompt;
-      negative = llm.negative;
-      reasoning = llm.reasoning;
-      promptMeta = llm.llmMeta;
+      const supabase = getServiceClient();
+      await supabase
+        .from('content_draft_images')
+        .update({
+          status: 'prompt_ready',
+          image_prompt: llm.prompt,
+          negative_prompt: llm.negative ?? null,
+          reasoning: llm.reasoning,
+          style_slug: target.style?.slug ?? row.style_slug,
+          llm_meta: { ...llm.llmMeta, auto_reasoning: true },
+          last_error: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+      return { imageId };
     }
     const styleSuffix = target.style?.prompt_suffix?.trim() || '';
     const finalPrompt = styleSuffix ? `${imagePrompt}, ${styleSuffix}` : imagePrompt;

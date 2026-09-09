@@ -22,6 +22,7 @@ interface Props {
 function statusBadge(status: string) {
   const map: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800',
+    prompt_ready: 'bg-violet-100 text-violet-800',
     ready: 'bg-sky-100 text-sky-800',
     selected: 'bg-emerald-100 text-emerald-800',
     failed: 'bg-red-100 text-red-800'
@@ -43,15 +44,22 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     const slug = latest?.style_slug ?? '';
     return options.styles.some((s) => s.slug === slug) ? slug : '';
   });
-  const [promptDraft, setPromptDraft] = useState('');
-  const [negativeDraft, setNegativeDraft] = useState('');
+  const [promptDraft, setPromptDraft] = useState(() => latestOf(initialImages)?.image_prompt ?? '');
+  const [negativeDraft, setNegativeDraft] = useState(() => latestOf(initialImages)?.negative_prompt ?? '');
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => {
+    const latest = latestOf(initialImages);
+    const hasVisual = initialImages.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
+    return latest?.status === 'prompt_ready' && !hasVisual
+      ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.'
+      : null;
+  });
   const [isPending, startTransition] = useTransition();
 
   const selected = images.find((i) => i.id === selectedId) ?? null;
+  const hasVisual = images.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
 
   function refresh() {
     startTransition(async () => {
@@ -66,7 +74,10 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
-        setNotice('Diperbarui.');
+        const hasVisual = cover.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
+        setNotice(latest?.status === 'prompt_ready' && !hasVisual
+          ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.'
+          : 'Diperbarui.');
       } catch (e) {
         setNotice(e instanceof Error ? e.message : 'Refresh gagal.');
       }
@@ -80,7 +91,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
       return;
     }
-    setNotice('Menyiapkan generate...');
+    setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
       try {
@@ -90,7 +101,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           imagePrompt: p || null,
           negativePrompt: n || null
         });
-        setNotice('Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil. Prompt edit tersimpan sebagai visual_strategy=custom.');
+        setNotice(p
+          ? 'Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil. Prompt edit tersimpan sebagai visual_strategy=custom.'
+          : 'Masuk antrean reasoning. Worker menyiapkan draf prompt (tanpa generate) — tekan Muat ulang untuk cek prompt.');
         const rows = await listDraftImages(draftId);
         setImages(rows.filter((r) => (r.post_index ?? 0) === 0));
       } catch (e) {
@@ -172,7 +185,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         </div>
       ) : (
         <p className="mt-3 text-sm text-ink-muted">
-          Belum ada ilustrasi. Generate otomatis berjalan via worker, atau picu manual di bawah.
+          Belum ada ilustrasi. Reasoning otomatis menyiapkan draf prompt — cek/edit prompt di bawah lalu Generate.
         </p>
       )}
 
@@ -250,7 +263,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           disabled={isPending || isEnhancing}
           className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
-          {isPending ? 'Memproses...' : images.length > 0 ? 'Regenerate' : 'Generate ilustrasi'}
+          {isPending ? 'Memproses...' : hasVisual ? 'Regenerate' : 'Generate ilustrasi'}
         </button>
         <span className="ml-2 text-[11px] text-ink-muted">Sempurnakan = side-by-side (prompt+negative) → Terima/Batal → Regenerate.</span>
       </div>
@@ -318,6 +331,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
                     {img.reasoning.hook_keywords?.length ? ` · hook: ${img.reasoning.hook_keywords.join(', ')}` : ''}
                     {img.reasoning.justification ? ` — ${img.reasoning.justification}` : ''}
                   </p>
+                ) : null}
+                {img.status === 'prompt_ready' ? (
+                  <p className="mt-1 text-violet-700">Draf prompt otomatis — cek textarea lalu Generate (belum dirender).</p>
                 ) : null}
                 {img.status === 'failed' && img.last_error ? (
                   <p className="mt-1 text-red-700">Error: {img.last_error}</p>
