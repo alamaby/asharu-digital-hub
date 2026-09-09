@@ -29,11 +29,20 @@ function statusBadge(status: string) {
   return map[status] ?? 'bg-surface text-ink-muted';
 }
 
+function latestOf(rows: DraftImageRow[]): DraftImageRow | null {
+  return [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+}
+
 export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false }: Props) {
   const [images, setImages] = useState<DraftImageRow[]>(initialImages);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
-  const [styleSlug, setStyleSlug] = useState('');
+  // Rehydrate dari style gambar terakhir agar dropdown mencerminkan yang terpakai.
+  const [styleSlug, setStyleSlug] = useState(() => {
+    const latest = latestOf(initialImages);
+    const slug = latest?.style_slug ?? '';
+    return options.styles.some((s) => s.slug === slug) ? slug : '';
+  });
   const [promptDraft, setPromptDraft] = useState('');
   const [negativeDraft, setNegativeDraft] = useState('');
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
@@ -53,9 +62,10 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         setImages(cover);
         const sel = cover.find((r) => r.status === 'selected') ?? null;
         setSelectedId(sel?.id ?? null);
-        const latest = [...cover].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+        const latest = latestOf(cover);
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
+        if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
         setNotice('Diperbarui.');
       } catch (e) {
         setNotice(e instanceof Error ? e.message : 'Refresh gagal.');
@@ -98,7 +108,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null);
+      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null, styleSlug || null);
       setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {

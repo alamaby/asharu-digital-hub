@@ -70,7 +70,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null);
+      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null, styleSlug || null);
       setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {
@@ -99,6 +99,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         const latest = rows.filter((r) => (r.post_index ?? 0) === postIndex).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
+        if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
         setNotice(sel ? 'Diperbarui.' : 'Belum ada visualisasi untuk post ini.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Refresh gagal.');

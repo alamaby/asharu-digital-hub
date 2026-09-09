@@ -99,40 +99,37 @@ export async function resolveImageTarget(options: {
   draftOverride?: { modelUuid?: string | null; styleSlug?: string | null } | null;
 }): Promise<ResolvedImageTarget> {
   const { sessionId, draftOverride } = options;
+  const session = await getSessionOverride(sessionId);
+  const defaults = await getGenDefaults();
+  // Style: prioritas manual (picker review) > sesi > global default.
+  // Di-resolusi sekali dan dipakai semua cabang model (pinned/sesi/global/waterfall),
+  // agar pilihan Style tetap berlaku saat Model = Auto.
+  const style =
+    (await findStyle(draftOverride?.styleSlug ?? null)) ??
+    (await findStyle(session?.image_style_slug)) ??
+    (await findStyle(defaults?.style_slug)) ??
+    null;
 
   // 1) Per-draft override (review picker)
   if (draftOverride?.modelUuid) {
     const found = await findModel(draftOverride.modelUuid);
     if (found) {
-      const style =
-        (await findStyle(draftOverride.styleSlug ?? null)) ??
-        (await findStyle((await getSessionOverride(sessionId))?.image_style_slug)) ??
-        (await findStyle((await getGenDefaults())?.style_slug));
-      const defaults = await getGenDefaults();
       return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1' };
     }
   }
 
   // 2) Session override
-  const session = await getSessionOverride(sessionId);
   if (session?.image_model_id) {
     const found = await findModel(session.image_model_id);
     if (found) {
-      const style =
-        (await findStyle(session.image_style_slug)) ??
-        (await findStyle((await getGenDefaults())?.style_slug));
-      const defaults = await getGenDefaults();
       return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1' };
     }
   }
 
   // 3) Global defaults (half-pin guard: keduanya set atau keduanya NULL)
-  const defaults = await getGenDefaults();
   if (defaults?.model_id) {
     const found = await findModel(defaults.model_id);
     if (found) {
-      const style =
-        (await findStyle(session?.image_style_slug)) ?? (await findStyle(defaults.style_slug));
       return { provider: found.provider, model: found.model, style, aspect: defaults.aspect };
     }
   }
@@ -143,8 +140,6 @@ export async function resolveImageTarget(options: {
     const models = await activeModels(provider.id);
     const pick = models.find((m) => m.is_default) ?? models[0];
     if (!pick) continue;
-    const style =
-      (await findStyle(session?.image_style_slug)) ?? (await findStyle(defaults?.style_slug));
     return { provider, model: pick, style, aspect: defaults?.aspect ?? '1:1' };
   }
   throw new Error('No active image provider/model available');

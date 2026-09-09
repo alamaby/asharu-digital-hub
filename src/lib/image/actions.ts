@@ -119,12 +119,15 @@ export interface EnhancePromptResult {
  * Enhance (polish) prompt yang sudah diketik user di review — side-by-side.
  * Hanya bila sudah ada draf prompt (≥10 char), tanpa insert DB.
  * Stage: enhance_image_prompt (picker Admin→LLM), limit 30/jam, admin bypass.
+ * styleSlug: bila diisi, style hint (suffix) mengikuti pilihan picker review,
+ * bukan default global.
  */
 export async function enhanceImagePrompt(
   draftId: string,
   postIndex: number,
   promptDraft: string,
-  negativeDraft?: string | null
+  negativeDraft?: string | null,
+  styleSlug?: string | null
 ): Promise<EnhancePromptResult> {
   const supabase = await requireAdmin();
   const draftPrompt = promptDraft?.trim() ?? '';
@@ -173,7 +176,10 @@ export async function enhanceImagePrompt(
   }
 
   const { resolveImageTarget } = await import('./config');
-  const target = await resolveImageTarget({ sessionId, draftOverride: null });
+  const target = await resolveImageTarget({
+    sessionId,
+    draftOverride: styleSlug ? { styleSlug } : null
+  });
   const styleSuffix = target.style?.prompt_suffix ?? null;
 
   const { buildEnhancePromptMessages, parseImagePrompt, validateImagePromptContradiction } = await import('./prompt');
