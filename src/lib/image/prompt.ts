@@ -228,7 +228,7 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
 } {
   const system = [
     'You are a senior visual designer for Asharu social content — POLISH mode.',
-    'The user already drafted an image_prompt (and maybe negative_prompt) for supporting illustration. Your job: POLISH it into a better prompt.',
+    'The user already drafted an image_prompt (and maybe negative_prompt) for supporting illustration. Your job: POLISH it into a better prompt — NOT rewrite to a generic scene.',
     'Preserve intent, correct English, make it single scene, concrete objects/action/setting, ≤60 words.',
     'First REASON about hook-type vs visual, then output the polished visual.',
     'Rules:',
@@ -238,14 +238,21 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     '- visual_strategy: BEFORE = pain/problem hook (cramped, messy); AFTER = solved/aspirational; BRIDGE = curiosity-gap object.',
     '- DEFAULT: if source post has pain keywords (sempit/berantakan/cramped/messy/cluttered), strategy MUST be "before".',
     '- BEFORE rules: image_prompt MUST show cramped/messy corner + pain-reflection word (cramped/messy/clutter/narrow/crowded/piled/disorganized/untidy/small). MUST NOT have neat/organized/tidy/spacious. negative MUST NOT ban pain words.',
-    '- Keep core idea from user draft; improve clarity/composition/lighting details.',
-    '- No people faces close-up unless source demands it; prefer objects/scenes.',
+    '- CRITICAL PRESERVATION: User draft may be in Indonesian — translate to English FAITHFULLY and keep EVERY explicit detail. Do NOT drop or generalize:',
+    '  * clothing (e.g. "pakaian fitted" → "fitted clothing/outfit"),',
+    '  * camera angle/shot (e.g. "angle agak menyamping bawah" → "slightly low three-quarter side angle, eye-level from below"),',
+    '  * pose/expression (e.g. "menatap khawatir" → "looking worried/anxiously"),',
+    '  * setting/location (e.g. "di luar rumah sederhana di Bandung" → "outside a simple house in Bandung" — do NOT change to "crowded street" if user said "outside house"),',
+    '  * accessories (mask, etc.) and atmosphere (hazy, volcanic ash).',
+    '- If you omit any of these, the output is WRONG. When in doubt, keep the detail verbatim (translated).',
+    '- Do not invent new setting (street/alley) if user specified house exterior; do not drop "fitted".',
+    '- No people faces close-up unless source demands it; prefer medium shot that shows outfit + setting.',
     '- No violent, sexual, or political content.'
   ].join('\n');
   const user = [
     `Source post (ID): ${input.sourceId}`,
     `Source post (EN): ${input.sourceEn}`,
-    `User draft prompt: ${input.promptDraft}`,
+    `User draft prompt (PRESERVE all details, ID→EN translate): ${input.promptDraft}`,
     input.negativeDraft ? `User draft negative: ${input.negativeDraft}` : '',
     input.topic ? `Topic: ${input.topic}` : '',
     typeof input.postIndex === 'number' ? `Source post_index: ${input.postIndex} (0=cover, >=1=reply)` : '',
