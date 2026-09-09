@@ -643,7 +643,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Makarizo Asters Mova Hair Straightening Brush', en: 'Makarizo Asters Mova Hair Straightening Brush' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fOhMuds4C',
-    image: '/images/products/affiliate/32433430-a01ef4c7bb71.webp',
+    image: '/images/products/affiliate/32433430-1fc77edb9645.webp',
     featured: false
   },
   {
@@ -1103,7 +1103,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4AtFwW1FzC',
-    image: '/images/products/affiliate/24529826-8d28f0c8c46a.webp',
+    image: '/images/products/affiliate/24529826-eb239152d426.webp',
     featured: false
   },
   {
