@@ -151,7 +151,18 @@ export function realEstateListingSchema(
             : property.location[locale],
         addressRegion: 'Jawa Barat',
         addressCountry: 'ID'
-      }
+      },
+      // Owner-verified pin for the Kamarasan listing
+      // (6°58'06.3"S 107°40'07.5"E); omitted for other listings.
+      ...(property.slug === 'dijual-rumah-kamarasan-bandung-timur'
+        ? {
+            geo: {
+              '@type': 'GeoCoordinates',
+              latitude: -6.9684167,
+              longitude: 107.66875
+            }
+          }
+        : {})
     },
     additionalProperty
   };

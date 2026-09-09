@@ -422,7 +422,7 @@ export default async function PropertyDetailPage({
         </section>
       ) : null}
 
-      {/* Map embed (area approximation; exact pin via the Google Maps link) */}
+      {/* Map embed (owner-verified pin; same point as the Google Maps link) */}
       {property.mapsUrl ? (
         <section aria-labelledby="map-heading" className="mt-10">
           <h2 id="map-heading" className="text-xl font-semibold text-ink">
@@ -431,7 +431,7 @@ export default async function PropertyDetailPage({
           <div className="mt-4 overflow-hidden rounded-xl border border-line shadow-card">
             <iframe
               title={`${property.title[locale]} — ${tPage('mapHeading')}`}
-              src="https://www.google.com/maps?q=Kamarasan+Residence,+Buahbatu,+Bojongsoang,+Bandung+Regency&z=15&output=embed"
+              src="https://www.google.com/maps?q=-6.9684167,107.66875&z=17&output=embed"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               className="h-80 w-full border-0 sm:h-96"
