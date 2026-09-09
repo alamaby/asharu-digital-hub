@@ -17,7 +17,8 @@ Task: User memilih template riset opsional (Problem-Solution, Before-After, Prod
 
 ## Verifikasi
 - `npm run typecheck` ✓, `npm run lint` ✓, `npm test` ✓ (328 tests, 42 files).
-- Belum: aplikasikan migrasi ke production via MCP + QA manual per template.
+- Migrasi production TERAPLIKASI via MCP (`research_templates`): 6 seed aktif + kolom `sessions.template_slug` terverifikasi ada.
+- Sisa: QA manual 1 riset per template.
 
 ## Commit
 - submodule `supabase@967191d` — `feat(research): katalog template riset + sessions.template_slug`

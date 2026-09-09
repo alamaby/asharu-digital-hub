@@ -23,7 +23,7 @@ User memilih 1 dari 6 template riset (opsional, default Bebas) saat membuat rise
 - [x] T4 `prompts.ts` + `llm/prompt.ts`: hint discovery + struktur thread; wiring `orchestrator.ts` + `development.ts`
 - [x] T5 Form picker + `baru/page.tsx` props + i18n id/en + badge detail sesi
 - [x] T6 Test (`templates.test.ts`, picker) — gate hijau 328 tests
-- [ ] T7 Terapkan migrasi ke production via MCP (butuh akses tulis DB)
+- [x] T7 Terapkan migrasi ke production via MCP (butuh akses tulis DB)
 
 ## Risks
 - Katalog di DB: isi hint tidak ter-review di PR kode (mitigasi: seed ditinjau).
@@ -32,6 +32,7 @@ User memilih 1 dari 6 template riset (opsional, default Bebas) saat membuat rise
 
 ## Progress Log
 - 2026-09-09 16:10:00 — Implementasi selesai + gate hijau (typecheck, lint, 328 tests); submodule pushed; parent siap commit. Migrasi production (T7) menunggu eksekusi.
+- 2026-09-09 — T7 selesai: migrasi `research_templates` teraplikasi ke production via MCP; verifikasi 6 seed aktif + kolom `sessions.template_slug` ada.
 
 ## Notes
 Keputusan user (plan mode): Discovery + development, tabel DB baru, opsional + Bebas, GenerateIdea sadar template.
