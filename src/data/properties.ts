@@ -231,6 +231,7 @@ export const properties: Property[] = [
       { display: '0813-2449-8379', international: '6281324498379' },
       { display: '0899-6685-300', international: '628996685300' }
     ],
+    mapsUrl: 'https://maps.app.goo.gl/KG9sRSjGQaHvFL6f7',
     disclaimers: {
       page: {
         id: 'Informasi disusun berdasarkan data pemilik. Proses transaksi melalui notaris dan bank; biaya notaris, pajak, pelunasan KPR, dan balik nama dinegosiasikan terpisah. Dijual langsung oleh pemilik, tanpa perantara.',

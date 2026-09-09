@@ -33,6 +33,10 @@ const contentSecurityPolicy = [
     ? "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com"
     : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
   "style-src 'self' 'unsafe-inline'",
+  // Google Maps embed (<iframe>) on property detail pages. Narrowly scoped to
+  // Google Maps hosts; frame-ancestors stays 'none' so others still cannot
+  // embed asharu.id.
+  "frame-src 'self' https://www.google.com https://maps.google.com",
   "img-src 'self' data: https://www.google-analytics.com https://*.google-analytics.com " +
     supabaseImageHost(),
   "font-src 'self' data:",

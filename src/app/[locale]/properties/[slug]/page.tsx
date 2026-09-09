@@ -422,6 +422,29 @@ export default async function PropertyDetailPage({
         </section>
       ) : null}
 
+      {/* Map embed (area approximation; exact pin via the Google Maps link) */}
+      {property.mapsUrl ? (
+        <section aria-labelledby="map-heading" className="mt-10">
+          <h2 id="map-heading" className="text-xl font-semibold text-ink">
+            {tPage('mapHeading')}
+          </h2>
+          <div className="mt-4 overflow-hidden rounded-xl border border-line shadow-card">
+            <iframe
+              title={`${property.title[locale]} — ${tPage('mapHeading')}`}
+              src="https://www.google.com/maps?q=Kamarasan+Residence,+Buahbatu,+Bojongsoang,+Bandung+Regency&z=15&output=embed"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="h-80 w-full border-0 sm:h-96"
+            />
+          </div>
+          <div className="mt-3">
+            <ExternalLink href={property.mapsUrl} aria-label={t('mapsCta')}>
+              {t('mapsCta')}
+            </ExternalLink>
+          </div>
+        </section>
+      ) : null}
+
       {/* Video tour */}
       {property.video ? (
         <section aria-labelledby="video-heading" className="mt-10">
