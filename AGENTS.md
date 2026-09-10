@@ -10,6 +10,12 @@ berlaku untuk setiap sesi kerja agent di repo ini.
   menunggu instruksi "commit push" tambahan dari user.
 - Gate sebelum commit: `npm run typecheck`, `npm run lint`, `npm test`
   harus hijau. Jangan commit dalam keadaan merah kecuali user meminta.
+- Gate bersifat final: SETIAP edit setelah gate hijau (sekecil apa pun,
+  termasuk fix hasil lint) MEMBATALKAN gate — wajib re-run `npm run
+  typecheck` + `npm run lint` (dan `npm run build` bila menyentuh pola
+  yang hanya ditangkap build, mis. konstanta di-assign ulang) sebelum
+  commit. Insiden 2026-09-10: fix `prefer-const` (`let`→`const`) lolos
+  tanpa re-check dan mematahkan build Vercel (`c3afbc5` memperbaikinya).
 - Format pesan: Conventional Commits, satu baris, tanpa trailer
   `Co-authored-by:` (termasuk bot/agent).
 - Sebelum commit: `git status --short`, `git diff`, `git log --oneline -10`;
