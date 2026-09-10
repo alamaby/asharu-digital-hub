@@ -1,41 +1,144 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link as I18nLink, usePathname, useRouter } from '@/i18n/navigation';
 import NextLink from 'next/link';
+import { formatDateTime } from '@/lib/utils/format';
+
+interface DraftItem {
+  id: string;
+  status: string;
+  created_at: string;
+  platform_slug?: string | null;
+  research_topic_id?: string | null;
+  generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+  affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[];
+  llm_meta?: { provider: string; model: string; platform?: string };
+}
 
 interface Props {
-  drafts: Array<{ id: string; status: string; created_at: string; research_topic_id?: string | null; generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] }; affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[]; llm_meta?: { provider: string; model: string } }>;
+  drafts: DraftItem[];
   topicSessionMap: Record<string, string>;
   platforms: { slug: string; display_name: string }[];
-  filters: { status: string; provider: string; platform: string; date: string; sort: string; page: number };
+  filters: { status: string[]; provider: string[]; platform: string[]; date: string; sort: string };
   page: number;
   totalPages: number;
   totalCount: number;
   pageSize: number;
   locale: string;
+  timeZone: string;
   error: string | null;
 }
 
-export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, page, totalPages, totalCount, locale, error }: Props) {
+const STATUS_OPTIONS = ['needs_review', 'approved', 'rejected'];
+const PROVIDER_OPTIONS = ['naraya', 'openrouter', 'gemini', 'cloudflare'];
+
+function MultiSelect({
+  label,
+  allLabel,
+  countHint,
+  options,
+  selected,
+  onChange
+}: {
+  label: string;
+  allLabel: string;
+  countHint: (count: number) => string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-1 text-xs font-medium text-ink-muted">
+      <span className="uppercase tracking-wide">{label}</span>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="w-full rounded-lg border border-line bg-background px-2 py-2 text-left text-sm font-normal text-ink focus:border-primary focus:outline-none"
+        >
+          {selected.length === 0 ? allLabel : countHint(selected.length)}
+        </button>
+        {open ? (
+          <div className="absolute z-10 mt-1 max-h-56 w-56 overflow-auto rounded-lg border border-line bg-surface p-2 shadow-card">
+            <div className="flex gap-2 pb-2">
+              <button
+                type="button"
+                onClick={() => onChange(options.map((o) => o.value))}
+                className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+              >
+                Pilih semua
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+              >
+                Hapus
+              </button>
+            </div>
+            {options.map((o) => (
+              <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm font-normal text-ink hover:bg-background">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(o.value)}
+                  onChange={() =>
+                    onChange(selected.includes(o.value) ? selected.filter((s) => s !== o.value) : [...selected, o.value])
+                  }
+                  className="size-4 accent-[var(--color-primary)]"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, page, totalPages, totalCount, locale, timeZone, error }: Props) {
   const t = useTranslations('content.review');
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [selStatus, setSelStatus] = useState<string[]>(filters.status);
+  const [selProvider, setSelProvider] = useState<string[]>(filters.provider);
+  const [selPlatform, setSelPlatform] = useState<string[]>(filters.platform);
+
+  // Sinkronkan checkbox saat filter terapan berubah via navigasi (Reset/back).
+  useEffect(() => {
+    setSelStatus(filters.status);
+  }, [filters.status]);
+  useEffect(() => {
+    setSelProvider(filters.provider);
+  }, [filters.provider]);
+  useEffect(() => {
+    setSelPlatform(filters.platform);
+  }, [filters.platform]);
+
+  function queryObject(): Record<string, string> {
+    const o: Record<string, string> = {};
+    if (selStatus.length > 0) o.status = selStatus.join(',');
+    if (selProvider.length > 0) o.provider = selProvider.join(',');
+    if (selPlatform.length > 0) o.platform = selPlatform.join(',');
+    if (filters.date !== 'all') o.date = filters.date;
+    if (filters.sort !== 'newest') o.sort = filters.sort;
+    return o;
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const params = new URLSearchParams();
-    const status = String(fd.get('status') ?? 'all');
-    const provider = String(fd.get('provider') ?? 'all');
-    const platform = String(fd.get('platform') ?? 'all');
+    if (selStatus.length > 0) params.set('status', selStatus.join(','));
+    if (selProvider.length > 0) params.set('provider', selProvider.join(','));
+    if (selPlatform.length > 0) params.set('platform', selPlatform.join(','));
     const date = String(fd.get('date') ?? 'all');
     const sort = String(fd.get('sort') ?? 'newest');
-    if (status !== 'all') params.set('status', status);
-    if (provider !== 'all') params.set('provider', provider);
-    if (platform !== 'all') params.set('platform', platform);
     if (date !== 'all') params.set('date', date);
     if (sort !== 'newest') params.set('sort', sort);
     const qs = params.toString();
@@ -46,34 +149,30 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
     <div className="mt-6 space-y-4">
       <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-4 shadow-card">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <label className="text-xs font-medium text-ink-muted">
-            Status
-            <select name="status" defaultValue={filters.status} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm">
-              <option value="all">Semua status</option>
-              <option value="needs_review">needs_review</option>
-              <option value="approved">approved</option>
-              <option value="rejected">rejected</option>
-            </select>
-          </label>
-          <label className="text-xs font-medium text-ink-muted">
-            Provider
-            <select name="provider" defaultValue={filters.provider} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm">
-              <option value="all">Semua provider</option>
-              <option value="naraya">naraya</option>
-              <option value="openrouter">openrouter</option>
-              <option value="gemini">gemini</option>
-              <option value="cloudflare">cloudflare</option>
-            </select>
-          </label>
-          <label className="text-xs font-medium text-ink-muted">
-            Platform
-            <select name="platform" defaultValue={filters.platform} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm">
-              <option value="all">Semua platform</option>
-              {platforms.map((p) => (
-                <option key={p.slug} value={p.slug}>{p.display_name}</option>
-              ))}
-            </select>
-          </label>
+          <MultiSelect
+            label="Status"
+            allLabel="Semua status"
+            countHint={(c) => `${c} status dipilih`}
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+            selected={selStatus}
+            onChange={setSelStatus}
+          />
+          <MultiSelect
+            label="Provider"
+            allLabel="Semua provider"
+            countHint={(c) => `${c} provider dipilih`}
+            options={PROVIDER_OPTIONS.map((p) => ({ value: p, label: p }))}
+            selected={selProvider}
+            onChange={setSelProvider}
+          />
+          <MultiSelect
+            label="Platform"
+            allLabel="Semua platform"
+            countHint={(c) => `${c} platform dipilih`}
+            options={platforms.map((p) => ({ value: p.slug, label: p.display_name }))}
+            selected={selPlatform}
+            onChange={setSelPlatform}
+          />
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium text-ink-muted">
@@ -109,15 +208,21 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
             const snippet = d.generated_thread.main.id.slice(0, 120);
             const inj = d.affiliate_injections[0];
             const sessionId = (d.research_topic_id && topicSessionMap[d.research_topic_id]) || null;
-            return (
+            const platform = d.platform_slug ?? d.llm_meta?.platform ?? 'all';
+  return (
               <div key={d.id}>
                 <NextLink
                   href={`/${locale}/konten/review/${d.id}`}
                   className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="inline-flex items-center rounded-full border bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{d.status}</span>
-                    <span className="text-xs text-ink-muted">{new Date(d.created_at).toLocaleString(locale)}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-flex items-center rounded-full border bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{d.status}</span>
+                      <span className="inline-flex items-center rounded-full border border-line bg-background px-2 py-0.5 text-xs font-medium text-ink-muted" title="Target platform draf">
+                        {platform}
+                      </span>
+                    </span>
+                    <span className="text-xs text-ink-muted">{formatDateTime(d.created_at, locale as never, timeZone)}</span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm text-ink">{snippet}</p>
                   <div className="mt-2 flex items-center gap-2 text-xs text-ink-muted">
@@ -144,8 +249,8 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
       <nav aria-label="pagination" className="flex items-center justify-between">
         <span className="text-xs text-ink-muted">Hal {page} dari {totalPages}</span>
         <div className="flex gap-2">
-          <I18nLink href={{ pathname: '/konten/review', query: { ...filters, page: String(page - 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page <= 1 ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Prev</I18nLink>
-          <I18nLink href={{ pathname: '/konten/review', query: { ...filters, page: String(page + 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page >= totalPages ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Next</I18nLink>
+          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page - 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page <= 1 ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Prev</I18nLink>
+          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page + 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page >= totalPages ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Next</I18nLink>
         </div>
       </nav>
     </div>

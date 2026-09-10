@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-10 13:30 (local time)
+Last updated: 2026-09-10 14:30 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-10 13:30 (local time)
 
 ## Recent Entries
 
+- [143000-review-multiselect-logs-image-admin.md](2026-09-10/143000-review-multiselect-logs-image-admin.md) — Review: filter Status/Provider/Platform multi + badge platform; logs: tab Image (thumbnail + link draf) + waktu zona-user 3 tab; /admin/visual: urutan provider/model/key image + account_id cloudflare (LLM + image, pair saat tambah key); 376 tests hijau.
 - [133000-image-subject-template-suggest.md](2026-09-10/133000-image-subject-template-suggest.md) — Template subjek visual + tombol "Siapkan prompt awal" (cover & reply): micro-LLM ekstrak scene → gabung subjek → textarea → Sempurnakan; `/admin/visual` CRUD + nav; migrasi applied prod; 372 tests hijau.
 - [124500-admin-llm-feedback-image-retry.md](2026-09-10/124500-admin-llm-feedback-image-retry.md) — Admin/llm: notice inline + busy/disable + rollback drag + Suspense per-board + form config ber-feedback; worker retry parse JSON-ONLY; tombol Ulangi generik image failed (kasus 023e0a95: waterfall 503/503/17-token); 366 tests hijau.
 - [112500-llm-truncation-fix-provider-models-view.md](2026-09-10/112500-llm-truncation-fix-provider-models-view.md) — Log Gemini terpotong: thinking HIGH × maxTokens kecil → MAX_TOKENS + finishReason tak dicatat. Fix: parse finishReason/parts/thought di gemini.ts + cap effort low 6 stage kecil + MAX_TOKENS jadi failure waterfall + kolom audit + view `v_llm_provider_models` (applied prod); 361 tests hijau.
@@ -71,7 +72,8 @@ Last updated: 2026-09-10 13:30 (local time)
 - [134500-facebook-domain-verification.md](2026-09-07/134500-facebook-domain-verification.md) — Verifikasi domain Meta: token site-wide + layout statis (lepas cookies) agar tag literal di `<head>`; gate hijau, siap deploy + klik Verify.
 - [125500-riset-detail-panels-redesign.md](2026-09-07/125500-riset-detail-panels-redesign.md) — Redesign 3 panel detail riset: log clamp+expand+paginasi server, performa chart SVG/CSS + KPI token, parameter 3 kartu grup; 307 tests, build sukses.
 - [114842-riset-b8194a1f-skor-nol-display-fix.md](2026-09-07/114842-riset-b8194a1f-skor-nol-display-fix.md) — Riset b8194a1f: skor 0 = by-design mekanisme dua (verifying+scoring dilewati); fix display jujur (Tanpa skor + stepper Dilewati + hint shortlist), tanpa migrasi; gate hijau.
-- [193000-image-generation-five-providers.md](2026-09-06/193000-image-generation-five-providers.md) — Visualisasi otomatis pasca-development: 5 provider image (Pixazo→CF→Pollinations→Gemini 3.1-lite→Bynara 2.1), multi-key backup, stage image_prompt, worker + review + social IMAGE aditif; migrasi applied; 297 tests hijau, pushed.
+
+## Legacy Archive
 
 ## Legacy Archive
 

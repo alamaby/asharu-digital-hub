@@ -4,6 +4,8 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/auth/is-admin';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
+import { formatDateTimeSeconds } from '@/lib/utils/format';
 import { Link } from '@/i18n/navigation';
 
 interface PageProps {
@@ -12,6 +14,31 @@ interface PageProps {
 }
 
 const PAGE_SIZE = 20;
+const IMAGE_STATUSES = ['pending', 'prompt_ready', 'ready', 'failed', 'selected'] as const;
+
+type Tab = 'search' | 'llm' | 'image';
+
+function TabNav({ active }: { active: Tab }) {
+  const cls = (on: boolean) => (on ? 'rounded bg-primary px-3 py-1 text-white' : 'rounded border border-line px-3 py-1');
+  return (
+    <div className="flex gap-2 text-sm">
+      <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm' } }} className={cls(active === 'llm')}>LLM</Link>
+      <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'search' } }} className={cls(active === 'search')}>Search</Link>
+      <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'image' } }} className={cls(active === 'image')}>Image</Link>
+    </div>
+  );
+}
+
+function pretty(v: unknown): string {
+  try {
+    if (typeof v === 'string') {
+      try { return JSON.stringify(JSON.parse(v), null, 2); } catch { return v; }
+    }
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return String(v);
+  }
+}
 
 export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const { locale: rawLocale } = await params;
@@ -21,7 +48,7 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   if (!(await isAdmin())) redirect({ href: '/masuk', locale });
 
   const sp = await searchParams;
-  const tab = sp.tab === 'search' ? 'search' : 'llm';
+  const tab: Tab = sp.tab === 'search' ? 'search' : sp.tab === 'image' ? 'image' : 'llm';
   const providerFilter = sp.provider ?? 'all';
   const statusFilter = sp.status ?? 'all';
   const stageFilter = sp.stage ?? 'all';
@@ -33,6 +60,9 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
 
   const supabase = createSupabaseService();
   if (!supabase) return <div className="p-10">Supabase not configured</div>;
+  // Waktu log mengikuti zona user (profil → device → Asia/Jakarta), bukan UTC server.
+  const timeZone = await getDisplayTimezone();
+  const fmt = (iso: string) => formatDateTimeSeconds(iso, locale, timeZone);
 
   if (tab === 'search') {
     let query = supabase.from('search_call_logs').select('*', { count: 'exact' }).order(sortBy, { ascending: dir }).order('id', { ascending: false }).range(from, to);
@@ -51,12 +81,9 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-ink">Log Search Lengkap</h1>
-            <p className="text-sm text-ink-muted">Request & hasil per search provider (generik: tavily / pengganti). Tab LLM untuk model.</p>
+            <p className="text-sm text-ink-muted">Request & hasil per search provider (generik: tavily / pengganti). Tab LLM untuk model, Image untuk generate gambar.</p>
           </div>
-          <div className="flex gap-2 text-sm">
-            <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm' } }} className="rounded border border-line px-3 py-1">LLM</Link>
-            <span className="rounded bg-primary px-3 py-1 text-white">Search</span>
-          </div>
+          <TabNav active="search" />
         </header>
         <form className="mt-6 flex flex-wrap gap-2">
           <input type="hidden" name="tab" value="search" />
@@ -86,7 +113,7 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
                 const r = row as { id: string; created_at: string; provider_slug: string; operation: string; session_id?: string | null; latency_ms?: number | null; http_status?: number | null; error?: string | null; query_count?: number | null; result_count?: number | null; queries?: unknown; request_payload?: unknown; response_summary?: unknown };
                 return (
                   <tr key={r.id} className="border-t border-line align-top">
-                    <td className="px-3 py-2 text-xs">{new Date(r.created_at).toLocaleString('id-ID')}</td>
+                    <td className="px-3 py-2 text-xs">{fmt(r.created_at)}</td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{r.provider_slug} / {r.operation}</div>
                       {r.session_id ? <div className="font-mono text-[11px] text-ink-muted" title={r.session_id}>ses {r.session_id.slice(0, 8)}</div> : null}
@@ -122,6 +149,112 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
     );
   }
 
+  if (tab === 'image') {
+    let query = supabase.from('content_draft_images').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+    if (providerFilter !== 'all') query = query.eq('provider_slug', providerFilter);
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    const { data: logs, count } = await query;
+    const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+    const { data: providers } = await supabase.from('image_providers').select('slug, display_name').order('priority');
+    const provOpts = ((providers ?? []) as { slug: string; display_name: string }[]);
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <header className="space-y-3">
+          <Link href={{ pathname: '/admin/llm' }} className="inline-flex items-center gap-1 text-sm text-primary underline">
+            ← Providers
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-ink">Log Image Lengkap</h1>
+            <p className="text-sm text-ink-muted">Riwayat generate gambar per draf/post: prompt, provider/model, hasil, error worker.</p>
+          </div>
+          <TabNav active="image" />
+        </header>
+        <form className="mt-6 flex flex-wrap gap-2">
+          <input type="hidden" name="tab" value="image" />
+          <select name="provider" defaultValue={providerFilter} className="rounded border border-line px-2 py-1 text-sm">
+            <option value="all">Semua provider</option>
+            {provOpts.map((p) => (<option key={p.slug} value={p.slug}>{p.display_name}</option>))}
+          </select>
+          <select name="status" defaultValue={statusFilter} className="rounded border border-line px-2 py-1 text-sm">
+            <option value="all">Semua status</option>
+            {IMAGE_STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
+          </select>
+          <button type="submit" className="rounded bg-primary px-3 py-1 text-sm text-white">Filter</button>
+        </form>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-line">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted text-xs text-ink-muted">
+              <tr>
+                <th className="px-3 py-2">Waktu</th>
+                <th className="px-3 py-2">Gambar</th>
+                <th className="px-3 py-2">Provider / Model</th>
+                <th className="px-3 py-2">Draf</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Prompt / Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(logs ?? []).map((row) => {
+                const r = row as {
+                  id: string; draft_id: string; post_index: number; image_prompt: string; negative_prompt?: string | null;
+                  style_slug?: string | null; provider_slug: string; model_id: string; public_url?: string | null;
+                  width?: number | null; height?: number | null; status: string; last_error?: string | null;
+                  attempts: number; reasoning?: { visual_strategy?: string } | null; created_at: string;
+                };
+                return (
+                  <tr key={r.id} className="border-t border-line align-top">
+                    <td className="px-3 py-2 text-xs">{fmt(r.created_at)}</td>
+                    <td className="px-3 py-2">
+                      {r.public_url ? (
+                        <span className="block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.public_url} alt={`Hasil ${r.id.slice(0, 8)}`} loading="lazy" className="h-20 w-20 rounded-lg border border-line object-cover" />
+                          <a href={r.public_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Lihat</a>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-ink-muted">—</span>
+                      )}
+                      {r.width && r.height ? <div className="text-[11px] text-ink-muted">{r.width}×{r.height}</div> : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{r.provider_slug || '—'}</div>
+                      <div className="text-xs text-ink-muted">{r.model_id || '—'}</div>
+                      {r.style_slug ? <div className="text-xs text-ink-muted">{r.style_slug}</div> : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      <Link href={{ pathname: '/konten/review/[draftId]', params: { draftId: r.draft_id } }} className="font-mono text-primary hover:underline" title={r.draft_id}>
+                        {r.draft_id.slice(0, 8)}
+                      </Link>
+                      <div className="text-ink-muted">post {r.post_index ?? 0} · try {r.attempts ?? 0}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${r.status === 'failed' ? 'bg-red-50 text-red-800' : r.status === 'selected' ? 'bg-emerald-50 text-emerald-800' : r.status === 'ready' ? 'bg-sky-50 text-sky-800' : 'bg-amber-50 text-amber-800'}`}>
+                        {r.status}
+                      </span>
+                      {r.reasoning?.visual_strategy ? <div className="mt-1 text-[11px] text-ink-muted">{r.reasoning.visual_strategy}</div> : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.last_error ? <p className="text-xs text-red-600">{r.last_error.slice(0, 300)}</p> : null}
+                      <p className="mt-1 line-clamp-3 text-xs text-ink-muted" title={r.image_prompt || ''}>{r.image_prompt || '—'}</p>
+                    </td>
+                  </tr>
+                );
+              })}
+              {(!logs || logs.length === 0) ? (<tr><td colSpan={6} className="px-3 py-8 text-center text-sm text-ink-muted">Tidak ada log image</td></tr>) : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-ink-muted">Halaman {page} / {totalPages} · {count ?? 0} total</span>
+          <div className="flex gap-2">
+            {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'image', provider: providerFilter, status: statusFilter, page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
+            {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'image', provider: providerFilter, status: statusFilter, page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   let query = supabase.from('llm_call_logs').select('*', { count: 'exact' }).order(sortBy, { ascending: dir }).order('id', { ascending: false }).range(from, to);
   if (providerFilter !== 'all') query = query.eq('provider_slug', providerFilter);
   if (statusFilter === 'success') query = query.eq('http_status', 200);
@@ -139,17 +272,6 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
   const { data: providers } = await supabase.from('llm_providers').select('slug').order('priority');
   const slugs = ((providers ?? []) as { slug: string }[]).map((p) => p.slug);
 
-  function pretty(v: unknown): string {
-    try {
-      if (typeof v === 'string') {
-        try { return JSON.stringify(JSON.parse(v), null, 2); } catch { return v; }
-      }
-      return JSON.stringify(v, null, 2);
-    } catch {
-      return String(v);
-    }
-  }
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <header className="space-y-3">
@@ -160,13 +282,11 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
           <h1 className="text-2xl font-bold text-ink">LLM Logs Lengkap</h1>
           <p className="text-sm text-ink-muted">Request & response per provider/model/key. Filter, sorting & pagination DB-driven.</p>
         </div>
-        <div className="flex gap-2 text-sm">
-          <span className="rounded bg-primary px-3 py-1 text-white">LLM</span>
-          <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'search' } }} className="rounded border border-line px-3 py-1">Search</Link>
-        </div>
+        <TabNav active="llm" />
       </header>
 
       <form className="mt-6 flex flex-wrap gap-2">
+        <input type="hidden" name="tab" value="llm" />
         <select name="provider" defaultValue={providerFilter} className="rounded border border-line px-2 py-1 text-sm">
           <option value="all">Semua provider</option>
           {slugs.map((s) => (
@@ -212,7 +332,7 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
               const r = row as { id: string; created_at: string; provider_slug: string; model_id: string; stage?: string | null; session_id?: string | null; request_id?: string | null; latency_ms?: number | null; http_status?: number | null; error?: string | null; key_hash?: string | null; request_messages?: unknown; response_text?: string | null; prompt_tokens?: number | null; completion_tokens?: number | null; total_tokens?: number | null; finish_reason?: string | null; is_fallback?: boolean | null };
               return (
                 <tr key={r.id} className="border-t border-line align-top">
-                  <td className="px-3 py-2 text-xs">{new Date(r.created_at).toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-2 text-xs">{fmt(r.created_at)}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{r.provider_slug}{r.is_fallback ? <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-800">fallback</span> : null}</div>
                     <div className="text-xs text-ink-muted">{r.model_id}</div>
@@ -250,8 +370,8 @@ export default async function LlmLogsPage({ params, searchParams }: PageProps) {
       <div className="mt-4 flex items-center justify-between text-sm">
         <span className="text-ink-muted">Halaman {page} / {totalPages} · {count ?? 0} total</span>
         <div className="flex gap-2">
-          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
-          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
+          {page > 1 ? <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm', provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page - 1) } }} className="rounded border border-line px-3 py-1">Prev</Link> : null}
+          {page < totalPages ? <Link href={{ pathname: '/admin/llm/logs', query: { tab: 'llm', provider: providerFilter, status: statusFilter, stage: stageFilter, sort: sortBy === 'latency_ms' ? 'latency' : sortBy === 'provider_slug' ? 'provider' : 'created_at', dir: dir ? 'asc' : 'desc', page: String(page + 1) } }} className="rounded border border-line px-3 py-1">Next</Link> : null}
         </div>
       </div>
     </div>

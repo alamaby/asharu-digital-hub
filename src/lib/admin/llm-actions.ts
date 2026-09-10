@@ -63,6 +63,27 @@ export async function updateProviderBaseUrl(providerId: string, formData: FormDa
   return { ok: true };
 }
 
+/**
+ * Simpan account_id Cloudflare (identifier, bukan secret) ke providers.config.
+ * Dibutuhkan oleh Cloudflare Workers AI disamping API key (backup pair).
+ */
+export async function updateLlmProviderAccountId(providerId: string, formData: FormData): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  const accountId = String(formData.get('account_id') ?? '').trim();
+  if (!accountId) return fail('account_id required');
+  if (!/^[0-9a-f]{32}$/i.test(accountId)) return fail('account_id harus 32 hex char');
+  const { data: row } = await supabase.from('llm_providers').select('config').eq('id', providerId).single();
+  const current = ((row as { config?: Record<string, string> } | null)?.config ?? {}) as Record<string, string>;
+  const { error } = await supabase
+    .from('llm_providers')
+    .update({ config: { ...current, account_id: accountId } })
+    .eq('id', providerId);
+  if (error) return fail(error.message);
+  revalidatePath('/admin/llm');
+  revalidatePath(`/admin/llm/${providerId}`);
+  return { ok: true };
+}
+
 export async function reorderModels(providerId: string, orderedIds: string[]): Promise<LlmActionResult> {
   const supabase = await requireAdmin();
   for (let i = 0; i < orderedIds.length; i++) {
@@ -212,8 +233,19 @@ export async function addBackupKey(providerId: string, formData: FormData): Prom
   const { data: maxRow } = await supabase.from('llm_provider_keys').select('priority').eq('provider_id', providerId).order('priority', { ascending: false }).limit(1).maybeSingle();
   const nextPriority = (((maxRow as { priority?: number } | null)?.priority ?? -1) + 1);
   const hash = createHash('sha256').update(rawKey).digest('hex').slice(0, 16);
-  const { data: provider } = await supabase.from('llm_providers').select('slug').eq('id', providerId).single();
+  const { data: provider } = await supabase.from('llm_providers').select('slug, config').eq('id', providerId).single();
   const slug = (provider as { slug?: string } | null)?.slug ?? 'unknown';
+  // Pair cloudflare: account_id ikut disimpan ke config (identifier, bukan secret).
+  const accountId = String(formData.get('account_id') ?? '').trim();
+  if (slug === 'cloudflare' && accountId) {
+    if (!/^[0-9a-f]{32}$/i.test(accountId)) return fail('account_id harus 32 hex char');
+    const current = ((provider as { config?: Record<string, string> } | null)?.config ?? {}) as Record<string, string>;
+    const { error: cfgError } = await supabase
+      .from('llm_providers')
+      .update({ config: { ...current, account_id: accountId } })
+      .eq('id', providerId);
+    if (cfgError) return fail(cfgError.message);
+  }
   const { data: vaultId, error: vaultError } = await supabase.rpc('vault_create_secret', { p_secret: rawKey, p_name: `llm_${slug}_${hash}` });
   if (vaultError) return fail(`vault_create_secret: ${vaultError.message}`);
   const { error } = await supabase.from('llm_provider_keys').upsert({

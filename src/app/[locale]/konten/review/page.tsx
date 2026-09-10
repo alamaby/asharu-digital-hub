@@ -5,8 +5,10 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ReviewListClient } from '@/components/admin/ReviewListClient';
+import { REVIEW_PROVIDERS, REVIEW_STATUSES, parseMultiParam } from '@/lib/admin/review-list';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -14,8 +16,6 @@ interface PageProps {
 }
 
 const PAGE_SIZE = 12;
-const ALLOWED_STATUS = new Set(['needs_review', 'approved', 'rejected']);
-const ALLOWED_PROVIDER = new Set(['naraya', 'openrouter', 'gemini', 'cloudflare']);
 const ALLOWED_DATE = new Set(['all', '7d', '30d']);
 const ALLOWED_SORT = new Set(['newest', 'oldest']);
 
@@ -32,13 +32,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 function normalizeParams(p: Awaited<PageProps['searchParams']>) {
-  const status = p.status && ALLOWED_STATUS.has(p.status) ? p.status : 'all';
-  const provider = p.provider && ALLOWED_PROVIDER.has(p.provider) ? p.provider : 'all';
-  const platform = p.platform ?? 'all';
   const date = p.date && ALLOWED_DATE.has(p.date) ? p.date : 'all';
   const sort = p.sort && ALLOWED_SORT.has(p.sort) ? p.sort : 'newest';
   const page = Math.max(1, Number.parseInt(p.page ?? '1', 10) || 1);
-  return { status, provider, platform, date, sort, page };
+  return { statusRaw: p.status, providerRaw: p.provider, platformRaw: p.platform, date, sort, page };
 }
 
 function dateFromNow(period: string): string | null {
@@ -46,6 +43,9 @@ function dateFromNow(period: string): string | null {
   const days = period === '7d' ? 7 : 30;
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
+
+const DRAFT_SELECT =
+  'id, status, created_at, platform_slug, research_topic_id, generated_thread, affiliate_injections, llm_meta';
 
 export default async function ReviewPage({ params, searchParams }: PageProps) {
   const rawLocale = (await params).locale;
@@ -73,34 +73,49 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
 
   const t = await getTranslations({ locale, namespace: 'content.review' });
   const sp = normalizeParams(await searchParams);
+
+  // Platform options dulu (allowlist untuk parse + filter).
+  const { data: platOpts } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
+  const platformOptions = (platOpts ?? []) as { slug: string; display_name: string }[];
+  const allowedPlatforms = new Set(platformOptions.map((p) => p.slug));
+
+  // Multi-select: `?status=a,b&provider=c,d&platform=e,f`. Kosong = semua.
+  const selectedStatus = parseMultiParam(sp.statusRaw, REVIEW_STATUSES);
+  const selectedProviders = parseMultiParam(sp.providerRaw, REVIEW_PROVIDERS);
+  const selectedPlatforms = parseMultiParam(sp.platformRaw, allowedPlatforms);
+
   const since = dateFromNow(sp.date);
   const ascending = sp.sort === 'oldest';
   const fromRow = (sp.page - 1) * PAGE_SIZE;
   const toRow = fromRow + PAGE_SIZE - 1;
 
-  // Fetch drafts with filters — provider via jsonb, status/date/sort/pagination server-side
-  let query = supabase.from('content_drafts').select('*', { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
-  if (sp.status !== 'all') query = query.eq('status', sp.status);
-  if (sp.provider !== 'all') query = query.eq('llm_meta->>provider' as never, sp.provider as never);
-  if (since) query = query.gte('created_at', since);
-  // Platform filter langsung via kolom draf (migrasi 20260906000004).
-  // Draf agnostik warisan (platform_slug 'all'/null) hanya muncul saat filter 'all'.
-  if (sp.platform !== 'all') query = query.eq('platform_slug', sp.platform);
+  // Fetch drafts dengan filter — provider via jsonb, platform via kolom draf.
+  // Draf agnostik warisan (platform_slug 'all'/null) hanya muncul saat filter platform kosong.
+  function baseQuery() {
+    let q = supabase.from('content_drafts').select(DRAFT_SELECT, { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
+    if (selectedStatus.length > 0) q = q.in('status', selectedStatus);
+    if (selectedProviders.length > 0) q = q.in('llm_meta->>provider' as never, selectedProviders as never);
+    if (since) q = q.gte('created_at', since);
+    if (selectedPlatforms.length > 0) q = q.in('platform_slug', selectedPlatforms);
+    return q;
+  }
 
-  const { data: draftsRaw, count, error: draftsError } = await query;
+  const { data: draftsRaw, count, error: draftsError } = await baseQuery();
   let drafts = (draftsRaw ?? []) as unknown as DraftListCardImport[];
   if (draftsError) {
-    // fallback to unfiltered if jsonb filter fails
-    const { data: fallback } = await supabase.from('content_drafts').select('*').order('created_at', { ascending: false }).limit(PAGE_SIZE);
-    drafts = (fallback ?? []) as unknown as DraftListCardImport[];
+    // Fallback: filter provider jsonb dilepas, filter lain dipertahankan.
+    let q = supabase.from('content_drafts').select(DRAFT_SELECT, { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
+    if (selectedStatus.length > 0) q = q.in('status', selectedStatus);
+    if (since) q = q.gte('created_at', since);
+    if (selectedPlatforms.length > 0) q = q.in('platform_slug', selectedPlatforms);
+    const retry = await q;
+    drafts = (retry.data ?? []) as unknown as DraftListCardImport[];
+    count = retry.count;
+    if (retry.error) draftsError = retry.error;
   }
 
   const totalCount = count ?? drafts.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-
-  // Platform options for filter
-  const { data: platOpts } = await supabase.from('platforms').select('slug, display_name').eq('is_active', true).order('slug');
-  const platformOptions = (platOpts ?? []) as { slug: string; display_name: string }[];
 
   // Map research_topic_id → session_id untuk link riset sumber per kartu (1 query).
   const visibleTopicIds = [...new Set(
@@ -119,6 +134,8 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
     );
   }
 
+  const timeZone = await getDisplayTimezone();
+
   return (
     <div>
       <AdminTopBar />
@@ -126,7 +143,19 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
         <p className="mt-2 text-sm text-ink-muted">{t('realtime')}</p>
 
-        <ReviewListClient drafts={drafts as never} topicSessionMap={topicSessionMap} platforms={platformOptions} filters={sp} page={sp.page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} locale={locale} error={draftsError?.message ?? null} />
+        <ReviewListClient
+          drafts={drafts as never}
+          topicSessionMap={topicSessionMap}
+          platforms={platformOptions}
+          filters={{ status: selectedStatus, provider: selectedProviders, platform: selectedPlatforms, date: sp.date, sort: sp.sort }}
+          page={sp.page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          locale={locale}
+          timeZone={timeZone}
+          error={draftsError?.message ?? null}
+        />
       </div>
     </div>
   );
@@ -136,7 +165,9 @@ interface DraftListCardImport {
   id: string;
   status: string;
   created_at: string;
+  platform_slug?: string | null;
+  research_topic_id?: string | null;
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
   affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[];
-  llm_meta?: { provider: string; model: string };
+  llm_meta?: { provider: string; model: string; platform?: string };
 }

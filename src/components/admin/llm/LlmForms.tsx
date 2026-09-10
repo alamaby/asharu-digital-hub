@@ -5,6 +5,7 @@ import {
   addBackupKey,
   addModel,
   replaceKey,
+  updateLlmProviderAccountId,
   updateModelConfig,
   updateProviderBaseUrl,
   upsertStageDefault,
@@ -143,9 +144,26 @@ export function AddModelForm({ providerId }: { providerId: string }) {
   );
 }
 
-/** Form tambah backup key. */
-export function AddKeyForm({ providerId }: { providerId: string }) {
+/** Form account_id Cloudflare (identifier, bukan secret — tampil apa adanya). */
+export function AccountIdForm({ providerId, defaultValue }: { providerId: string; defaultValue: string }) {
+  const { notice, run } = useActionForm('Account ID tersimpan.');
+  return (
+    <form action={(fd) => {
+      void run(() => updateLlmProviderAccountId(providerId, fd));
+    }} className="mt-3 max-w-xl">
+      <div className="flex gap-2">
+        <input name="account_id" defaultValue={defaultValue} aria-label="Cloudflare Account ID" placeholder="32 hex char" className="flex-1 rounded border border-line px-2 py-1 font-mono text-sm" />
+        <PendingButton label="Simpan ID" className="rounded bg-primary px-3 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60" />
+      </div>
+      {notice ? <div className="mt-2"><ActionNoticeView notice={notice} /></div> : null}
+    </form>
+  );
+}
+
+/** Form tambah backup key (dengan field account_id untuk cloudflare). */
+export function AddKeyForm({ providerId, providerSlug }: { providerId: string; providerSlug?: string }) {
   const { notice, run } = useActionForm('Backup key tersimpan ke Vault.');
+  const needsAccountId = providerSlug === 'cloudflare';
   return (
     <form
       action={async (fd) => {
@@ -160,6 +178,12 @@ export function AddKeyForm({ providerId }: { providerId: string }) {
           <input id={`api-key-${providerId}`} name="api_key" type="password" placeholder="sk-... / api key baru" className="mt-1 w-full rounded border border-line px-2 py-1 text-sm" required />
           <p className="mt-1 text-xs text-ink-muted">Akan disimpan ke Vault (hash ditampilkan, key tidak pernah dibaca kembali).</p>
         </div>
+        {needsAccountId ? (
+          <div className="min-w-[220px] flex-1">
+            <label htmlFor={`account-id-${providerId}`} className="text-xs text-ink-muted">Account ID (pair cloudflare, opsional bila sudah tersimpan)</label>
+            <input id={`account-id-${providerId}`} name="account_id" placeholder="32 hex char" className="mt-1 w-full rounded border border-line px-2 py-1 font-mono text-sm" />
+          </div>
+        ) : null}
         <PendingButton label="Add Backup Key" className="rounded bg-primary px-3 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60" />
       </div>
       {notice ? <div className="mt-2"><ActionNoticeView notice={notice} /></div> : null}
