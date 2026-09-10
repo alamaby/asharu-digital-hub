@@ -100,8 +100,10 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
     return q;
   }
 
-  const { data: draftsRaw, count, error: draftsError } = await baseQuery();
-  let drafts = (draftsRaw ?? []) as unknown as DraftListCardImport[];
+  const first = await baseQuery();
+  let drafts = (first.data ?? []) as unknown as DraftListCardImport[];
+  let count = first.count;
+  let draftsError = first.error;
   if (draftsError) {
     // Fallback: filter provider jsonb dilepas, filter lain dipertahankan.
     let q = supabase.from('content_drafts').select(DRAFT_SELECT, { count: 'exact' }).order('created_at', { ascending }).range(fromRow, toRow);
