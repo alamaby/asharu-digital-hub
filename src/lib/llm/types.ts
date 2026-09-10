@@ -55,6 +55,8 @@ export interface ChatOutput {
   latencyMs: number;
   /** Provider finish reason (stop/length/tool_calls/...) — null when unknown. */
   finishReason?: string | null;
+  /** Thinking/reasoning tokens consumed (Gemini thoughtsTokenCount) — null when unknown. */
+  thoughtTokens?: number | null;
   /** Truncated raw payload preview (≤2000 chars) for forensics when text is empty. */
   rawPreview?: string | null;
 }

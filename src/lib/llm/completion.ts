@@ -8,7 +8,7 @@ import { OpenAICompatibleProvider } from './providers/openai-compatible';
 import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
 import { fetchOrderedModels, markModelFailure, markModelUsage } from '@/lib/supabase/vault';
-import { resolveModelParams, type ModelParams } from './model-config';
+import { capEffortForStage, isLengthCutoff, resolveModelParams, type ModelParams } from './model-config';
 
 function providerFromRow(row: ProviderRow): LLMProvider {
   if (row.slug === 'gemini') return new GeminiProvider(row.base_url);
@@ -44,7 +44,10 @@ export interface LLMCompletionInput {
  * Run a single LLM completion with provider -> model -> key round-robin + fallback.
  * Order is DB-driven: llm_providers.priority, llm_models.priority/last_used_at, llm_provider_keys.priority/last_used_at.
  * For each provider, iterate its active models in DB order; for each model try its keys via KeyPool.
- * Reasoning effort is read from llm_models.config.reasoning / reasoning_effort.
+ * Reasoning effort is read from llm_models.config.reasoning / reasoning_effort,
+ * capped to 'low' for short-output stages (see capEffortForStage).
+ * Empty AND length-truncated (MAX_TOKENS) outputs are failures: the waterfall
+ * continues instead of logging a silent success.
  */
 export async function runLLMCompletion(
   supabase: SupabaseClient,
@@ -105,7 +108,7 @@ export async function runLLMCompletion(
     }
 
     for (const mod of candidateModels) {
-      const params = resolveModelParams(mod.config);
+      const params = capEffortForStage(resolveModelParams(mod.config), input.stage);
       try {
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const provider = providerFromRow(prov);
@@ -141,6 +144,8 @@ export async function runLLMCompletion(
               completion_tokens: result.usage?.completionTokens ?? null,
               total_tokens: result.usage?.totalTokens ?? null,
               finish_reason: result.finishReason ?? null,
+              response_truncated: isLengthCutoff(result.finishReason),
+              thought_tokens: result.thoughtTokens ?? null,
               is_fallback: Boolean(input.modelUuid ?? input.modelHint),
               latency_ms: result.latencyMs,
               http_status: 200,
@@ -150,6 +155,42 @@ export async function runLLMCompletion(
             await markModelFailure(mod.id).catch(() => undefined);
           }
           lastError = new Error(emptyMsg);
+          continue;
+        }
+        // Length-cutoff guard (2026-09-10): HTTP 200 tapi finishReason
+        // MAX_TOKENS/LENGTH — output JSON terpotong tengah dan tak bisa
+        // di-parse. Perlakukan sebagai failure agar waterfall lanjut ke model
+        // berikutnya, bukan sukses diam-diam.
+        if (isLengthCutoff(result.finishReason)) {
+          const truncMsg = `LLM output terpotong limit (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason}, completion ${result.usage?.completionTokens ?? '?'} tokens, latency ${result.latencyMs}ms)`;
+          await supabase
+            .from('llm_call_logs')
+            .insert({
+              request_id: input.requestId ?? null,
+              session_id: input.sessionId ?? null,
+              provider_slug: prov.slug,
+              provider_id: prov.id,
+              model_id: result.model,
+              key_hash: keyRow.key_hash,
+              key_id: keyRow.id,
+              stage: input.stage ?? null,
+              request_messages: input.messages as unknown as Record<string, unknown>,
+              response_text: result.text.slice(0, 8000),
+              prompt_tokens: result.usage?.promptTokens ?? null,
+              completion_tokens: result.usage?.completionTokens ?? null,
+              total_tokens: result.usage?.totalTokens ?? null,
+              finish_reason: result.finishReason ?? null,
+              response_truncated: true,
+              thought_tokens: result.thoughtTokens ?? null,
+              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
+              latency_ms: result.latencyMs,
+              http_status: 200,
+              error: truncMsg.slice(0, 2000)
+            } as unknown as Record<string, unknown>);
+          if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
+            await markModelFailure(mod.id).catch(() => undefined);
+          }
+          lastError = new Error(truncMsg);
           continue;
         }
         // RR bookkeeping for model (best-effort)
@@ -174,6 +215,8 @@ export async function runLLMCompletion(
               completion_tokens: result.usage?.completionTokens ?? null,
               total_tokens: result.usage?.totalTokens ?? null,
               finish_reason: result.finishReason ?? null,
+              response_truncated: isLengthCutoff(result.finishReason),
+              thought_tokens: result.thoughtTokens ?? null,
               is_fallback: Boolean(input.modelUuid ?? input.modelHint),
               latency_ms: result.latencyMs,
               http_status: 200
@@ -272,7 +315,7 @@ async function tryPinnedModel(
   const prov = providers.find((p) => p.id === targetProviderId);
   if (!prov) return null;
   const pool = new KeyPool(prov);
-  const params = resolveModelParams(model.config);
+  const params = capEffortForStage(resolveModelParams(model.config), input.stage);
   try {
     const { result, keyRow } = await pool.withFallback(async (apiKey) => {
       const provider = providerFromRow(prov);
@@ -295,10 +338,39 @@ async function tryPinnedModel(
         completion_tokens: result.usage?.completionTokens ?? null,
         total_tokens: result.usage?.totalTokens ?? null,
         finish_reason: result.finishReason ?? null,
+        response_truncated: isLengthCutoff(result.finishReason),
+        thought_tokens: result.thoughtTokens ?? null,
         is_fallback: false,
         latency_ms: result.latencyMs,
         http_status: 200,
         error: emptyMsg.slice(0, 2000)
+      } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+      await markModelFailure(model.id).catch(() => undefined);
+      return null;
+    }
+    if (isLengthCutoff(result.finishReason)) {
+      const truncMsg = `Model pilihan output terpotong limit (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason}) — fallback ke urutan global`;
+      await supabase.from('llm_call_logs').insert({
+        request_id: input.requestId ?? null,
+        session_id: input.sessionId ?? null,
+        provider_slug: prov.slug,
+        provider_id: prov.id,
+        model_id: result.model,
+        key_hash: keyRow.key_hash,
+        key_id: keyRow.id,
+        stage: input.stage ?? null,
+        request_messages: input.messages as unknown as Record<string, unknown>,
+        response_text: result.text.slice(0, 8000),
+        prompt_tokens: result.usage?.promptTokens ?? null,
+        completion_tokens: result.usage?.completionTokens ?? null,
+        total_tokens: result.usage?.totalTokens ?? null,
+        finish_reason: result.finishReason ?? null,
+        response_truncated: true,
+        thought_tokens: result.thoughtTokens ?? null,
+        is_fallback: false,
+        latency_ms: result.latencyMs,
+        http_status: 200,
+        error: truncMsg.slice(0, 2000)
       } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
       await markModelFailure(model.id).catch(() => undefined);
       return null;
@@ -319,6 +391,8 @@ async function tryPinnedModel(
       completion_tokens: result.usage?.completionTokens ?? null,
       total_tokens: result.usage?.totalTokens ?? null,
       finish_reason: result.finishReason ?? null,
+      response_truncated: isLengthCutoff(result.finishReason),
+      thought_tokens: result.thoughtTokens ?? null,
       is_fallback: false,
       latency_ms: result.latencyMs,
       http_status: 200
@@ -352,7 +426,7 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
   let resolvedModelId = input.modelHint!;
   if (model) {
     targetProviderId = model.provider_id;
-    hintParams = resolveModelParams(model.config);
+    hintParams = capEffortForStage(resolveModelParams(model.config), input.stage);
     resolvedModelId = model.model_id;
   }
   const registry = new ProviderRegistry();
@@ -383,10 +457,39 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
           completion_tokens: result.usage?.completionTokens ?? null,
           total_tokens: result.usage?.totalTokens ?? null,
           finish_reason: result.finishReason ?? null,
+          response_truncated: isLengthCutoff(result.finishReason),
+          thought_tokens: result.thoughtTokens ?? null,
           is_fallback: false,
           latency_ms: result.latencyMs,
           http_status: 200,
           error: emptyMsg.slice(0, 2000)
+        } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+        if (model) await markModelFailure(model.id).catch(() => undefined);
+        continue;
+      }
+      if (isLengthCutoff(result.finishReason)) {
+        const truncMsg = `Model hint output terpotong limit (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason}) — lanjut fallback`;
+        await supabase.from('llm_call_logs').insert({
+          request_id: input.requestId ?? null,
+          session_id: input.sessionId ?? null,
+          provider_slug: prov.slug,
+          provider_id: prov.id,
+          model_id: result.model,
+          key_hash: keyRow.key_hash,
+          key_id: keyRow.id,
+          stage: input.stage ?? null,
+          request_messages: input.messages as unknown as Record<string, unknown>,
+          response_text: result.text.slice(0, 8000),
+          prompt_tokens: result.usage?.promptTokens ?? null,
+          completion_tokens: result.usage?.completionTokens ?? null,
+          total_tokens: result.usage?.totalTokens ?? null,
+          finish_reason: result.finishReason ?? null,
+          response_truncated: true,
+          thought_tokens: result.thoughtTokens ?? null,
+          is_fallback: false,
+          latency_ms: result.latencyMs,
+          http_status: 200,
+          error: truncMsg.slice(0, 2000)
         } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
         if (model) await markModelFailure(model.id).catch(() => undefined);
         continue;
@@ -406,12 +509,14 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
         prompt_tokens: result.usage?.promptTokens ?? null,
         completion_tokens: result.usage?.completionTokens ?? null,
         total_tokens: result.usage?.totalTokens ?? null,
-        finish_reason: result.finishReason ?? null,
-        is_fallback: false,
-        latency_ms: result.latencyMs,
-        http_status: 200
-      } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
-      return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs, fallback: false };
+          finish_reason: result.finishReason ?? null,
+          response_truncated: isLengthCutoff(result.finishReason),
+          thought_tokens: result.thoughtTokens ?? null,
+          is_fallback: false,
+          latency_ms: result.latencyMs,
+          http_status: 200
+        } as unknown as Record<string, unknown>).then(() => undefined, () => undefined);
+        return { output: { ...result, provider: prov.slug, keyId: keyRow.id }, providerSlug: prov.slug, model: result.model, keyHash: keyRow.key_hash, latencyMs: result.latencyMs, fallback: false };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await supabase.from('llm_call_logs').insert({

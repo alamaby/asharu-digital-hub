@@ -44,12 +44,33 @@ export class GeminiProvider implements LLMProvider {
       throw new LLMHttpError(res.status, `LLM gemini ${res.status}: ${text.slice(0, 500)}`);
     }
     const json = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      candidates?: {
+        finishReason?: string;
+        content?: { parts?: { text?: string; thought?: boolean }[] };
+      }[];
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        thoughtsTokenCount?: number;
+        thoughtTokenCount?: number;
+      };
     };
-    const content = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const candidate = json.candidates?.[0];
+    const parts = candidate?.content?.parts ?? [];
+    // Gabung semua part teks non-thought (respons bisa multi-part); part
+    // thought hanya untuk forensik rawPreview, jangan cemari output.
+    const textParts: string[] = [];
+    const thoughtParts: string[] = [];
+    for (const p of parts) {
+      if (typeof p.text !== 'string' || p.text.length === 0) continue;
+      if (p.thought) thoughtParts.push(p.text);
+      else textParts.push(p.text);
+    }
+    const content = textParts.join('');
     const promptTokens = json.usageMetadata?.promptTokenCount ?? 0;
     const completionTokens = json.usageMetadata?.candidatesTokenCount ?? 0;
+    const thoughtTokens =
+      json.usageMetadata?.thoughtsTokenCount ?? json.usageMetadata?.thoughtTokenCount ?? null;
     return {
       text: content,
       usage: json.usageMetadata
@@ -59,6 +80,9 @@ export class GeminiProvider implements LLMProvider {
             totalTokens: promptTokens + completionTokens
           }
         : undefined,
+      finishReason: candidate?.finishReason ?? null,
+      thoughtTokens,
+      rawPreview: content ? null : thoughtParts.join('').slice(0, 2000) || null,
       model: input.model,
       latencyMs: Date.now() - started
     };

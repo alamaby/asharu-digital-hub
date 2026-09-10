@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildThinkingConfig, resolveModelParams } from './model-config';
+import { buildThinkingConfig, capEffortForStage, isLengthCutoff, resolveModelParams } from './model-config';
 
 describe('resolveModelParams', () => {
   it('returns empty for null config', () => {
@@ -67,5 +67,51 @@ describe('buildThinkingConfig', () => {
 
   it('explicit budget wins over effort', () => {
     expect(buildThinkingConfig({ reasoningEffort: 'max', thinkingBudget: 1024 })).toEqual({ thinkingBudget: 1024 });
+  });
+});
+
+describe('capEffortForStage', () => {
+  it('caps max/high/medium to low for short-output stages', () => {
+    for (const eff of ['max', 'high', 'medium'] as const) {
+      expect(capEffortForStage({ reasoningEffort: eff }, 'idea_generation')).toEqual({ reasoningEffort: 'low' });
+      expect(capEffortForStage({ reasoningEffort: eff }, 'image_prompt')).toEqual({ reasoningEffort: 'low' });
+    }
+  });
+
+  it('keeps developing/discovering and unknown stages untouched', () => {
+    expect(capEffortForStage({ reasoningEffort: 'max' }, 'developing')).toEqual({ reasoningEffort: 'max' });
+    expect(capEffortForStage({ reasoningEffort: 'max' }, 'discovering')).toEqual({ reasoningEffort: 'max' });
+    expect(capEffortForStage({ reasoningEffort: 'max' }, undefined)).toEqual({ reasoningEffort: 'max' });
+    expect(capEffortForStage({ reasoningEffort: 'max' }, 'bogus')).toEqual({ reasoningEffort: 'max' });
+  });
+
+  it('respects explicit thinking level/budget and existing low', () => {
+    expect(capEffortForStage({ reasoningEffort: 'max', thinkingLevel: 'HIGH' }, 'idea_generation')).toEqual({
+      reasoningEffort: 'max',
+      thinkingLevel: 'HIGH'
+    });
+    expect(capEffortForStage({ reasoningEffort: 'max', thinkingBudget: 512 }, 'scoring')).toEqual({
+      reasoningEffort: 'max',
+      thinkingBudget: 512
+    });
+    expect(capEffortForStage({ reasoningEffort: 'low' }, 'idea_generation')).toEqual({ reasoningEffort: 'low' });
+    expect(capEffortForStage({}, 'idea_generation')).toEqual({});
+  });
+
+  it('capped params map to thinkingLevel LOW', () => {
+    expect(buildThinkingConfig(capEffortForStage({ reasoningEffort: 'max' }, 'verifying'))).toEqual({
+      thinkingLevel: 'LOW'
+    });
+  });
+});
+
+describe('isLengthCutoff', () => {
+  it('detects limit-truncated finish reasons', () => {
+    expect(isLengthCutoff('MAX_TOKENS')).toBe(true);
+    expect(isLengthCutoff('LENGTH')).toBe(true);
+    expect(isLengthCutoff('STOP')).toBe(false);
+    expect(isLengthCutoff('SAFETY')).toBe(false);
+    expect(isLengthCutoff(null)).toBe(false);
+    expect(isLengthCutoff(undefined)).toBe(false);
   });
 });

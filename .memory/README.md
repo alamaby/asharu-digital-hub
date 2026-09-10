@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-10 10:15 (local time)
+Last updated: 2026-09-10 11:25 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-10 10:15 (local time)
 
 ## Recent Entries
 
+- [112500-llm-truncation-fix-provider-models-view.md](2026-09-10/112500-llm-truncation-fix-provider-models-view.md) — Log Gemini terpotong: thinking HIGH × maxTokens kecil → MAX_TOKENS + finishReason tak dicatat. Fix: parse finishReason/parts/thought di gemini.ts + cap effort low 6 stage kecil + MAX_TOKENS jadi failure waterfall + kolom audit + view `v_llm_provider_models` (applied prod); 361 tests hijau.
 - [101500-admin-konten-list-fixes.md](2026-09-10/101500-admin-konten-list-fixes.md) — Admin konten: 1 tabel gabungan terurut + topik riset terisi + sortable header + multi-select platform + i18n pageOf/rangeInfo; gate hijau 356 tests.
 - [085552-llm-gemini-bynara-resync.md](2026-09-10/085552-llm-gemini-bynara-resync.md) — Resync LLM: 5 Gemini + 6 Bynara/naraya aktif (reasoning max, priority urutan tulis), `thinkingConfig` Gemini configurable by table (`model-config.ts` + `updateModelConfig` + ModelBoard form); migrasi applied prod; gate hijau 346 tests.
 - [175500-image-styles-batch2.md](2026-09-09/175500-image-styles-batch2.md) — Style review: `UGC POV`→`UGC` (POV dari prompt) + 28 preset baru (editorial … scale-comparison); text-based boleh teks minimal; migrasi submodule `ceb8c13` teraplikasi (34 aktif).

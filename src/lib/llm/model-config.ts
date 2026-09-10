@@ -81,3 +81,32 @@ export function buildThinkingConfig(params: ModelParams): Record<string, unknown
   if (params.reasoningEffort) return { thinkingLevel: EFFORT_TO_LEVEL[params.reasoningEffort] };
   return undefined;
 }
+
+/**
+ * Stage ber-output JSON pendek (ide, prompt gambar, skor, verifikasi).
+ * Thinking dalam (max/high) menghabiskan maxOutputTokens kecil (500–900) —
+ * teks terlihat terpotong tengah kalimat dengan finishReason MAX_TOKENS.
+ * Cap effort ke 'low' untuk stage ini; developing/discovering tidak dicap.
+ */
+export const LOW_EFFORT_STAGES: readonly string[] = [
+  'idea_generation',
+  'image_prompt',
+  'enhance_image_prompt',
+  'scoring',
+  'verifying',
+  'regen_affiliate'
+] as const;
+
+export function capEffortForStage(params: ModelParams, stage: string | undefined | null): ModelParams {
+  if (!stage || !LOW_EFFORT_STAGES.includes(stage)) return params;
+  // Konfigurasi eksplisit (level/budget) menang — hanya cap mapping effort.
+  if (params.thinkingLevel || params.thinkingBudget !== undefined) return params;
+  if (!params.reasoningEffort || params.reasoningEffort === 'low') return params;
+  return { ...params, reasoningEffort: 'low' };
+}
+
+/** finishReason yang berarti output dipenggal limit token, bukan berhenti wajar. */
+export function isLengthCutoff(finishReason: string | null | undefined): boolean {
+  if (!finishReason) return false;
+  return /^(MAX_TOKENS|LENGTH|length)$/i.test(finishReason.trim());
+}
