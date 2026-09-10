@@ -1103,7 +1103,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     description: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4AtFwW1FzC',
-    image: '/images/products/affiliate/24529826-eb239152d426.webp',
+    image: '/images/products/affiliate/24529826-8d28f0c8c46a.webp',
     featured: false
   },
   {
