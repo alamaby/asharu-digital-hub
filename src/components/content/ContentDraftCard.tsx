@@ -29,7 +29,7 @@ interface Draft {
   platform_slug?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [] }, queue = null }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
@@ -269,7 +269,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   imageUrl={postImages.find((p) => p.post_index === idx)?.public_url ?? null}
                   isAffiliate={isInjected}
                   perReplyEnabled={perReplyEnabled}
-                  options={{ models: imageOptions.models, styles: imageOptions.styles }}
+                  options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects }}
                 />
               )}
             </div>

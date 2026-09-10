@@ -138,6 +138,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   let imageProviders: { id: string; slug: string; display_name: string }[] = [];
   let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[] = [];
   let imageStyles: { slug: string; display_name: string }[] = [];
+  let imageSubjects: { slug: string; display_name: string }[] = [];
   let draftImages: {
     id: string; draft_id: string; post_index: number; image_prompt: string; negative_prompt: string | null;
     reasoning: {
@@ -164,6 +165,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       .eq('is_active', true)
       .order('priority');
     const { data: istlyes } = await svc.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug');
+    const { data: isubjects } = await svc.from('image_subject_templates').select('slug, display_name').eq('is_active', true).order('sort_order', { ascending: true }).order('slug');
     const { data: dimgs } = await svc.from('content_draft_images').select('*').eq('draft_id', draftId).order('created_at', { ascending: false });
     const { data: dmode } = await svc.from('content_drafts').select('image_mode').eq('id', draftId).maybeSingle();
     const draftMode = (dmode as { image_mode: string | null } | null)?.image_mode ?? null;
@@ -186,6 +188,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       );
     }
     if (istlyes) imageStyles = istlyes as typeof imageStyles;
+    if (isubjects) imageSubjects = isubjects as typeof imageSubjects;
     if (dimgs) draftImages = dimgs as typeof draftImages;
     // Info antrean posting untuk badge di kartu (semi-otomatis: kelihatan walau worker off).
     const { data: qrow } = await svc
@@ -231,7 +234,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           perReplyEnabled={imageMode === 'per-reply-opt-in'}
           coverImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
           coverSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
-          imageOptions={{ providers: imageProviders, models: imageModels, styles: imageStyles }}
+          imageOptions={{ providers: imageProviders, models: imageModels, styles: imageStyles, subjects: imageSubjects }}
         />
       </div>
       </div>

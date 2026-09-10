@@ -90,6 +90,10 @@ export const routing = defineRouting({
       id: '/admin/llm/[providerId]',
       en: '/admin/llm/[providerId]'
     },
+    '/admin/visual': {
+      id: '/admin/visual',
+      en: '/admin/visual'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

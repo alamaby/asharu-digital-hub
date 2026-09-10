@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generatePostImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
+import { enhanceImagePrompt, generatePostImage, listDraftImages, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
 export interface ReplyImageOption {
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
+  subjects: { slug: string; display_name: string }[];
 }
 
 interface Props {
@@ -32,6 +33,8 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
   const [imgBroken, setImgBroken] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -63,8 +66,22 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
     });
   }
 
-  async function handleEnhance() {
-    const p = promptDraft.trim();
+  async function handleSuggest() {
+    setIsSuggesting(true);
+    setNotice('Menyiapkan prompt awal dari balasan…');
+    try {
+      const res = await suggestImagePrompt(draftId, postIndex, subjectSlug || null);
+      setPromptDraft(res.prompt);
+      setProposed(null);
+      setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Siapkan prompt gagal.');
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
+
+  async function handleEnhance() {    const p = promptDraft.trim();
     if (!p || p.length < 10) {
       setNotice('Isi image prompt dulu (≥10 karakter) — enhance hanya untuk polish draf yang sudah ada.');
       return;
@@ -194,6 +211,20 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
             </select>
           </label>
           <label className="text-[11px]">
+            <span className="mb-0.5 block text-ink-muted">Template subjek</span>
+            <select
+              value={subjectSlug}
+              onChange={(e) => setSubjectSlug(e.target.value)}
+              className="w-full rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
+            >
+              {options.subjects.map((s) => (
+                <option key={s.slug} value={s.slug}>
+                  {s.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[11px]">
             <span className="mb-0.5 block text-ink-muted">Image prompt (EN, ≤500 — edit lalu Regenerate)</span>
             <textarea
               value={promptDraft}
@@ -223,8 +254,18 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
         <div className="mt-1 flex flex-wrap gap-1">
           <button
             type="button"
+            onClick={handleSuggest}
+            disabled={isPending || isEnhancing || isSuggesting || options.subjects.length === 0}
+            aria-busy={isSuggesting}
+            className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
+            title={options.subjects.length === 0 ? 'Belum ada template subjek aktif' : 'Buat draf prompt dari template + isi balasan'}
+          >
+            {isSuggesting ? 'Menyiapkan…' : 'Siapkan prompt awal'}
+          </button>
+          <button
+            type="button"
             onClick={handleEnhance}
-            disabled={isPending || isEnhancing || !promptDraft.trim() || promptDraft.trim().length < 10}
+            disabled={isPending || isEnhancing || isSuggesting || !promptDraft.trim() || promptDraft.trim().length < 10}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
             title={!promptDraft.trim() ? 'Isi prompt dulu (≥10 karakter)' : 'Polish prompt + negative via LLM'}
           >
@@ -233,7 +274,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
           <button
             type="button"
             onClick={enqueue}
-            disabled={isPending || isEnhancing}
+            disabled={isPending || isEnhancing || isSuggesting}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
           >
             {isPending ? 'Memproses...' : url ? 'Regenerate visual' : 'Generate visual'}
@@ -241,7 +282,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
           <button
             type="button"
             onClick={pickLatestReady}
-            disabled={isPending || isEnhancing}
+            disabled={isPending || isEnhancing || isSuggesting}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink hover:border-primary disabled:opacity-50"
           >
             Pilih hasil terbaru

@@ -1,0 +1,80 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { isAdmin } from '@/lib/auth/is-admin';
+import { createSupabaseService } from '@/lib/supabase/server';
+import type { LlmActionResult } from './llm-actions';
+
+function fail(message: string): LlmActionResult {
+  return { ok: false, error: message };
+}
+
+async function requireAdmin() {
+  if (!(await isAdmin())) throw new Error('Unauthorized: admin only');
+  const supabase = createSupabaseService();
+  if (!supabase) throw new Error('Supabase not configured');
+  return supabase;
+}
+
+function slugify(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+export interface SubjectRow {
+  slug: string;
+  display_name: string;
+  subject_en: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export async function addSubject(formData: FormData): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  const displayName = String(formData.get('display_name') ?? '').trim();
+  const subjectEn = String(formData.get('subject_en') ?? '').trim();
+  const slugRaw = String(formData.get('slug') ?? '').trim();
+  if (!displayName) return fail('display_name required');
+  if (subjectEn.length < 10 || subjectEn.length > 500) return fail('subject_en 10–500 karakter');
+  const slug = slugRaw ? slugify(slugRaw) : slugify(displayName);
+  if (!slug) return fail('slug tidak valid');
+  const { data: maxRow } = await supabase.from('image_subject_templates').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
+  const nextOrder = (((maxRow as { sort_order?: number } | null)?.sort_order ?? 90) + 10);
+  const { error } = await supabase.from('image_subject_templates').insert({
+    slug, display_name: displayName, subject_en: subjectEn, is_active: true, sort_order: nextOrder
+  } as never);
+  if (error) return fail(error.message);
+  revalidatePath('/admin/visual');
+  revalidatePath('/konten/review');
+  return { ok: true };
+}
+
+export async function updateSubject(slug: string, formData: FormData): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  const displayName = String(formData.get('display_name') ?? '').trim();
+  const subjectEn = String(formData.get('subject_en') ?? '').trim();
+  const sortOrder = Number(String(formData.get('sort_order') ?? '').trim());
+  if (!displayName) return fail('display_name required');
+  if (subjectEn.length < 10 || subjectEn.length > 500) return fail('subject_en 10–500 karakter');
+  const patch: Record<string, unknown> = { display_name: displayName, subject_en: subjectEn };
+  if (Number.isFinite(sortOrder)) patch.sort_order = Math.floor(sortOrder);
+  const { error } = await supabase.from('image_subject_templates').update(patch).eq('slug', slug);
+  if (error) return fail(error.message);
+  revalidatePath('/admin/visual');
+  revalidatePath('/konten/review');
+  return { ok: true };
+}
+
+export async function toggleSubjectActive(slug: string, isActive: boolean): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from('image_subject_templates').update({ is_active: isActive }).eq('slug', slug);
+  if (error) return fail(error.message);
+  revalidatePath('/admin/visual');
+  revalidatePath('/konten/review');
+  return { ok: true };
+}

@@ -67,6 +67,7 @@
     "adminKonten": "Content",
     "adminRiset": "Research",
     "adminLlm": "LLM",
+    "adminVisual": "Visual",
     "adminBaru": "New",
     "adminReview": "Review"
   },

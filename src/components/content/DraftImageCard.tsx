@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage } from '@/lib/image/actions';
+import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
 export interface ImageOption {
   providers: { id: string; slug: string; display_name: string }[];
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
+  subjects: { slug: string; display_name: string }[];
 }
 
 interface Props {
@@ -49,6 +50,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
   const [notice, setNotice] = useState<string | null>(() => {
     const latest = latestOf(initialImages);
     const hasVisual = initialImages.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
@@ -112,8 +115,22 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     });
   }
 
-  async function handleEnhance() {
-    const p = promptDraft.trim();
+  async function handleSuggest() {
+    setIsSuggesting(true);
+    setNotice('Menyiapkan prompt awal dari postingan…');
+    try {
+      const res = await suggestImagePrompt(draftId, 0, subjectSlug || null);
+      setPromptDraft(res.prompt);
+      setProposed(null);
+      setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Siapkan prompt gagal.');
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
+
+  async function handleEnhance() {    const p = promptDraft.trim();
     if (!p || p.length < 10) {
       setNotice('Isi image prompt dulu (≥10 karakter) — enhance hanya untuk polish draf yang sudah ada.');
       return;
@@ -234,6 +251,20 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             ))}
           </select>
         </label>
+        <label className="text-xs">
+          <span className="mb-1 block text-ink-muted">Template subjek (untuk prompt awal)</span>
+          <select
+            value={subjectSlug}
+            onChange={(e) => setSubjectSlug(e.target.value)}
+            className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm"
+          >
+            {options.subjects.map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="mt-3 grid gap-2">
         <label className="text-xs">
@@ -264,8 +295,18 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
+          onClick={handleSuggest}
+          disabled={isPending || isEnhancing || isSuggesting || options.subjects.length === 0}
+          aria-busy={isSuggesting}
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary disabled:opacity-50"
+          title={options.subjects.length === 0 ? 'Belum ada template subjek aktif' : 'Buat draf prompt dari template subjek + isi postingan'}
+        >
+          {isSuggesting ? 'Menyiapkan…' : 'Siapkan prompt awal'}
+        </button>
+        <button
+          type="button"
           onClick={handleEnhance}
-          disabled={isPending || isEnhancing || !promptDraft.trim() || promptDraft.trim().length < 10}
+          disabled={isPending || isEnhancing || isSuggesting || !promptDraft.trim() || promptDraft.trim().length < 10}
           className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary disabled:opacity-50"
           title={!promptDraft.trim() ? 'Isi prompt dulu (≥10 karakter)' : 'Polish prompt + negative via LLM'}
         >
@@ -274,7 +315,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         <button
           type="button"
           onClick={enqueue}
-          disabled={isPending || isEnhancing}
+          disabled={isPending || isEnhancing || isSuggesting}
           className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? 'Memproses...' : hasVisual ? 'Regenerate' : 'Generate ilustrasi'}

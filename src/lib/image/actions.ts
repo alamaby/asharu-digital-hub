@@ -124,6 +124,95 @@ export async function retryFailedImage(imageId: string): Promise<{ imageId: stri
   return { imageId };
 }
 
+export interface SuggestPromptResult {
+  prompt: string;
+  subjectSlug: string;
+  subjectName: string;
+  scene: { activity: string; setting: string; objects: string[] };
+}
+
+/**
+ * Siapkan prompt awal dari template subjek + scene postingan (tanpa insert DB).
+ * Micro-LLM mengekstrak activity/setting/objects (JSON ≤150 token, stage
+ * image_prompt agar ikut waterfall + audit); gabungan deterministik via
+ * composeSubjectPrompt. Hasil untuk textarea → Sempurnakan → Generate.
+ */
+export async function suggestImagePrompt(
+  draftId: string,
+  postIndex: number,
+  subjectSlug?: string | null
+): Promise<SuggestPromptResult> {
+  const supabase = await requireAdmin();
+  if (!draftId) throw new Error('draftId required');
+  if (!Number.isInteger(postIndex) || postIndex < 0) throw new Error('postIndex must be >= 0');
+
+  const { data: draft } = await supabase
+    .from('content_drafts')
+    .select('id, generated_thread, research_topic_id')
+    .eq('id', draftId)
+    .maybeSingle();
+  if (!draft) throw new Error('draft not found');
+  const d = draft as {
+    generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+    research_topic_id: string | null;
+  };
+  const posts = [d.generated_thread.main, ...d.generated_thread.replies];
+  const sourcePost = posts[postIndex];
+  if (!sourcePost) throw new Error(`post ${postIndex} not found`);
+
+  const { data: tpl } = await supabase
+    .from('image_subject_templates')
+    .select('slug, display_name, subject_en')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+  const templates = (tpl ?? []) as { slug: string; display_name: string; subject_en: string }[];
+  const subject =
+    (subjectSlug ? templates.find((t) => t.slug === subjectSlug) : undefined) ?? templates[0] ?? null;
+  if (!subject) throw new Error('tidak ada template subjek aktif');
+
+  let sessionId: string | null = null;
+  if (d.research_topic_id) {
+    const { data: topic } = await supabase
+      .from('content_research_topics')
+      .select('session_id')
+      .eq('id', d.research_topic_id)
+      .maybeSingle();
+    sessionId = (topic as { session_id: string } | null)?.session_id ?? null;
+  }
+
+  const { buildSceneMessages, parseSceneJson, composeSubjectPrompt } = await import('./subjects');
+  const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+  const { runLLMCompletion } = await import('@/lib/llm/completion');
+  const svc = (await import('@/lib/supabase/service')).getServiceClient();
+
+  const { system, user } = buildSceneMessages(sourcePost.id ?? '', sourcePost.en ?? '');
+  const { providerId, modelUuid } = await resolveStageModel('image_prompt', null);
+  const out = await runLLMCompletion(svc, {
+    stage: 'image_prompt',
+    providerId,
+    modelUuid,
+    messages: [
+      { role: 'system' as const, content: system },
+      { role: 'user' as const, content: user }
+    ],
+    temperature: 0.3,
+    maxTokens: 150,
+    sessionId
+  });
+  let scene;
+  try {
+    scene = parseSceneJson(out.output.text);
+  } catch {
+    throw new Error('gagal ekstrak scene postingan — coba lagi');
+  }
+  return {
+    prompt: composeSubjectPrompt(subject.subject_en, scene),
+    subjectSlug: subject.slug,
+    subjectName: subject.display_name,
+    scene
+  };
+}
+
   async function isPerReplyEnabled(d: { image_mode: string | null; research_topic_id: string | null }): Promise<boolean> {
   const { isPerReplyMode } = await import('./config');
   const supabase = createSupabaseService();
