@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { redirect } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
@@ -7,6 +8,7 @@ import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { ProviderBoard } from '@/components/admin/llm/ProviderBoard';
+import { BoardSkeleton } from '@/components/admin/llm/ActionFeedback';
 import { Link } from '@/i18n/navigation';
 
 interface PageProps {
@@ -26,21 +28,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
-export default async function AdminLlmPage({ params }: PageProps) {
-  const rawLocale = (await params).locale;
-  const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
-  setRequestLocale(locale);
-
-  if (!(await isAdmin())) {
-    redirect({ href: '/masuk', locale });
-  }
-
+async function ProviderSection() {
   const supabase = createSupabaseService();
   if (!supabase) {
-    return <div className="mx-auto max-w-5xl px-4 py-10">Supabase not configured</div>;
+    return <p role="alert" className="text-sm text-red-700">Supabase not configured.</p>;
   }
-
-  const { data: providers } = await supabase.from('llm_providers').select('*').order('priority', { ascending: true });
+  const { data: providers, error } = await supabase.from('llm_providers').select('*').order('priority', { ascending: true });
+  if (error) {
+    return <p role="alert" className="text-sm text-red-700">Gagal memuat provider: {error.message}</p>;
+  }
   const provRows = (providers ?? []) as Array<{ id: string; slug: string; display_name: string; base_url: string; priority: number; is_active: boolean }>;
 
   // counts per provider
@@ -51,6 +47,29 @@ export default async function AdminLlmPage({ params }: PageProps) {
       supabase.from('llm_provider_keys').select('*', { count: 'exact', head: true }).eq('provider_id', p.id).eq('is_active', true)
     ]);
     counts.set(p.id, { models: mc ?? 0, keys: kc ?? 0 });
+  }
+
+  if (provRows.length === 0) {
+    return <p className="text-sm text-ink-muted">Belum ada provider.</p>;
+  }
+  return (
+    <ProviderBoard
+      providers={provRows.map((p) => ({
+        ...p,
+        modelCount: counts.get(p.id)?.models ?? 0,
+        keyCount: counts.get(p.id)?.keys ?? 0
+      }))}
+    />
+  );
+}
+
+export default async function AdminLlmPage({ params }: PageProps) {
+  const rawLocale = (await params).locale;
+  const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
+  setRequestLocale(locale);
+
+  if (!(await isAdmin())) {
+    redirect({ href: '/masuk', locale });
   }
 
   return (
@@ -71,13 +90,9 @@ export default async function AdminLlmPage({ params }: PageProps) {
       </header>
 
       <div className="mt-8 rounded-xl border border-line bg-surface p-4 shadow-card">
-        <ProviderBoard
-          providers={provRows.map((p) => ({
-            ...p,
-            modelCount: counts.get(p.id)?.models ?? 0,
-            keyCount: counts.get(p.id)?.keys ?? 0
-          }))}
-        />
+        <Suspense fallback={<BoardSkeleton lines={4} label="Memuat provider…" />}>
+          <ProviderSection />
+        </Suspense>
       </div>
 
       <section className="mt-6 rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-ink-muted">

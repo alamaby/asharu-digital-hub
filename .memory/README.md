@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-10 11:25 (local time)
+Last updated: 2026-09-10 12:45 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-10 11:25 (local time)
 
 ## Recent Entries
 
+- [124500-admin-llm-feedback-image-retry.md](2026-09-10/124500-admin-llm-feedback-image-retry.md) — Admin/llm: notice inline + busy/disable + rollback drag + Suspense per-board + form config ber-feedback; worker retry parse JSON-ONLY; tombol Ulangi generik image failed (kasus 023e0a95: waterfall 503/503/17-token); 366 tests hijau.
 - [112500-llm-truncation-fix-provider-models-view.md](2026-09-10/112500-llm-truncation-fix-provider-models-view.md) — Log Gemini terpotong: thinking HIGH × maxTokens kecil → MAX_TOKENS + finishReason tak dicatat. Fix: parse finishReason/parts/thought di gemini.ts + cap effort low 6 stage kecil + MAX_TOKENS jadi failure waterfall + kolom audit + view `v_llm_provider_models` (applied prod); 361 tests hijau.
 - [101500-admin-konten-list-fixes.md](2026-09-10/101500-admin-konten-list-fixes.md) — Admin konten: 1 tabel gabungan terurut + topik riset terisi + sortable header + multi-select platform + i18n pageOf/rangeInfo; gate hijau 356 tests.
 - [085552-llm-gemini-bynara-resync.md](2026-09-10/085552-llm-gemini-bynara-resync.md) — Resync LLM: 5 Gemini + 6 Bynara/naraya aktif (reasoning max, priority urutan tulis), `thinkingConfig` Gemini configurable by table (`model-config.ts` + `updateModelConfig` + ModelBoard form); migrasi applied prod; gate hijau 346 tests.
@@ -70,7 +71,6 @@ Last updated: 2026-09-10 11:25 (local time)
 - [125500-riset-detail-panels-redesign.md](2026-09-07/125500-riset-detail-panels-redesign.md) — Redesign 3 panel detail riset: log clamp+expand+paginasi server, performa chart SVG/CSS + KPI token, parameter 3 kartu grup; 307 tests, build sukses.
 - [114842-riset-b8194a1f-skor-nol-display-fix.md](2026-09-07/114842-riset-b8194a1f-skor-nol-display-fix.md) — Riset b8194a1f: skor 0 = by-design mekanisme dua (verifying+scoring dilewati); fix display jujur (Tanpa skor + stepper Dilewati + hint shortlist), tanpa migrasi; gate hijau.
 - [193000-image-generation-five-providers.md](2026-09-06/193000-image-generation-five-providers.md) — Visualisasi otomatis pasca-development: 5 provider image (Pixazo→CF→Pollinations→Gemini 3.1-lite→Bynara 2.1), multi-key backup, stage image_prompt, worker + review + social IMAGE aditif; migrasi applied; 297 tests hijau, pushed.
-- [105839-threads-auto-post-queue.md](2026-09-06/105839-threads-auto-post-queue.md) — Auto-post Threads @asharu.id: antrean terjadwal, full-text chain, config-by-table (social_*), worker + OAuth + /admin/sosial; migrasi committed (belum applied prod); Fase 0 Meta App = user action; 283 tests hijau, pushed.
 - [2026-09-06 000000-riset-815c8df8-empty-fallback-searchlog-retry.md](2026-09-06/000000-riset-815c8df8-empty-fallback-searchlog-retry.md) — Fix 815c8df8: empty-LLM guard + auto-fallback + self-retry owner + search_call_logs generik + kolom perf; migrasi applied; gate hijau.
 
 ## Legacy Archive

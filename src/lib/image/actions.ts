@@ -96,6 +96,34 @@ export async function generatePostImage(
   return { imageId: (created as { id: string }).id };
 }
 
+/**
+ * Ulangi image yang failed (generik — mis. image_prompt no JSON): kembalikan ke
+ * antrean pending agar worker cron memproses ulang (attempts direset).
+ * Hanya baris failed; baris aktif (pending/prompt_ready/ready/selected) ditolak
+ * agar tidak duplikat antrean.
+ */
+export async function retryFailedImage(imageId: string): Promise<{ imageId: string }> {
+  const supabase = await requireAdmin();
+  if (!imageId) throw new Error('imageId required');
+  const { data: row } = await supabase
+    .from('content_draft_images')
+    .select('id, status, draft_id')
+    .eq('id', imageId)
+    .maybeSingle();
+  const r = row as { id: string; status: string; draft_id: string } | null;
+  if (!r) throw new Error('image not found');
+  if (r.status !== 'failed') throw new Error('hanya image failed yang bisa diulang');
+  const { error } = await supabase
+    .from('content_draft_images')
+    .update({ status: 'pending', attempts: 0, last_error: null, updated_at: new Date().toISOString() })
+    .eq('id', imageId)
+    .eq('status', 'failed');
+  if (error) throw new Error(error.message);
+  revalidatePath('/konten/review');
+  revalidatePath('/konten/review/[draftId]', 'page');
+  return { imageId };
+}
+
   async function isPerReplyEnabled(d: { image_mode: string | null; research_topic_id: string | null }): Promise<boolean> {
   const { isPerReplyMode } = await import('./config');
   const supabase = createSupabaseService();

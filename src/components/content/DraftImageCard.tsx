@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generateDraftImage, listDraftImages, selectDraftImage } from '@/lib/image/actions';
+import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 
 export interface ImageOption {
@@ -151,6 +151,20 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         setNotice('Cover dipilih — jadi lampiran review & antrean social.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Pilih gagal.');
+      }
+    });
+  }
+
+  function retry(imageId: string) {
+    setNotice('Mengulang reasoning…');
+    startTransition(async () => {
+      try {
+        await retryFailedImage(imageId);
+        const rows = await listDraftImages(draftId);
+        setImages(rows.filter((r) => (r.post_index ?? 0) === 0));
+        setNotice('Masuk antrean ulang. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil.');
+      } catch (e) {
+        setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Ulangi gagal.');
       }
     });
   }
@@ -353,6 +367,18 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
                     className="text-primary hover:underline disabled:opacity-50"
                   >
                     Pilih
+                  </button>
+                ) : null}
+                {img.status === 'failed' ? (
+                  <button
+                    type="button"
+                    onClick={() => retry(img.id)}
+                    disabled={isPending}
+                    aria-busy={isPending}
+                    className="text-primary hover:underline disabled:opacity-50"
+                    title="Kembalikan ke antrean worker (attempts direset)"
+                  >
+                    {isPending ? 'Memproses…' : 'Ulangi'}
                   </button>
                 ) : null}
               </div>

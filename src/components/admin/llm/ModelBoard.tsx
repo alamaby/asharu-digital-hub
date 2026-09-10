@@ -1,8 +1,10 @@
 'use client';
 
-import { useTransition } from 'react';
-import { reorderModels, toggleModelActive, updateModelConfig } from '@/lib/admin/llm-actions';
+import { useState } from 'react';
+import { reorderModels, toggleModelActive } from '@/lib/admin/llm-actions';
 import { SortableList } from './SortableList';
+import { ActionNoticeView, type ActionNotice } from './ActionFeedback';
+import { ModelConfigForm } from './LlmForms';
 
 interface Model {
   id: string;
@@ -16,25 +18,59 @@ interface Model {
 }
 
 export function ModelBoard({ providerId, models }: { providerId: string; models: Model[] }) {
-  const [pending, startTransition] = useTransition();
+  const [notice, setNotice] = useState<ActionNotice | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function handleReorder(ids: string[]) {
+    setBusy('reorder');
+    setNotice({ type: 'working', message: 'Menyimpan urutan model…' });
+    const r = await reorderModels(providerId, ids);
+    if (!r.ok) throw new Error(r.error);
+  }
+
+  function handleSettled(ok: boolean, error?: string) {
+    setBusy(null);
+    setNotice(
+      ok
+        ? { type: 'success', message: 'Urutan model tersimpan.' }
+        : { type: 'error', message: 'Gagal menyimpan urutan — dikembalikan.', detail: error }
+    );
+  }
+
+  async function handleToggle(m: Model, active: boolean) {
+    setBusy(m.id);
+    setNotice({ type: 'working', message: `Memproses ${m.model_id}…` });
+    try {
+      const r = await toggleModelActive(m.id, providerId, active);
+      setNotice(
+        r.ok
+          ? { type: 'success', message: active ? `${m.model_id} diaktifkan.` : `${m.model_id} dinonaktifkan.` }
+          : { type: 'error', message: `Gagal mengubah ${m.model_id}.`, detail: r.error }
+      );
+    } catch (e) {
+      setNotice({ type: 'error', message: `Gagal mengubah ${m.model_id}.`, detail: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-ink">Models — drag ≡ untuk urutan fallback & RR</h3>
-        {pending ? <span className="text-xs text-ink-muted">Menyimpan…</span> : null}
+        {busy === 'reorder' ? (
+          <span role="status" className="text-xs text-ink-muted">Menyimpan…</span>
+        ) : null}
       </div>
       {models.length === 0 ? <p className="text-xs text-ink-muted">Belum ada model.</p> : null}
       <SortableList
         items={models.map((m) => ({ id: m.id }))}
-        onReorder={(ids) => startTransition(() => reorderModels(providerId, ids))}
+        onReorder={handleReorder}
+        onSettled={handleSettled}
         renderItem={(id) => {
           const m = models.find((x) => x.id === id)!;
           const cfg = (m.config ?? {}) as Record<string, unknown>;
-          const effort = cfg.reasoning === false ? 'off' : String(cfg.reasoning_effort ?? 'max');
-          const budget = cfg.thinking_budget != null ? String(cfg.thinking_budget) : '';
-          const level = cfg.thinking_level != null ? String(cfg.thinking_level) : '';
-          const temp = cfg.temperature != null ? String(cfg.temperature) : '';
-          const maxT = cfg.max_tokens != null ? String(cfg.max_tokens) : '';
+          const rowBusy = busy !== null;
           return (
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -48,53 +84,29 @@ export function ModelBoard({ providerId, models }: { providerId: string; models:
                   <input
                     type="checkbox"
                     checked={m.is_active}
-                    onChange={(e) => startTransition(() => toggleModelActive(m.id, providerId, e.target.checked))}
+                    disabled={rowBusy}
+                    aria-busy={busy === m.id}
+                    onChange={(e) => handleToggle(m, e.target.checked)}
                   />
-                  aktif
+                  aktif{busy === m.id ? '…' : ''}
                 </label>
               </div>
-              <form
-                action={updateModelConfig.bind(null, m.id, providerId)}
-                className="flex w-full flex-wrap items-end gap-2 rounded-lg bg-canvas p-2 text-xs"
-              >
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-ink-muted">reasoning</span>
-                  <select name="reasoning_effort" defaultValue={effort} className="rounded border border-line px-1 py-0.5">
-                    <option value="off">off</option>
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="max">max</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-ink-muted">thinking_budget</span>
-                  <input name="thinking_budget" defaultValue={budget} placeholder="cth 2048" inputMode="numeric" className="w-24 rounded border border-line px-1 py-0.5" />
-                </label>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-ink-muted">thinking_level</span>
-                  <select name="thinking_level" defaultValue={level} className="rounded border border-line px-1 py-0.5">
-                    <option value="">—</option>
-                    <option value="MINIMAL">MINIMAL</option>
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-ink-muted">temperature</span>
-                  <input name="temperature" defaultValue={temp} placeholder="0–2" inputMode="decimal" className="w-16 rounded border border-line px-1 py-0.5" />
-                </label>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-ink-muted">max_tokens</span>
-                  <input name="max_tokens" defaultValue={maxT} placeholder="cth 4000" inputMode="numeric" className="w-24 rounded border border-line px-1 py-0.5" />
-                </label>
-                <button type="submit" className="rounded bg-primary px-2 py-1 text-xs text-white">Simpan</button>
-              </form>
+              <ModelConfigForm
+                modelId={m.id}
+                providerId={providerId}
+                defaults={{
+                  effort: cfg.reasoning === false ? 'off' : String(cfg.reasoning_effort ?? 'max'),
+                  budget: cfg.thinking_budget != null ? String(cfg.thinking_budget) : '',
+                  level: cfg.thinking_level != null ? String(cfg.thinking_level) : '',
+                  temperature: cfg.temperature != null ? String(cfg.temperature) : '',
+                  maxTokens: cfg.max_tokens != null ? String(cfg.max_tokens) : ''
+                }}
+              />
             </div>
           );
         }}
       />
+      <ActionNoticeView notice={notice} />
       <p className="text-xs text-ink-muted">Jika 1 model gagal, lanjut model berikutnya sesuai urutan. Nonaktif = skip.</p>
     </div>
   );

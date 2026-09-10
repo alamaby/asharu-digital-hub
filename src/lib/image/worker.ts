@@ -186,11 +186,29 @@ async function runImagePromptLLM(
       sessionId,
       stage: 'image_prompt'
     });
-    return { parsed: parseImagePrompt(output.text), providerSlug, model };
+    return { text: output.text, providerSlug, model };
+  };
+  const attemptParsed = async (temperature: number, retryNote?: string) => {
+    const raw = await attempt(temperature, retryNote);
+    return { parsed: parseImagePrompt(raw.text), providerSlug: raw.providerSlug, model: raw.model };
   };
 
   const sourceText = `${mainId} ${mainEn}`;
-  const first = await attempt(0.7);
+  // Gagal parse (model emit fragmen reasoning tanpa JSON, mis. output terpotong)
+  // → 1x retry suhu rendah dengan penegasan JSON ONLY sebelum gagal jujur.
+  let parseRetried = false;
+  let first: { parsed: ReturnType<typeof parseImagePrompt>; providerSlug: string; model: string };
+  try {
+    first = await attemptParsed(0.7);
+  } catch {
+    parseRetried = true;
+    const raw = await attempt(
+      0.3,
+      'Output sebelumnya bukan JSON valid — balas HANYA satu objek JSON {"visual_strategy": ..., "hook_keywords": [...], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}, tanpa teks/markdown lain.'
+    );
+    // Throw bila tetap gagal (last_error tercatat jujur oleh failImage).
+    first = { parsed: parseImagePrompt(raw.text), providerSlug: raw.providerSlug, model: raw.model };
+  }
   let gate = validateImagePromptContradiction(
     { image_prompt: first.parsed.image_prompt, negative_prompt: first.parsed.negative_prompt, reasoning: first.parsed.reasoning },
     sourceText
@@ -198,9 +216,9 @@ async function runImagePromptLLM(
   let chosen = first;
   let gateNotes: string[] = [];
   if (!gate.ok) {
-    // 1x retry suhu rendah.
+    // 1x retry suhu rendah (parse juga bisa gagal di sini → throw jujur).
     gateNotes = gate.reasons;
-    const second = await attempt(0.3, gate.reasons.join('; '));
+    const second = await attemptParsed(0.3, gate.reasons.join('; '));
     gate = validateImagePromptContradiction(
       { image_prompt: second.parsed.image_prompt, negative_prompt: second.parsed.negative_prompt, reasoning: second.parsed.reasoning },
       sourceText
@@ -216,7 +234,7 @@ async function runImagePromptLLM(
   return {
     prompt: chosen.parsed.image_prompt,
     negative: chosen.parsed.negative_prompt,
-    reasoning: { ...chosen.parsed.reasoning, gate_passed: true, gate_retried: gateNotes.length > 0 },
+    reasoning: { ...chosen.parsed.reasoning, gate_passed: true, gate_retried: gateNotes.length > 0 || parseRetried },
     llmMeta: { provider: chosen.providerSlug, model: chosen.model, stage: 'image_prompt' }
   };
 }
