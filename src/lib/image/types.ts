@@ -87,6 +87,8 @@ export interface ImageStylePreset {
   slug: string;
   display_name: string;
   prompt_suffix: string;
+  description?: string;
+  negative_prompt?: string | null;
   is_active: boolean;
 }
 

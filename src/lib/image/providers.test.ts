@@ -6,7 +6,7 @@ import { GeminiImageAdapter } from './providers/gemini';
 import { BynaraImageAdapter } from './providers/bynara';
 import { ImageHttpError } from './types';
 import { isHttpsUrl, base64ToBytes } from './providers/base';
-import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -76,6 +76,18 @@ describe('CloudflareImageAdapter', () => {
     expect(calls[0]?.[0] as string).toContain('/accounts/acc1/ai/v1/run/@cf/black-forest-labs/flux-1-schnell');
     expect(() => new CloudflareImageAdapter({ baseUrl: 'https://x.test', model: 'm', accountId: '' }, 't')).toThrow(/account_id/);
   });
+  it('sends negative_prompt when provided', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1', model: '@cf/black-forest-labs/flux-1-schnell', accountId: 'acc1' },
+      'tok'
+    );
+    await adapter.generateImage({ prompt: 'cat', negativePrompt: 'blurry, text' });
+    const calls = fetchMock.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as { body: string };
+    expect(JSON.parse(init.body).negative_prompt).toBe('blurry, text');
+  });
 });
 
 describe('PollinationsImageAdapter', () => {
@@ -107,6 +119,18 @@ describe('GeminiImageAdapter', () => {
     expect(init.headers['x-goog-api-key']).toBe('gk');
     expect(JSON.parse(init.body).generationConfig.responseModalities).toEqual(['TEXT', 'IMAGE']);
   });
+  it('appends Avoid: clause when negative provided', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: B64 } }] } }] })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new GeminiImageAdapter({ baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.1-flash-lite-image' }, 'gk');
+    await adapter.generateImage({ prompt: 'pan', negativePrompt: 'watercolor, text' });
+    const calls = fetchMock.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as { contents: { parts: { text: string }[] }[] };
+    expect(body.contents[0]!.parts[0]!.text).toBe('pan Avoid: watercolor, text');
+  });
   it('throws when no image part', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ candidates: [{ content: { parts: [{ text: 'no image' }] } }] })));
     const adapter = new GeminiImageAdapter({ baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.1-flash-lite-image' }, 'gk');
@@ -129,6 +153,22 @@ describe('BynaraImageAdapter', () => {
   it('rejects non-integer seed', async () => {
     const adapter = new BynaraImageAdapter({ baseUrl: 'https://api-images.bynara.id/v1', model: 'agnes-image-2.1-flash' }, 'bk');
     await expect(adapter.generateImage({ prompt: 'x', seed: 1.5 })).rejects.toThrow(/integer/);
+  });
+});
+
+describe('mergeImageNegativePrompts', () => {
+  it('joins user + style with comma', () => {
+    expect(mergeImageNegativePrompts('blurry, text', 'watercolor, oil')).toBe('blurry, text, watercolor, oil');
+  });
+  it('returns user only when style empty', () => {
+    expect(mergeImageNegativePrompts('blurry', '   ')).toBe('blurry');
+  });
+  it('returns style only when user empty', () => {
+    expect(mergeImageNegativePrompts(null, 'watercolor')).toBe('watercolor');
+  });
+  it('returns undefined when both empty', () => {
+    expect(mergeImageNegativePrompts(undefined, undefined)).toBeUndefined();
+    expect(mergeImageNegativePrompts('  ', '  ')).toBeUndefined();
   });
 });
 

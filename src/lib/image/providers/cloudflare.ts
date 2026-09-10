@@ -50,6 +50,7 @@ export class CloudflareImageAdapter implements ImageGenerationProvider {
       Math.max(1, (input.parameters?.['steps'] as number) ?? 4)
     );
     const body: Record<string, unknown> = { prompt: input.prompt, steps };
+    if (input.negativePrompt?.trim()) body['negative_prompt'] = input.negativePrompt.trim();
     if (typeof input.parameters?.['seed'] === 'number') body['seed'] = input.parameters['seed'];
     if (typeof input.seed === 'number') body['seed'] = input.seed;
 

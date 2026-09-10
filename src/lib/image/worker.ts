@@ -9,7 +9,7 @@ import {
   markImageModelUsage,
   resolveImageTarget
 } from './config';
-import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
 import type { ImageReasoning } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
 import { ImageHttpError } from './types';
@@ -309,14 +309,16 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
 
     // Prompt: pakai yang sudah ada (regenerate simpan prompt / custom edit) atau reasoning-only bila kosong.
     const imagePrompt = row.image_prompt?.trim() || '';
-    const negative = row.negative_prompt ?? undefined;
+    const userNegative = row.negative_prompt ?? undefined;
+    const styleNegative = target.style?.negative_prompt?.trim();
+    const finalNegative = mergeImageNegativePrompts(userNegative, styleNegative);
     const promptMeta: Record<string, unknown> = {};
     const reasoning: Record<string, unknown> | null =
       (row as { reasoning?: Record<string, unknown> | null }).reasoning ?? null;
     const isCustom = Boolean(imagePrompt) && (reasoning as { visual_strategy?: string } | null)?.visual_strategy === 'custom';
     if (isCustom) {
       const gate = validateImagePromptContradiction(
-        { image_prompt: imagePrompt, negative_prompt: negative ?? undefined, reasoning: reasoning as unknown as ImageReasoning },
+        { image_prompt: imagePrompt, negative_prompt: userNegative ?? undefined, reasoning: reasoning as unknown as ImageReasoning },
         `${mainId} ${mainEn}`
       );
       if (!gate.ok) {
@@ -365,7 +367,7 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
         const pool = new ImageKeyPool(provider);
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const adapter = createImageAdapter(provider, modelRow.model_id, apiKey);
-          return adapter.generateImage({ prompt: finalPrompt, negativePrompt: negative, aspectRatio: aspect });
+          return adapter.generateImage({ prompt: finalPrompt, negativePrompt: finalNegative, aspectRatio: aspect });
         });
         let bytes: Uint8Array;
         let mime = result.mimeType;
@@ -394,7 +396,7 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
           .update({
             status: 'selected',
             image_prompt: imagePrompt,
-            negative_prompt: negative ?? null,
+            negative_prompt: userNegative ?? null,
             reasoning,
             style_slug: target.style?.slug ?? row.style_slug,
             provider_slug: provider.slug,

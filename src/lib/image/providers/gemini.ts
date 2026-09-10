@@ -46,8 +46,10 @@ export class GeminiImageAdapter implements ImageGenerationProvider {
   async generateImage(input: GenerateImageInput): Promise<ImageGenerationResult> {
     if (!input.prompt?.trim()) throw new Error('gemini prompt must be a non-empty string');
     const url = `${this.baseUrl}/models/${this.model}:generateContent`;
+    const avoid = input.negativePrompt?.trim();
+    const text = avoid ? `${input.prompt} Avoid: ${avoid}` : input.prompt;
     const body = {
-      contents: [{ parts: [{ text: input.prompt }] }],
+      contents: [{ parts: [{ text }] }],
       generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
     };
 

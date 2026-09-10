@@ -196,3 +196,8 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     .join('\n');
   return { system, user };
 }
+
+export function mergeImageNegativePrompts(userNegative: string | null | undefined, styleNegative: string | null | undefined): string | undefined {
+  const parts = [userNegative?.trim(), styleNegative?.trim()].filter((p): p is string => Boolean(p));
+  return parts.length ? parts.join(', ') : undefined;
+}
