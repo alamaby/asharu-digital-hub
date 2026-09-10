@@ -654,9 +654,10 @@
       "typeRequests": "Permintaan",
       "typeDrafts": "Draf",
       "typeBoth": "Permintaan & Draf",
-      "sortLabel": "Urutkan",
-      "sortNewest": "Terbaru",
-      "sortOldest": "Terlama",
+      "sortBy": "Urutkan berdasarkan {column}",
+      "platformCountHint": "{count} platform dipilih",
+      "platformSelectAll": "Pilih semua",
+      "platformClear": "Hapus",
       "colTopic": "Topik",
       "colPlatform": "Platform",
       "colStatus": "Status",
@@ -673,6 +674,7 @@
       "pagePrev": "Sebelumnya",
       "pageNext": "Berikutnya",
       "pageOf": "Halaman {page} dari {total}",
+      "rangeInfo": "{from}–{to} dari {count}",
       "apply": "Terapkan",
       "reset": "Reset"
     }

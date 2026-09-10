@@ -654,9 +654,10 @@
       "typeRequests": "Requests",
       "typeDrafts": "Drafts",
       "typeBoth": "Requests & Drafts",
-      "sortLabel": "Sort",
-      "sortNewest": "Newest",
-      "sortOldest": "Oldest",
+      "sortBy": "Sort by {column}",
+      "platformCountHint": "{count} platforms selected",
+      "platformSelectAll": "Select all",
+      "platformClear": "Clear",
       "colTopic": "Topic",
       "colPlatform": "Platform",
       "colStatus": "Status",
@@ -673,6 +674,7 @@
       "pagePrev": "Previous",
       "pageNext": "Next",
       "pageOf": "Page {page} of {total}",
+      "rangeInfo": "{from}–{to} of {count}",
       "apply": "Apply",
       "reset": "Reset"
     }
