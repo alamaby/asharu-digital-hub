@@ -1,5 +1,6 @@
 import type { ChatInput, ChatOutput, LLMProvider } from '../types';
 import { LLMHttpError } from '../types';
+import { buildThinkingConfig } from '../model-config';
 
 export class GeminiProvider implements LLMProvider {
   readonly slug = 'gemini' as const;
@@ -16,16 +17,26 @@ export class GeminiProvider implements LLMProvider {
     // Key goes in the x-goog-api-key header, not the query string — URLs end
     // up in access logs far more often than headers do.
     const url = `${this.baseUrl.replace(/\/$/, '')}/models/${model}:generateContent`;
+    // Reasoning: read from llm_models.config (configurable by table).
+    // thinking_level eksplisit > thinking_budget eksplisit > mapping effort.
+    // Tanpa reasoning → jangan kirim thinkingConfig (hemat + aman utk varian lite).
+    const thinkingConfig = buildThinkingConfig({
+      reasoningEffort: input.reasoningEffort,
+      thinkingBudget: input.thinkingBudget,
+      thinkingLevel: input.thinkingLevel
+    });
+    const generationConfig: Record<string, unknown> = {
+      temperature: input.temperature ?? 0.7,
+      maxOutputTokens: input.maxTokens,
+      responseMimeType: 'application/json'
+    };
+    if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents,
-        generationConfig: {
-          temperature: input.temperature ?? 0.7,
-          maxOutputTokens: input.maxTokens,
-          responseMimeType: 'application/json'
-        }
+        generationConfig
       })
     });
     if (!res.ok) {

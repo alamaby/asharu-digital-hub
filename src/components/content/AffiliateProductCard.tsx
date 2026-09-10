@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from '@/i18n/navigation';
 import { swapAffiliateProduct, removeAffiliateInjection, regenerateAffiliateInsertion } from '@/lib/content/actions';
 import { relevanceBand } from '@/lib/research/affiliate';
+import { modelEffortLabel } from './StageModelPicker';
 import { AffiliateProductPicker } from './AffiliateProductPicker';
 
 interface Injection {
@@ -271,7 +272,7 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
             <label htmlFor="regen-model" className="block text-[11px] font-medium text-ink-muted">Model (regen)</label>
             <select id="regen-model" value={regenModelId} onChange={(e) => setRegenModelId(e.target.value)} disabled={!regenProviderId} className="mt-1 block w-full rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink disabled:opacity-60">
               <option value="">Default global</option>
-              {filteredRegenModels.map((m) => <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{m.config?.reasoning ? ' · reasoning' : ''}</option>)}
+              {filteredRegenModels.map((m) => <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{modelEffortLabel(m.config)}</option>)}
             </select>
           </div>
           <p className="col-span-full text-[11px] text-ink-muted">Kosongkan untuk pakai default Admin → LLM. Jika model pilihan gagal, otomatis fallback ke urutan global dan tercatat di log.</p>

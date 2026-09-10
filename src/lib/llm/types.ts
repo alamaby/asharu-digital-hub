@@ -40,6 +40,10 @@ export interface ChatInput {
   maxTokens?: number;
   /** Max reasoning effort — set to "max" when model supports it. Forwarded as reasoning_effort. */
   reasoningEffort?: 'max' | 'high' | 'medium' | 'low';
+  /** Explicit Gemini thinking budget (overrides effort mapping). Resolved from llm_models.config. */
+  thinkingBudget?: number;
+  /** Explicit Gemini thinking level MINIMAL/LOW/MEDIUM/HIGH (overrides budget + effort). */
+  thinkingLevel?: string;
 }
 
 export interface ChatOutput {

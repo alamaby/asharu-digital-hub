@@ -8,6 +8,7 @@ import { OpenAICompatibleProvider } from './providers/openai-compatible';
 import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
 import { fetchOrderedModels, markModelFailure, markModelUsage } from '@/lib/supabase/vault';
+import { resolveModelParams, type ModelParams } from './model-config';
 
 function providerFromRow(row: ProviderRow): LLMProvider {
   if (row.slug === 'gemini') return new GeminiProvider(row.base_url);
@@ -104,18 +105,12 @@ export async function runLLMCompletion(
     }
 
     for (const mod of candidateModels) {
-      const reasoningEffort = resolveReasoningEffort(mod.config);
+      const params = resolveModelParams(mod.config);
       try {
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const provider = providerFromRow(prov);
           return provider.chat(
-            {
-              model: mod.model_id,
-              messages: input.messages,
-              temperature: input.temperature,
-              maxTokens: input.maxTokens,
-              reasoningEffort
-            },
+            chatInputFor(input, mod.model_id, params),
             apiKey
           );
         });
@@ -221,13 +216,24 @@ export async function runLLMCompletion(
   throw lastError ?? new Error('All LLM providers failed');
 }
 
-function resolveReasoningEffort(config: Record<string, unknown> | null): 'max' | 'high' | undefined {
-  if (!config) return undefined;
-  if (config.reasoning === false) return undefined;
-  const eff = (config.reasoning_effort as string | undefined) ?? (config.reasoningEffort as string | undefined);
-  if (eff === 'max' || eff === 'high') return eff as 'max' | 'high';
-  if (config.reasoning === true) return 'max';
-  return undefined;
+/**
+ * Build a ChatInput for a model: request values win, llm_models.config fills
+ * gaps (temperature / max_tokens / reasoning knobs) — configurable by table.
+ */
+function chatInputFor(
+  input: LLMCompletionInput,
+  modelId: string,
+  params: ModelParams
+): ChatInput {
+  return {
+    model: modelId,
+    messages: input.messages,
+    temperature: input.temperature ?? params.temperature,
+    maxTokens: input.maxTokens ?? params.maxTokens,
+    reasoningEffort: params.reasoningEffort,
+    thinkingBudget: params.thinkingBudget,
+    thinkingLevel: params.thinkingLevel
+  };
 }
 
 async function pickDefaultModel(supabase: SupabaseClient, providerId: string): Promise<string> {
@@ -266,11 +272,11 @@ async function tryPinnedModel(
   const prov = providers.find((p) => p.id === targetProviderId);
   if (!prov) return null;
   const pool = new KeyPool(prov);
-  const reasoningEffort = resolveReasoningEffort(model.config);
+  const params = resolveModelParams(model.config);
   try {
     const { result, keyRow } = await pool.withFallback(async (apiKey) => {
       const provider = providerFromRow(prov);
-      return provider.chat({ model: model.model_id, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort }, apiKey);
+      return provider.chat(chatInputFor(input, model.model_id, params), apiKey);
     });
     if (!result.text || result.text.trim().length === 0) {
       const emptyMsg = `Model pilihan return kosong (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason ?? 'unknown'}) — fallback ke urutan global`;
@@ -342,11 +348,11 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
   const { data: modelRow } = await supabase.from('llm_models').select('id, provider_id, model_id, config, is_active').eq('model_id', input.modelHint!).eq('is_active', true).maybeSingle();
   const model = modelRow as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null; is_active: boolean } | null;
   let targetProviderId: string | null = null;
-  let reasoningEffort: 'max' | 'high' | undefined = undefined;
+  let hintParams: ModelParams = {};
   let resolvedModelId = input.modelHint!;
   if (model) {
     targetProviderId = model.provider_id;
-    reasoningEffort = resolveReasoningEffort(model.config);
+    hintParams = resolveModelParams(model.config);
     resolvedModelId = model.model_id;
   }
   const registry = new ProviderRegistry();
@@ -358,7 +364,7 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
     try {
       const { result, keyRow } = await pool.withFallback(async (apiKey) => {
         const provider = providerFromRow(prov);
-        return provider.chat({ model: resolvedModelId, messages: input.messages, temperature: input.temperature, maxTokens: input.maxTokens, reasoningEffort }, apiKey);
+        return provider.chat(chatInputFor(input, resolvedModelId, hintParams), apiKey);
       });
       if (!result.text || result.text.trim().length === 0) {
         const emptyMsg = `Model hint return kosong (provider ${prov.slug}, model ${result.model}) — lanjut fallback`;

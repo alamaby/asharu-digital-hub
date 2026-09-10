@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-09 17:53 (local time)
+Last updated: 2026-09-10 09:00 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-09 17:53 (local time)
 
 ## Recent Entries
 
+- [085552-llm-gemini-bynara-resync.md](2026-09-10/085552-llm-gemini-bynara-resync.md) — Resync LLM: 5 Gemini + 6 Bynara/naraya aktif (reasoning max, priority urutan tulis), `thinkingConfig` Gemini configurable by table (`model-config.ts` + `updateModelConfig` + ModelBoard form); migrasi applied prod; gate hijau 346 tests.
 - [175500-image-styles-batch2.md](2026-09-09/175500-image-styles-batch2.md) — Style review: `UGC POV`→`UGC` (POV dari prompt) + 28 preset baru (editorial … scale-comparison); text-based boleh teks minimal; migrasi submodule `ceb8c13` teraplikasi (34 aktif).
 - [174000-riset-detail-3-fixes.md](2026-09-09/174000-riset-detail-3-fixes.md) — Detail sesi riset: card produk tetap mekanis-2 (gambar+nama+link) + metrik anti-overlap (grid 2/3 kolom + wrap) + draf sortir server-side + paginasi 5/halaman; 333 tests hijau.
 - [161000-research-templates-6-pilihan.md](2026-09-09/161000-research-templates-6-pilihan.md) — Template riset: katalog DB 6 pilihan (opsional, default Bebas) mengarahkan discovery + development + Generate Idea; badge detail sesi; migrasi submodule `967191d`; 328 tests hijau (migrasi production belum).

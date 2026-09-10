@@ -15,6 +15,12 @@ interface Props {
   disabled?: boolean;
 }
 
+export function modelEffortLabel(config: Record<string, unknown> | null): string {
+  if (!config || config.reasoning === false) return '';
+  const eff = typeof config.reasoning_effort === 'string' ? config.reasoning_effort : 'max';
+  return ` · reasoning ${eff}`;
+}
+
 export function StageModelPicker({ stage, label, providers, models, providerId, modelId, onProviderChange, onModelChange, disabled }: Props) {
   const filteredModels = providerId ? models.filter((m) => m.provider_id === providerId) : [];
   const providerSelectId = `stage-${stage}-provider`;
@@ -50,7 +56,7 @@ export function StageModelPicker({ stage, label, providers, models, providerId, 
           >
             <option value="">Default global</option>
             {filteredModels.map((m) => (
-              <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{m.config?.reasoning ? ' · reasoning' : ''}</option>
+              <option key={m.id} value={m.id}>{m.display_name} · {m.model_id}{modelEffortLabel(m.config)}</option>
             ))}
           </select>
         </div>

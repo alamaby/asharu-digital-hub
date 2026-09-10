@@ -78,6 +78,66 @@ export async function updateModelReasoning(modelId: string, providerId: string, 
   revalidatePath(`/admin/llm/${providerId}`);
 }
 
+const MODEL_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
+const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
+
+function parseOptionalNumber(raw: FormDataEntryValue | null, min: number, max: number, int: boolean): number | null | undefined {
+  // undefined = field tak dikirim (jangan sentuh); null = kosong (hapus key); number = set.
+  if (raw === null) return undefined;
+  const s = String(raw).trim();
+  if (s === '') return null;
+  const v = Number(s);
+  if (!Number.isFinite(v)) throw new Error(`nilai harus angka (dapat "${s}")`);
+  if (v < min || v > max) throw new Error(`nilai harus ${min}–${max} (dapat ${s})`);
+  return int ? Math.floor(v) : v;
+}
+
+/**
+ * Update knob LLM per-model dari tabel (configurable by table).
+ * Merge ke `config` jsonb — key lain dipertahankan. Nilai kosong menghapus key.
+ */
+export async function updateModelConfig(modelId: string, providerId: string, formData: FormData) {
+  const supabase = await requireAdmin();
+  const { data: row } = await supabase.from('llm_models').select('config').eq('id', modelId).single();
+  const next = { ...(((row as { config?: Record<string, unknown> } | null)?.config ?? {})) } as Record<string, unknown>;
+
+  const effort = String(formData.get('reasoning_effort') ?? '').trim();
+  if (effort === 'off' || effort === '') {
+    next.reasoning = false;
+    delete next.reasoning_effort;
+  } else if ((MODEL_EFFORTS as readonly string[]).includes(effort)) {
+    next.reasoning = true;
+    next.reasoning_effort = effort;
+  } else {
+    throw new Error('reasoning_effort tidak valid (off/low/medium/high/max)');
+  }
+
+  const budget = parseOptionalNumber(formData.get('thinking_budget'), 0, 32768, true);
+  if (budget === null) delete next.thinking_budget;
+  else if (budget !== undefined) next.thinking_budget = budget;
+
+  const levelRaw = String(formData.get('thinking_level') ?? '').trim().toUpperCase();
+  if (levelRaw === '') {
+    delete next.thinking_level;
+  } else if ((THINKING_LEVELS as readonly string[]).includes(levelRaw)) {
+    next.thinking_level = levelRaw;
+  } else {
+    throw new Error('thinking_level tidak valid (MINIMAL/LOW/MEDIUM/HIGH)');
+  }
+
+  const temp = parseOptionalNumber(formData.get('temperature'), 0, 2, false);
+  if (temp === null) delete next.temperature;
+  else if (temp !== undefined) next.temperature = temp;
+
+  const maxT = parseOptionalNumber(formData.get('max_tokens'), 1, 1000000, true);
+  if (maxT === null) delete next.max_tokens;
+  else if (maxT !== undefined) next.max_tokens = maxT;
+
+  const { error } = await supabase.from('llm_models').update({ config: next }).eq('id', modelId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/llm/${providerId}`);
+}
+
 export async function addModel(providerId: string, formData: FormData) {
   const supabase = await requireAdmin();
   const modelIdRaw = String(formData.get('model_id') ?? '').trim();
