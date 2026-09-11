@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-10 16:50 (local time)
+Last updated: 2026-09-10 18:10 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-10 16:50 (local time)
 
 ## Recent Entries
 
+- [181000-admin-visual-llm-pattern.md](2026-09-10/181000-admin-visual-llm-pattern.md) — /admin/visual ikut pola admin/llm: root provider+subjek DnD; 3 route detail baru ([providerId] model+key, model config is_default+JSON cosmetic, subjek edit); fix base_url ke kolom; tanpa hapus; 382 tests + build hijau.
 - [165000-image-styles-manga-pencil.md](2026-09-10/165000-image-styles-manga-pencil.md) — 15 style preset generate visual: Manga, Pencil Drawing, Pencil Sketch (+12 varian); migrasi kolom `description`+`negative_prompt` (applied prod); worker merge user+style negative; cloudflare/gemini kini dukung negative; 382 tests + build hijau.
 - [143000-review-multiselect-logs-image-admin.md](2026-09-10/143000-review-multiselect-logs-image-admin.md) — Review: filter Status/Provider/Platform multi + badge platform; logs: tab Image (thumbnail + link draf) + waktu zona-user 3 tab; /admin/visual: urutan provider/model/key image + account_id cloudflare (LLM + image, pair saat tambah key); 376 tests hijau.
 - [133000-image-subject-template-suggest.md](2026-09-10/133000-image-subject-template-suggest.md) — Template subjek visual + tombol "Siapkan prompt awal" (cover & reply): micro-LLM ekstrak scene → gabung subjek → textarea → Sempurnakan; `/admin/visual` CRUD + nav; migrasi applied prod; 372 tests hijau.
