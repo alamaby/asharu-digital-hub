@@ -94,6 +94,18 @@ export const routing = defineRouting({
       id: '/admin/visual',
       en: '/admin/visual'
     },
+    '/admin/visual/[providerId]': {
+      id: '/admin/visual/[providerId]',
+      en: '/admin/visual/[providerId]'
+    },
+    '/admin/visual/[providerId]/models/[modelId]': {
+      id: '/admin/visual/[providerId]/models/[modelId]',
+      en: '/admin/visual/[providerId]/models/[modelId]'
+    },
+    '/admin/visual/subjects/[subjectSlug]': {
+      id: '/admin/visual/subjects/[subjectSlug]',
+      en: '/admin/visual/subjects/[subjectSlug]'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

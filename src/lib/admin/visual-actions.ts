@@ -66,6 +66,7 @@ export async function updateSubject(slug: string, formData: FormData): Promise<L
   const { error } = await supabase.from('image_subject_templates').update(patch).eq('slug', slug);
   if (error) return fail(error.message);
   revalidatePath('/admin/visual');
+  revalidatePath('/admin/visual/subjects/[subjectSlug]');
   revalidatePath('/konten/review');
   return { ok: true };
 }
@@ -75,6 +76,21 @@ export async function toggleSubjectActive(slug: string, isActive: boolean): Prom
   const { error } = await supabase.from('image_subject_templates').update({ is_active: isActive }).eq('slug', slug);
   if (error) return fail(error.message);
   revalidatePath('/admin/visual');
+  revalidatePath('/admin/visual/subjects/[subjectSlug]');
+  revalidatePath('/konten/review');
+  return { ok: true };
+}
+
+export async function reorderImageSubjects(orderedSlugs: string[]): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  for (let i = 0; i < orderedSlugs.length; i++) {
+    const slug = orderedSlugs[i]!;
+    const sortOrder = (i + 1) * 10;
+    const { error } = await supabase.from('image_subject_templates').update({ sort_order: sortOrder }).eq('slug', slug);
+    if (error) return fail(`reorderImageSubjects ${slug}: ${error.message}`);
+  }
+  revalidatePath('/admin/visual');
+  revalidatePath('/admin/visual/subjects/[subjectSlug]');
   revalidatePath('/konten/review');
   return { ok: true };
 }

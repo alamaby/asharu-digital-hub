@@ -5,7 +5,9 @@ import {
   addImageBackupKey,
   addImageModel,
   replaceImageKey,
-  updateImageProviderAccountId
+  updateImageModelConfig,
+  updateImageProviderAccountId,
+  updateImageProviderBaseUrl
 } from '@/lib/admin/image-admin-actions';
 import type { LlmActionResult } from '@/lib/admin/llm-actions';
 import { ActionNoticeView, PendingButton, type ActionNotice } from '../llm/ActionFeedback';
@@ -118,6 +120,71 @@ export function ReplaceImageKeyForm({ keyId }: { keyId: string }) {
         <PendingButton label="Simpan" />
       </div>
       {notice ? <div className="mt-2"><ActionNoticeView notice={notice} /></div> : null}
+    </form>
+  );
+}
+
+export function ImageBaseUrlForm({ providerId, defaultValue }: { providerId: string; defaultValue: string }) {
+  const { notice, run } = useImageForm('Base URL tersimpan.');
+  return (
+    <form
+      action={(fd) => {
+        void run(() => updateImageProviderBaseUrl(providerId, fd));
+      }}
+      className="mt-2 flex max-w-xl flex-wrap items-end gap-2"
+    >
+      <label className="min-w-[220px] flex-1 text-xs">
+        <span className="mb-0.5 block text-ink-muted">Base URL</span>
+        <input name="base_url" defaultValue={defaultValue} className="w-full rounded border border-line px-2 py-1 font-mono text-xs" required />
+      </label>
+      <PendingButton label="Simpan URL" />
+      {notice ? <div className="w-full"><ActionNoticeView notice={notice} /></div> : null}
+    </form>
+  );
+}
+
+export interface ImageModelConfigDefaults {
+  displayName: string;
+  isDefault: boolean;
+  configJson: string;
+}
+
+export function ImageModelConfigForm({
+  modelId,
+  providerId,
+  defaults
+}: {
+  modelId: string;
+  providerId: string;
+  defaults: ImageModelConfigDefaults;
+}) {
+  const { notice, run } = useImageForm('Konfigurasi model tersimpan.');
+  return (
+    <form
+      action={(fd) => {
+        void run(() => updateImageModelConfig(modelId, providerId, fd));
+      }}
+      className="space-y-3"
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-xs">
+          <span className="mb-0.5 block text-ink-muted">Display name</span>
+          <input name="display_name" defaultValue={defaults.displayName} className="w-full rounded border border-line px-2 py-1 text-xs" required />
+        </label>
+        <label className="flex items-center gap-2 text-xs">
+          <input type="checkbox" name="is_default" defaultChecked={defaults.isDefault} />
+          Jadikan model default (satu per provider)
+        </label>
+      </div>
+      <label className="block text-xs">
+        <span className="mb-0.5 block text-ink-muted">Config JSON</span>
+        <textarea name="config_json" defaultValue={defaults.configJson} rows={6} className="w-full rounded border border-line bg-background px-2 py-1 font-mono text-xs" />
+        <span className="mt-1 block text-ink-muted">Objek JSON. Nilai ini belum dikonsumsi worker image generation.</span>
+      </label>
+      <div className="flex items-center gap-3">
+        <PendingButton label="Simpan Config" />
+        {notice ? <ActionNoticeView notice={notice} /> : null}
+      </div>
     </form>
   );
 }

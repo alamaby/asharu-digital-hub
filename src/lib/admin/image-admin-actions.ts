@@ -26,6 +26,12 @@ function validAccountId(v: string): boolean {
   return /^[0-9a-f]{32}$/i.test(v);
 }
 
+function revalidateVisualPaths(opts?: { providerId?: string | null; modelId?: string | null }) {
+  revalidatePath('/admin/visual');
+  if (opts?.providerId) revalidatePath('/admin/visual/[providerId]');
+  if (opts?.providerId && opts.modelId) revalidatePath('/admin/visual/[providerId]/models/[modelId]');
+}
+
 // --- Providers ---
 
 export async function reorderImageProviders(orderedIds: string[]): Promise<LlmActionResult> {
@@ -44,7 +50,7 @@ export async function toggleImageProviderActive(providerId: string, isActive: bo
   const supabase = await requireAdmin();
   const { error } = await supabase.from('image_providers').update({ is_active: isActive }).eq('id', providerId);
   if (error) return fail(error.message);
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
@@ -58,14 +64,18 @@ async function mergeImageProviderConfig(providerId: string, patch: Record<string
     .update({ config: { ...current, ...patch } })
     .eq('id', providerId);
   if (error) return fail(error.message);
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
 export async function updateImageProviderBaseUrl(providerId: string, formData: FormData): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
   const baseUrl = String(formData.get('base_url') ?? '').trim();
   if (!baseUrl) return fail('base_url required');
-  return mergeImageProviderConfig(providerId, { base_url: baseUrl });
+  const { error } = await supabase.from('image_providers').update({ base_url: baseUrl }).eq('id', providerId);
+  if (error) return fail(error.message);
+  revalidateVisualPaths({ providerId });
+  return { ok: true };
 }
 
 export async function updateImageProviderAccountId(providerId: string, formData: FormData): Promise<LlmActionResult> {
@@ -85,15 +95,15 @@ export async function reorderImageModels(providerId: string, orderedIds: string[
     const { error } = await supabase.from('image_models').update({ priority }).eq('id', id);
     if (error) return fail(`reorderImageModels ${id}: ${error.message}`);
   }
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
-export async function toggleImageModelActive(modelId: string, isActive: boolean): Promise<LlmActionResult> {
+export async function toggleImageModelActive(modelId: string, providerId: string, isActive: boolean): Promise<LlmActionResult> {
   const supabase = await requireAdmin();
-  const { error } = await supabase.from('image_models').update({ is_active: isActive }).eq('id', modelId);
+  const { error } = await supabase.from('image_models').update({ is_active: isActive }).eq('id', modelId).eq('provider_id', providerId);
   if (error) return fail(error.message);
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
@@ -114,13 +124,45 @@ export async function addImageModel(providerId: string, formData: FormData): Pro
     config: {}
   } as never);
   if (error) return fail(error.message);
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
-// --- Keys (Vault by-name + suffix audit, meniru seed) ---
+export async function updateImageModelConfig(modelId: string, providerId: string, formData: FormData): Promise<LlmActionResult> {
+  const supabase = await requireAdmin();
+  const displayName = String(formData.get('display_name') ?? '').trim();
+  const isDefault = formData.get('is_default') === 'on';
+  const configRaw = String(formData.get('config_json') ?? '').trim();
+  if (!displayName) return fail('display_name required');
+  let config: Record<string, unknown> = {};
+  if (configRaw) {
+    try {
+      const parsed: unknown = JSON.parse(configRaw);
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('config harus objek JSON');
+      config = parsed as Record<string, unknown>;
+    } catch {
+      return fail('config JSON tidak valid');
+    }
+  }
+  if (isDefault) {
+    const { error: siblingError } = await supabase
+      .from('image_models')
+      .update({ is_default: false })
+      .eq('provider_id', providerId)
+      .neq('id', modelId);
+    if (siblingError) return fail(siblingError.message);
+  }
+  const { error } = await supabase
+    .from('image_models')
+    .update({ display_name: displayName, is_default: isDefault, config })
+    .eq('id', modelId)
+    .eq('provider_id', providerId);
+  if (error) return fail(error.message);
+  revalidateVisualPaths({ providerId, modelId });
+  return { ok: true };
+}
 
-export async function reorderImageKeys(orderedIds: string[]): Promise<LlmActionResult> {
+export async function reorderImageKeys(providerId: string, orderedIds: string[]): Promise<LlmActionResult> {
   const supabase = await requireAdmin();
   for (let i = 0; i < orderedIds.length; i++) {
     const id = orderedIds[i]!;
@@ -128,17 +170,17 @@ export async function reorderImageKeys(orderedIds: string[]): Promise<LlmActionR
     const { error } = await supabase.from('image_provider_keys').update({ priority }).eq('id', id);
     if (error) return fail(`reorderImageKeys ${id}: ${error.message}`);
   }
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
-export async function toggleImageKeyActive(keyId: string, isActive: boolean): Promise<LlmActionResult> {
+export async function toggleImageKeyActive(keyId: string, providerId: string, isActive: boolean): Promise<LlmActionResult> {
   const supabase = await requireAdmin();
   const patch: Record<string, unknown> = { is_active: isActive };
   if (isActive) patch.failure_count = 0;
   const { error } = await supabase.from('image_provider_keys').update(patch).eq('id', keyId);
   if (error) return fail(error.message);
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
@@ -180,7 +222,7 @@ export async function addImageBackupKey(providerId: string, formData: FormData):
     try { await supabase.rpc('vault_delete_secret', { p_id: vaultId }); } catch { /* ignore */ }
     return fail(error.message);
   }
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }
 
@@ -214,6 +256,6 @@ export async function replaceImageKey(keyId: string, formData: FormData): Promis
   if (oldVaultId) {
     try { await supabase.rpc('vault_delete_secret', { p_id: oldVaultId }); } catch { /* ignore */ }
   }
-  revalidatePath('/admin/visual');
+  revalidateVisualPaths({ providerId });
   return { ok: true };
 }

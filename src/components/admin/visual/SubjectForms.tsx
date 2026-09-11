@@ -94,19 +94,13 @@ export function SubjectRowForm({ row }: { row: SubjectRow }) {
             aktif{busy ? '…' : ''}
           </label>
         </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_120px]">
-          <label className="text-xs">
-            <span className="mb-0.5 block text-ink-muted">Nama tampilan</span>
-            <input name="display_name" defaultValue={row.display_name} className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm" required />
-          </label>
-          <label className="text-xs">
-            <span className="mb-0.5 block text-ink-muted">Urutan</span>
-            <input name="sort_order" defaultValue={row.sort_order} inputMode="numeric" className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm" />
-          </label>
-        </div>
+        <label className="mt-2 block text-xs">
+          <span className="mb-0.5 block text-ink-muted">Nama tampilan</span>
+          <input name="display_name" defaultValue={row.display_name} className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm" required />
+        </label>
         <label className="mt-2 block text-xs">
           <span className="mb-0.5 block text-ink-muted">Subject (EN)</span>
-          <textarea name="subject_en" defaultValue={row.subject_en} rows={2} maxLength={500} className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm" required />
+          <textarea name="subject_en" defaultValue={row.subject_en} rows={3} maxLength={500} className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm" required />
         </label>
         <div className="mt-2">
           <PendingButton label="Simpan" />
