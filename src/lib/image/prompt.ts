@@ -201,3 +201,44 @@ export function mergeImageNegativePrompts(userNegative: string | null | undefine
   const parts = [userNegative?.trim(), styleNegative?.trim()].filter((p): p is string => Boolean(p));
   return parts.length ? parts.join(', ') : undefined;
 }
+
+export interface StudioEnhanceInput {
+  promptDraft: string;
+  negativeDraft?: string | null;
+  styleSuffix?: string;
+}
+
+/**
+ * Builder enhance untuk Studio (prompt bebas, TANPA konteks postingan).
+ * Beda dari buildEnhancePromptMessages (review): tidak ada aturan
+ * MISSED-DETAIL vs source post — LLM polish + perkaya detail visual dari
+ * draf itu sendiri (pencahayaan, komposisi, mood, tekstur) tanpa membuang
+ * detail eksplisit user.
+ */
+export function buildStudioEnhanceMessages(input: StudioEnhanceInput): {
+  system: string;
+  user: string;
+} {
+  const system = [
+    'You are a senior visual designer for Asharu Studio — POLISH mode.',
+    'The user drafted an image_prompt (and maybe negative_prompt) for a standalone illustration. There is NO source post — polish and ENRICH the draft itself.',
+    'Preserve intent, correct English, make it single scene, concrete objects/action/setting, ≤60 words.',
+    'Rules:',
+    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
+    '- image_prompt: polished English, ≤60 words (hard limit), concrete, no text/watermark/logo.',
+    '- Negative: polish too (no text, no watermark, no logo), ≤300 chars.',
+    '- visual_strategy: AFTER = direct/aspirational illustration; BRIDGE = curiosity-gap object.',
+    '- ENRICHMENT: add concrete visual detail the draft lacks (lighting, composition, mood, texture, atmosphere) so the image generator has enough to work with. NEVER drop explicit details already in the draft — only add.',
+    '- CRITICAL PRESERVATION: User draft may be in Indonesian — translate to English FAITHFULLY and keep EVERY explicit detail (clothing, camera angle/shot, pose/expression, setting/location, accessories, atmosphere). When in doubt, keep the detail verbatim (translated).',
+    '- No people faces close-up unless the draft demands it; prefer medium shot that shows subject + setting.',
+    '- No violent, sexual, or political content.'
+  ].join('\n');
+  const user = [
+    `User draft prompt (PRESERVE all details, ID→EN translate, then ENRICH): ${input.promptDraft}`,
+    input.negativeDraft ? `User draft negative: ${input.negativeDraft}` : '',
+    input.styleSuffix ? `Style hint (will be appended by worker): ${input.styleSuffix}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return { system, user };
+}

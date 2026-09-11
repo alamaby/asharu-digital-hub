@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { enqueueStudioImage, type EnqueueStudioInput } from '@/lib/studio/actions';
-import type { StudioOptions } from '@/lib/studio/types';
+import { useEffect, useState, useTransition } from 'react';
+import { enhanceStudioPrompt, enqueueStudioImage, type EnqueueStudioInput } from '@/lib/studio/actions';
+import type { StudioGenerationRow, StudioOptions } from '@/lib/studio/types';
 import { useTranslations } from 'next-intl';
 
 interface Props {
   options: StudioOptions | null;
   quota: { used: number; remaining: number | null; limit: number | null | undefined } | null;
+  /** Baris histori untuk "Pakai ulang" — form diisi sekali per klik. */
+  reuseRow?: StudioGenerationRow | null;
 }
 
-export function StudioForm({ options, quota }: Props) {
+export function StudioForm({ options, quota, reuseRow }: Props) {
   const t = useTranslations('studio');
   const tForm = useTranslations('studio.form');
   const tNotice = useTranslations('studio.notice');
+  const tEnhance = useTranslations('studio.enhance');
 
   const [prompt, setPrompt] = useState('');
   const [negative, setNegative] = useState('');
@@ -23,8 +26,34 @@ export function StudioForm({ options, quota }: Props) {
   const [subjectSlug, setSubjectSlug] = useState('');
   const [cameraSlug, setCameraSlug] = useState(options?.config.default_camera_slug ?? '');
   const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
+  // Pin model LLM untuk enhance (Auto = stage default enhance_image_prompt).
+  const [llmProviderId, setLlmProviderId] = useState('');
+  const [llmModelId, setLlmModelId] = useState('');
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [proposed, setProposed] = useState<{ prompt: string; negative?: string } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [lastReuseId, setLastReuseId] = useState<string | null>(null);
+
+  // "Pakai ulang" dari riwayat: isi form dari baris (sekali per klik).
+  useEffect(() => {
+    if (!reuseRow || reuseRow.id === lastReuseId) return;
+    setLastReuseId(reuseRow.id);
+    setPrompt(reuseRow.image_prompt);
+    setNegative(reuseRow.negative_prompt ?? '');
+    setProviderId(reuseRow.provider_id ?? '');
+    setModelId(reuseRow.model_id ?? '');
+    setStyleSlug(reuseRow.style_slug ?? '');
+    setSubjectSlug(reuseRow.subject_slug ?? '');
+    setCameraSlug(reuseRow.camera_slug ?? '');
+    if (reuseRow.aspect_slug) setAspectSlug(reuseRow.aspect_slug);
+    setProposed(null);
+    setNotice(tForm('reused'));
+  }, [reuseRow, lastReuseId, tForm]);
+
+  // Ganti provider image → reset model (pola lama, dipertahankan).
+  // Ganti provider LLM → reset model LLM.
 
   const maxPrompt = options?.config.max_prompt_length ?? 500;
   const negativeTrimmed = negative.trim();
@@ -73,6 +102,43 @@ export function StudioForm({ options, quota }: Props) {
   // Field input hanya disable saat submit berjalan / opsi belum ada — bukan
   // saat prompt kosong (user harus bisa mengetik dulu).
   const fieldsDisabled = isPending || !options;
+  const filteredLlmModels = llmProviderId
+    ? (options?.llmModels ?? []).filter((m) => m.provider_id === llmProviderId)
+    : (options?.llmModels ?? []);
+  const canEnhance = !isEnhancing && !isPending && Boolean(options) && prompt.trim().length >= 10;
+
+  async function handleEnhance() {
+    const p = prompt.trim();
+    if (!p || p.length < 10) {
+      setNotice(tForm('promptMin'));
+      return;
+    }
+    setIsEnhancing(true);
+    setNotice(tEnhance('working'));
+    try {
+      const res = await enhanceStudioPrompt({
+        prompt: p,
+        negativePrompt: negativeTrimmed || null,
+        styleSlug: styleSlug || null,
+        llmModelId: llmModelId || null
+      });
+      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt });
+      setNotice(tEnhance('ready'));
+    } catch (e) {
+      setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : tEnhance('failed'));
+    } finally {
+      setIsEnhancing(false);
+    }
+  }
+
+  function acceptProposed() {
+    if (!proposed) return;
+    setPrevPrompt({ prompt, negative });
+    setPrompt(proposed.prompt);
+    setNegative(proposed.negative ?? '');
+    setProposed(null);
+    setNotice(tEnhance('accepted'));
+  }
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-3" noValidate>
@@ -253,6 +319,96 @@ export function StudioForm({ options, quota }: Props) {
       >
         {isSubmitting ? tForm('submitting') : tForm('submit')}
       </button>
+
+      {/* Enhance prompt (LLM): polish + perkaya detail, side-by-side. */}
+      <div className="rounded-md border border-line bg-background p-3">
+        <p className="text-sm font-medium text-ink">{tEnhance('title')}</p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{tEnhance('hint')}</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs" htmlFor="studio-llm-provider">
+            <span className="text-ink-muted">{tEnhance('providerLabel')}</span>
+            <select
+              id="studio-llm-provider"
+              value={llmProviderId}
+              onChange={(e) => {
+                setLlmProviderId(e.target.value);
+                setLlmModelId('');
+              }}
+              disabled={fieldsDisabled || isEnhancing}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">{tEnhance('providerAuto')}</option>
+              {options?.llmProviders.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs" htmlFor="studio-llm-model">
+            <span className="text-ink-muted">{tEnhance('modelLabel')}</span>
+            <select
+              id="studio-llm-model"
+              value={llmModelId}
+              onChange={(e) => setLlmModelId(e.target.value)}
+              disabled={fieldsDisabled || isEnhancing}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">{tEnhance('modelAuto')}</option>
+              {filteredLlmModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name} ({m.model_id})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={handleEnhance}
+          disabled={!canEnhance}
+          aria-busy={isEnhancing}
+          title={!prompt.trim() || prompt.trim().length < 10 ? tForm('promptMin') : tEnhance('button')}
+          className="mt-2 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary disabled:opacity-50"
+        >
+          {isEnhancing ? tEnhance('working') : tEnhance('button')}
+        </button>
+
+        {proposed ? (
+          <div className="mt-3 rounded-md border border-amber-300 bg-amber-50/40 p-3 text-xs">
+            <p className="font-semibold text-amber-900">{tEnhance('sideBySide')}</p>
+            <div className="mt-2 grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-line bg-surface p-2">
+                <p className="text-[11px] font-semibold text-ink-muted">{tEnhance('yourDraft')}</p>
+                <p className="mt-1 text-ink">{prompt || '—'}</p>
+                <p className="mt-2 text-ink-muted">Negative: {negative || '—'}</p>
+              </div>
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
+                <p className="text-[11px] font-semibold text-primary">{tEnhance('llmSuggestion')}</p>
+                <p className="mt-1 text-ink">{proposed.prompt}</p>
+                <p className="mt-2 text-ink-muted">Negative: {proposed.negative || '—'}</p>
+              </div>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={acceptProposed} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
+                {tEnhance('accept')}
+              </button>
+              <button type="button" onClick={() => setProposed(null)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs">
+                {tEnhance('cancel')}
+              </button>
+              {prevPrompt ? (
+                <button
+                  type="button"
+                  onClick={() => { setPrompt(prevPrompt.prompt); setNegative(prevPrompt.negative); setPrevPrompt(null); setNotice(tEnhance('reverted')); }}
+                  className="text-xs text-ink-muted hover:text-primary"
+                >
+                  {tEnhance('undo')}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {notice ? (
         <p role="status" className="text-sm text-ink-muted">

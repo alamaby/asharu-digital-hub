@@ -1,46 +1,134 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Copy, Download, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { StudioGenerationRow } from '@/lib/studio/types';
+import type { Locale } from '@/i18n/routing';
+import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
+import type { StudioGenerationRow, StudioListOptions } from '@/lib/studio/types';
 import { retryFailedStudioImage, deleteStudioImage, listUserImages } from '@/lib/studio/actions';
+
+interface OptionLists {
+  providers: { id: string; slug: string; display_name: string }[];
+  models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  styles: { slug: string; display_name: string }[];
+  subjects: { slug: string; display_name: string }[];
+  cameras: { slug: string; display_name: string }[];
+  aspects: { slug: string; display_name: string; width: number; height: number }[];
+}
 
 interface Props {
   images: StudioGenerationRow[];
   pollingIntervalSec: number;
-  /** Katalog provider/model aktif — untuk label request saat antre (bukan "auto"). */
-  options?: {
-    providers: { id: string; slug: string; display_name: string }[];
-    models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
-  } | null;
+  /** Katalog opsi aktif — untuk toolbar filter + label request saat antre. */
+  options?: OptionLists | null;
+  locale: Locale;
+  timeZone: string;
+  /** Dipanggil saat user menekan "Pakai ulang" — form diisi dari baris ini. */
+  onReuse?: (img: StudioGenerationRow) => void;
 }
 
-export function StudioHistory({ images: initialImages, pollingIntervalSec, options }: Props) {
+export interface HistoryFilters {
+  status: 'all' | 'pending' | 'ready' | 'failed';
+  providerId: string;
+  modelId: string;
+  styleSlug: string;
+  subjectSlug: string;
+  cameraSlug: string;
+  aspectSlug: string;
+  sortBy: 'created_at' | 'updated_at';
+  dir: 'desc' | 'asc';
+}
+
+const DEFAULT_FILTERS: HistoryFilters = {
+  status: 'all',
+  providerId: '',
+  modelId: '',
+  styleSlug: '',
+  subjectSlug: '',
+  cameraSlug: '',
+  aspectSlug: '',
+  sortBy: 'created_at',
+  dir: 'desc'
+};
+
+function toListOptions(f: HistoryFilters): StudioListOptions {
+  return {
+    status: f.status,
+    limit: 50,
+    sortBy: f.sortBy,
+    dir: f.dir,
+    providerId: f.providerId || null,
+    modelId: f.modelId || null,
+    styleSlug: f.styleSlug || null,
+    subjectSlug: f.subjectSlug || null,
+    cameraSlug: f.cameraSlug || null,
+    aspectSlug: f.aspectSlug || null
+  };
+}
+
+const STATUS_CLASS: Record<string, string> = {
+  ready: 'bg-sky-100 text-sky-800',
+  failed: 'bg-red-100 text-red-800',
+  pending: 'bg-amber-100 text-amber-800'
+};
+
+const selectCls =
+  'w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary';
+
+function prettyMeta(meta: Record<string, unknown> | null): string {
+  if (!meta) return '—';
+  try {
+    return JSON.stringify(meta, null, 2);
+  } catch {
+    return String(meta);
+  }
+}
+
+export function StudioHistory({ images: initialImages, pollingIntervalSec, options, locale, timeZone, onReuse }: Props) {
   const tHist = useTranslations('studio.history');
   const tNotice = useTranslations('studio.notice');
 
   const [images, setImages] = useState<StudioGenerationRow[]>(initialImages);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1, loop: false });
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_FILTERS);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const count = images.length;
   const pendingImages = images.filter((i) => i.status === 'pending');
+  const filtersActive =
+    filters.status !== 'all' ||
+    filters.providerId !== '' ||
+    filters.modelId !== '' ||
+    filters.styleSlug !== '' ||
+    filters.subjectSlug !== '' ||
+    filters.cameraSlug !== '' ||
+    filters.aspectSlug !== '';
 
+  function refresh(next?: HistoryFilters) {
+    startTransition(async () => {
+      try {
+        const refreshed = await listUserImages(toListOptions(next ?? filters));
+        setImages(refreshed);
+      } catch {
+        // polling/refresh gagal diam-diam, coba lagi di tick berikutnya
+      }
+    });
+  }
+
+  // Polling hanya saat ada antrean; filter aktif ikut dibawa.
   useEffect(() => {
     if (pendingImages.length === 0) return;
     let active = true;
+    const current = toListOptions(filters);
     const timer = setInterval(() => {
       startTransition((): Promise<void> =>
         (async () => {
           try {
-            const refreshed = await listUserImages({ limit: 30 });
+            const refreshed = await listUserImages(current);
             if (active) setImages(refreshed);
           } catch {
             // polling gagal diam-diam, coba lagi di tick berikutnya
@@ -52,13 +140,21 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
       active = false;
       clearInterval(timer);
     };
-  }, [pendingImages, pollingIntervalSec]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImages.length > 0, filters.status, filters.providerId, filters.modelId, filters.styleSlug, filters.subjectSlug, filters.cameraSlug, filters.aspectSlug, filters.sortBy, filters.dir, pollingIntervalSec]);
 
-  useEffect(() => {
-    if (!emblaApi) return;
-    const onSelect = () => setSelectedIndex(emblaApi.selectedScrollSnap());
-    emblaApi.on('select', onSelect);
-  }, [emblaApi]);
+  function setFilter<K extends keyof HistoryFilters>(key: K, value: HistoryFilters[K]) {
+    const next: HistoryFilters = { ...filters, [key]: value };
+    // Ganti provider → reset model agar tidak nyangkut di provider lama.
+    if (key === 'providerId') next.modelId = '';
+    setFilters(next);
+    refresh(next);
+  }
+
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS);
+    refresh(DEFAULT_FILTERS);
+  }
 
   async function download(img: StudioGenerationRow) {
     const url = img.public_url;
@@ -84,14 +180,30 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     }
   }
 
+  async function copyPrompt(img: StudioGenerationRow) {
+    const text = img.image_prompt;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedId(img.id);
+    setTimeout(() => setCopiedId((cur) => (cur === img.id ? null : cur)), 2000);
+  }
+
   function retry(imgId: string) {
     setRetryingId(imgId);
     setNotice(tNotice('processing'));
     startTransition(async () => {
       try {
         await retryFailedStudioImage(imgId);
-        const refreshed = await listUserImages({ limit: 30 });
-        setImages(refreshed);
+        refresh();
         setNotice(tNotice('enqueue'));
       } catch (e) {
         setNotice(e instanceof Error ? e.message : tHist('retry'));
@@ -117,9 +229,8 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
   }
 
   function metaLabel(img: StudioGenerationRow): string {
-    // Baris hasil: tampilkan provider/model aktual. Baris antre (slug '')
-    // dengan pin user: tampilkan yang diminta + "(antre)" agar tidak
-    // disangka Auto (kasus cloudflare→pixazo 11 Sep 2026).
+    // Baris hasil: provider/model aktual. Baris antre (slug '') dengan pin
+    // user: yang diminta + "(antre)" agar tidak disangka Auto.
     if (!img.provider_slug && !img.model_slug && img.status === 'pending' && img.model_id && options) {
       const model = options.models.find((m) => m.id === img.model_id);
       if (model) {
@@ -140,169 +251,292 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     });
   }
 
-  if (count === 0) {
-    return null;
-  }
+  const filteredModels = filters.providerId
+    ? (options?.models ?? []).filter((m) => m.provider_id === filters.providerId)
+    : (options?.models ?? []);
+  const hasImages = images.length > 0;
 
   return (
     <div className="mt-8">
       <h2 className="text-lg font-semibold text-ink">{tHist('heading')}</h2>
 
-      <div role="region" aria-label={tHist('heading')}>
-        <div ref={emblaRef} className="overflow-hidden rounded-lg">
-          <div className="flex">
-            {images.map((img, idx) => {
-              const isCurrent = idx === selectedIndex;
-              return (
-                <div
-                  key={img.id}
-                  data-testid="studio-slide"
-                  className="min-w-0 flex-[0_0_100%]"
-                  inert={isCurrent ? undefined : true}
+      {/* Toolbar: sort + filter primer, sisanya di "Filter lanjutan". */}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="grid gap-1 text-xs">
+          <span className="text-ink-muted">{tHist('filterStatus')}</span>
+          <select
+            value={filters.status}
+            onChange={(e) => setFilter('status', e.target.value as HistoryFilters['status'])}
+            className={selectCls}
+          >
+            <option value="all">{tHist('all')}</option>
+            <option value="pending">{tHist('pending')}</option>
+            <option value="ready">{tHist('ready')}</option>
+            <option value="failed">{tHist('failed')}</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs">
+          <span className="text-ink-muted">{tHist('filterProvider')}</span>
+          <select value={filters.providerId} onChange={(e) => setFilter('providerId', e.target.value)} className={selectCls}>
+            <option value="">{tHist('all')}</option>
+            {(options?.providers ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs">
+          <span className="text-ink-muted">{tHist('filterModel')}</span>
+          <select value={filters.modelId} onChange={(e) => setFilter('modelId', e.target.value)} className={selectCls}>
+            <option value="">{tHist('all')}</option>
+            {filteredModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.provider_slug} · {m.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs">
+          <span className="text-ink-muted">{tHist('sortLabel')}</span>
+          <select
+            value={`${filters.sortBy}:${filters.dir}`}
+            onChange={(e) => {
+              const [sortBy, dir] = e.target.value.split(':') as [HistoryFilters['sortBy'], HistoryFilters['dir']];
+              const next = { ...filters, sortBy, dir };
+              setFilters(next);
+              refresh(next);
+            }}
+            className={selectCls}
+          >
+            <option value="created_at:desc">{tHist('sortNewest')}</option>
+            <option value="created_at:asc">{tHist('sortOldest')}</option>
+            <option value="updated_at:desc">{tHist('sortUpdatedDesc')}</option>
+            <option value="updated_at:asc">{tHist('sortUpdatedAsc')}</option>
+          </select>
+        </label>
+      </div>
+
+      <details className="mt-2 rounded-lg border border-line bg-surface px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-ink">{tHist('advancedFilters')}</summary>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="grid gap-1 text-xs">
+            <span className="text-ink-muted">{tHist('filterStyle')}</span>
+            <select value={filters.styleSlug} onChange={(e) => setFilter('styleSlug', e.target.value)} className={selectCls}>
+              <option value="">{tHist('all')}</option>
+              {(options?.styles ?? []).map((s) => (
+                <option key={s.slug} value={s.slug}>
+                  {s.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="text-ink-muted">{tHist('filterSubject')}</span>
+            <select value={filters.subjectSlug} onChange={(e) => setFilter('subjectSlug', e.target.value)} className={selectCls}>
+              <option value="">{tHist('all')}</option>
+              {(options?.subjects ?? []).map((s) => (
+                <option key={s.slug} value={s.slug}>
+                  {s.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="text-ink-muted">{tHist('filterCamera')}</span>
+            <select value={filters.cameraSlug} onChange={(e) => setFilter('cameraSlug', e.target.value)} className={selectCls}>
+              <option value="">{tHist('all')}</option>
+              {(options?.cameras ?? []).map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs">
+            <span className="text-ink-muted">{tHist('filterAspect')}</span>
+            <select value={filters.aspectSlug} onChange={(e) => setFilter('aspectSlug', e.target.value)} className={selectCls}>
+              <option value="">{tHist('all')}</option>
+              {(options?.aspects ?? []).map((a) => (
+                <option key={a.slug} value={a.slug}>
+                  {a.display_name} ({a.width}×{a.height})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {filtersActive ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={isPending}
+            className="mt-2 text-xs text-primary hover:underline disabled:opacity-50"
+          >
+            {tHist('clearFilters')}
+          </button>
+        ) : null}
+      </details>
+
+      {!hasImages ? (
+        <p className="mt-4 text-sm text-ink-muted" role="status">
+          {filtersActive ? tHist('noResults') : tHist('empty')}
+        </p>
+      ) : (
+        <ol className="mt-4 space-y-4">
+          {images.map((img, idx) => (
+            <li key={img.id} data-testid="studio-row" className="rounded-lg border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_CLASS[img.status] ?? 'bg-surface text-ink-muted'}`}
                 >
-                  <div className="rounded-lg border border-line bg-surface p-4">
-                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                          img.status === 'ready'
-                            ? 'bg-sky-100 text-sky-800'
-                            : img.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {img.status === 'ready' ? tHist('ready') : img.status === 'failed' ? tHist('failed') : tHist('pending')}
-                      </span>
-                      <span className="text-[11px] text-ink-muted">{metaLabel(img)}</span>
-                    </div>
+                  {img.status === 'ready' ? tHist('ready') : img.status === 'failed' ? tHist('failed') : tHist('pending')}
+                </span>
+                <span className="text-[11px] text-ink-muted">{metaLabel(img)}</span>
+                <span className="ml-auto text-[11px] tabular-nums text-ink-muted" title={img.created_at}>
+                  {formatDateTime(img.created_at, locale, timeZone)}
+                </span>
+              </div>
 
-                    {img.public_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={img.public_url}
-                        alt={tHist('imageAlt', { current: idx + 1, total: count })}
-                        className="w-full max-h-64 rounded object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-40 w-full items-center justify-center rounded border border-line bg-line/20">
-                        <span className="text-xs text-ink-muted">
-                          {img.status === 'pending'
-                            ? tHist('processing')
-                            : img.last_error
-                            ? tHist('loadError', { error: img.last_error })
-                            : tHist('noImage')}
-                        </span>
-                      </div>
-                    )}
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                {img.public_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={img.public_url}
+                    alt={tHist('imageAlt', { current: idx + 1, total: images.length })}
+                    className="w-full max-h-48 rounded object-cover sm:w-40 sm:shrink-0"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-24 w-full items-center justify-center rounded border border-line bg-line/20 sm:w-40 sm:shrink-0">
+                    <span className="px-2 text-center text-xs text-ink-muted">
+                      {img.status === 'pending'
+                        ? tHist('processing')
+                        : img.last_error
+                        ? tHist('loadError', { error: img.last_error.slice(0, 120) })
+                        : tHist('noImage')}
+                    </span>
+                  </div>
+                )}
 
-                    <p className="mt-2 text-xs text-ink-muted line-clamp-2 break-words" title={img.image_prompt}>
-                      {img.image_prompt}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-ink">{tHist('promptLabel')}</p>
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink">{img.image_prompt}</p>
+                  {img.negative_prompt ? (
+                    <p className="mt-1 text-[11px] text-ink-muted">
+                      {tHist('negativeLabel')}: {img.negative_prompt}
                     </p>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {img.public_url && img.status === 'ready' ? (
-                        <button
-                          type="button"
-                          onClick={() => download(img)}
-                          disabled={isPending || downloadingId === img.id}
-                          aria-busy={downloadingId === img.id}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50"
-                        >
-                          <Download className="h-3 w-3" aria-hidden />
-                          {downloadingId === img.id ? tHist('downloading') : tHist('download')}
-                        </button>
-                      ) : null}
-                      {img.public_url && img.status === 'ready' ? (
-                        <a
-                          href={img.public_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
-                        >
-                          <svg
-                            className="h-3 w-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            aria-hidden
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10 6H8a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V8a2 2 0 00-2-2h-2"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                          </svg>
-                          {tHist('view')}
-                        </a>
-                      ) : null}
-                      {img.status === 'failed' && (
-                        <button
-                          type="button"
-                          onClick={() => retry(img.id)}
-                          disabled={isPending || retryingId === img.id}
-                          aria-busy={retryingId === img.id}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50"
-                        >
-                          <RefreshCw className="h-3 w-3" aria-hidden />
-                          {retryingId === img.id ? tHist('retrying') : tHist('retry')}
-                        </button>
-                      )}
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyPrompt(img)}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
+                    >
+                      {copiedId === img.id ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+                      {copiedId === img.id ? tHist('copied') : tHist('copy')}
+                    </button>
+                    {onReuse ? (
                       <button
                         type="button"
-                        onClick={() => del(img)}
-                        disabled={isPending || deletingId === img.id}
-                        aria-busy={deletingId === img.id}
-                        className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                        onClick={() => onReuse(img)}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
                       >
-                        <Trash2 className="h-3 w-3" aria-hidden />
-                        {deletingId === img.id ? tHist('deleting') : tHist('delete')}
+                        <RotateCcw className="h-3 w-3" aria-hidden />
+                        {tHist('reuse')}
                       </button>
-                    </div>
+                    ) : null}
+                    {img.public_url && img.status === 'ready' ? (
+                      <button
+                        type="button"
+                        onClick={() => download(img)}
+                        disabled={isPending || downloadingId === img.id}
+                        aria-busy={downloadingId === img.id}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50"
+                      >
+                        <Download className="h-3 w-3" aria-hidden />
+                        {downloadingId === img.id ? tHist('downloading') : tHist('download')}
+                      </button>
+                    ) : null}
+                    {img.public_url && img.status === 'ready' ? (
+                      <a
+                        href={img.public_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
+                      >
+                        {tHist('view')}
+                      </a>
+                    ) : null}
+                    {img.status === 'failed' && (
+                      <button
+                        type="button"
+                        onClick={() => retry(img.id)}
+                        disabled={isPending || retryingId === img.id}
+                        aria-busy={retryingId === img.id}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover disabled:opacity-50"
+                      >
+                        <RefreshCw className="h-3 w-3" aria-hidden />
+                        {retryingId === img.id ? tHist('retrying') : tHist('retry')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => del(img)}
+                      disabled={isPending || deletingId === img.id}
+                      aria-busy={deletingId === img.id}
+                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3 w-3" aria-hidden />
+                      {deletingId === img.id ? tHist('deleting') : tHist('delete')}
+                    </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
 
-        {count > 1 ? (
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => emblaApi?.scrollPrev()}
-              disabled={selectedIndex === 0}
-              aria-label={tHist('prevSlide')}
-              className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
-            >
-              <ChevronLeft className="size-4" aria-hidden />
-            </button>
-            <span data-testid="slide-counter" aria-live="polite" className="text-xs tabular-nums text-ink-muted">
-              {selectedIndex + 1}/{count}
-            </span>
-            <button
-              type="button"
-              onClick={() => emblaApi?.scrollNext()}
-              disabled={selectedIndex === count - 1}
-              aria-label={tHist('nextSlide')}
-              className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
-            >
-              <ChevronRight className="size-4" aria-hidden />
-            </button>
-          </div>
-        ) : null}
-      </div>
+              {/* Detail log: last_error penuh + attempts + llm_meta + timestamp. */}
+              <details className="mt-2 rounded-md border border-line/60 bg-background px-2 py-1.5 text-[11px]">
+                <summary className="cursor-pointer font-medium text-ink-muted">{tHist('detailLog')}</summary>
+                <dl className="mt-1.5 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('createdAt')}</dt>
+                    <dd className="tabular-nums text-ink">{formatDateTimeSeconds(img.created_at, locale, timeZone)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('updatedAt')}</dt>
+                    <dd className="tabular-nums text-ink">{formatDateTimeSeconds(img.updated_at, locale, timeZone)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('attempts')}</dt>
+                    <dd className="text-ink">{img.attempts}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('dimensions')}</dt>
+                    <dd className="text-ink">{img.width && img.height ? `${img.width}×${img.height}` : '—'}</dd>
+                  </div>
+                </dl>
+                {img.last_error ? (
+                  <div className="mt-1.5">
+                    <p className="font-medium text-ink-muted">{tHist('lastError')}</p>
+                    <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-red-700">
+                      {img.last_error}
+                    </pre>
+                  </div>
+                ) : null}
+                <div className="mt-1.5">
+                  <p className="font-medium text-ink-muted">{tHist('llmMeta')}</p>
+                  <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-ink">
+                    {prettyMeta(img.llm_meta)}
+                  </pre>
+                </div>
+              </details>
+            </li>
+          ))}
+        </ol>
+      )}
 
       {notice ? (
         <p role="status" className="mt-2 text-sm text-ink-muted">

@@ -75,6 +75,38 @@ export interface StudioOptions {
   cameras: { slug: string; display_name: string }[];
   aspects: StudioAspectRow[];
   config: StudioConfig;
+  /** Pilihan provider/model LLM untuk tombol enhance prompt (llm_* aktif). */
+  llmProviders: { id: string; slug: string; display_name: string }[];
+  llmModels: { id: string; provider_id: string; model_id: string; display_name: string }[];
+}
+
+/** Filter + sort riwayat studio (semua kolom sudah ada di user_image_generations). */
+export interface StudioListOptions {
+  status?: 'pending' | 'ready' | 'failed' | 'all';
+  limit?: number;
+  /** Sort tanggal: dibuat (default) atau diperbarui. */
+  sortBy?: 'created_at' | 'updated_at';
+  dir?: 'asc' | 'desc';
+  /** Pin request user (UUID) — baris Auto (null) tidak ikut filter ini. */
+  providerId?: string | null;
+  modelId?: string | null;
+  /** Parameter enqueue berbasis slug. */
+  styleSlug?: string | null;
+  subjectSlug?: string | null;
+  cameraSlug?: string | null;
+  aspectSlug?: string | null;
+}
+
+/** Hasil enhance prompt studio (bentuk sama dengan EnhancePromptResult review). */
+export interface StudioEnhanceResult {
+  image_prompt: string;
+  negative_prompt?: string;
+  reasoning: {
+    visual_strategy: string;
+    hook_keywords?: string[];
+    contradiction_check?: string;
+    justification?: string;
+  };
 }
 
 export interface StudioQuota {

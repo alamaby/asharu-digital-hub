@@ -1,9 +1,23 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/require-user';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { DEFAULT_STUDIO_CONFIG, type StudioConfig, type StudioGenerationRow, type StudioOptions, type StudioQuota } from './types';
+import { getServiceClient } from '@/lib/supabase/service';
+import { runLLMCompletion } from '@/lib/llm/completion';
+import { resolveStageModel } from '@/lib/llm/stage-defaults';
+import { buildStudioEnhanceMessages, parseImagePrompt, validateImagePromptContradiction } from '@/lib/image/prompt';
+import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
+import {
+  DEFAULT_STUDIO_CONFIG,
+  type StudioConfig,
+  type StudioGenerationRow,
+  type StudioListOptions,
+  type StudioOptions,
+  type StudioQuota,
+  type StudioEnhanceResult
+} from './types';
 import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink } from './validation';
 import { removeUserImage } from './storage';
 
@@ -27,12 +41,13 @@ export async function getStudioConfig(): Promise<StudioConfig> {
 /**
  * Opsi picker studio (tanpa secret): provider+model+style+subjek+aspek aktif.
  * Auto = null (waterfall prioritas / default config).
+ * Plus opsi LLM (llm_* aktif) untuk tombol enhance prompt.
  */
 export async function listStudioOptions(): Promise<StudioOptions> {
   await requireUser();
   const supabase = svc();
   const config = await getStudioConfig();
-  const [{ data: providers }, { data: models }, { data: styles }, { data: subjects }, { data: cameras }, { data: aspects }] =
+  const [{ data: providers }, { data: models }, { data: styles }, { data: subjects }, { data: cameras }, { data: aspects }, { data: llmProviders }, { data: llmModels }] =
     await Promise.all([
       supabase.from('image_providers').select('id, slug, display_name').eq('is_active', true).order('priority'),
       supabase
@@ -53,7 +68,9 @@ export async function listStudioOptions(): Promise<StudioOptions> {
         .eq('is_active', true)
         .order('sort_order')
         .order('slug'),
-      supabase.from('image_aspect_ratios').select('*').eq('is_active', true).order('sort_order')
+      supabase.from('image_aspect_ratios').select('*').eq('is_active', true).order('sort_order'),
+      supabase.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority'),
+      supabase.from('llm_models').select('id, provider_id, model_id, display_name').eq('is_active', true).order('priority')
     ]);
   const mappedModels = ((models ?? []) as unknown as Array<{
     id: string;
@@ -69,7 +86,9 @@ export async function listStudioOptions(): Promise<StudioOptions> {
     subjects: (subjects ?? []) as StudioOptions['subjects'],
     cameras: (cameras ?? []) as StudioOptions['cameras'],
     aspects: (aspects ?? []) as StudioOptions['aspects'],
-    config
+    config,
+    llmProviders: (llmProviders ?? []) as StudioOptions['llmProviders'],
+    llmModels: (llmModels ?? []) as StudioOptions['llmModels']
   };
 }
 
@@ -169,22 +188,137 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
   return { imageId: (created as { id: string }).id, expiresAt: (created as { expires_at: string }).expires_at };
 }
 
-/** Histori milik user (terbaru dulu, default 20). Baris expired disembunyikan. */
-export async function listUserImages(options?: { status?: 'pending' | 'ready' | 'failed' | 'all'; limit?: number }): Promise<StudioGenerationRow[]> {
+/**
+ * Histori milik user (default terbaru dulu). Baris expired disembunyikan.
+ * Filter per parameter enqueue + sort tanggal (semua kolom sudah ada di tabel).
+ */
+export async function listUserImages(options?: StudioListOptions): Promise<StudioGenerationRow[]> {
   const { id: userId } = await requireUser();
   const supabase = svc();
   const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
+  const sortBy = options?.sortBy === 'updated_at' ? 'updated_at' : 'created_at';
+  const ascending = options?.dir === 'asc';
   let q = supabase
     .from('user_image_generations')
     .select('*')
     .eq('user_id', userId)
     .gte('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
+    .order(sortBy, { ascending })
     .limit(limit);
   if (options?.status && options.status !== 'all') q = q.eq('status', options.status);
+  if (options?.providerId) q = q.eq('provider_id', options.providerId);
+  if (options?.modelId) q = q.eq('model_id', options.modelId);
+  if (options?.styleSlug) q = q.eq('style_slug', options.styleSlug);
+  if (options?.subjectSlug) q = q.eq('subject_slug', options.subjectSlug);
+  if (options?.cameraSlug) q = q.eq('camera_slug', options.cameraSlug);
+  if (options?.aspectSlug) q = q.eq('aspect_slug', options.aspectSlug);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as StudioGenerationRow[];
+}
+
+export interface EnhanceStudioInput {
+  prompt: string;
+  negativePrompt?: string | null;
+  styleSlug?: string | null;
+  /** Pin model LLM (UUID llm_models.id). Null = Auto = stage default enhance. */
+  llmModelId?: string | null;
+}
+
+/**
+ * Enhance (polish) prompt di form Studio — side-by-side Terima/Batal.
+ * Tanpa konteks postingan (Studio prompt bebas): style suffix hanya hint,
+ * gate self-consistency (panjang + strategi valid).
+ * Stage: enhance_image_prompt; rate limit 30/jam TERPISAH dari kuota
+ * generate harian agar eksplorasi prompt tidak memotong kuota.
+ */
+export async function enhanceStudioPrompt(input: EnhanceStudioInput): Promise<StudioEnhanceResult> {
+  await requireUser();
+  const config = await getStudioConfig();
+  const maxPrompt = config.max_prompt_length;
+
+  const draftPrompt = input.prompt?.trim() ?? '';
+  if (!draftPrompt || draftPrompt.length < 10) throw new Error('Prompt minimal 10 karakter (isi dulu di textarea).');
+  if (draftPrompt.length > maxPrompt) throw new Error(`Prompt maksimal ${maxPrompt} karakter.`);
+  const negDraft = input.negativePrompt?.trim().slice(0, 300) ?? null;
+
+  // Validasi pin LLM aktif (sekali jalan, tanpa secret).
+  if (input.llmModelId) {
+    const { data: lm } = await svc()
+      .from('llm_models')
+      .select('id')
+      .eq('id', input.llmModelId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!lm) throw new Error('Model LLM tidak aktif — refresh pilihan.');
+  }
+
+  // Style hint (suffix) mengikuti pilihan picker studio, bukan default global.
+  let styleSuffix: string | null = null;
+  if (input.styleSlug) {
+    const { data: st } = await svc()
+      .from('image_style_presets')
+      .select('prompt_suffix')
+      .eq('slug', input.styleSlug)
+      .eq('is_active', true)
+      .maybeSingle();
+    styleSuffix = ((st as { prompt_suffix?: string } | null)?.prompt_suffix ?? null) || null;
+  }
+
+  // Rate limit 30/jam (bucket sendiri: enhance_studio_prompt).
+  const hdrs = await headers();
+  const ip = getClientIp(hdrs);
+  const { allowed, count } = await checkRateLimit(ip, 'enhance_studio_prompt', 30);
+  if (!allowed) throw new Error(`rate_limit:${count} — enhance 30/jam`);
+
+  const { system, user } = buildStudioEnhanceMessages({
+    promptDraft: draftPrompt.slice(0, maxPrompt),
+    negativeDraft: negDraft,
+    styleSuffix: styleSuffix ?? undefined
+  });
+
+  const { providerId, modelUuid } = await resolveStageModel('enhance_image_prompt', input.llmModelId ?? null);
+  const llm = getServiceClient();
+
+  async function attempt(temperature: number, gateNote?: string) {
+    const msgs = [
+      { role: 'system' as const, content: system },
+      { role: 'user' as const, content: gateNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${gateNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
+    ];
+    const out = await runLLMCompletion(llm, {
+      stage: 'enhance_image_prompt',
+      providerId,
+      modelUuid,
+      messages: msgs,
+      temperature,
+      maxTokens: 500
+    });
+    return { parsed: parseImagePrompt(out.output.text) };
+  }
+
+  // Gate konsisten dengan worker konten: self-check panjang + strategi valid.
+  let chosen = await attempt(0.5);
+  const gate = validateImagePromptContradiction(
+    { image_prompt: chosen.parsed.image_prompt, negative_prompt: chosen.parsed.negative_prompt, reasoning: chosen.parsed.reasoning },
+    draftPrompt
+  );
+  if (!gate.ok) {
+    const retry = await attempt(0.3, gate.reasons.join('; '));
+    const gate2 = validateImagePromptContradiction(
+      { image_prompt: retry.parsed.image_prompt, negative_prompt: retry.parsed.negative_prompt, reasoning: retry.parsed.reasoning },
+      draftPrompt
+    );
+    if (!gate2.ok) throw new Error(`enhance gate: ${[...gate.reasons, ...gate2.reasons].join(' | ').slice(0, 500)}`);
+    chosen = retry;
+  }
+
+  await incrementRateLimit(ip, 'enhance_studio_prompt').catch(() => {});
+
+  return {
+    image_prompt: chosen.parsed.image_prompt,
+    negative_prompt: chosen.parsed.negative_prompt,
+    reasoning: chosen.parsed.reasoning
+  };
 }
 
 /** Detail 1 hasil milik user (untuk polling status). */

@@ -5,6 +5,7 @@ import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { listStudioOptions, listUserImages, getStudioQuota } from '@/lib/studio/actions';
 import { StudioPageClient } from '@/components/studio/StudioPageClient';
 import type { StudioOptions, StudioQuota, StudioGenerationRow } from '@/lib/studio/types';
@@ -49,11 +50,13 @@ export default async function StudioPage({ params }: PageProps) {
   let quota: StudioQuota | null = null;
   let images: StudioGenerationRow[] = [];
   let err: string | null = null;
+  // Zona waktu display user untuk timestamp riwayat (pola admin/llm/logs).
+  const timeZone = await getDisplayTimezone();
   try {
     [options, quota, images] = await Promise.all([
       listStudioOptions(),
       getStudioQuota(),
-      listUserImages({ limit: 30 })
+      listUserImages({ limit: 50 })
     ]);
   } catch (e) {
     err = e instanceof Error ? e.message : String(e);
@@ -62,6 +65,7 @@ export default async function StudioPage({ params }: PageProps) {
   return (
     <StudioPageClient
       locale={locale}
+      timeZone={timeZone}
       options={options}
       quota={quota}
       images={images}

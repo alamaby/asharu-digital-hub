@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import type { Locale } from '@/i18n/routing';
 import type { StudioOptions, StudioQuota } from '@/lib/studio/types';
 import { StudioForm } from './StudioForm';
 import { StudioHistory } from './StudioHistory';
@@ -9,15 +11,20 @@ import type { StudioGenerationRow } from '@/lib/studio/types';
 
 interface Props {
   locale: string;
+  /** Zona waktu display user untuk timestamp riwayat. */
+  timeZone: string;
   options: StudioOptions | null;
   quota: StudioQuota | null;
   images: StudioGenerationRow[];
   error: string | null;
 }
 
-export function StudioPageClient({ locale, options, quota, images, error }: Props) {
+export function StudioPageClient({ locale, timeZone, options, quota, images, error }: Props) {
   const t = useTranslations('studio');
   const tNav = useTranslations('nav');
+
+  // "Pakai ulang" dari riwayat → form diisi dari baris ini (sekali per klik).
+  const [reuseRow, setReuseRow] = useState<StudioGenerationRow | null>(null);
 
   const pollingIntervalSec = options?.config.polling_interval_sec ?? 10;
   const remaining = quota?.remaining ?? null;
@@ -62,14 +69,21 @@ export function StudioPageClient({ locale, options, quota, images, error }: Prop
       )}
 
       <div className="mt-8 rounded-lg border border-line bg-surface p-6 shadow-card">
-        <StudioForm options={options} quota={quota} />
+        <StudioForm options={options} quota={quota} reuseRow={reuseRow} />
       </div>
 
-      {images.length > 0 ? (
-        <StudioHistory images={images} pollingIntervalSec={pollingIntervalSec} options={options} />
-      ) : (
-        <p className="mt-6 text-sm text-ink-muted">{t('notice.empty')}</p>
-      )}
+      <StudioHistory
+        images={images}
+        pollingIntervalSec={pollingIntervalSec}
+        options={options}
+        locale={locale as Locale}
+        timeZone={timeZone}
+        onReuse={(img) => {
+          setReuseRow(img);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+      {images.length === 0 ? <p className="mt-6 text-sm text-ink-muted">{t('notice.empty')}</p> : null}
     </div>
   );
 }
