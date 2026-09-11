@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-10 18:10 (local time)
+Last updated: 2026-09-11 10:05 (local time)
 
 ## Current State
 
@@ -52,6 +52,8 @@ Last updated: 2026-09-10 18:10 (local time)
 
 ## Recent Entries
 
+- [100500-image-carousel-download.md](2026-09-11/100500-image-carousel-download.md) — Carousel review: tombol Unduh (fetch → blob → object URL, nama file basename URL, busy state, fallback tab baru saat CORS gagal) + Lihat = open new tab; 391 tests + build hijau.
+- [094000-image-history-carousel.md](2026-09-11/094000-image-history-carousel.md) — Review visual: riwayat generate (cover + per-reply) jadi carousel embla, terbaru di depan, swipe/keyboard/dots + info provider·model·style per slide; blok gambar terpilih & daftar tumpuk dihapus; dep baru embla-carousel-react; gotcha stub matchMedia/IO/RO di test; 389 tests + build hijau, pushed `9ea92c4`.
 - [181000-admin-visual-llm-pattern.md](2026-09-10/181000-admin-visual-llm-pattern.md) — /admin/visual ikut pola admin/llm: root provider+subjek DnD; 3 route detail baru ([providerId] model+key, model config is_default+JSON cosmetic, subjek edit); fix base_url ke kolom; tanpa hapus; 382 tests + build hijau.
 - [165000-image-styles-manga-pencil.md](2026-09-10/165000-image-styles-manga-pencil.md) — 15 style preset generate visual: Manga, Pencil Drawing, Pencil Sketch (+12 varian); migrasi kolom `description`+`negative_prompt` (applied prod); worker merge user+style negative; cloudflare/gemini kini dukung negative; 382 tests + build hijau.
 - [143000-review-multiselect-logs-image-admin.md](2026-09-10/143000-review-multiselect-logs-image-admin.md) — Review: filter Status/Provider/Platform multi + badge platform; logs: tab Image (thumbnail + link draf) + waktu zona-user 3 tab; /admin/visual: urutan provider/model/key image + account_id cloudflare (LLM + image, pair saat tambah key); 376 tests hijau.
@@ -70,10 +72,6 @@ Last updated: 2026-09-10 18:10 (local time)
 - [082900-bing-webmaster-verification.md](2026-09-08/082900-bing-webmaster-verification.md) — Verifikasi Bing Webmaster: `public/BingSiteAuth.xml` di root, gate hijau, pushed `a45947c`; [USER ACTION] tunggu deploy → cek prod → klik Verify.
 - [173000-kamarasan-seo-hyperlocal.md](2026-09-07/173000-kamarasan-seo-hyperlocal.md) — SEO hyperlocal Kamarasan: title/H1 Bojongsoang–Gedebage–Ciwastra (3 mnt), locationGuide+buyingGuide, FAQ 10 + FAQPage, PostalAddress + datePosted, sitemap per-properti; gate hijau (314 tests), pushed `640b4d0`.
 - [163000-image-prompt-reasoning-before.md](2026-09-07/163000-image-prompt-reasoning-before.md) — Image prompt reasoning: default Before untuk pain-hook + gate kontradiksi + kolom reasoning jsonb; gate hijau (314 tests), pushed.
-- [141500-homepage-section-reorder.md](2026-09-07/141500-homepage-section-reorder.md) — Reorder section beranda: afiliasi → properti → toko → medsos → matematika; hero CTA → `#affiliate-products`; gate hijau (308 tests).
-- [134500-facebook-domain-verification.md](2026-09-07/134500-facebook-domain-verification.md) — Verifikasi domain Meta: token site-wide + layout statis (lepas cookies) agar tag literal di `<head>`; gate hijau, siap deploy + klik Verify.
-- [125500-riset-detail-panels-redesign.md](2026-09-07/125500-riset-detail-panels-redesign.md) — Redesign 3 panel detail riset: log clamp+expand+paginasi server, performa chart SVG/CSS + KPI token, parameter 3 kartu grup; 307 tests, build sukses.
-- [114842-riset-b8194a1f-skor-nol-display-fix.md](2026-09-07/114842-riset-b8194a1f-skor-nol-display-fix.md) — Riset b8194a1f: skor 0 = by-design mekanisme dua (verifying+scoring dilewati); fix display jujur (Tanpa skor + stepper Dilewati + hint shortlist), tanpa migrasi; gate hijau.
 
 ## Legacy Archive
 

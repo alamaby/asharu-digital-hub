@@ -51,6 +51,17 @@ function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string
   return { cls: 'border-line bg-background text-ink-muted', text: 'Belum ada gambar.' };
 }
 
+/** Nama file unduhan: basename URL Storage bila berekstensi, else visual-<id>.png. */
+function filenameFor(img: DraftImageRow, url: string): string {
+  try {
+    const base = new URL(url).pathname.split('/').pop();
+    if (base && /\.[a-z0-9]{2,5}$/i.test(base)) return base;
+  } catch {
+    // URL tidak valid — pakai fallback di bawah.
+  }
+  return `visual-${img.id.slice(0, 8)}.png`;
+}
+
 /**
  * Carousel riwayat hasil generate visual (cover & per-reply): slide terbaru di
  * depan, geser (swipe embla), tombol chevron, dots, dan keyboard arrow.
@@ -61,6 +72,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set());
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const latestIdRef = useRef<string | null>(rows[0]?.id ?? null);
   const focusIdRef = useRef<string | null>(rows[0]?.id ?? null);
 
@@ -124,6 +136,32 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
       scrollNext();
+    }
+  }
+
+  async function download(img: DraftImageRow) {
+    const url = img.public_url;
+    if (!url || downloadingId) return;
+    setDownloadingId(img.id);
+    try {
+      // URL Storage lintas origin: atribut download <a> diabaikan browser,
+      // jadi unduh via fetch → blob → object URL.
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filenameFor(img, url);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // CORS/network gagal — fallback: buka di tab baru agar tetap bisa disimpan manual.
+      window.open(url, '_blank', 'noreferrer');
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -192,14 +230,25 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {hasImage ? (
-                    <a
-                      href={img.public_url as string}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`text-primary hover:underline ${isCover ? 'text-xs' : 'text-[11px]'}`}
-                    >
-                      Lihat
-                    </a>
+                    <>
+                      <a
+                        href={img.public_url as string}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`text-primary hover:underline ${isCover ? 'text-xs' : 'text-[11px]'}`}
+                      >
+                        Lihat
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => download(img)}
+                        disabled={isPending || downloadingId !== null}
+                        aria-busy={downloadingId === img.id}
+                        className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
+                      >
+                        {downloadingId === img.id ? 'Mengunduh...' : 'Unduh'}
+                      </button>
+                    </>
                   ) : null}
                   {onSelect && (img.status === 'ready' || img.status === 'selected') && img.id !== selectedId ? (
                     <button

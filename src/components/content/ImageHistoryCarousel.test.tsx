@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
 import type { DraftImageRow } from '@/lib/image/types';
 
@@ -31,9 +31,16 @@ function mockResizeObserver() {
   })));
 }
 
-mockMatchMedia();
-mockIntersectionObserver();
-mockResizeObserver();
+beforeEach(() => {
+  mockMatchMedia();
+  mockIntersectionObserver();
+  mockResizeObserver();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function row(over: Partial<DraftImageRow> & { id: string }): DraftImageRow {
   return {
@@ -144,5 +151,43 @@ describe('ImageHistoryCarousel', () => {
     );
     expect(slideAt(container, 0).textContent).toContain('Masuk antrean');
     expect(slideAt(container, 1).textContent).toContain('Draf prompt otomatis siap');
+  });
+
+  it('downloads the slide image via fetch → blob and revokes the object URL', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(['img-bytes']))
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURL = vi.fn();
+    // jsdom belum mendukung unduhan: cegah anchor.click() memicu navigation.
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const prevCreate = URL.createObjectURL;
+    const prevRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    try {
+      const { container } = render(<ImageHistoryCarousel rows={rows} selectedId="chosen" />);
+      const unduh = Array.from(slideAt(container, 0).querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === 'Unduh');
+      expect(unduh).toBeTruthy();
+      fireEvent.click(unduh as HTMLButtonElement);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('https://cdn.test/1.png'));
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+      await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url'));
+    } finally {
+      URL.createObjectURL = prevCreate;
+      URL.revokeObjectURL = prevRevoke;
+    }
+  });
+
+  it('falls back to opening the image in a new tab when download fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { container } = render(<ImageHistoryCarousel rows={rows} selectedId="chosen" />);
+    const unduh = Array.from(slideAt(container, 0).querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === 'Unduh');
+    expect(unduh).toBeTruthy();
+    fireEvent.click(unduh as HTMLButtonElement);
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith('https://cdn.test/1.png', '_blank', 'noreferrer'));
   });
 });
