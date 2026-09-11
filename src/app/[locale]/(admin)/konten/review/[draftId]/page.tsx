@@ -7,7 +7,6 @@ import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
@@ -202,9 +201,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div>
-      <AdminTopBar />
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={{ pathname: '/konten/review' }} className="text-sm text-primary hover:underline">
           ← {t('backToList')}
@@ -234,7 +231,6 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           coverSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
           imageOptions={{ providers: imageProviders, models: imageModels, styles: imageStyles, subjects: imageSubjects }}
         />
-      </div>
       </div>
     </div>
   );

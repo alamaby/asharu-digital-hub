@@ -11,7 +11,7 @@ interface NavMenuProps {
   onNavigate?: () => void;
 }
 
-/** Primary nav links with `aria-current="page"` on the active route. Note: admin nav is rendered separately via AdminTopBar to avoid crowding. */
+/** Primary nav links with `aria-current="page"` on the active route. Note: admin nav lives in the admin sidebar shell to avoid crowding. */
 export function NavMenu({ variant, items, onNavigate }: NavMenuProps) {
   const t = useTranslations('nav');
   const tHeader = useTranslations('header');

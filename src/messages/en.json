@@ -47,7 +47,8 @@
     }
   },
   "a11y": {
-    "newTab": "(opens in a new tab)"
+    "newTab": "(opens in a new tab)",
+    "breadcrumb": "Breadcrumb"
   },
   "header": {
     "skipToContent": "Skip to main content",
@@ -69,7 +70,15 @@
     "adminLlm": "LLM",
     "adminVisual": "Visual",
     "adminBaru": "New",
-    "adminReview": "Review"
+    "adminReview": "Review",
+    "adminSosial": "Social",
+    "backToSite": "Back to site",
+    "signIn": "Sign in",
+    "groupManage": "Manage",
+    "groupCreate": "Create",
+    "groupOther": "Other",
+    "toggleSidebar": "Toggle sidebar",
+    "toggleTheme": "Toggle light/dark mode"
   },
   "hero": {
     "title": "Everything you need, in one place.",

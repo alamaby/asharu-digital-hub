@@ -4,7 +4,6 @@ import { redirect } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { isAdmin } from '@/lib/auth/is-admin';
-import { AdminTopBar } from '@/components/admin/AdminTopBar';
 
 interface Props {
   children: ReactNode;
@@ -20,10 +19,5 @@ export default async function AdminLayout({ children, params }: Props) {
     redirect({ href: '/masuk', locale });
   }
 
-  return (
-    <div>
-      <AdminTopBar />
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }

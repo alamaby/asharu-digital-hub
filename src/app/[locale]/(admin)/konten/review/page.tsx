@@ -6,7 +6,6 @@ import { routing } from '@/i18n/routing';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
-import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { ReviewListClient } from '@/components/admin/ReviewListClient';
 import { REVIEW_PROVIDERS, REVIEW_STATUSES, parseMultiParam } from '@/lib/admin/review-list';
 
@@ -139,9 +138,7 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
   const timeZone = await getDisplayTimezone();
 
   return (
-    <div>
-      <AdminTopBar />
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
         <p className="mt-2 text-sm text-ink-muted">{t('realtime')}</p>
 
@@ -158,7 +155,6 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
           timeZone={timeZone}
           error={draftsError?.message ?? null}
         />
-      </div>
     </div>
   );
 }

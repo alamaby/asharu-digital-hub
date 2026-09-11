@@ -15,7 +15,10 @@ export interface NavItem {
     | 'adminReview'
     | 'adminRiset'
     | 'adminLlm'
-    | 'adminVisual';
+    | 'adminVisual'
+    | 'adminSosial'
+    | 'backToSite'
+    | 'signIn';
   pathname:
     | '/'
     | '/products'
@@ -27,8 +30,10 @@ export interface NavItem {
     | '/admin/llm'
     | '/admin/llm/logs'
     | '/admin/visual'
+    | '/admin/sosial'
     | '/konten/baru'
-    | '/konten/review';
+    | '/konten/review'
+    | '/masuk';
   /** In-page anchor (homepage sections). */
   hash?: string;
   /** Anchor-only entries never get `aria-current="page"`. */
@@ -53,6 +58,7 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminRiset', pathname: '/admin/riset' },
   { key: 'adminLlm', pathname: '/admin/llm' },
   { key: 'adminVisual', pathname: '/admin/visual' },
+  { key: 'adminSosial', pathname: '/admin/sosial' },
   { key: 'adminBaru', pathname: '/konten/baru' },
   { key: 'adminReview', pathname: '/konten/review' }
 ];

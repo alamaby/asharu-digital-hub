@@ -47,7 +47,8 @@
     }
   },
   "a11y": {
-    "newTab": "(membuka di tab baru)"
+    "newTab": "(membuka di tab baru)",
+    "breadcrumb": "Navigasi breadcrumb"
   },
   "header": {
     "skipToContent": "Langsung ke konten utama",
@@ -69,7 +70,15 @@
     "adminLlm": "LLM",
     "adminVisual": "Visual",
     "adminBaru": "Buat",
-    "adminReview": "Review"
+    "adminReview": "Review",
+    "adminSosial": "Sosial",
+    "backToSite": "Kembali ke situs",
+    "signIn": "Masuk",
+    "groupManage": "Kelola",
+    "groupCreate": "Buat",
+    "groupOther": "Lainnya",
+    "toggleSidebar": "Buka/tutup sidebar",
+    "toggleTheme": "Ganti mode terang/gelap"
   },
   "hero": {
     "title": "Semua yang Anda cari, dalam satu tempat.",

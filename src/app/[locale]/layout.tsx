@@ -4,21 +4,12 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
-import { env } from '@/lib/env';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { pickClientMessages } from '@/lib/i18n/client-messages';
 import { DEFAULT_TIMEZONE } from '@/lib/utils/format';
 import type { Metadata } from 'next';
 import '../globals.css';
-import { JsonLd } from '@/components/ui/JsonLd';
-import { organizationSchema, websiteSchema } from '@/lib/seo/jsonld';
-import { SkipLink } from '@/components/layout/SkipLink';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
 import { TimezoneSync } from '@/components/layout/TimezoneSync';
-import { ConsentBanner } from '@/components/analytics/ConsentBanner';
-import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
-import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -48,6 +39,16 @@ export async function generateMetadata({
   });
 }
 
+/**
+ * Root locale layout — disengaja ramping: hanya font, i18n provider, dan
+ * sinkronisasi zona waktu. Chrome publik (Header/Footer/analytics) tinggal
+ * di `(public)/layout`, shell admin di `(admin)/layout`, sehingga area
+ * non-publik tidak mewarisi chrome pemasaran.
+ *
+ * PENTING SSG: jangan baca cookie/header di sini — itu akan memaksa seluruh
+ * subtree (`/id`, `/en`) menjadi dinamis dan tag `<head>` mengalir via
+ * Flight, tak terlihat crawler tanpa-JS.
+ */
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) {
@@ -66,25 +67,11 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const timeZone = DEFAULT_TIMEZONE;
 
   return (
-    <html lang={locale} className={inter.variable}>
+    <html lang={locale} className={inter.variable} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col bg-background text-ink">
         <NextIntlClientProvider messages={messages} timeZone={timeZone}>
           <TimezoneSync />
-          <SkipLink />
-          <Header />
-          <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
-            {children}
-          </main>
-          <Footer showAnalyticsPrefs={Boolean(env.gaMeasurementId)} />
-          <ConsentBanner enabled={Boolean(env.gaMeasurementId)} />
-          {env.gaMeasurementId ? (
-            <>
-              <GoogleAnalytics measurementId={env.gaMeasurementId} />
-              <PageViewTracker />
-            </>
-          ) : null}
-          <JsonLd data={websiteSchema()} />
-          <JsonLd data={organizationSchema()} />
+          {children}
         </NextIntlClientProvider>
       </body>
     </html>

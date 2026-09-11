@@ -38,11 +38,12 @@ export default async function middleware(request: NextRequest) {
     supabaseResponse = response;
   }
 
-  // Guard admin + /konten/review — only admin; anon or non-admin → /masuk
+  // Guard area non-publik admin — only admin; anon or non-admin → /masuk.
+  // `/konten/baru` dan `/masuk` tetap publik (form anonim + login).
   const pathname = request.nextUrl.pathname;
   const isProtected =
-    /^\/(id|en)\/konten\/review(\/|$)/.test(pathname) ||
-    /^\/(id|en)\/admin\/llm(\/|$)/.test(pathname);
+    /^\/(id|en)\/admin(\/|$)/.test(pathname) ||
+    /^\/(id|en)\/konten\/(review|riset)(\/|$)/.test(pathname);
   if (isProtected) {
     if (!supabase) {
       // Supabase not configured — treat as not authenticated
