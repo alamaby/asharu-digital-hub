@@ -1,5 +1,8 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import { AdminBadge } from '@/components/admin/shell/AdminBadge';
+import { AdminCard } from '@/components/admin/shell/AdminCard';
+import { AdminPageHeader } from '@/components/admin/shell/AdminPageHeader';
 
 interface RecentDraft {
   id: string;
@@ -12,28 +15,40 @@ interface RecentDraft {
   llm_meta?: { provider: string; model: string };
 }
 
+export interface TrendDay {
+  hari: string;
+  draf: number;
+}
+
+export interface FunnelRow {
+  status: string;
+  jumlah: number;
+}
+
+export interface LlmWeek {
+  panggilan: number;
+  sukses_pct: number | null;
+  token_masuk: number;
+  token_keluar: number;
+}
+
 interface DashboardCardsProps {
   pending: number;
   failed: number;
   needsReview: number;
+  awaitingSelection: number;
   email: string;
   recentDrafts: RecentDraft[];
+  trend: TrendDay[];
+  funnel: FunnelRow[];
+  llmWeek: LlmWeek;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === 'needs_review'
-      ? 'bg-amber-50 text-amber-800'
-      : status === 'approved'
-        ? 'bg-emerald-50 text-emerald-800'
-        : status === 'rejected'
-          ? 'bg-red-50 text-red-800'
-          : 'bg-surface text-ink-muted';
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
-      {status}
-    </span>
-  );
+function badgeColor(status: string): 'warning' | 'success' | 'error' | 'neutral' {
+  if (status === 'needs_review') return 'warning';
+  if (status === 'approved') return 'success';
+  if (status === 'rejected' || status === 'failed') return 'error';
+  return 'neutral';
 }
 
 function shortTopic(topic: string, max = 80): string {
@@ -41,73 +56,148 @@ function shortTopic(topic: string, max = 80): string {
   return topic.slice(0, max - 1) + '…';
 }
 
-export function DashboardCards({ pending, failed, needsReview, email, recentDrafts }: DashboardCardsProps) {
+function StatCard({
+  label,
+  value,
+  href,
+  query
+}: {
+  label: string;
+  value: number;
+  href: string;
+  query?: Record<string, string>;
+}) {
+  return (
+    <Link
+      href={{ pathname: href as never, query }}
+      className="rounded-2xl border border-line bg-surface p-5 shadow-card transition-colors hover:border-brand-400 dark:shadow-none"
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
+    </Link>
+  );
+}
+
+export function DashboardCards({
+  pending,
+  failed,
+  needsReview,
+  awaitingSelection,
+  email,
+  recentDrafts,
+  trend,
+  funnel,
+  llmWeek
+}: DashboardCardsProps) {
   const t = useTranslations('admin.dashboard');
+  const maxTrend = Math.max(1, ...trend.map((d) => d.draf));
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-ink-muted">{t('greeting', { email })}</p>
-        </div>
-        <span className="chip border border-primary/30 bg-primary/10 text-primary">{t('roleBadge')}</span>
-      </header>
+    <div className="space-y-6">
+      <AdminPageHeader
+        title={t('title')}
+        intro={t('greeting', { email })}
+        badge={
+          <span className="chip border border-brand-200 bg-brand-50 text-brand-600 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
+            {t('roleBadge')}
+          </span>
+        }
+      />
 
       <section aria-labelledby="queue-heading" className="space-y-3">
-        <h2 id="queue-heading" className="text-lg font-semibold text-ink">{t('queueHeading')}</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Link
-            href={{ pathname: '/admin/konten', query: { type: 'requests', status: 'pending' } }}
-            className="rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
-          >
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('queuePending')}</p>
-            <p className="mt-1 text-3xl font-bold text-ink">{pending}</p>
-          </Link>
-          <Link
-            href={{ pathname: '/admin/konten', query: { type: 'requests', status: 'failed' } }}
-            className="rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
-          >
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('queueFailed')}</p>
-            <p className="mt-1 text-3xl font-bold text-ink">{failed}</p>
-          </Link>
+        <h2 id="queue-heading" className="sr-only">
+          {t('queueHeading')}
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label={t('queuePending')}
+            value={pending}
+            href="/admin/konten"
+            query={{ type: 'requests', status: 'pending' }}
+          />
+          <StatCard
+            label={t('queueFailed')}
+            value={failed}
+            href="/admin/konten"
+            query={{ type: 'requests', status: 'failed' }}
+          />
+          <StatCard
+            label={t('reviewHeading')}
+            value={needsReview}
+            href="/admin/konten"
+            query={{ type: 'drafts', status: 'needs_review' }}
+          />
+          <StatCard
+            label={t('queueAwaiting')}
+            value={awaitingSelection}
+            href="/admin/riset"
+          />
         </div>
       </section>
 
-      <section aria-labelledby="review-heading" className="space-y-3">
-        <div className="flex items-end justify-between">
-          <h2 id="review-heading" className="text-lg font-semibold text-ink">{t('reviewHeading')}</h2>
-          <Link
-            href={{ pathname: '/admin/konten', query: { type: 'drafts', status: 'needs_review' } }}
-            className="text-sm text-primary underline"
-          >
-            {t('actionsReview')}
-          </Link>
-        </div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
-          <p className="text-3xl font-bold text-ink">{needsReview}</p>
-          {needsReview === 0 ? <p className="mt-1 text-sm text-ink-muted">{t('reviewEmpty')}</p> : null}
-        </div>
-      </section>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+        <AdminCard title={t('trendHeading')} desc={t('trendDesc')} className="xl:col-span-3">
+          {trend.length === 0 ? (
+            <p className="text-sm text-ink-muted">{t('recentEmpty')}</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {trend.map((day) => (
+                <li key={day.hari} className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 text-xs tabular-nums text-ink-muted">
+                    {day.hari.slice(5)}
+                  </span>
+                  <span
+                    className="h-2.5 min-w-1 rounded-full bg-brand-500"
+                    style={{ width: `${Math.max(2, Math.round((day.draf / maxTrend) * 100))}%` }}
+                    role="img"
+                    aria-label={`${day.draf} ${t('trendDrafts')}`}
+                  />
+                  <span className="text-xs font-semibold tabular-nums text-ink">{day.draf}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminCard>
 
-      <section aria-labelledby="research-heading" className="space-y-3">
-        <div className="flex items-end justify-between">
-          <h2 id="research-heading" className="text-lg font-semibold text-ink">{t('researchHeading')}</h2>
-          <Link
-            href={{ pathname: '/admin/riset' }}
-            className="text-sm text-primary underline"
-          >
-            {t('actionsResearch')}
-          </Link>
-        </div>
-        <Link
-          href={{ pathname: '/admin/riset' }}
-          className="block rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-ink-muted shadow-card transition-colors hover:border-primary"
-        >
-          <p className="font-medium text-ink">{t('researchHint')}</p>
-          <p className="mt-1">{t('researchCTA')}</p>
-        </Link>
-      </section>
+        <AdminCard title={t('funnelHeading')} desc={t('funnelDesc')} className="xl:col-span-2">
+          {funnel.length === 0 ? (
+            <p className="text-sm text-ink-muted">{t('recentEmpty')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {funnel.map((row) => (
+                <li
+                  key={row.status}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2"
+                >
+                  <AdminBadge color={badgeColor(row.status)}>{row.status}</AdminBadge>
+                  <span className="text-lg font-bold tabular-nums text-ink">{row.jumlah}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminCard>
+      </div>
+
+      <AdminCard title={t('llmHeading')} desc={t('llmDesc')}>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl bg-background p-4">
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('llmCalls')}</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">{llmWeek.panggilan}</dd>
+          </div>
+          <div className="rounded-xl bg-background p-4">
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('llmSuccess')}</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">
+              {llmWeek.sukses_pct === null ? '—' : `${llmWeek.sukses_pct}%`}
+            </dd>
+          </div>
+          <div className="rounded-xl bg-background p-4">
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('llmTokens')}</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">
+              {(llmWeek.token_masuk + llmWeek.token_keluar).toLocaleString()}
+            </dd>
+          </div>
+        </dl>
+      </AdminCard>
 
       <RecentDraftsList drafts={recentDrafts} />
 
@@ -119,19 +209,19 @@ export function DashboardCards({ pending, failed, needsReview, email, recentDraf
           </Link>
           <Link
             href={{ pathname: '/admin/konten', query: { status: 'needs_review' } }}
-            className="rounded-lg border border-line bg-surface px-4 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-primary"
+            className="btn-secondary text-center"
           >
             {t('actionsReview')}
           </Link>
           <Link
             href={{ pathname: '/admin/konten' }}
-            className="rounded-lg border border-line bg-surface px-4 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-primary"
+            className="btn-secondary text-center"
           >
             {t('actionsList')}
           </Link>
           <Link
             href={{ pathname: '/admin/riset' }}
-            className="rounded-lg border border-line bg-surface px-4 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-primary"
+            className="btn-secondary text-center"
           >
             {t('actionsDiscovery')}
           </Link>
@@ -144,19 +234,26 @@ export function DashboardCards({ pending, failed, needsReview, email, recentDraf
 function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
   const t = useTranslations('admin.dashboard');
   return (
-    <section aria-labelledby="recent-heading" className="space-y-3">
-      <h2 id="recent-heading" className="text-lg font-semibold text-ink">{t('recentHeading')}</h2>
+    <AdminCard
+      title={t('recentHeading')}
+      action={
+        <Link
+          href={{ pathname: '/admin/konten', query: { type: 'drafts', status: 'needs_review' } }}
+          className="text-sm text-primary underline"
+        >
+          {t('actionsReview')}
+        </Link>
+      }
+    >
       {drafts.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line bg-surface p-4 text-sm text-ink-muted">
-          {t('recentEmpty')}
-        </p>
+        <p className="text-sm text-ink-muted">{t('recentEmpty')}</p>
       ) : (
         <ul className="space-y-2">
           {drafts.map((d) => (
             <li key={d.id}>
               <Link
                 href={{ pathname: '/konten/review' }}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 shadow-card transition-colors hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink">{shortTopic(d.topic)}</p>
@@ -164,12 +261,12 @@ function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
                     {d.llm_meta?.provider ?? '—'} · {d.llm_meta?.model ?? '—'}
                   </p>
                 </div>
-                <StatusBadge status={d.status} />
+                <AdminBadge color={badgeColor(d.status)}>{d.status}</AdminBadge>
               </Link>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </AdminCard>
   );
 }

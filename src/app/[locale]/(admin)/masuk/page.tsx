@@ -31,14 +31,25 @@ export default async function LoginPage({ params }: LoginPageProps) {
   const t = await getTranslations({ locale, namespace: 'auth.login' });
 
   return (
-    <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-        {t('title')}
-      </h1>
-      <p className="mt-3 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
-      <div className="mt-8">
-        <LoginForm />
-      </div>
+    <div className="mx-auto flex w-full max-w-md flex-col items-center px-4 py-10 sm:px-6">
+      <p className="text-2xl font-bold tracking-tight text-brand-500 dark:text-brand-400" aria-hidden>
+        Asharu<span className="text-orange-400">.</span>
+      </p>
+      <section
+        aria-labelledby="masuk-heading"
+        className="mt-6 w-full overflow-hidden rounded-2xl border border-line bg-surface shadow-card dark:shadow-none"
+      >
+        <div className="h-1.5 bg-gradient-to-r from-brand-500 via-theme-purple-500 to-theme-pink-500" aria-hidden />
+        <div className="p-6 sm:p-8">
+          <h1 id="masuk-heading" className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            {t('title')}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">{t('intro')}</p>
+          <div className="mt-6">
+            <LoginForm />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

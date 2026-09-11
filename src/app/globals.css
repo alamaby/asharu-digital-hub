@@ -166,6 +166,22 @@
     border-color: var(--color-gray-200, currentColor);
   }
 
+  /*
+    Token Asharu dalam mode gelap (area non-publik). Karena utilities
+    Tailwind v4 membaca var ini saat runtime, seluruh komponen existing
+    (bg-surface, text-ink, border-line, …) otomatis adaptif tanpa edit
+    per-file. Isian (bg-primary) sengaja TIDAK diubah agar tombol
+    putih-di-atasnya tetap kontras; teks primary ditangani aturan
+    `.dark .text-primary` di bawah.
+  */
+  .dark {
+    --color-background: #0c111d;
+    --color-surface: #1a2231;
+    --color-ink: #f2f4f7;
+    --color-ink-muted: #98a2b3;
+    --color-line: #1d2939;
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -290,4 +306,19 @@
 
 .apexcharts-gridline {
   @apply !stroke-gray-100 dark:!stroke-gray-800;
+}
+
+/*
+  Kontras teks di mode gelap. Disengaja UNLAYERED agar menang atas utilities
+  berlapis: `text-primary` (#075985, kontras buruk di atas surface gelap)
+  menjadi biru terang, sementara isian `bg-primary` tidak tersentuh sehingga
+  tombol putih-di-atasnya tetap lolos WCAG AA.
+*/
+.dark .text-primary {
+  color: var(--color-blue-light-300);
+}
+
+.dark .btn-secondary:hover,
+.dark .btn-secondary:active {
+  color: var(--color-blue-light-300);
 }
