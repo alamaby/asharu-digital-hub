@@ -11,39 +11,39 @@ interface Props {
 }
 
 export function StudioForm({ options, quota }: Props) {
-    const t = useTranslations('studio');
-    const tForm = useTranslations('studio.form');
-    const tNotice = useTranslations('studio.notice');
+  const t = useTranslations('studio');
+  const tForm = useTranslations('studio.form');
+  const tNotice = useTranslations('studio.notice');
 
-    const [prompt, setPrompt] = useState('');
-    const [negative, setNegative] = useState('');
-    const [providerId, setProviderId] = useState('');
-    const [modelId, setModelId] = useState('');
-    const [styleSlug, setStyleSlug] = useState('');
-    const [subjectSlug, setSubjectSlug] = useState('');
-    const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
-    const [notice, setNotice] = useState<string | null>(null);
-    const [isPending, startTransition] = useTransition();
+  const [prompt, setPrompt] = useState('');
+  const [negative, setNegative] = useState('');
+  const [providerId, setProviderId] = useState('');
+  const [modelId, setModelId] = useState('');
+  const [styleSlug, setStyleSlug] = useState('');
+  const [subjectSlug, setSubjectSlug] = useState('');
+  const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-    const maxPrompt = options?.config.max_prompt_length ?? 500;
-    const negativeTrimmed = negative.trim();
+  const maxPrompt = options?.config.max_prompt_length ?? 500;
+  const negativeTrimmed = negative.trim();
 
-    function handleSubmit(e: React.FormEvent) {
-      e.preventDefault();
-      const p = prompt.trim();
-      if (p && p.length < 10) {
-        setNotice(tForm('promptMin'));
-        return;
-      }
-      if (!options) {
-        setNotice(tForm('errorInput'));
-        return;
-      }
-      const limited = quota?.remaining;
-      if (typeof limited === 'number' && limited <= 0) {
-        setNotice(t('quota.used', { used: quota?.used ?? 0, limit: quota?.limit ?? 0 }));
-        return;
-      }
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const p = prompt.trim();
+    if (p && p.length < 10) {
+      setNotice(tForm('promptMin'));
+      return;
+    }
+    if (!options) {
+      setNotice(tForm('errorInput'));
+      return;
+    }
+    const limited = quota?.remaining;
+    if (typeof limited === 'number' && limited <= 0) {
+      setNotice(t('quota.exhausted', { limit: quota?.limit ?? 0 }));
+      return;
+    }
     setNotice(tNotice('enqueue'));
     startTransition(async () => {
       try {
@@ -68,6 +68,9 @@ export function StudioForm({ options, quota }: Props) {
 
   const isSubmitDisabled = isPending || !prompt.trim() || !options || (typeof quota?.remaining === 'number' && quota.remaining <= 0);
   const isSubmitting = isPending;
+  // Field input hanya disable saat submit berjalan / opsi belum ada — bukan
+  // saat prompt kosong (user harus bisa mengetik dulu).
+  const fieldsDisabled = isPending || !options;
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-3" noValidate>
@@ -82,12 +85,12 @@ export function StudioForm({ options, quota }: Props) {
           maxLength={maxPrompt}
           rows={3}
           placeholder={tForm('promptPlaceholder')}
-          disabled={isSubmitDisabled}
+          disabled={fieldsDisabled}
           required
           minLength={10}
           className="w-full resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <p className="text-[11px] text-ink-muted">{prompt.trim().length}/{maxPrompt}</p>
+        <p className="text-[11px] text-ink-muted">{tForm('promptChar', { current: prompt.trim().length, max: maxPrompt })}</p>
         {prompt.trim() && prompt.trim().length < 10 ? (
           <p role="alert" className="text-[11px] text-red-600">
             {tForm('promptMin')}
@@ -106,10 +109,10 @@ export function StudioForm({ options, quota }: Props) {
           maxLength={500}
           rows={1}
           placeholder={tForm('negativePlaceholder')}
-          disabled={isSubmitDisabled}
+          disabled={fieldsDisabled}
           className="w-full resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <p className="text-[11px] text-ink-muted">{negative.length}/500</p>
+        <p className="text-[11px] text-ink-muted">{tForm('negativeChar', { current: negative.length })}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -124,7 +127,7 @@ export function StudioForm({ options, quota }: Props) {
               setProviderId(e.target.value);
               setModelId('');
             }}
-            disabled={isSubmitDisabled || !options}
+            disabled={fieldsDisabled}
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">{tForm('providerAuto')}</option>
@@ -144,7 +147,7 @@ export function StudioForm({ options, quota }: Props) {
             id="studio-model"
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
-            disabled={isSubmitDisabled || !options}
+            disabled={fieldsDisabled}
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">{tForm('modelAuto')}</option>
@@ -166,7 +169,7 @@ export function StudioForm({ options, quota }: Props) {
             id="studio-style"
             value={styleSlug}
             onChange={(e) => setStyleSlug(e.target.value)}
-            disabled={isSubmitDisabled || !options}
+            disabled={fieldsDisabled}
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">{tForm('styleAuto')}</option>
@@ -186,7 +189,7 @@ export function StudioForm({ options, quota }: Props) {
             id="studio-subject"
             value={subjectSlug}
             onChange={(e) => setSubjectSlug(e.target.value)}
-            disabled={isSubmitDisabled || !options}
+            disabled={fieldsDisabled}
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">{tForm('subjectNone')}</option>
@@ -206,7 +209,7 @@ export function StudioForm({ options, quota }: Props) {
             id="studio-aspect"
             value={aspectSlug}
             onChange={(e) => setAspectSlug(e.target.value)}
-            disabled={isSubmitDisabled || !options}
+            disabled={fieldsDisabled}
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {options?.aspects

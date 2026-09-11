@@ -757,10 +757,17 @@
       "deleting": "Menghapus...",
       "deleted": "Dihentikan — file dan catatan dihapus.",
       "download": "Unduh",
+      "downloading": "Mengunduh...",
       "view": "Lihat",
       "expired": "Kedaluwarsa (dihapus {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
-      "noStyle": "tanpa style"
+      "noStyle": "tanpa style",
+      "processing": "Worker sedang memproses...",
+      "noImage": "Belum ada gambar.",
+      "loadError": "Error: {error}",
+      "imageAlt": "Hasil studio {current} dari {total}",
+      "prevSlide": "Slide sebelumnya",
+      "nextSlide": "Slide berikutnya"
     }
   }
 }

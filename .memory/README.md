@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-11 12:35 (local time)
+Last updated: 2026-09-11 15:55 (local time)
 
 ## Current State
 
@@ -54,6 +54,7 @@ Last updated: 2026-09-11 12:35 (local time)
 
 - [112722-tailadmin-admin-shell.md](2026-09-11/112722-tailadmin-admin-shell.md) — Shell TailAdmin area non-publik (6 fase): TW4 + route groups + sidebar/header/dark + 4 view agregasi + dasbor chart + kartu masuk; 406 tests + build hijau, pushed.
 - [123500-studio-generate-image.md](2026-09-11/123500-studio-generate-image.md) — Menu generate image user login: `/studio` login-only, picker provider/model/subjek/style/aspek, antre cron, polling, 30d history, kuota harian. Migrasi DB (aspects, config, user_image_generations, bucket, cron) applied prod; typecheck+lint+test(413)+build hijau; commit `1ea2e36`.
+- [153000-studio-label-i18n-fix.md](2026-09-11/153000-studio-label-i18n-fix.md) — Fix label mentah studio: namespace `studio` masuk allow-list pesan client (akar masalah) + 7 key baru + string hardcoded via key + bug textarea ter-disable saat prompt kosong; 453 tests hijau.
 - [100500-image-carousel-download.md](2026-09-11/100500-image-carousel-download.md) — Carousel review: tombol Unduh (fetch → blob → object URL, nama file basename URL, busy state, fallback tab baru saat CORS gagal) + Lihat = open new tab; 391 tests + build hijau.
 - [094000-image-history-carousel.md](2026-09-11/094000-image-history-carousel.md) — Review visual: riwayat generate (cover + per-reply) jadi carousel embla, terbaru di depan, swipe/keyboard/dots + info provider·model·style per slide; blok gambar terpilih & daftar tumpuk dihapus; dep baru embla-carousel-react; gotcha stub matchMedia/IO/RO di test; 389 tests + build hijau, pushed `9ea92c4`.
 - [181000-admin-visual-llm-pattern.md](2026-09-10/181000-admin-visual-llm-pattern.md) — /admin/visual ikut pola admin/llm: root provider+subjek DnD; 3 route detail baru ([providerId] model+key, model config is_default+JSON cosmetic, subjek edit); fix base_url ke kolom; tanpa hapus; 382 tests + build hijau.

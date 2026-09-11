@@ -112,13 +112,12 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
   }
 
   function metaLabel(img: StudioGenerationRow): string {
-    const parts = [
-      img.provider_slug || 'auto',
-      img.model_slug || 'auto',
-      img.style_slug || 'tanpa style',
-      img.aspect_slug
-    ];
-    return parts.join(' · ');
+    return tHist('meta', {
+      provider: img.provider_slug || 'auto',
+      model: img.model_slug || 'auto',
+      style: img.style_slug || tHist('noStyle'),
+      aspect: img.aspect_slug
+    });
   }
 
   if (count === 0) {
@@ -129,7 +128,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
     <div className="mt-8">
       <h2 className="text-lg font-semibold text-ink">{tHist('heading')}</h2>
 
-      <div role="region" aria-label="Riwayat generate studio">
+      <div role="region" aria-label={tHist('heading')}>
         <div ref={emblaRef} className="overflow-hidden rounded-lg">
           <div className="flex">
             {images.map((img, idx) => {
@@ -161,7 +160,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={img.public_url}
-                        alt={`Hasil studio ${idx + 1} dari ${count}`}
+                        alt={tHist('imageAlt', { current: idx + 1, total: count })}
                         className="w-full max-h-64 rounded object-cover"
                         loading="lazy"
                         onError={(e) => {
@@ -173,10 +172,10 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
                       <div className="flex h-40 w-full items-center justify-center rounded border border-line bg-line/20">
                         <span className="text-xs text-ink-muted">
                           {img.status === 'pending'
-                            ? 'Worker sedang memproses…'
+                            ? tHist('processing')
                             : img.last_error
-                            ? `Error: ${img.last_error}`
-                            : 'Belum ada gambar.'}
+                            ? tHist('loadError', { error: img.last_error })
+                            : tHist('noImage')}
                         </span>
                       </div>
                     )}
@@ -264,7 +263,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
               type="button"
               onClick={() => emblaApi?.scrollPrev()}
               disabled={selectedIndex === 0}
-              aria-label="Slide sebelumnya"
+              aria-label={tHist('prevSlide')}
               className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
             >
               <ChevronLeft className="size-4" aria-hidden />
@@ -276,7 +275,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
               type="button"
               onClick={() => emblaApi?.scrollNext()}
               disabled={selectedIndex === count - 1}
-              aria-label="Slide berikutnya"
+              aria-label={tHist('nextSlide')}
               className="flex size-7 items-center justify-center rounded-lg border border-line bg-surface text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
             >
               <ChevronRight className="size-4" aria-hidden />

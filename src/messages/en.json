@@ -757,10 +757,17 @@
       "deleting": "Deleting...",
       "deleted": "Removed — file and record deleted.",
       "download": "Download",
+      "downloading": "Downloading...",
       "view": "View",
       "expired": "Expired (removed {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
-      "noStyle": "no style"
+      "noStyle": "no style",
+      "processing": "Worker is processing...",
+      "noImage": "No image yet.",
+      "loadError": "Error: {error}",
+      "imageAlt": "Studio result {current} of {total}",
+      "prevSlide": "Previous slide",
+      "nextSlide": "Next slide"
     }
   }
 }
