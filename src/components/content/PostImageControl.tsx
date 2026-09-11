@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generatePostImage, listDraftImages, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
+import { enhanceImagePrompt, generatePostImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
+import { ImageHistoryCarousel } from './ImageHistoryCarousel';
 
 export interface ReplyImageOption {
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
@@ -13,8 +14,8 @@ export interface ReplyImageOption {
 interface Props {
   draftId: string;
   postIndex: number;
-  /** URL selected untuk post ini (bila sudah ada). */
-  imageUrl: string | null;
+  /** Riwayat gambar post ini (terbaru dulu) — carousel menampilkan semuanya. */
+  initialHistory: DraftImageRow[];
   /** True bila post ini reply afiliasi (pakai gambar produk, generate ditolak). */
   isAffiliate: boolean;
   /** True bila mode per-reply aktif (global/sesi/draf). Cover (0) selalu boleh. */
@@ -22,10 +23,10 @@ interface Props {
   options: ReplyImageOption;
 }
 
-/** Thumbnail + tombol generate per reply (opt-in, skip afiliasi) di dalam kartu post. */
-export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, perReplyEnabled, options }: Props) {
+/** Carousel riwayat + tombol generate per reply (opt-in, skip afiliasi) di dalam kartu post. */
+export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
-  const [url, setUrl] = useState<string | null>(imageUrl);
+  const [history, setHistory] = useState<DraftImageRow[]>(initialHistory);
   const [modelUuid, setModelUuid] = useState('');
   const [styleSlug, setStyleSlug] = useState('');
   const [promptDraft, setPromptDraft] = useState('');
@@ -35,8 +36,10 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
-  const [imgBroken, setImgBroken] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const selected = history.find((r) => r.status === 'selected') ?? null;
+  const hasVisual = history.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
 
   if (isAffiliate) return null;
 
@@ -108,41 +111,73 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
     setProposed(null);
   }
 
+  function fetchHistoryAndSync(): Promise<DraftImageRow[]> {
+    return listDraftImages(draftId).then((rows) => {
+      const mine = rows.filter((r) => (r.post_index ?? 0) === postIndex);
+      setHistory(mine);
+      return mine;
+    });
+  }
+
   async function refreshOne() {
     startTransition(async () => {
       try {
-        const rows: DraftImageRow[] = await listDraftImages(draftId);
-        const sel = rows.find((r) => (r.post_index ?? 0) === postIndex && r.status === 'selected') ?? null;
-        setUrl(sel?.public_url ?? null);
-        setImgBroken(false);
-        const latest = rows.filter((r) => (r.post_index ?? 0) === postIndex).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+        const mine = await fetchHistoryAndSync();
+        const latest = mine[0] ?? null;
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
-        setNotice(sel ? 'Diperbarui.' : latest?.status === 'prompt_ready' ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.' : 'Belum ada visualisasi untuk post ini.');
+        setNotice(latest?.status === 'selected' || latest?.status === 'ready'
+          ? 'Diperbarui.'
+          : latest?.status === 'prompt_ready'
+            ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.'
+            : 'Belum ada visualisasi untuk post ini.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Refresh gagal.');
       }
     });
   }
 
-  async function pickLatestReady() {
+  function pickLatestReady() {
     startTransition(async () => {
       try {
-        const rows: DraftImageRow[] = await listDraftImages(draftId);
-        const ready = rows
-          .filter((r) => (r.post_index ?? 0) === postIndex && (r.status === 'ready' || r.status === 'selected') && r.public_url)
-          .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+        const ready = history
+          .filter((r) => (r.status === 'ready' || r.status === 'selected') && r.public_url)[0] ?? null;
         if (!ready) {
           setNotice('Belum ada hasil ready — tunggu worker, lalu tekan Muat ulang.');
           return;
         }
         await selectDraftImage(draftId, ready.id);
-        setUrl(ready.public_url);
-        setImgBroken(false);
+        await fetchHistoryAndSync();
         setNotice('Visual dipilih — jadi lampiran social.');
       } catch (e) {
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Pilih gagal.');
+      }
+    });
+  }
+
+  function select(imageId: string) {
+    setNotice('Memilih visual...');
+    startTransition(async () => {
+      try {
+        await selectDraftImage(draftId, imageId);
+        await fetchHistoryAndSync();
+        setNotice('Visual dipilih — jadi lampiran social.');
+      } catch (e) {
+        setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Pilih gagal.');
+      }
+    });
+  }
+
+  function retryOne(imageId: string) {
+    setNotice('Mengulang reasoning...');
+    startTransition(async () => {
+      try {
+        await retryFailedImage(imageId);
+        await fetchHistoryAndSync();
+        setNotice('Masuk antrean ulang. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil.');
+      } catch (e) {
+        setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Ulangi gagal.');
       }
     });
   }
@@ -160,15 +195,15 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
           {isPending ? 'Memuat…' : 'Muat ulang'}
         </button>
       </div>
-      {url && !imgBroken ? (
+      {history.length > 0 ? (
         <div className="mt-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url}
-            alt={`Ilustrasi balasan ${postIndex}`}
-            className="max-h-48 w-full rounded-lg object-cover"
-            loading="lazy"
-            onError={() => setImgBroken(true)}
+          <ImageHistoryCarousel
+            rows={history}
+            selectedId={selected?.id ?? null}
+            variant="reply"
+            isPending={isPending}
+            onSelect={select}
+            onRetry={retryOne}
           />
         </div>
       ) : (
@@ -277,7 +312,7 @@ export function PostImageControl({ draftId, postIndex, imageUrl, isAffiliate, pe
             disabled={isPending || isEnhancing || isSuggesting}
             className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary disabled:opacity-50"
           >
-            {isPending ? 'Memproses...' : url ? 'Regenerate visual' : 'Generate visual'}
+            {isPending ? 'Memproses...' : hasVisual ? 'Regenerate visual' : 'Generate visual'}
           </button>
           <button
             type="button"

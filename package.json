@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@swc/helpers": "^0.5.23",
+    "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
     "next-intl": "^4.0.0",

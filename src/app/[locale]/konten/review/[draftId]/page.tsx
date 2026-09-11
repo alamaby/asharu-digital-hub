@@ -228,9 +228,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           regenProviders={regenProviders}
           regenModels={regenModels}
           queue={queueInfo}
-          postImages={draftImages
-            .filter((i) => i.status === 'selected' && i.public_url)
-            .map((i) => ({ post_index: i.post_index, public_url: i.public_url as string }))}
+          replyImages={draftImages.filter((i) => (i.post_index ?? 0) >= 1)}
           perReplyEnabled={imageMode === 'per-reply-opt-in'}
           coverImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
           coverSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}

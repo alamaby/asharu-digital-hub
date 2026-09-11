@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
+import { ImageHistoryCarousel } from './ImageHistoryCarousel';
 
 export interface ImageOption {
   providers: { id: string; slug: string; display_name: string }[];
@@ -18,17 +19,6 @@ interface Props {
   options: ImageOption;
   /** True bila dirender di dalam thread (margin ringkas, tanpa mt-6). */
   compact?: boolean;
-}
-
-function statusBadge(status: string) {
-  const map: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800',
-    prompt_ready: 'bg-violet-100 text-violet-800',
-    ready: 'bg-sky-100 text-sky-800',
-    selected: 'bg-emerald-100 text-emerald-800',
-    failed: 'bg-red-100 text-red-800'
-  };
-  return map[status] ?? 'bg-surface text-ink-muted';
 }
 
 function latestOf(rows: DraftImageRow[]): DraftImageRow | null {
@@ -61,7 +51,6 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   });
   const [isPending, startTransition] = useTransition();
 
-  const selected = images.find((i) => i.id === selectedId) ?? null;
   const hasVisual = images.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
 
   function refresh() {
@@ -200,19 +189,16 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         </button>
       </div>
 
-      {selected?.public_url ? (
+      {images.length > 0 ? (
         <div className="mt-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={selected.public_url}
-            alt="Ilustrasi pendukung konten"
-            className="max-h-80 w-full rounded-lg object-cover"
-            loading="lazy"
+          <ImageHistoryCarousel
+            rows={images}
+            selectedId={selectedId}
+            variant="cover"
+            isPending={isPending}
+            onSelect={select}
+            onRetry={retry}
           />
-          <p className="mt-2 text-xs text-ink-muted">
-            {selected.provider_slug} · {selected.model_id}
-            {selected.style_slug ? ` · ${selected.style_slug}` : ''}
-          </p>
         </div>
       ) : (
         <p className="mt-3 text-sm text-ink-muted">
@@ -362,70 +348,6 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             ) : null}
           </div>
         </div>
-      ) : null}
-
-      {images.length > 0 ? (
-        <ul className="mt-4 space-y-2">
-          {images.map((img) => (
-            <li key={img.id} className="flex items-start justify-between gap-2 rounded-lg border border-line p-2 text-xs">
-              <div className="min-w-0">
-                <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${statusBadge(img.status)}`}>
-                  {img.status}
-                </span>{' '}
-                <span className="text-ink-muted">
-                  {img.provider_slug || 'auto'} · {img.model_id || 'auto'}
-                  {img.style_slug ? ` · ${img.style_slug}` : ''}
-                </span>
-                <p className="mt-1 line-clamp-2 text-ink">{img.image_prompt || 'Menunggu worker…'}</p>
-                {(img as { negative_prompt?: string | null }).negative_prompt ? (
-                  <p className="mt-1 text-ink-muted">Negative: {(img as { negative_prompt?: string | null }).negative_prompt}</p>
-                ) : null}
-                {img.reasoning?.visual_strategy ? (
-                  <p className="mt-1 text-ink-muted">
-                    Strategi: {img.reasoning.visual_strategy}
-                    {img.reasoning.hook_keywords?.length ? ` · hook: ${img.reasoning.hook_keywords.join(', ')}` : ''}
-                    {img.reasoning.justification ? ` — ${img.reasoning.justification}` : ''}
-                  </p>
-                ) : null}
-                {img.status === 'prompt_ready' ? (
-                  <p className="mt-1 text-violet-700">Draf prompt otomatis — cek textarea lalu Generate (belum dirender).</p>
-                ) : null}
-                {img.status === 'failed' && img.last_error ? (
-                  <p className="mt-1 text-red-700">Error: {img.last_error}</p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                {img.public_url ? (
-                  <a href={img.public_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    Lihat
-                  </a>
-                ) : null}
-                {img.status === 'ready' && img.id !== selectedId ? (
-                  <button
-                    type="button"
-                    onClick={() => select(img.id)}
-                    disabled={isPending}
-                    className="text-primary hover:underline disabled:opacity-50"
-                  >
-                    Pilih
-                  </button>
-                ) : null}
-                {img.status === 'failed' ? (
-                  <button
-                    type="button"
-                    onClick={() => retry(img.id)}
-                    disabled={isPending}
-                    aria-busy={isPending}
-                    className="text-primary hover:underline disabled:opacity-50"
-                    title="Kembalikan ke antrean worker (attempts direset)"
-                  >
-                    {isPending ? 'Memproses…' : 'Ulangi'}
-                  </button>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
       ) : null}
 
       {notice ? (

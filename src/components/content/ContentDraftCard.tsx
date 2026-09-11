@@ -29,12 +29,12 @@ interface Draft {
   platform_slug?: string | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], postImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], replyImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
-  /** Selected image per post_index (dari server, tanpa secret). */
-  postImages?: { post_index: number; public_url: string }[];
+  /** Riwayat gambar per-reply (post_index ≥ 1, terbaru dulu — dari server, tanpa secret). */
+  replyImages?: DraftImageRow[];
   /** True bila mode per-reply aktif (global/sesi/draf). */
   perReplyEnabled?: boolean;
   /** History cover (post 0) untuk panel di antara post utama dan balasan 1. */
@@ -266,7 +266,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                 <PostImageControl
                   draftId={draft.id}
                   postIndex={idx}
-                  imageUrl={postImages.find((p) => p.post_index === idx)?.public_url ?? null}
+                  initialHistory={replyImages.filter((i) => (i.post_index ?? 0) === idx)}
                   isAffiliate={isInjected}
                   perReplyEnabled={perReplyEnabled}
                   options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects }}
