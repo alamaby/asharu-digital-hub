@@ -19,6 +19,7 @@ export interface StudioConfig {
   default_model_id: string | null;
   default_style_slug: string | null;
   default_subject_slug: string | null;
+  default_camera_slug: string | null;
   default_aspect_slug: string;
   max_prompt_length: number;
   allow_empty_prompt: boolean;
@@ -33,6 +34,7 @@ export const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   default_model_id: null,
   default_style_slug: null,
   default_subject_slug: null,
+  default_camera_slug: null,
   default_aspect_slug: '1:1',
   max_prompt_length: 500,
   allow_empty_prompt: false,
@@ -48,6 +50,7 @@ export interface StudioGenerationRow {
   model_id: string | null;
   style_slug: string | null;
   subject_slug: string | null;
+  camera_slug: string | null;
   aspect_slug: string;
   provider_slug: string;
   model_slug: string;
@@ -69,6 +72,7 @@ export interface StudioOptions {
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
+  cameras: { slug: string; display_name: string }[];
   aspects: StudioAspectRow[];
   config: StudioConfig;
 }

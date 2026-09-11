@@ -110,6 +110,10 @@ export const routing = defineRouting({
       id: '/admin/visual/subjects/[subjectSlug]',
       en: '/admin/visual/subjects/[subjectSlug]'
     },
+    '/admin/visual/angles/[angleSlug]': {
+      id: '/admin/visual/angles/[angleSlug]',
+      en: '/admin/visual/angles/[angleSlug]'
+    },
     '/admin/sosial': {
       id: '/admin/sosial',
       en: '/admin/sosial'

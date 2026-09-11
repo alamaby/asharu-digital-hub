@@ -351,7 +351,25 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
       return { imageId };
     }
     const styleSuffix = target.style?.prompt_suffix?.trim() || '';
-    const finalPrompt = styleSuffix ? `${imagePrompt}, ${styleSuffix}` : imagePrompt;
+    // Camera angle: auto-append natural sebelum style suffix (opsional).
+    // Guard anti-duplikat: prompt textarea bisa sudah berisi angle (suggest).
+    let withAngle = imagePrompt;
+    const camSlug = row.camera_slug ?? null;
+    if (camSlug) {
+      const supabase = getServiceClient();
+      const { data: cam } = await supabase
+        .from('image_camera_angles')
+        .select('angle_en')
+        .eq('slug', camSlug)
+        .eq('is_active', true)
+        .maybeSingle();
+      const angleEn = (cam as { angle_en?: string } | null)?.angle_en?.trim();
+      if (angleEn) {
+        const { appendCameraAngle } = await import('./camera-angles');
+        withAngle = appendCameraAngle(withAngle, angleEn);
+      }
+    }
+    const finalPrompt = styleSuffix ? `${withAngle}, ${styleSuffix}` : withAngle;
     const aspect: ImageAspect = target.aspect;
 
     // Waterfall provider: resolved dulu, lalu sisanya sesuai prioritas.

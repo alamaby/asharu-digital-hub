@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-11 16:20 (local time)
+Last updated: 2026-09-11 21:33 (local time)
 
 ## Current State
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-11 16:20 (local time)
 
 ## Recent Entries
 
+- [213200-camera-angle-templates.md](2026-09-11/213200-camera-angle-templates.md) — Template camera angle configurable: tabel `image_camera_angles` + seed 25 + CRUD/reorder `/admin/visual` + picker Studio & review (cover+reply) + auto-append worker + anti-duplikat; 464 tests + build hijau. [USER ACTION] Apply migrasi ke prod.
 - [112722-tailadmin-admin-shell.md](2026-09-11/112722-tailadmin-admin-shell.md) — Shell TailAdmin area non-publik (6 fase): TW4 + route groups + sidebar/header/dark + 4 view agregasi + dasbor chart + kartu masuk; 406 tests + build hijau, pushed.
 - [123500-studio-generate-image.md](2026-09-11/123500-studio-generate-image.md) — Menu generate image user login: `/studio` login-only, picker provider/model/subjek/style/aspek, antre cron, polling, 30d history, kuota harian. Migrasi DB (aspects, config, user_image_generations, bucket, cron) applied prod; typecheck+lint+test(413)+build hijau; commit `1ea2e36`.
 - [153000-studio-label-i18n-fix.md](2026-09-11/153000-studio-label-i18n-fix.md) — Fix label mentah studio: namespace `studio` masuk allow-list pesan client (akar masalah) + 7 key baru + string hardcoded via key + bug textarea ter-disable saat prompt kosong; 453 tests hijau.

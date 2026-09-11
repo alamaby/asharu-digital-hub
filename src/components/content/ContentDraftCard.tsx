@@ -269,7 +269,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   initialHistory={replyImages.filter((i) => (i.post_index ?? 0) === idx)}
                   isAffiliate={isInjected}
                   perReplyEnabled={perReplyEnabled}
-                  options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects }}
+                  options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects, cameras: imageOptions.cameras }}
                 />
               )}
             </div>

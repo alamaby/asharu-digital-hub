@@ -32,7 +32,7 @@ export async function listStudioOptions(): Promise<StudioOptions> {
   await requireUser();
   const supabase = svc();
   const config = await getStudioConfig();
-  const [{ data: providers }, { data: models }, { data: styles }, { data: subjects }, { data: aspects }] =
+  const [{ data: providers }, { data: models }, { data: styles }, { data: subjects }, { data: cameras }, { data: aspects }] =
     await Promise.all([
       supabase.from('image_providers').select('id, slug, display_name').eq('is_active', true).order('priority'),
       supabase
@@ -43,6 +43,12 @@ export async function listStudioOptions(): Promise<StudioOptions> {
       supabase.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug'),
       supabase
         .from('image_subject_templates')
+        .select('slug, display_name')
+        .eq('is_active', true)
+        .order('sort_order')
+        .order('slug'),
+      supabase
+        .from('image_camera_angles')
         .select('slug, display_name')
         .eq('is_active', true)
         .order('sort_order')
@@ -61,6 +67,7 @@ export async function listStudioOptions(): Promise<StudioOptions> {
     models: mappedModels,
     styles: (styles ?? []) as StudioOptions['styles'],
     subjects: (subjects ?? []) as StudioOptions['subjects'],
+    cameras: (cameras ?? []) as StudioOptions['cameras'],
     aspects: (aspects ?? []) as StudioOptions['aspects'],
     config
   };
@@ -73,6 +80,7 @@ export interface EnqueueStudioInput {
   modelId?: string | null;
   styleSlug?: string | null;
   subjectSlug?: string | null;
+  cameraSlug?: string | null;
   aspectSlug: string;
 }
 
@@ -92,6 +100,7 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
     modelId: input.modelId ?? null,
     styleSlug: input.styleSlug ?? null,
     subjectSlug: input.subjectSlug ?? null,
+    cameraSlug: input.cameraSlug ?? null,
     aspectSlug: input.aspectSlug
   });
   if (!parsed.success) {
@@ -121,6 +130,10 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
     const { data: sj } = await supabase.from('image_subject_templates').select('slug').eq('slug', v.subjectSlug).eq('is_active', true).maybeSingle();
     if (!sj) throw new Error('Template subjek tidak aktif — refresh pilihan.');
   }
+  if (v.cameraSlug) {
+    const { data: ca } = await supabase.from('image_camera_angles').select('slug').eq('slug', v.cameraSlug).eq('is_active', true).maybeSingle();
+    if (!ca) throw new Error('Camera angle tidak aktif — refresh pilihan.');
+  }
 
   // Kuota harian per user (configurable; null = unlimited).
   const dayStart = new Date();
@@ -145,6 +158,7 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
       model_id: v.modelId,
       style_slug: v.styleSlug,
       subject_slug: v.subjectSlug,
+      camera_slug: v.cameraSlug,
       aspect_slug: v.aspectSlug,
       expires_at: expiresAt
     })

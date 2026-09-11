@@ -9,6 +9,7 @@ export interface ReplyImageOption {
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
+  cameras?: { slug: string; display_name: string }[];
 }
 
 interface Props {
@@ -36,6 +37,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
+  const [cameraSlug, setCameraSlug] = useState('');
   const [isPending, startTransition] = useTransition();
 
   const selected = history.find((r) => r.status === 'selected') ?? null;
@@ -57,6 +59,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
         await generatePostImage(draftId, postIndex, {
           modelUuid: modelUuid || null,
           styleSlug: styleSlug || null,
+          cameraSlug: cameraSlug || null,
           imagePrompt: p || null,
           negativePrompt: n || null
         });
@@ -73,7 +76,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
     setIsSuggesting(true);
     setNotice('Menyiapkan prompt awal dari balasan…');
     try {
-      const res = await suggestImagePrompt(draftId, postIndex, subjectSlug || null);
+      const res = await suggestImagePrompt(draftId, postIndex, subjectSlug || null, cameraSlug || null);
       setPromptDraft(res.prompt);
       setProposed(null);
       setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
@@ -127,6 +130,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
+        if (latest?.camera_slug && (options.cameras ?? []).some((c) => c.slug === latest.camera_slug)) setCameraSlug(latest.camera_slug);
         setNotice(latest?.status === 'selected' || latest?.status === 'ready'
           ? 'Diperbarui.'
           : latest?.status === 'prompt_ready'
@@ -255,6 +259,21 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
               {options.subjects.map((s) => (
                 <option key={s.slug} value={s.slug}>
                   {s.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[11px]">
+            <span className="mb-0.5 block text-ink-muted">Camera angle (auto ke prompt)</span>
+            <select
+              value={cameraSlug}
+              onChange={(e) => setCameraSlug(e.target.value)}
+              className="w-full rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
+            >
+              <option value="">(tanpa angle khusus)</option>
+              {(options.cameras ?? []).map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.display_name}
                 </option>
               ))}
             </select>

@@ -731,6 +731,8 @@
       "styleAuto": "Auto (global default)",
       "subjectLabel": "Subject template",
       "subjectNone": "(no subject)",
+      "cameraLabel": "Camera angle",
+      "cameraAuto": "Auto (no specific angle)",
       "aspectLabel": "Aspect ratio",
       "submit": "Generate",
       "submitting": "Adding to queue...",

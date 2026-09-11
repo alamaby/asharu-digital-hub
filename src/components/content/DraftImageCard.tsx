@@ -10,6 +10,7 @@ export interface ImageOption {
   models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
+  cameras?: { slug: string; display_name: string }[];
 }
 
 interface Props {
@@ -37,6 +38,13 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   });
   const [promptDraft, setPromptDraft] = useState(() => latestOf(initialImages)?.image_prompt ?? '');
   const [negativeDraft, setNegativeDraft] = useState(() => latestOf(initialImages)?.negative_prompt ?? '');
+  // Rehydrate dari kamera gambar terakhir (seperti style) agar dropdown
+  // mencerminkan yang terpakai; default kosong = tanpa angle.
+  const [cameraSlug, setCameraSlug] = useState(() => {
+    const latest = latestOf(initialImages);
+    const slug = latest?.camera_slug ?? '';
+    return (options.cameras ?? []).some((c) => c.slug === slug) ? slug : '';
+  });
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -66,6 +74,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         if (latest?.image_prompt) setPromptDraft(latest.image_prompt);
         if (latest?.negative_prompt !== undefined) setNegativeDraft(latest.negative_prompt ?? '');
         if (latest?.style_slug && options.styles.some((s) => s.slug === latest.style_slug)) setStyleSlug(latest.style_slug);
+        if (latest?.camera_slug && (options.cameras ?? []).some((c) => c.slug === latest.camera_slug)) setCameraSlug(latest.camera_slug);
         const hasVisual = cover.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
         setNotice(latest?.status === 'prompt_ready' && !hasVisual
           ? 'Draf prompt otomatis siap — cek, edit bila perlu, lalu Generate.'
@@ -90,6 +99,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         await generateDraftImage(draftId, {
           modelUuid: modelUuid || null,
           styleSlug: styleSlug || null,
+          cameraSlug: cameraSlug || null,
           imagePrompt: p || null,
           negativePrompt: n || null
         });
@@ -108,7 +118,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     setIsSuggesting(true);
     setNotice('Menyiapkan prompt awal dari postingan…');
     try {
-      const res = await suggestImagePrompt(draftId, 0, subjectSlug || null);
+      const res = await suggestImagePrompt(draftId, 0, subjectSlug || null, cameraSlug || null);
       setPromptDraft(res.prompt);
       setProposed(null);
       setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
@@ -247,6 +257,21 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             {options.subjects.map((s) => (
               <option key={s.slug} value={s.slug}>
                 {s.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs">
+          <span className="mb-1 block text-ink-muted">Camera angle (otomatis ditambah ke prompt)</span>
+          <select
+            value={cameraSlug}
+            onChange={(e) => setCameraSlug(e.target.value)}
+            className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm"
+          >
+            <option value="">(tanpa angle khusus)</option>
+            {(options.cameras ?? []).map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.display_name}
               </option>
             ))}
           </select>

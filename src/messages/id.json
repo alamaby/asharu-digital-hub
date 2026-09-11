@@ -731,6 +731,8 @@
       "styleAuto": "Auto (default global)",
       "subjectLabel": "Template subjek",
       "subjectNone": "(tidak pakai subjek)",
+      "cameraLabel": "Camera angle",
+      "cameraAuto": "Auto (tanpa angle khusus)",
       "aspectLabel": "Aspek rasio",
       "submit": "Generate",
       "submitting": "Memasukkan antrean...",

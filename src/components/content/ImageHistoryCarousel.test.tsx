@@ -50,6 +50,7 @@ function row(over: Partial<DraftImageRow> & { id: string }): DraftImageRow {
     negative_prompt: null,
     reasoning: null,
     style_slug: null,
+    camera_slug: null,
     provider_slug: '',
     model_id: '',
     key_suffix: null,

@@ -173,9 +173,10 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       return { imageId: null, error: 'empty prompt' };
     }
     const styleSuffix = target.style?.prompt_suffix?.trim() || '';
-    const finalPrompt = styleSuffix ? `${prompt}, ${styleSuffix}` : prompt;
+    // Urutan natural: [subject, prompt, angle, style]. Angle disisip sebelum
+    // style suffix (instruksi render) agar framing terbaca sebagai scene.
+    let composed = prompt;
     // Subject template: disisipkan di depan sebagai konteks visual (opsional).
-    let composed = finalPrompt;
     if (row.subject_slug) {
       const supabase = getServiceClient();
       const { data: tpl } = await supabase
@@ -185,8 +186,27 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
         .eq('is_active', true)
         .maybeSingle();
       const subjectEn = (tpl as { subject_en?: string } | null)?.subject_en?.trim();
-      if (subjectEn) composed = `${subjectEn}, ${finalPrompt}`;
+      if (subjectEn) composed = `${subjectEn}, ${composed}`;
     }
+    // Camera angle: auto-append natural di belakang prompt (opsional).
+    const angleSlug = row.camera_slug ?? config.default_camera_slug ?? null;
+    if (angleSlug) {
+      const supabase = getServiceClient();
+      const { data: ang } = await supabase
+        .from('image_camera_angles')
+        .select('angle_en')
+        .eq('slug', angleSlug)
+        .eq('is_active', true)
+        .maybeSingle();
+      const angleEn = (ang as { angle_en?: string } | null)?.angle_en?.trim();
+      if (angleEn) {
+        const { appendCameraAngle } = await import('@/lib/image/camera-angles');
+        // Tanpa maxLen: prompt user tidak dipotong (batasan max_prompt_length
+        // hanya untuk textarea UX, bukan prompt provider).
+        composed = appendCameraAngle(composed, angleEn);
+      }
+    }
+    if (styleSuffix) composed = `${composed}, ${styleSuffix}`;
     const finalNegative = mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
 
     const supabase = getServiceClient();

@@ -18,6 +18,7 @@ export function studioInputSchema(maxPromptLength: number) {
     modelId: z.string().uuid('Model tidak valid.').nullable().default(null),
     styleSlug: z.string().trim().max(120).nullable().default(null),
     subjectSlug: z.string().trim().max(120).nullable().default(null),
+    cameraSlug: z.string().trim().max(120).nullable().default(null),
     aspectSlug: z.string().trim().min(1, 'Pilih aspek rasio.')
   });
 }

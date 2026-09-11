@@ -33,7 +33,7 @@ export async function listDraftImages(draftId: string): Promise<DraftImageRow[]>
  */
 export async function generateDraftImage(
   draftId: string,
-  override?: { modelUuid?: string | null; styleSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
+  override?: { modelUuid?: string | null; styleSlug?: string | null; cameraSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
 ): Promise<{ imageId: string }> {
   return generatePostImage(draftId, 0, override);
 }
@@ -46,7 +46,7 @@ export async function generateDraftImage(
 export async function generatePostImage(
   draftId: string,
   postIndex: number,
-  override?: { modelUuid?: string | null; styleSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
+  override?: { modelUuid?: string | null; styleSlug?: string | null; cameraSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
 ): Promise<{ imageId: string }> {
   const supabase = await requireAdmin();
   if (!draftId) throw new Error('draftId required');
@@ -76,6 +76,20 @@ export async function generatePostImage(
     throw new Error('mode per-reply belum aktif (image_gen_defaults / sesi / draf)');
   }
   const hasCustom = Boolean(customPrompt);
+  let cameraSlug: string | null = null;
+  if (override?.cameraSlug) {
+    const slug = override.cameraSlug.trim().slice(0, 120);
+    if (slug) {
+      const { data: cam } = await supabase
+        .from('image_camera_angles')
+        .select('slug')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!cam) throw new Error('camera angle tidak aktif — refresh pilihan');
+      cameraSlug = slug;
+    }
+  }
   const { data: created, error } = await supabase
     .from('content_draft_images')
     .insert({
@@ -85,6 +99,7 @@ export async function generatePostImage(
       negative_prompt: hasCustom ? (customNegative || null) : null,
       provider_slug: '',
       model_id: '',
+      camera_slug: cameraSlug,
       reasoning: hasCustom ? { visual_strategy: 'custom', justification: 'user_edited' } : null,
       llm_meta: override ? { override } : {}
     })
@@ -140,7 +155,8 @@ export interface SuggestPromptResult {
 export async function suggestImagePrompt(
   draftId: string,
   postIndex: number,
-  subjectSlug?: string | null
+  subjectSlug?: string | null,
+  cameraSlug?: string | null
 ): Promise<SuggestPromptResult> {
   const supabase = await requireAdmin();
   if (!draftId) throw new Error('draftId required');
@@ -169,6 +185,21 @@ export async function suggestImagePrompt(
   const subject =
     (subjectSlug ? templates.find((t) => t.slug === subjectSlug) : undefined) ?? templates[0] ?? null;
   if (!subject) throw new Error('tidak ada template subjek aktif');
+
+  // Camera angle opsional: tanpa pilihan = prompt tanpa angle (worker nanti
+  // menambah dari kamera baris bila generate memakai camera_slug).
+  let angleEn: string | null = null;
+  if (cameraSlug) {
+    const { data: cam } = await supabase
+      .from('image_camera_angles')
+      .select('angle_en')
+      .eq('slug', cameraSlug)
+      .eq('is_active', true)
+      .maybeSingle();
+    const found = (cam as { angle_en?: string } | null)?.angle_en?.trim();
+    if (!found) throw new Error('camera angle tidak aktif — refresh pilihan');
+    angleEn = found;
+  }
 
   let sessionId: string | null = null;
   if (d.research_topic_id) {
@@ -205,8 +236,14 @@ export async function suggestImagePrompt(
   } catch {
     throw new Error('gagal ekstrak scene postingan — coba lagi');
   }
+  let prompt = composeSubjectPrompt(subject.subject_en, scene);
+  if (angleEn) {
+    const { appendCameraAngle } = await import('./camera-angles');
+    // Textarea review max 500 → potong prompt, jaga angle utuh.
+    prompt = appendCameraAngle(prompt, angleEn, 500);
+  }
   return {
-    prompt: composeSubjectPrompt(subject.subject_en, scene),
+    prompt,
     subjectSlug: subject.slug,
     subjectName: subject.display_name,
     scene

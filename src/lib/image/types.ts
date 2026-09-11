@@ -120,6 +120,8 @@ export interface DraftImageRow {
     gate_retried?: boolean;
   } | null;
   style_slug: string | null;
+  /** Camera angle pilihan admin (FK image_camera_angles.slug, auto-append worker). */
+  camera_slug: string | null;
   provider_slug: string;
   model_id: string;
   key_suffix: string | null;

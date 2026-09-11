@@ -21,6 +21,7 @@ export function StudioForm({ options, quota }: Props) {
   const [modelId, setModelId] = useState('');
   const [styleSlug, setStyleSlug] = useState('');
   const [subjectSlug, setSubjectSlug] = useState('');
+  const [cameraSlug, setCameraSlug] = useState(options?.config.default_camera_slug ?? '');
   const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -54,6 +55,7 @@ export function StudioForm({ options, quota }: Props) {
           modelId: modelId || null,
           styleSlug: styleSlug || null,
           subjectSlug: subjectSlug || null,
+          cameraSlug: cameraSlug || null,
           aspectSlug: aspectSlug
         };
         await enqueueStudioImage(input);
@@ -196,6 +198,26 @@ export function StudioForm({ options, quota }: Props) {
             {options?.subjects.map((s) => (
               <option key={s.slug} value={s.slug}>
                 {s.display_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid gap-1">
+          <label className="text-sm font-medium text-ink" htmlFor="studio-camera">
+            {tForm('cameraLabel')}
+          </label>
+          <select
+            id="studio-camera"
+            value={cameraSlug}
+            onChange={(e) => setCameraSlug(e.target.value)}
+            disabled={fieldsDisabled}
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">{tForm('cameraAuto')}</option>
+            {options?.cameras.map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.display_name}
               </option>
             ))}
           </select>

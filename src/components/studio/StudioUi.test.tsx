@@ -56,6 +56,7 @@ function options(): StudioOptions {
     ],
     styles: [{ slug: 'photorealistic', display_name: 'Photorealistic' }],
     subjects: [{ slug: 'wanita-muda-modis', display_name: 'Wanita Muda Modis' }],
+    cameras: [{ slug: 'eye-level-three-quarter', display_name: 'Eye-Level Three-Quarter' }],
     aspects: [{ slug: '1:1', display_name: 'Square (1:1)', width: 1024, height: 1024, sort_order: 10, is_active: true }],
     config: DEFAULT_STUDIO_CONFIG
   };
@@ -70,6 +71,7 @@ function genRow(over: Partial<StudioGenerationRow> & { id: string }): StudioGene
     model_id: null,
     style_slug: null,
     subject_slug: null,
+    camera_slug: null,
     aspect_slug: '1:1',
     provider_slug: 'pixazo',
     model_slug: 'flux-schnell',

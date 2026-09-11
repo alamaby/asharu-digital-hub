@@ -10,6 +10,8 @@ import { createSupabaseService } from '@/lib/supabase/server';
 import { BoardSkeleton } from '@/components/admin/llm/ActionFeedback';
 import { AddSubjectForm, type SubjectRow } from '@/components/admin/visual/SubjectForms';
 import { SubjectBoard } from '@/components/admin/visual/SubjectBoard';
+import { AddCameraAngleForm, type CameraAngleRow } from '@/components/admin/visual/CameraAngleForms';
+import { CameraAngleBoard } from '@/components/admin/visual/CameraAngleBoard';
 import { ImageProviderBoard, type ImageProvider } from '@/components/admin/visual/ImageBoards';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -63,6 +65,21 @@ async function SubjectsSection() {
   return <SubjectBoard subjects={rows} />;
 }
 
+async function CameraAnglesSection() {
+  const supabase = createSupabaseService();
+  if (!supabase) {
+    return <p role="alert" className="text-sm text-red-700">Supabase not configured.</p>;
+  }
+  const { data, error } = await supabase
+    .from('image_camera_angles')
+    .select('slug, display_name, angle_en, is_active, sort_order')
+    .order('sort_order', { ascending: true })
+    .order('slug');
+  if (error) return <p role="alert" className="text-sm text-red-700">Gagal memuat angle: {error.message}</p>;
+  const rows = (data ?? []) as CameraAngleRow[];
+  return <CameraAngleBoard angles={rows} />;
+}
+
 export default async function AdminVisualPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: rawLocale } = await params;
   const locale = (routing.locales.includes(rawLocale as Locale) ? rawLocale : routing.defaultLocale) as Locale;
@@ -96,6 +113,17 @@ export default async function AdminVisualPage({ params }: { params: Promise<{ lo
           <SubjectsSection />
         </Suspense>
         <AddSubjectForm />
+      </section>
+
+      <section className="mt-8 rounded-xl border border-line bg-surface p-4 shadow-card">
+        <h2 className="mb-3 text-lg font-semibold text-ink">Template Camera Angle</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Angle aktif muncul di picker Studio &amp; review; worker menambahkan otomatis ke prompt. Drag ≡ untuk urutan.
+        </p>
+        <Suspense fallback={<BoardSkeleton lines={4} label="Memuat angle..." />}>
+          <CameraAnglesSection />
+        </Suspense>
+        <AddCameraAngleForm />
       </section>
     </div>
   );
