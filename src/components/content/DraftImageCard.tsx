@@ -208,6 +208,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             isPending={isPending}
             onSelect={select}
             onRetry={retry}
+            modelOptions={options.models}
           />
         </div>
       ) : (

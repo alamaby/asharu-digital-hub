@@ -154,6 +154,28 @@ describe('ImageHistoryCarousel', () => {
     expect(slideAt(container, 1).textContent).toContain('Draf prompt otomatis siap');
   });
 
+  it('shows the requested model for a queued pin instead of auto', () => {
+    const modelOptions = [
+      { id: 'm-cf', provider_id: 'p-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare' }
+    ];
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({
+            id: 'q',
+            status: 'pending',
+            llm_meta: { override: { modelUuid: 'm-cf', styleSlug: null } }
+          })
+        ]}
+        selectedId={null}
+        modelOptions={modelOptions}
+      />
+    );
+    expect(slideAt(container, 0).textContent).toContain(
+      'cloudflare · @cf/black-forest-labs/flux-1-schnell (antre)'
+    );
+  });
+
   it('downloads the slide image via fetch → blob and revokes the object URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -66,7 +66,7 @@ export function StudioPageClient({ locale, options, quota, images, error }: Prop
       </div>
 
       {images.length > 0 ? (
-        <StudioHistory images={images} pollingIntervalSec={pollingIntervalSec} />
+        <StudioHistory images={images} pollingIntervalSec={pollingIntervalSec} options={options} />
       ) : (
         <p className="mt-6 text-sm text-ink-muted">{t('notice.empty')}</p>
       )}

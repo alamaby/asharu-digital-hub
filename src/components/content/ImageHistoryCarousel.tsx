@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DraftImageRow } from '@/lib/image/types';
+import { requestedImageModelUuid } from '@/lib/image/requested-label';
 
 export type ImageCarouselVariant = 'cover' | 'reply';
 
@@ -16,6 +17,8 @@ interface Props {
   isPending?: boolean;
   onSelect?: (imageId: string) => void;
   onRetry?: (imageId: string) => void;
+  /** Katalog model aktif — untuk label request saat antre (bukan "auto"). */
+  modelOptions?: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -51,6 +54,23 @@ function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string
   return { cls: 'border-line bg-background text-ink-muted', text: 'Belum ada gambar.' };
 }
 
+/** Label provider·model: hasil aktual bila slug terisi; request pin + "(antre)"
+ *  bila masih antre dengan override manual; "auto · auto" untuk Auto murni. */
+function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptions']): string {
+  if (img.provider_slug || img.model_id) {
+    return `${img.provider_slug || 'auto'} · ${img.model_id || 'auto'}${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+  }
+  const uuid = requestedImageModelUuid({
+    provider_slug: img.provider_slug,
+    model_id: img.model_id,
+    llm_meta: img.llm_meta
+  });
+  const model = uuid ? modelOptions?.find((m) => m.id === uuid) : undefined;
+  if (!model) {
+    return `auto · auto${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+  }
+  return `${model.provider_slug} · ${model.model_id} (antre)${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+}
 /** Nama file unduhan: basename URL Storage bila berekstensi, else visual-<id>.png. */
 function filenameFor(img: DraftImageRow, url: string): string {
   try {
@@ -68,7 +88,7 @@ function filenameFor(img: DraftImageRow, url: string): string {
  * Tanpa auto-advance — alat review admin. Slide non-aktif diberi inert agar
  * fokus/aksinya tidak bocor ke layar pembaca.
  */
-export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry }: Props) {
+export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, modelOptions }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set());
@@ -209,8 +229,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                     <span className="rounded bg-emerald-600 px-1.5 py-0.5 font-medium text-white">Terpilih</span>
                   ) : null}
                   <span className={isCover ? 'text-xs text-ink-muted' : 'text-[11px] text-ink-muted'}>
-                    {img.provider_slug || 'auto'} · {img.model_id || 'auto'}
-                    {img.style_slug ? ` · ${img.style_slug}` : ''}
+                    {providerModelLabel(img, modelOptions)}
                   </span>
                 </div>
 

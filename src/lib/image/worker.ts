@@ -373,7 +373,9 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
     const aspect: ImageAspect = target.aspect;
 
     // Waterfall provider: resolved dulu, lalu sisanya sesuai prioritas.
-    const providers = await orderedProviders(target.provider.id);
+    // Pin manual admin (override review): hanya provider terpilih — gagal
+    // jujur tanpa fallback lintas-provider. Auto/sesi/global: waterfall.
+    const providers = target.pinned ? [target.provider] : await orderedProviders(target.provider.id);
     let lastError: unknown = null;
     for (const provider of providers) {
       const modelRow =
@@ -425,7 +427,14 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
             width: result.width ?? null,
             height: result.height ?? null,
             last_error: null,
-            llm_meta: { ...promptMeta, provider: provider.slug, model: modelRow.model_id, key_suffix: keyRow.key_suffix },
+            llm_meta: {
+              ...promptMeta,
+              provider: provider.slug,
+              model: modelRow.model_id,
+              key_suffix: keyRow.key_suffix,
+              // Jejak audit: pin vs waterfall (kasus cloudflare→pixazo 11 Sep 2026).
+              pinned: target.pinned
+            },
             updated_at: new Date().toISOString()
           })
           .eq('id', imageId);

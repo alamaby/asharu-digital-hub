@@ -17,6 +17,8 @@ interface StudioTarget {
   model: ImageModelRow;
   style: ImageStylePreset | null;
   aspect: ImageAspect;
+  /** True bila target berasal dari pin manual user (provider_id/model_id) — gagal jujur, tanpa fallback. */
+  pinned: boolean;
 }
 
 async function getStudioConfigRow(): Promise<StudioConfig> {
@@ -64,17 +66,20 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
     : '1:1';
 
   // 1) Model pilihan user (validasi silang provider bila keduanya diisi).
+  // Strict-fail: pin manual TIDAK boleh jatuh ke waterfall diam-diam —
+  // bila model/provider nonaktif atau tidak cocok → throw jujur.
   if (row.model_id) {
     const found = await findStudioModel(row.model_id);
-    if (found) {
-      if (row.provider_id && found.provider.id !== row.provider_id) {
-        throw new Error('Model bukan milik provider terpilih.');
-      }
-      return { provider: found.provider, model: found.model, style, aspect };
+    if (!found) {
+      throw new Error('Model pilihan tidak aktif — pilih ulang model lalu coba lagi.');
     }
+    if (row.provider_id && found.provider.id !== row.provider_id) {
+      throw new Error('Model bukan milik provider terpilih.');
+    }
+    return { provider: found.provider, model: found.model, style, aspect, pinned: true };
   }
 
-  // 2) Provider pilihan user → model default provider itu.
+  // 2) Provider pilihan user → model default provider itu (juga pin: gagal jujur).
   if (row.provider_id) {
     const supabase = getServiceClient();
     const { data: prov } = await supabase
@@ -84,23 +89,28 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
       .eq('is_active', true)
       .maybeSingle();
     const provider = (prov as ImageProviderRow | null) ?? null;
-    if (provider) {
-      const { data: mods } = await supabase
-        .from('image_models')
-        .select('*')
-        .eq('provider_id', provider.id)
-        .eq('is_active', true)
-        .order('priority');
-      const rows = (mods ?? []) as unknown as ImageModelRow[];
-      const pick = rows.find((m) => m.is_default) ?? rows[0];
-      if (pick) return { provider, model: pick, style, aspect };
+    if (!provider) {
+      throw new Error('Provider pilihan tidak aktif — pilih ulang provider lalu coba lagi.');
     }
+    const { data: mods } = await supabase
+      .from('image_models')
+      .select('*')
+      .eq('provider_id', provider.id)
+      .eq('is_active', true)
+      .order('priority');
+    const rows = (mods ?? []) as unknown as ImageModelRow[];
+    const pick = rows.find((m) => m.is_default) ?? rows[0];
+    if (!pick) {
+      throw new Error('Provider pilihan tidak punya model aktif — pilih provider lain lalu coba lagi.');
+    }
+    return { provider, model: pick, style, aspect, pinned: true };
   }
 
-  // 3) Default config studio.
+  // 3) Default config studio (fallback config — boleh waterfall-kan provider,
+  //    tapi pin model bila diisi).
   if (config.default_model_id) {
     const found = await findStudioModel(config.default_model_id);
-    if (found) return { provider: found.provider, model: found.model, style, aspect };
+    if (found) return { provider: found.provider, model: found.model, style, aspect, pinned: true };
   }
 
   // 4) Waterfall prioritas.
@@ -119,7 +129,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
       .order('priority');
     const rows = (mods ?? []) as unknown as ImageModelRow[];
     const pick = rows.find((m) => m.is_default) ?? rows[0];
-    if (pick) return { provider, model: pick, style, aspect };
+    if (pick) return { provider, model: pick, style, aspect, pinned: false };
   }
   throw new Error('Tidak ada provider/model image aktif.');
 }
@@ -215,9 +225,13 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       .select('*')
       .eq('is_active', true)
       .order('priority');
-    const providers = ((provs ?? []) as unknown as ImageProviderRow[]).sort((a, b) =>
-      a.id === target.provider.id ? -1 : b.id === target.provider.id ? 1 : 0
-    );
+    // Pin manual user: hanya provider terpilih (gagal jujur, tanpa fallback
+    // lintas-provider). Auto: waterfall prioritas seperti semula.
+    const providers = target.pinned
+      ? [target.provider]
+      : ((provs ?? []) as unknown as ImageProviderRow[]).sort((a, b) =>
+          a.id === target.provider.id ? -1 : b.id === target.provider.id ? 1 : 0
+        );
 
     let lastError: unknown = null;
     for (const provider of providers) {
@@ -265,7 +279,16 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
             width: result.width ?? null,
             height: result.height ?? null,
             last_error: null,
-            llm_meta: { provider: provider.slug, model: modelRow.model_id, key_suffix: keyRow.key_suffix },
+            llm_meta: {
+            provider: provider.slug,
+            model: modelRow.model_id,
+            key_suffix: keyRow.key_suffix,
+            // Jejak audit: pin vs waterfall, agar hasil "bukan pilihan saya"
+            // bisa dibedakan dari bug (kasus cloudflare→pixazo 11 Sep 2026).
+            pinned: target.pinned,
+            requested_provider_id: row.provider_id,
+            requested_model_id: row.model_id
+          },
             updated_at: new Date().toISOString()
           })
           .eq('id', imageId);

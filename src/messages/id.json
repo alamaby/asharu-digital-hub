@@ -763,6 +763,7 @@
       "view": "Lihat",
       "expired": "Kedaluwarsa (dihapus {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
+      "metaQueued": "{provider} · {model} · {style} · {aspect} (antre)",
       "noStyle": "tanpa style",
       "processing": "Worker sedang memproses...",
       "noImage": "Belum ada gambar.",

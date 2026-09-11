@@ -50,9 +50,13 @@ function mockObservers() {
 
 function options(): StudioOptions {
   return {
-    providers: [{ id: 'prov-1', slug: 'pixazo', display_name: 'Pixazo' }],
+    providers: [
+      { id: 'prov-1', slug: 'pixazo', display_name: 'Pixazo' },
+      { id: 'prov-cf', slug: 'cloudflare', display_name: 'Cloudflare Workers AI' }
+    ],
     models: [
-      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo' }
+      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo' },
+      { id: 'model-cf', provider_id: 'prov-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare' }
     ],
     styles: [{ slug: 'photorealistic', display_name: 'Photorealistic' }],
     subjects: [{ slug: 'wanita-muda-modis', display_name: 'Wanita Muda Modis' }],
@@ -133,6 +137,7 @@ describe('StudioHistory', () => {
           genRow({ id: 'f1', status: 'failed', last_error: 'boom' })
         ]}
         pollingIntervalSec={10}
+        options={options()}
       />
     );
     expect(screen.getByText('Riwayat Generate')).toBeInTheDocument();
@@ -154,8 +159,40 @@ describe('StudioHistory', () => {
   it('menampilkan placeholder memproses untuk antrean pending', () => {
     mockMatchMedia();
     mockObservers();
-    renderWithMessages(<StudioHistory images={[genRow({ id: 'p1', status: 'pending' })]} pollingIntervalSec={10} />);
+    renderWithMessages(
+      <StudioHistory
+        images={[genRow({ id: 'p1', status: 'pending', provider_slug: '', model_slug: '' })]}
+        pollingIntervalSec={10}
+        options={options()}
+      />
+    );
     expect(screen.getByText('Worker sedang memproses...')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('antrean pending dengan pin cloudflare menampilkan request, bukan auto', () => {
+    mockMatchMedia();
+    mockObservers();
+    renderWithMessages(
+      <StudioHistory
+        images={[
+          genRow({
+            id: 'p2',
+            status: 'pending',
+            provider_slug: '',
+            model_slug: '',
+            provider_id: 'prov-cf',
+            model_id: 'model-cf'
+          })
+        ]}
+        pollingIntervalSec={10}
+        options={options()}
+      />
+    );
+    // Label request + "(antre)" — regresi kasus cloudflare→pixazo 11 Sep 2026.
+    expect(
+      screen.getByText('cloudflare · @cf/black-forest-labs/flux-1-schnell · tanpa style · 1:1 (antre)')
+    ).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 });

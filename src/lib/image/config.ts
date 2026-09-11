@@ -14,6 +14,12 @@ export interface ResolvedImageTarget {
   model: ImageModelRow;
   style: ImageStylePreset | null;
   aspect: ImageAspect;
+  /**
+   * True bila target berasal dari pin manual admin (override review) —
+   * worker wajib gagal jujur tanpa fallback lintas-provider.
+   * Session/global defaults + waterfall = false (boleh fallback).
+   */
+  pinned: boolean;
 }
 
 interface SessionImageOverride {
@@ -110,19 +116,21 @@ export async function resolveImageTarget(options: {
     (await findStyle(defaults?.style_slug)) ??
     null;
 
-  // 1) Per-draft override (review picker)
+  // 1) Per-draft override (review picker) — pin manual admin: gagal jujur
+  //    bila model tidak aktif (jangan jatuh diam-diam ke waterfall).
   if (draftOverride?.modelUuid) {
     const found = await findModel(draftOverride.modelUuid);
-    if (found) {
-      return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1' };
+    if (!found) {
+      throw new Error('Model pilihan tidak aktif — pilih ulang model lalu coba lagi.');
     }
+    return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: true };
   }
 
   // 2) Session override
   if (session?.image_model_id) {
     const found = await findModel(session.image_model_id);
     if (found) {
-      return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1' };
+      return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
     }
   }
 
@@ -130,7 +138,7 @@ export async function resolveImageTarget(options: {
   if (defaults?.model_id) {
     const found = await findModel(defaults.model_id);
     if (found) {
-      return { provider: found.provider, model: found.model, style, aspect: defaults.aspect };
+      return { provider: found.provider, model: found.model, style, aspect: defaults.aspect, pinned: false };
     }
   }
 
@@ -140,7 +148,7 @@ export async function resolveImageTarget(options: {
     const models = await activeModels(provider.id);
     const pick = models.find((m) => m.is_default) ?? models[0];
     if (!pick) continue;
-    return { provider, model: pick, style, aspect: defaults?.aspect ?? '1:1' };
+    return { provider, model: pick, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
   }
   throw new Error('No active image provider/model available');
 }

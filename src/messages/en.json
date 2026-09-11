@@ -763,6 +763,7 @@
       "view": "View",
       "expired": "Expired (removed {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
+      "metaQueued": "{provider} · {model} · {style} · {aspect} (queued)",
       "noStyle": "no style",
       "processing": "Worker is processing...",
       "noImage": "No image yet.",

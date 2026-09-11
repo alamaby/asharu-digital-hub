@@ -208,6 +208,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             isPending={isPending}
             onSelect={select}
             onRetry={retryOne}
+            modelOptions={options.models}
           />
         </div>
       ) : (

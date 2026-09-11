@@ -156,6 +156,24 @@ describe('resolveImageTarget — prioritas style', () => {
     });
     expect(t.model.model_id).toBe('flux-1-schnell');
     expect(t.style?.slug).toBe('anime');
+    expect(t.pinned).toBe(true);
+  });
+
+  it('pin manual nonaktif → throw jujur (tanpa fallback diam-diam ke pixazo)', async () => {
+    useTables(makeTables());
+    await expect(
+      resolveImageTarget({
+        sessionId: null,
+        draftOverride: { modelUuid: 'model-tidak-ada', styleSlug: null }
+      })
+    ).rejects.toThrow('Model pilihan tidak aktif');
+  });
+
+  it('waterfall Auto → pinned false (boleh fallback lintas-provider)', async () => {
+    useTables(makeTables({ defaults: defaultsRow({ model_id: null }) }));
+    const t = await resolveImageTarget({ sessionId: null, draftOverride: null });
+    expect(t.model.model_id).toBe('flux-1-schnell');
+    expect(t.pinned).toBe(false);
   });
 
   it('model sesi + styleSlug override: model sesi tetap, style manual menang', async () => {

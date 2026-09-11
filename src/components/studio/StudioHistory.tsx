@@ -10,9 +10,14 @@ import { retryFailedStudioImage, deleteStudioImage, listUserImages } from '@/lib
 interface Props {
   images: StudioGenerationRow[];
   pollingIntervalSec: number;
+  /** Katalog provider/model aktif — untuk label request saat antre (bukan "auto"). */
+  options?: {
+    providers: { id: string; slug: string; display_name: string }[];
+    models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  } | null;
 }
 
-export function StudioHistory({ images: initialImages, pollingIntervalSec }: Props) {
+export function StudioHistory({ images: initialImages, pollingIntervalSec, options }: Props) {
   const tHist = useTranslations('studio.history');
   const tNotice = useTranslations('studio.notice');
 
@@ -112,6 +117,21 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec }: Pro
   }
 
   function metaLabel(img: StudioGenerationRow): string {
+    // Baris hasil: tampilkan provider/model aktual. Baris antre (slug '')
+    // dengan pin user: tampilkan yang diminta + "(antre)" agar tidak
+    // disangka Auto (kasus cloudflare→pixazo 11 Sep 2026).
+    if (!img.provider_slug && !img.model_slug && img.status === 'pending' && img.model_id && options) {
+      const model = options.models.find((m) => m.id === img.model_id);
+      if (model) {
+        const provider = options.providers.find((p) => p.id === model.provider_id);
+        return tHist('metaQueued', {
+          provider: provider?.slug ?? model.provider_slug,
+          model: model.model_id,
+          style: img.style_slug || tHist('noStyle'),
+          aspect: img.aspect_slug
+        });
+      }
+    }
     return tHist('meta', {
       provider: img.provider_slug || 'auto',
       model: img.model_slug || 'auto',
