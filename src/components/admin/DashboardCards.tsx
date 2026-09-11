@@ -3,6 +3,8 @@ import { Link } from '@/i18n/navigation';
 import { AdminBadge } from '@/components/admin/shell/AdminBadge';
 import { AdminCard } from '@/components/admin/shell/AdminCard';
 import { AdminPageHeader } from '@/components/admin/shell/AdminPageHeader';
+import { AdminFunnelChart } from '@/components/admin/charts/AdminFunnelChart';
+import { AdminTrendChart } from '@/components/admin/charts/AdminTrendChart';
 
 interface RecentDraft {
   id: string;
@@ -18,6 +20,7 @@ interface RecentDraft {
 export interface TrendDay {
   hari: string;
   draf: number;
+  disetujui: number;
 }
 
 export interface FunnelRow {
@@ -90,7 +93,6 @@ export function DashboardCards({
   llmWeek
 }: DashboardCardsProps) {
   const t = useTranslations('admin.dashboard');
-  const maxTrend = Math.max(1, ...trend.map((d) => d.draf));
 
   return (
     <div className="space-y-6">
@@ -140,22 +142,12 @@ export function DashboardCards({
           {trend.length === 0 ? (
             <p className="text-sm text-ink-muted">{t('recentEmpty')}</p>
           ) : (
-            <ul className="space-y-2.5">
-              {trend.map((day) => (
-                <li key={day.hari} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 text-xs tabular-nums text-ink-muted">
-                    {day.hari.slice(5)}
-                  </span>
-                  <span
-                    className="h-2.5 min-w-1 rounded-full bg-brand-500"
-                    style={{ width: `${Math.max(2, Math.round((day.draf / maxTrend) * 100))}%` }}
-                    role="img"
-                    aria-label={`${day.draf} ${t('trendDrafts')}`}
-                  />
-                  <span className="text-xs font-semibold tabular-nums text-ink">{day.draf}</span>
-                </li>
-              ))}
-            </ul>
+            <AdminTrendChart
+              days={trend}
+              draftsLabel={t('trendDrafts')}
+              approvedLabel={t('trendApproved')}
+              chartLabel={t('trendHeading')}
+            />
           )}
         </AdminCard>
 
@@ -163,17 +155,7 @@ export function DashboardCards({
           {funnel.length === 0 ? (
             <p className="text-sm text-ink-muted">{t('recentEmpty')}</p>
           ) : (
-            <ul className="space-y-2">
-              {funnel.map((row) => (
-                <li
-                  key={row.status}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2"
-                >
-                  <AdminBadge color={badgeColor(row.status)}>{row.status}</AdminBadge>
-                  <span className="text-lg font-bold tabular-nums text-ink">{row.jumlah}</span>
-                </li>
-              ))}
-            </ul>
+            <AdminFunnelChart rows={funnel} chartLabel={t('funnelHeading')} />
           )}
         </AdminCard>
       </div>

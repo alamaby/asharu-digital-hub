@@ -642,6 +642,7 @@
     "trendHeading": "Tren 7 Hari",
     "trendDesc": "Draf dibuat per hari (UTC).",
     "trendDrafts": "draf",
+    "trendApproved": "disetujui",
     "funnelHeading": "Funnel Riset",
     "funnelDesc": "Sesi per status.",
     "llmHeading": "LLM 7 Hari",

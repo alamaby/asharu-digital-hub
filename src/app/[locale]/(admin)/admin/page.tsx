@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 interface ViewDailyRow {
   hari: string;
   draf: number;
+  disetujui: number;
 }
 
 interface ViewFunnelRow {
@@ -69,7 +70,7 @@ export default async function AdminDashboardPage({ params }: PageProps) {
 
   const [{ data: trendRows }, { data: funnelRows }, { data: llmRows }] = supabase
     ? await Promise.all([
-        supabase.from('v_admin_content_daily').select('hari, draf').order('hari', { ascending: false }).limit(7),
+        supabase.from('v_admin_content_daily').select('hari, draf, disetujui').order('hari', { ascending: false }).limit(14),
         supabase.from('v_admin_research_funnel').select('status, jumlah'),
         supabase
           .from('v_admin_llm_usage_daily')
@@ -97,7 +98,7 @@ export default async function AdminDashboardPage({ params }: PageProps) {
   const email = (await supabase?.auth.getUser().catch(() => ({ data: { user: null } })))?.data?.user?.email ?? '';
 
   const trend: TrendDay[] = ((trendRows ?? []) as ViewDailyRow[])
-    .map((r) => ({ hari: String(r.hari), draf: Number(r.draf) ?? 0 }))
+    .map((r) => ({ hari: String(r.hari), draf: Number(r.draf) ?? 0, disetujui: Number(r.disetujui) ?? 0 }))
     .reverse();
   const funnel: FunnelRow[] = ((funnelRows ?? []) as ViewFunnelRow[]).map((r) => ({
     status: String(r.status),

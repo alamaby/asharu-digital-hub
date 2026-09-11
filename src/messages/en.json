@@ -642,6 +642,7 @@
     "trendHeading": "7-Day Trend",
     "trendDesc": "Drafts created per day (UTC).",
     "trendDrafts": "drafts",
+    "trendApproved": "approved",
     "funnelHeading": "Research Funnel",
     "funnelDesc": "Sessions by status.",
     "llmHeading": "LLM, Last 7 Days",
