@@ -33,15 +33,15 @@ export interface AdminNavGroup {
  * namespace `nav` (kunci = `key`), judul grup via `nav.group*`.
  */
 export const adminNavGroups: readonly AdminNavGroup[] = [
-  {
-    id: 'manage',
+  { id: 'manage',
     entries: [
       { key: 'adminDashboard', pathname: '/admin', icon: LayoutDashboard, adminOnly: true, exact: true },
       { key: 'adminKonten', pathname: '/admin/konten', icon: FileText, adminOnly: true },
       { key: 'adminRiset', pathname: '/admin/riset', icon: FlaskConical, adminOnly: true },
       { key: 'adminLlm', pathname: '/admin/llm', icon: Cpu, adminOnly: true },
       { key: 'adminVisual', pathname: '/admin/visual', icon: Image, adminOnly: true },
-      { key: 'adminSosial', pathname: '/admin/sosial', icon: Share2, adminOnly: true }
+      { key: 'adminSosial', pathname: '/admin/sosial', icon: Share2, adminOnly: true },
+      { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false },
     ]
   },
   {

@@ -15,8 +15,7 @@ export default async function middleware(request: NextRequest) {
 
   let supabaseResponse = intlResponse;
   let user: import('@supabase/supabase-js').User | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let supabase: any = null;
+  let supabase: ReturnType<typeof createServerClient> | null = null;
 
   if (supabaseUrl && supabaseKey) {
     const response = intlResponse ?? NextResponse.next({ request });
@@ -40,6 +39,7 @@ export default async function middleware(request: NextRequest) {
 
   // Guard area non-publik admin — only admin; anon or non-admin → /masuk.
   // `/konten/baru` dan `/masuk` tetap publik (form anonim + login).
+  // `/studio` login-only (semua user yang login; bukan hanya admin).
   const pathname = request.nextUrl.pathname;
   const isProtected =
     /^\/(id|en)\/admin(\/|$)/.test(pathname) ||
@@ -66,6 +66,12 @@ export default async function middleware(request: NextRequest) {
       const locale = pathname.startsWith('/en/') ? 'en' : 'id';
       return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
     }
+  }
+
+  const isStudio = /^\/(id|en)\/studio(\/|$)/.test(pathname);
+  if (isStudio && !user) {
+    const locale = pathname.startsWith('/en/') ? 'en' : 'id';
+    return NextResponse.redirect(new URL(`/${locale}/masuk`, request.url));
   }
 
   return supabaseResponse ?? intlResponse;

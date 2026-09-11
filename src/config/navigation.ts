@@ -3,7 +3,7 @@
  * `pathnames` map in `src/i18n/routing.ts` so localized URLs stay consistent.
  */
 export interface NavItem {
-  key:
+  key?:
     | 'home'
     | 'stores'
     | 'products'
@@ -17,12 +17,14 @@ export interface NavItem {
     | 'adminLlm'
     | 'adminVisual'
     | 'adminSosial'
+    | 'studio'
     | 'backToSite'
     | 'signIn';
   pathname:
     | '/'
     | '/products'
     | '/properties'
+    | '/properties/[slug]'
     | '/about'
     | '/admin'
     | '/admin/konten'
@@ -33,6 +35,8 @@ export interface NavItem {
     | '/admin/sosial'
     | '/konten/baru'
     | '/konten/review'
+    | '/konten/review/[draftId]'
+    | '/studio'
     | '/masuk';
   /** In-page anchor (homepage sections). */
   hash?: string;
@@ -59,6 +63,7 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminLlm', pathname: '/admin/llm' },
   { key: 'adminVisual', pathname: '/admin/visual' },
   { key: 'adminSosial', pathname: '/admin/sosial' },
+  { key: 'studio', pathname: '/studio' },
   { key: 'adminBaru', pathname: '/konten/baru' },
   { key: 'adminReview', pathname: '/konten/review' }
 ];

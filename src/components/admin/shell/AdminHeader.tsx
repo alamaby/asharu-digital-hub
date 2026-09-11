@@ -51,7 +51,7 @@ export function AdminHeader() {
                 <>
                   <li aria-hidden className="shrink-0 text-gray-300 dark:text-gray-600">/</li>
                   <li className="truncate font-medium text-gray-800 dark:text-white/90">
-                    {tNav(active.entry.key)}
+                    {tNav(active.entry.key ?? 'home')}
                   </li>
                 </>
               ) : null}

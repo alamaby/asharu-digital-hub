@@ -27,10 +27,13 @@ export function NavMenu({ variant, items, onNavigate }: NavMenuProps) {
 
   const renderItem = (item: NavItem) => {
     const active = !item.isAnchor && pathname === item.pathname;
+    const href = (item.hash
+      ? { pathname: item.pathname, hash: item.hash }
+      : { pathname: item.pathname }) as never;
     return (
       <li key={item.key}>
         <Link
-          href={{ pathname: item.pathname, ...(item.hash ? { hash: item.hash } : {}) }}
+          href={href}
           aria-current={active ? 'page' : undefined}
           onClick={onNavigate}
           className={cn(
@@ -40,7 +43,7 @@ export function NavMenu({ variant, items, onNavigate }: NavMenuProps) {
               : 'bg-background font-semibold text-primary')
           )}
         >
-          {t(item.key)}
+          {t(item.key ?? 'home')}
         </Link>
       </li>
     );

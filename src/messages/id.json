@@ -41,6 +41,10 @@
         "description": "Daftar draf konten yang menunggu tinjauan admin."
       }
     },
+    "studio": {
+      "title": "Studio Gambar | Asharu",
+      "description": "Generate gambar dengan pilih provider, model, style, dan aspek rasio. Histori tersimpan 30 hari."
+    },
     "notFound": {
       "title": "Halaman Tidak Ditemukan | Asharu",
       "description": "Halaman yang Anda cari tidak tersedia. Silakan kembali ke beranda Asharu."
@@ -72,6 +76,7 @@
     "adminBaru": "Buat",
     "adminReview": "Review",
     "adminSosial": "Sosial",
+    "studio": "Studio",
     "backToSite": "Kembali ke situs",
     "signIn": "Masuk",
     "groupManage": "Kelola",
@@ -699,6 +704,62 @@
       "rangeInfo": "{from}–{to} dari {count}",
       "apply": "Terapkan",
       "reset": "Reset"
+    }
+  },
+  "studio": {
+    "title": "Studio Gambar",
+    "intro": "Generate gambar dengan memilih provider, model, template subjek, style, dan aspek rasio. Histori prompt + hasil disimpan 30 hari.",
+    "quota": {
+      "used": "Kuota hari ini: {used}/{limit}",
+      "unlimited": "Kuota: unlimited",
+      "remaining": "{remaining} sisa"
+    },
+    "form": {
+      "promptLabel": "Image prompt (EN, deskriptif)",
+      "promptPlaceholder": "Contoh: kamar tidur rapi setelah declutter, soft light...",
+      "promptChar": "{current}/{max} karakter",
+      "promptMin": "Prompt minimal 10 karakter (EN, deskriptif).",
+      "negativeLabel": "Negative prompt (opsional)",
+      "negativePlaceholder": "blurry, low quality",
+      "negativeChar": "{current}/500 karakter",
+      "providerLabel": "Provider",
+      "providerAuto": "Auto (waterfall prioritas)",
+      "modelLabel": "Model",
+      "modelAuto": "Auto (default provider)",
+      "styleLabel": "Preset style",
+      "styleAuto": "Auto (default global)",
+      "subjectLabel": "Template subjek",
+      "subjectNone": "(tidak pakai subjek)",
+      "aspectLabel": "Aspek rasio",
+      "submit": "Generate",
+      "submitting": "Memasukkan antrean...",
+      "errorRequired": "Login diperlukan.",
+      "errorQuota": "Kuota harian habis.",
+      "errorInput": "Input tidak valid."
+    },
+    "notice": {
+      "enqueue": "Masuk antrean. Worker memproses ≤5 menit — histori akan berubah ke ready otomatis.",
+      "processing": "Sedang diproses… worker sedang generate. Refresh otomatis setiap {interval}s.",
+      "ready": "Siap — klik gambar untuk perbesar.",
+      "failed": "Gagal: {error}. Coba Ulangi.",
+      "empty": "Belum ada hasil. Isi form di atas lalu Generate."
+    },
+    "history": {
+      "heading": "Riwayat Generate",
+      "empty": "Belum ada histori. Hasil generate pertama Anda akan muncul di sini.",
+      "pending": "Menunggu worker",
+      "ready": "Siap",
+      "failed": "Gagal",
+      "retry": "Ulangi",
+      "retrying": "Mengulang...",
+      "delete": "Hapus",
+      "deleting": "Menghapus...",
+      "deleted": "Dihentikan — file dan catatan dihapus.",
+      "download": "Unduh",
+      "view": "Lihat",
+      "expired": "Kedaluwarsa (dihapus {ago})",
+      "meta": "{provider} · {model} · {style} · {aspect}",
+      "noStyle": "tanpa style"
     }
   }
 }

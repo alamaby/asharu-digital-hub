@@ -42,6 +42,10 @@ export const routing = defineRouting({
       id: '/konten/baru',
       en: '/content/new'
     },
+    '/studio': {
+      id: '/studio',
+      en: '/studio'
+    },
     '/konten/review': {
       id: '/konten/review',
       en: '/content/review'

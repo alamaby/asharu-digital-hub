@@ -41,6 +41,10 @@
         "description": "Drafts awaiting admin review."
       }
     },
+    "studio": {
+      "title": "Image Studio | Asharu",
+      "description": "Generate images by picking provider, model, style, and aspect ratio. History retained for 30 days."
+    },
     "notFound": {
       "title": "Page Not Found | Asharu",
       "description": "The page you are looking for is not available. Please return to the Asharu homepage."
@@ -72,6 +76,7 @@
     "adminBaru": "New",
     "adminReview": "Review",
     "adminSosial": "Social",
+    "studio": "Studio",
     "backToSite": "Back to site",
     "signIn": "Sign in",
     "groupManage": "Manage",
@@ -699,6 +704,62 @@
       "rangeInfo": "{from}–{to} of {count}",
       "apply": "Apply",
       "reset": "Reset"
+    }
+  },
+  "studio": {
+    "title": "Image Studio",
+    "intro": "Generate images by picking provider, model, subject template, style, and aspect ratio. History retained for 30 days.",
+    "quota": {
+      "used": "Today's quota: {used}/{limit}",
+      "unlimited": "Quota: unlimited",
+      "remaining": "{remaining} remaining"
+    },
+    "form": {
+      "promptLabel": "Image prompt (English, descriptive)",
+      "promptPlaceholder": "E.g. tidy bedroom after declutter, soft light...",
+      "promptChar": "{current}/{max} chars",
+      "promptMin": "Prompt must be at least 10 characters (English, descriptive).",
+      "negativeLabel": "Negative prompt (optional)",
+      "negativePlaceholder": "blurry, low quality",
+      "negativeChar": "{current}/500 chars",
+      "providerLabel": "Provider",
+      "providerAuto": "Auto (priority waterfall)",
+      "modelLabel": "Model",
+      "modelAuto": "Auto (provider default)",
+      "styleLabel": "Style preset",
+      "styleAuto": "Auto (global default)",
+      "subjectLabel": "Subject template",
+      "subjectNone": "(no subject)",
+      "aspectLabel": "Aspect ratio",
+      "submit": "Generate",
+      "submitting": "Adding to queue...",
+      "errorRequired": "Login required.",
+      "errorQuota": "Daily quota exhausted.",
+      "errorInput": "Invalid input."
+    },
+    "notice": {
+      "enqueue": "Queued. The worker processes in ≤5 minutes — results turn ready automatically.",
+      "processing": "Processing… the worker is generating. Auto-refresh every {interval}s.",
+      "ready": "Ready — click image to enlarge.",
+      "failed": "Failed: {error}. Try retry.",
+      "empty": "Nothing yet. Fill the form above then Generate."
+    },
+    "history": {
+      "heading": "Generation History",
+      "empty": "No history yet. Your first generation will appear here.",
+      "pending": "Awaiting worker",
+      "ready": "Ready",
+      "failed": "Failed",
+      "retry": "Retry",
+      "retrying": "Retrying...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "deleted": "Removed — file and record deleted.",
+      "download": "Download",
+      "view": "View",
+      "expired": "Expired (removed {ago})",
+      "meta": "{provider} · {model} · {style} · {aspect}",
+      "noStyle": "no style"
     }
   }
 }

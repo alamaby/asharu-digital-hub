@@ -48,7 +48,7 @@ export function AdminSidebar({ isAdmin }: AdminSidebarProps) {
           <span className={active ? 'menu-item-icon-active' : 'menu-item-icon-inactive'}>
             <Icon className="size-5 shrink-0" aria-hidden />
           </span>
-          {showLabel ? <span className="truncate">{t(entry.key)}</span> : null}
+          {showLabel ? <span className="truncate">{t(entry.key ?? 'home')}</span> : null}
         </Link>
       </li>
     );
