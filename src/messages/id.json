@@ -709,10 +709,11 @@
   "studio": {
     "title": "Studio Gambar",
     "intro": "Generate gambar dengan memilih provider, model, template subjek, style, dan aspek rasio. Histori prompt + hasil disimpan 30 hari.",
-    "quota": {
+      "quota": {
       "used": "Kuota hari ini: {used}/{limit}",
       "unlimited": "Kuota: unlimited",
-      "remaining": "{remaining} sisa"
+      "remaining": "{remaining} sisa",
+      "exhausted": "Kuota harian habis ({limit}/hari) — coba lagi besok."
     },
     "form": {
       "promptLabel": "Image prompt (EN, deskriptif)",

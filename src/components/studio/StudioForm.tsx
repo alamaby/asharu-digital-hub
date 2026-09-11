@@ -7,43 +7,43 @@ import { useTranslations } from 'next-intl';
 
 interface Props {
   options: StudioOptions | null;
-  quota: { remaining: number | null; limit: number | null | undefined } | null;
+  quota: { used: number; remaining: number | null; limit: number | null | undefined } | null;
 }
 
 export function StudioForm({ options, quota }: Props) {
-  const t = useTranslations('studio');
-  const tForm = useTranslations('studio.form');
-  const tNotice = useTranslations('studio.notice');
+    const t = useTranslations('studio');
+    const tForm = useTranslations('studio.form');
+    const tNotice = useTranslations('studio.notice');
 
-  const [prompt, setPrompt] = useState('');
-  const [negative, setNegative] = useState('');
-  const [providerId, setProviderId] = useState('');
-  const [modelId, setModelId] = useState('');
-  const [styleSlug, setStyleSlug] = useState('');
-  const [subjectSlug, setSubjectSlug] = useState('');
-  const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+    const [prompt, setPrompt] = useState('');
+    const [negative, setNegative] = useState('');
+    const [providerId, setProviderId] = useState('');
+    const [modelId, setModelId] = useState('');
+    const [styleSlug, setStyleSlug] = useState('');
+    const [subjectSlug, setSubjectSlug] = useState('');
+    const [aspectSlug, setAspectSlug] = useState(options?.config.default_aspect_slug ?? '1:1');
+    const [notice, setNotice] = useState<string | null>(null);
+    const [isPending, startTransition] = useTransition();
 
-  const maxPrompt = options?.config.max_prompt_length ?? 500;
-  const negativeTrimmed = negative.trim();
+    const maxPrompt = options?.config.max_prompt_length ?? 500;
+    const negativeTrimmed = negative.trim();
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const p = prompt.trim();
-    if (p && p.length < 10) {
-      setNotice(tForm('promptMin'));
-      return;
-    }
-    if (!options) {
-      setNotice(tForm('errorInput'));
-      return;
-    }
-    const limited = quota?.remaining;
-    if (typeof limited === 'number' && limited <= 0) {
-      setNotice(t('notice.errorQuota'));
-      return;
-    }
+    function handleSubmit(e: React.FormEvent) {
+      e.preventDefault();
+      const p = prompt.trim();
+      if (p && p.length < 10) {
+        setNotice(tForm('promptMin'));
+        return;
+      }
+      if (!options) {
+        setNotice(tForm('errorInput'));
+        return;
+      }
+      const limited = quota?.remaining;
+      if (typeof limited === 'number' && limited <= 0) {
+        setNotice(t('quota.used', { used: quota?.used ?? 0, limit: quota?.limit ?? 0 }));
+        return;
+      }
     setNotice(tNotice('enqueue'));
     startTransition(async () => {
       try {

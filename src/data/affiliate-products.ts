@@ -7,6 +7,26 @@ import type { AffiliateProduct } from './schemas';
 
 export const affiliateProducts: AffiliateProduct[] = [
   {
+    id: 'affiliate-42321348',
+    name: { id: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse', en: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse' },
+    category: 'electronics',
+    description: { id: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse', en: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/50YyClbvr8',
+    image: '/images/products/affiliate/42321348-7b8149a63aca.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42269466',
+    name: { id: 'ecentio botol minum Portable 500ml aesthetic Olahraga bottle tail benning Anti Bocor botol plastik d', en: 'ecentio botol minum Portable 500ml aesthetic Olahraga bottle tail benning Anti Bocor botol plastik d' },
+    category: 'home-living',
+    description: { id: 'ecentio botol minum Portable 500ml aesthetic Olahraga bottle tail benning Anti Bocor botol plastik d', en: 'ecentio botol minum Portable 500ml aesthetic Olahraga bottle tail benning Anti Bocor botol plastik d' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/4fw6o2XB6G',
+    image: '/images/products/affiliate/42269466-89378b28c340.webp',
+    featured: true
+  },
+  {
     id: 'affiliate-42084244',
     name: { id: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo', en: 'Jet Shiny Kanebo | Lap Chamois | Plas | Kain Pengering Berserat | Kinobi - Xanebo' },
     category: 'others',
@@ -54,7 +74,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/W6Puq19QT',
     image: '/images/products/affiliate/41926248-1e3ebdd3e27d.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914588',
@@ -64,7 +84,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/40gHo2EsAE',
     image: '/images/products/affiliate/41914588-c9f2f2147323.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41914578',

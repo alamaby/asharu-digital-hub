@@ -712,7 +712,8 @@
     "quota": {
       "used": "Today's quota: {used}/{limit}",
       "unlimited": "Quota: unlimited",
-      "remaining": "{remaining} remaining"
+      "remaining": "{remaining} remaining",
+      "exhausted": "Daily quota exhausted ({limit}/day) — try again tomorrow."
     },
     "form": {
       "promptLabel": "Image prompt (English, descriptive)",
