@@ -23,7 +23,8 @@ Template camera angle dikelola admin di `/admin/visual`, tampil sebagai picker d
 - `ContentDraftCard` default `imageOptions` tanpa cameras → `PostImageControl`/`DraftImageCard` pakai `(options.cameras ?? [])`, aman backward-compat.
 
 ## Risiko / catatan
-- Migrasi BELUM di-apply ke prod (MCP read-only). Aditif murni (tabel + kolom NULL + policy) → aman di-apply kapan pun. Sebelum apply, query `image_camera_angles` gagal → `CameraAnglesSection` tampilkan error jujur; Studio/review tetap jalan (cameras kosong → dropdown "tanpa angle").
+- ~~Migrasi BELUM di-apply ke prod~~ → **APPLIED 2026-09-11 21:45** via MCP `apply_migration` (nama `image_camera_angles`, success). Verifikasi prod: seed 25/25 aktif (sort 10–250, angle_en 27–56 char); kolom `camera_slug` nullable di `content_draft_images` + `user_image_generations`, `default_camera_slug` nullable di `image_studio_config`; 3 FK `ON DELETE SET NULL`; RLS `image_angles_admin` (ALL, is_admin) + `image_angles_user_read` (SELECT aktif); spot-check 6 seed pertama OK.
+- Advisors pasca-apply: security = pre-existing (is_admin search_path, SECURITY DEFINER fns, leaked-pw) — tak terkait migrasi. Performance: `unindexed FK` pada kolom camera baru (INFO, pola sama dengan FK style/subject existing yang juga tanpa index) + `multiple_permissive_policies` admin+user_read (pola baku semua tabel image_*). Tak ada temuan baru yang butuh aksi.
 - `config.ts review` (`resolveImageTarget`) tidak disentuh — angle bukan bagian target provider/model/style, murni prompt suffix layer di worker.
 
 ## Verifikasi

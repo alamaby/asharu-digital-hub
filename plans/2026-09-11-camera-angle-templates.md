@@ -38,6 +38,7 @@ Keputusan user: (1) kolom minimal `slug/display_name/angle_en`; (2) persist tamb
 ## Progress Log
 - 2026-09-11 16:35:00 — Plan dibuat dari diskusi plan-mode; eksekusi dimulai.
 - 2026-09-11 21:35:00 — Selesai. Gate: typecheck ✓, lint ✓, 464 tests ✓ (59 file, +6 camera-angles), build ✓ (route `angles/[angleSlug]` terdaftar). Komit submodule + parent + push. [USER ACTION] Apply migrasi ke prod (Dashboard SQL / CLI) karena MCP read-only; tabel baru — aman (aditif).
+- 2026-09-11 21:45:00 — Migrasi APPLIED ke prod via MCP `apply_migration` (ternyata write tersedia di server asharu-be-production). Verifikasi: seed 25/25, 3 kolom FK, 3 FK SET NULL, 2 RLS policies, spot-check seed OK. Advisors: hanya pre-existing + INFO unindexed-FK (pola sama dgn FK existing). Follow-up: deploy Vercel agar UI picker live; QA manual /admin/visual + /studio + review.
 
 ## Notes
 - Skala kecil → TOGAF/C2M tak diseremonialkan (AGENTS §3 proporsional).
