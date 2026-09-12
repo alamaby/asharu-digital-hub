@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
+import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftImageReference } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
+import { ReferencePicker, type ReferenceModelOption } from './ReferencePicker';
 
 export interface ImageOption {
   providers: { id: string; slug: string; display_name: string }[];
-  models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  models: ReferenceModelOption[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
   cameras?: { slug: string; display_name: string }[];
@@ -50,6 +51,14 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
+  // Referensi img2img cover: URL aktif + strength + notice upload.
+  const [referenceUrl, setReferenceUrl] = useState<string | null>(() => latestOf(initialImages)?.reference_public_url ?? null);
+  const [referenceStrength, setReferenceStrength] = useState<number>(() => {
+    const s = Number(latestOf(initialImages)?.reference_strength);
+    return Number.isFinite(s) && s >= 0 && s <= 1 ? s : 0.6;
+  });
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [notice, setNotice] = useState<string | null>(() => {
     const latest = latestOf(initialImages);
     const hasVisual = initialImages.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
@@ -92,6 +101,11 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
       return;
     }
+    const pinned = options.models.find((m) => m.id === modelUuid) ?? null;
+    if (referenceUrl && pinned && pinned.supports_reference === false) {
+      setNotice(`Model ${pinned.display_name} tidak mendukung image reference — pilih model bertanda ref atau Auto.`);
+      return;
+    }
     setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
@@ -101,7 +115,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           styleSlug: styleSlug || null,
           cameraSlug: cameraSlug || null,
           imagePrompt: p || null,
-          negativePrompt: n || null
+          negativePrompt: n || null,
+          referencePublicUrl: referenceUrl,
+          referenceStrength: referenceUrl ? referenceStrength : null
         });
         setNotice(p
           ? 'Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil. Prompt edit tersimpan sebagai visual_strategy=custom.'
@@ -129,7 +145,35 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     }
   }
 
-  async function handleEnhance() {    const p = promptDraft.trim();
+  async function handleReferenceUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setReferenceNotice('Referensi maksimal 5MB — kecilkan dulu.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+      setReferenceNotice('Referensi harus gambar JPEG/PNG/WebP.');
+      return;
+    }
+    setIsUploadingRef(true);
+    setReferenceNotice('Mengunggah referensi...');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { publicUrl } = await uploadDraftImageReference(draftId, fd);
+      setReferenceUrl(publicUrl);
+      // Bila model terpin non-support → reset ke Auto agar tidak gagal jujur.
+      const pinned = options.models.find((m) => m.id === modelUuid) ?? null;
+      if (pinned && pinned.supports_reference === false) setModelUuid('');
+      setReferenceNotice('Referensi siap — pilih model bertanda ref atau Auto.');
+    } catch (e) {
+      setReferenceNotice(e instanceof Error ? e.message : 'Upload referensi gagal.');
+    } finally {
+      setIsUploadingRef(false);
+    }
+  }
+
+  async function handleEnhance() {
+    const p = promptDraft.trim();
     if (!p || p.length < 10) {
       setNotice('Isi image prompt dulu (≥10 karakter) — enhance hanya untuk polish draf yang sudah ada.');
       return;
@@ -208,6 +252,10 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             isPending={isPending}
             onSelect={select}
             onRetry={retry}
+            onUseAsReference={(url) => {
+              setReferenceUrl(url);
+              setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
+            }}
             modelOptions={options.models}
           />
         </div>
@@ -229,6 +277,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             {options.models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.provider_slug} · {m.display_name}
+                {m.supports_reference ? ' · ref' : ''}
               </option>
             ))}
           </select>
@@ -278,6 +327,20 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           </select>
         </label>
       </div>
+      <ReferencePicker
+        title="Gambar referensi (opsional, img2img)"
+        history={images}
+        referenceUrl={referenceUrl}
+        referenceStrength={referenceStrength}
+        modelUuid={modelUuid}
+        models={options.models}
+        disabled={isPending}
+        busy={isUploadingRef}
+        onUpload={(f) => void handleReferenceUpload(f)}
+        onSelectUrl={setReferenceUrl}
+        onStrength={setReferenceStrength}
+        notice={referenceNotice}
+      />
       <div className="mt-3 grid gap-2">
         <label className="text-xs">
           <span className="mb-1 block text-ink-muted">Image prompt (EN, ≤500 char / ≤60 kata — edit lalu Regenerate; style suffix ditambah otomatis)</span>

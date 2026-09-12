@@ -18,8 +18,14 @@ import {
   type StudioQuota,
   type StudioEnhanceResult
 } from './types';
-import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink } from './validation';
-import { removeUserImage } from './storage';
+import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink, validateReferenceModelLink } from './validation';
+import { removeUserImage, uploadUserReference } from './storage';
+import {
+  REFERENCE_IMAGE_ALLOWED_MIME,
+  REFERENCE_IMAGE_MAX_BYTES,
+  clampImg2ImgStrength,
+  modelSupportsReference
+} from '@/lib/image/types';
 
 function svc() {
   const supabase = createSupabaseService();
@@ -52,7 +58,7 @@ export async function listStudioOptions(): Promise<StudioOptions> {
       supabase.from('image_providers').select('id, slug, display_name').eq('is_active', true).order('priority'),
       supabase
         .from('image_models')
-        .select('id, provider_id, model_id, display_name, image_providers!inner(slug)')
+        .select('id, provider_id, model_id, display_name, config, image_providers!inner(slug)')
         .eq('is_active', true)
         .order('priority'),
       supabase.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug'),
@@ -77,8 +83,13 @@ export async function listStudioOptions(): Promise<StudioOptions> {
     provider_id: string;
     model_id: string;
     display_name: string;
+    config: Record<string, unknown> | null;
     image_providers: { slug: string };
-  }>).map(({ image_providers, ...m }) => ({ ...m, provider_slug: image_providers.slug }));
+  }>).map(({ image_providers, ...m }) => ({
+    ...m,
+    provider_slug: image_providers.slug,
+    supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config })
+  }));
   return {
     providers: (providers ?? []) as StudioOptions['providers'],
     models: mappedModels,
@@ -101,6 +112,37 @@ export interface EnqueueStudioInput {
   subjectSlug?: string | null;
   cameraSlug?: string | null;
   aspectSlug: string;
+  /** Kekuatan img2img 0–1 (hanya bermakna bila referensi diisi). */
+  referenceStrength?: number | null;
+  /** Public URL referensi: hasil upload baru atau public_url histori milik user. */
+  referencePublicUrl?: string | null;
+  /** Path storage referensi bila sudah di-upload (hemat re-upload). */
+  referenceStoragePath?: string | null;
+}
+
+/** Batas upload referensi img2img dipakai form dari `@/lib/image/types`. */
+
+/**
+ * Upload file referensi img2img milik user → Storage `user-images/ref/`.
+ * Validasi: login, mime JPEG/PNG/WebP, size ≤5MB. Tidak memotong kuota
+ * generate (upload ≠ generate).
+ */
+export async function uploadStudioReference(
+  formData: FormData
+): Promise<{ storagePath: string; publicUrl: string }> {
+  const { id: userId } = await requireUser();
+  const file = formData.get('file');
+  if (!(file instanceof File)) throw new Error('File referensi wajib diisi.');
+  if (!file.size || file.size <= 0) throw new Error('File referensi kosong.');
+  if (file.size > REFERENCE_IMAGE_MAX_BYTES) {
+    throw new Error('Referensi maksimal 5MB — kecilkan dulu.');
+  }
+  if (!(REFERENCE_IMAGE_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
+    throw new Error('Referensi harus gambar JPEG/PNG/WebP.');
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const refId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
+  return uploadUserReference(userId, refId, bytes, file.type);
 }
 
 /**
@@ -120,7 +162,9 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
     styleSlug: input.styleSlug ?? null,
     subjectSlug: input.subjectSlug ?? null,
     cameraSlug: input.cameraSlug ?? null,
-    aspectSlug: input.aspectSlug
+    aspectSlug: input.aspectSlug,
+    referenceStrength: input.referenceStrength ?? null,
+    referencePublicUrl: input.referencePublicUrl ?? null
   });
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Input tidak valid.');
@@ -130,16 +174,23 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
   // Validasi FK aktif (sekali jalan, tanpa secret).
   const [{ data: provs }, { data: mods }, { data: aspects }] = await Promise.all([
     supabase.from('image_providers').select('id').eq('is_active', true),
-    supabase.from('image_models').select('id, provider_id').eq('is_active', true),
+    supabase.from('image_models').select('id, provider_id, model_id, config').eq('is_active', true),
     supabase.from('image_aspect_ratios').select('slug').eq('is_active', true)
   ]);
   const providerIds = new Set(((provs ?? []) as { id: string }[]).map((p) => p.id));
-  const modelRows = (mods ?? []) as { id: string; provider_id: string }[];
+  const modelRows = (mods ?? []) as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null }[];
   const aspectSlugs = new Set(((aspects ?? []) as { slug: string }[]).map((a) => a.slug));
   if (v.providerId && !providerIds.has(v.providerId)) throw new Error('Provider tidak aktif — refresh pilihan.');
   if (v.modelId && !modelRows.some((m) => m.id === v.modelId)) throw new Error('Model tidak aktif — refresh pilihan.');
   const linkErr = validateProviderModelLink(v.providerId, v.modelId, modelRows);
   if (linkErr) throw new Error(linkErr);
+  const refModels = modelRows.map((m) => ({
+    id: m.id,
+    supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config }),
+    display_name: m.model_id
+  }));
+  const refLinkErr = validateReferenceModelLink(v.referencePublicUrl, v.modelId, refModels);
+  if (refLinkErr) throw new Error(refLinkErr);
   if (!aspectSlugs.has(v.aspectSlug)) throw new Error('Aspek rasio tidak aktif — refresh pilihan.');
   if (v.styleSlug) {
     const { data: st } = await supabase.from('image_style_presets').select('slug').eq('slug', v.styleSlug).eq('is_active', true).maybeSingle();
@@ -152,6 +203,25 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
   if (v.cameraSlug) {
     const { data: ca } = await supabase.from('image_camera_angles').select('slug').eq('slug', v.cameraSlug).eq('is_active', true).maybeSingle();
     if (!ca) throw new Error('Camera angle tidak aktif — refresh pilihan.');
+  }
+
+  // Referensi img2img: pastikan URL berasal dari histori milik user sendiri
+  // (public_url hasil generate sendiri ATAU ref/ milik sendiri) — cegah
+  // tempel URL asing yang lolos validasi client.
+  let referenceStoragePath: string | null = input.referenceStoragePath?.trim() || null;
+  if (v.referencePublicUrl) {
+    const { data: owned } = await supabase
+      .from('user_image_generations')
+      .select('reference_storage_path, storage_path')
+      .eq('user_id', userId)
+      .or(`public_url.eq.${v.referencePublicUrl},reference_public_url.eq.${v.referencePublicUrl}`)
+      .limit(1)
+      .maybeSingle();
+    if (!owned) throw new Error('Referensi harus dari upload atau histori milik Anda.');
+    const own = owned as { reference_storage_path: string | null; storage_path: string | null } | null;
+    if (!referenceStoragePath) {
+      referenceStoragePath = own?.reference_storage_path ?? own?.storage_path ?? null;
+    }
   }
 
   // Kuota harian per user (configurable; null = unlimited).
@@ -167,6 +237,7 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
   if (!allowed) throw new Error(quotaExceededMessage(config.daily_limit ?? 0));
 
   const expiresAt = buildStudioExpiry(new Date(), config.retention_days);
+  const strength = v.referencePublicUrl ? clampImg2ImgStrength(v.referenceStrength) : null;
   const { data: created, error } = await supabase
     .from('user_image_generations')
     .insert({
@@ -179,6 +250,9 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
       subject_slug: v.subjectSlug,
       camera_slug: v.cameraSlug,
       aspect_slug: v.aspectSlug,
+      reference_public_url: v.referencePublicUrl,
+      reference_storage_path: referenceStoragePath,
+      reference_strength: strength,
       expires_at: expiresAt
     })
     .select('id, expires_at')

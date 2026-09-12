@@ -5,6 +5,15 @@ import { PollinationsImageAdapter } from './providers/pollinations';
 import { GeminiImageAdapter } from './providers/gemini';
 import { BynaraImageAdapter } from './providers/bynara';
 import { ImageHttpError } from './types';
+import {
+  DEFAULT_IMG2IMG_STRENGTH,
+  clampImg2ImgDimension,
+  clampImg2ImgSteps,
+  clampImg2ImgStrength,
+  isImg2ImgModel,
+  modelSupportsReference,
+  stripDataUrlPrefix
+} from './types';
 import { isHttpsUrl, base64ToBytes } from './providers/base';
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
 
@@ -87,6 +96,119 @@ describe('CloudflareImageAdapter', () => {
     const calls = fetchMock.mock.calls as unknown[][];
     const init = calls[0]?.[1] as { body: string };
     expect(JSON.parse(init.body).negative_prompt).toBe('blurry, text');
+  });
+});
+
+describe('CloudflareImageAdapter img2img', () => {
+  const IMG2IMG = '@cf/runwayml/stable-diffusion-v1-5-img2img';
+  const SDXL = '@cf/bytedance/stable-diffusion-xl-lightning';
+  const cfg = { baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai', model: IMG2IMG, accountId: 'acc1' };
+
+  it('mengirim image_b64 + strength + num_steps + dimensi aspek', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(cfg, 'tok');
+    const result = await adapter.generateImage({
+      prompt: 'tidy bedroom, warm light',
+      referenceImageB64: `data:image/jpeg;base64,${B64}`,
+      strength: 0.4,
+      aspectRatio: '16:9'
+    });
+    expect(Buffer.from(result.imageBytes!).toString()).toBe('fake-bytes');
+    const calls = fetchMock.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(String(calls[0]?.[0])).toContain(`/run/${IMG2IMG}`);
+    expect(body['image_b64']).toBe(B64);
+    expect(body['strength']).toBe(0.4);
+    expect(body['num_steps']).toBe(10);
+    expect(body['width']).toBe(1344);
+    expect(body['height']).toBe(768);
+    expect(result.metadata).toMatchObject({ model: IMG2IMG, strength: 0.4 });
+  });
+
+  it('menerima respons biner langsung (ReadableStream binding)', async () => {
+    const bytes = Buffer.from('binary-png');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          ({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'image/png' }),
+            json: async () => {
+              throw new Error('not json');
+            },
+            text: async () => '',
+            arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+          }) as unknown as Response
+      )
+    );
+    const adapter = new CloudflareImageAdapter({ ...cfg, model: SDXL }, 'tok');
+    const result = await adapter.generateImage({ prompt: 'portrait', referenceImageB64: B64 });
+    expect(Buffer.from(result.imageBytes!).toString()).toBe('binary-png');
+    expect(result.mimeType).toBe('image/png');
+  });
+
+  it('menolak reference untuk model Flux sebelum request (hemat key/kuota)', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: 'https://x.test/ai', model: '@cf/black-forest-labs/flux-1-schnell', accountId: 'acc1' },
+      'tok'
+    );
+    await expect(adapter.generateImage({ prompt: 'cat', referenceImageB64: B64 })).rejects.toThrow(
+      /tidak mendukung image reference/
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('clamp strength/steps/dimensi + kupas prefix data URL', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(cfg, 'tok');
+    await adapter.generateImage({
+      prompt: 'room',
+      referenceImageB64: B64,
+      strength: 9,
+      numSteps: 99,
+      width: 99999,
+      height: 10
+    });
+    const init = (fetchMock.mock.calls as unknown[][])[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body['strength']).toBe(1);
+    expect(body['num_steps']).toBe(20);
+    expect(body['width']).toBe(2048);
+    expect(body['height']).toBe(256);
+  });
+});
+
+describe('img2img helpers', () => {
+  it('isImg2ImgModel hanya untuk 2 model fase 1', () => {
+    expect(isImg2ImgModel('@cf/runwayml/stable-diffusion-v1-5-img2img')).toBe(true);
+    expect(isImg2ImgModel('@cf/bytedance/stable-diffusion-xl-lightning')).toBe(true);
+    expect(isImg2ImgModel('@cf/lykon/dreamshaper-8-lcm')).toBe(false);
+    expect(isImg2ImgModel('@cf/black-forest-labs/flux-1-schnell')).toBe(false);
+  });
+  it('modelSupportsReference: flag config menang atas daftar', () => {
+    expect(modelSupportsReference({ model_id: 'flux-1-schnell', config: { supports_reference: true } })).toBe(true);
+    expect(
+      modelSupportsReference({ model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', config: { supports_reference: false } })
+    ).toBe(false);
+    expect(modelSupportsReference({ model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', config: null })).toBe(true);
+    expect(modelSupportsReference({ model_id: 'flux', config: null })).toBe(false);
+  });
+  it('clamp + strip prefix data URL', () => {
+    expect(clampImg2ImgStrength(2)).toBe(1);
+    expect(clampImg2ImgStrength(-1)).toBe(0);
+    expect(clampImg2ImgStrength('x')).toBe(DEFAULT_IMG2IMG_STRENGTH);
+    expect(clampImg2ImgSteps(0)).toBe(1);
+    expect(clampImg2ImgSteps(50)).toBe(20);
+    expect(clampImg2ImgDimension(100, 1024)).toBe(256);
+    expect(stripDataUrlPrefix(`data:image/png;base64,${B64}`)).toBe(B64);
+    expect(stripDataUrlPrefix(`  ${B64}  `)).toBe(B64);
   });
 });
 

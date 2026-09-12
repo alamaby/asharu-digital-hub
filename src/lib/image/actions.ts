@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
+import { REFERENCE_IMAGE_ALLOWED_MIME, REFERENCE_IMAGE_MAX_BYTES, clampImg2ImgStrength } from './types';
+import { uploadDraftReference } from './storage';
 import type { DraftImageRow } from './types';
 
 async function requireAdmin() {
@@ -25,6 +27,24 @@ export async function listDraftImages(draftId: string): Promise<DraftImageRow[]>
 }
 
 /**
+ * Override manual enqueue dari review (cover + per-reply): pin model/style/
+ * kamera + prompt edit + referensi img2img opsional.
+ */
+export interface ImageEnqueueOverride {
+  modelUuid?: string | null;
+  styleSlug?: string | null;
+  cameraSlug?: string | null;
+  imagePrompt?: string | null;
+  negativePrompt?: string | null;
+  /** Kekuatan img2img 0–1 (hanya bermakna bila referensi diisi). */
+  referenceStrength?: number | null;
+  /** Public URL referensi: upload baru atau histori draf ini. */
+  referencePublicUrl?: string | null;
+  /** Path storage referensi bila sudah di-upload (hemat re-upload). */
+  referenceStoragePath?: string | null;
+}
+
+/**
  * Enqueue generate cover (post 0) atau regenerate dengan override manual.
  * Worker cron memproses antrean; tidak blocking.
  * - imagePrompt diisi (user sudah cek/edit): worker langsung generate image.
@@ -33,9 +53,35 @@ export async function listDraftImages(draftId: string): Promise<DraftImageRow[]>
  */
 export async function generateDraftImage(
   draftId: string,
-  override?: { modelUuid?: string | null; styleSlug?: string | null; cameraSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
+  override?: ImageEnqueueOverride
 ): Promise<{ imageId: string }> {
   return generatePostImage(draftId, 0, override);
+}
+
+/**
+ * Upload file referensi img2img untuk draf → `draft-images/ref/`.
+ * Validasi: admin, mime JPEG/PNG/WebP, size ≤5MB.
+ */
+export async function uploadDraftImageReference(
+  draftId: string,
+  formData: FormData
+): Promise<{ storagePath: string; publicUrl: string }> {
+  const supabase = await requireAdmin();
+  if (!draftId) throw new Error('draftId required');
+  const { data: draft } = await supabase.from('content_drafts').select('id').eq('id', draftId).maybeSingle();
+  if (!draft) throw new Error('draft not found');
+  const file = formData.get('file');
+  if (!(file instanceof File)) throw new Error('File referensi wajib diisi.');
+  if (!file.size || file.size <= 0) throw new Error('File referensi kosong.');
+  if (file.size > REFERENCE_IMAGE_MAX_BYTES) {
+    throw new Error('Referensi maksimal 5MB — kecilkan dulu.');
+  }
+  if (!(REFERENCE_IMAGE_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
+    throw new Error('Referensi harus gambar JPEG/PNG/WebP.');
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const refId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
+  return uploadDraftReference(draftId, refId, bytes, file.type);
 }
 
 /**
@@ -46,7 +92,7 @@ export async function generateDraftImage(
 export async function generatePostImage(
   draftId: string,
   postIndex: number,
-  override?: { modelUuid?: string | null; styleSlug?: string | null; cameraSlug?: string | null; imagePrompt?: string | null; negativePrompt?: string | null }
+  override?: ImageEnqueueOverride
 ): Promise<{ imageId: string }> {
   const supabase = await requireAdmin();
   if (!draftId) throw new Error('draftId required');
@@ -90,6 +136,25 @@ export async function generatePostImage(
       cameraSlug = slug;
     }
   }
+  // Referensi img2img: URL harus berasal dari histori draf yang sama
+  // (public_url hasil sendiri ATAU referensi sebelumnya) — cegah tempel URL asing.
+  const referenceUrl = override?.referencePublicUrl?.trim().slice(0, 2048) || null;
+  let referenceStoragePath: string | null = override?.referenceStoragePath?.trim().slice(0, 1024) || null;
+  if (referenceUrl) {
+    const { data: owned } = await supabase
+      .from('content_draft_images')
+      .select('reference_storage_path, storage_path')
+      .eq('draft_id', draftId)
+      .or(`public_url.eq.${referenceUrl},reference_public_url.eq.${referenceUrl}`)
+      .limit(1)
+      .maybeSingle();
+    if (!owned) throw new Error('Referensi harus dari upload atau histori draf ini.');
+    const own = owned as { reference_storage_path: string | null; storage_path: string | null } | null;
+    if (!referenceStoragePath) {
+      referenceStoragePath = own?.reference_storage_path ?? own?.storage_path ?? null;
+    }
+  }
+  const referenceStrength = referenceUrl ? clampImg2ImgStrength(override?.referenceStrength) : null;
   const { data: created, error } = await supabase
     .from('content_draft_images')
     .insert({
@@ -100,6 +165,9 @@ export async function generatePostImage(
       provider_slug: '',
       model_id: '',
       camera_slug: cameraSlug,
+      reference_public_url: referenceUrl,
+      reference_storage_path: referenceStoragePath,
+      reference_strength: referenceStrength,
       reasoning: hasCustom ? { visual_strategy: 'custom', justification: 'user_edited' } : null,
       llm_meta: override ? { override } : {}
     })

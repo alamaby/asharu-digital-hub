@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generatePostImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt } from '@/lib/image/actions';
+import { enhanceImagePrompt, generatePostImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftImageReference } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
+import { ReferencePicker, type ReferenceModelOption } from './ReferencePicker';
 
 export interface ReplyImageOption {
-  models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  models: ReferenceModelOption[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
   cameras?: { slug: string; display_name: string }[];
@@ -38,6 +39,10 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
   const [cameraSlug, setCameraSlug] = useState('');
+  const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
+  const [referenceStrength, setReferenceStrength] = useState(0.6);
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const selected = history.find((r) => r.status === 'selected') ?? null;
@@ -52,6 +57,11 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
       setNotice('Prompt minimal 10 karakter (EN, ≤60 kata, akan ditambah style suffix).');
       return;
     }
+    const pinned = options.models.find((m) => m.id === modelUuid) ?? null;
+    if (referenceUrl && pinned && pinned.supports_reference === false) {
+      setNotice(`Model ${pinned.display_name} tidak mendukung image reference — pilih model bertanda ref atau Auto.`);
+      return;
+    }
     setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
@@ -61,7 +71,9 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
           styleSlug: styleSlug || null,
           cameraSlug: cameraSlug || null,
           imagePrompt: p || null,
-          negativePrompt: n || null
+          negativePrompt: n || null,
+          referencePublicUrl: referenceUrl,
+          referenceStrength: referenceUrl ? referenceStrength : null
         });
         setNotice(p
           ? 'Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil. Prompt edit custom.'
@@ -70,6 +82,32 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
         setNotice(e instanceof Error ? `Gagal: ${e.message}` : 'Generate gagal.');
       }
     });
+  }
+
+  async function handleReferenceUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setReferenceNotice('Referensi maksimal 5MB — kecilkan dulu.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+      setReferenceNotice('Referensi harus gambar JPEG/PNG/WebP.');
+      return;
+    }
+    setIsUploadingRef(true);
+    setReferenceNotice('Mengunggah referensi...');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { publicUrl } = await uploadDraftImageReference(draftId, fd);
+      setReferenceUrl(publicUrl);
+      const pinned = options.models.find((m) => m.id === modelUuid) ?? null;
+      if (pinned && pinned.supports_reference === false) setModelUuid('');
+      setReferenceNotice('Referensi siap — pilih model bertanda ref atau Auto.');
+    } catch (e) {
+      setReferenceNotice(e instanceof Error ? e.message : 'Upload referensi gagal.');
+    } finally {
+      setIsUploadingRef(false);
+    }
   }
 
   async function handleSuggest() {
@@ -208,6 +246,10 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             isPending={isPending}
             onSelect={select}
             onRetry={retryOne}
+            onUseAsReference={(url) => {
+              setReferenceUrl(url);
+              setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
+            }}
             modelOptions={options.models}
           />
         </div>
@@ -231,6 +273,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
               {options.models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.provider_slug} · {m.display_name}
+                  {m.supports_reference ? ' · ref' : ''}
                 </option>
               ))}
             </select>
@@ -303,6 +346,20 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             />
             <span className="text-[10px] text-ink-muted">{negativeDraft.length}/300</span>
           </label>
+          <ReferencePicker
+            title="Gambar referensi (opsional, img2img)"
+            history={history}
+            referenceUrl={referenceUrl}
+            referenceStrength={referenceStrength}
+            modelUuid={modelUuid}
+            models={options.models}
+            disabled={isPending}
+            busy={isUploadingRef}
+            onUpload={(f) => void handleReferenceUpload(f)}
+            onSelectUrl={setReferenceUrl}
+            onStrength={setReferenceStrength}
+            notice={referenceNotice}
+          />
         </div>
       ) : null}
       {postIndex > 0 && perReplyEnabled ? (

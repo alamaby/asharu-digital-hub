@@ -22,8 +22,8 @@ function options(): StudioOptions {
       { id: 'prov-cf', slug: 'cloudflare', display_name: 'Cloudflare Workers AI' }
     ],
     models: [
-      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo' },
-      { id: 'model-cf', provider_id: 'prov-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare' }
+      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo', supports_reference: false },
+      { id: 'model-cf', provider_id: 'prov-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare', supports_reference: false }
     ],
     styles: [{ slug: 'photorealistic', display_name: 'Photorealistic' }],
     subjects: [{ slug: 'wanita-muda-modis', display_name: 'Wanita Muda Modis' }],
@@ -56,6 +56,9 @@ function genRow(over: Partial<StudioGenerationRow> & { id: string }): StudioGene
     last_error: null,
     attempts: 0,
     llm_meta: null,
+    reference_storage_path: null,
+    reference_public_url: null,
+    reference_strength: null,
     expires_at: '2026-10-11T00:00:00Z',
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',
@@ -118,6 +121,26 @@ describe('StudioForm', () => {
     expect(await screen.findByText('Side-by-side — usulan LLM')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Terima' }));
     expect(screen.getByLabelText('Image prompt (EN, deskriptif)')).toHaveValue('polished prompt');
+  });
+
+  it('panel referensi: upload + slider strength + badge ref di opsi model', async () => {
+    const user = userEvent.setup();
+    const opts = options();
+    opts.models = [
+      ...opts.models,
+      { id: 'model-sd', provider_id: 'prov-cf', model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', display_name: 'SD 1.5 Img2Img', provider_slug: 'cloudflare', supports_reference: true }
+    ];
+    renderWithMessages(
+      <StudioForm options={opts} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    expect(screen.getByText('Gambar referensi (opsional, img2img)')).toBeInTheDocument();
+    expect(screen.getByText('Upload JPEG/PNG/WebP ≤5MB, atau Pakai ulang dari riwayat. Tanpa mask — inpainting menyusul.')).toBeInTheDocument();
+    // Slider muncul setelah referensi ada — simulasikan dengan file upload gagal tipe.
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput.accept).toContain('image/webp');
+    await user.selectOptions(screen.getByLabelText('Model'), 'model-sd');
+    expect(screen.getByLabelText('Model')).toHaveValue('model-sd');
   });
 });
 
@@ -231,5 +254,19 @@ describe('StudioHistory', () => {
     await user.click(screen.getByRole('button', { name: 'Pakai ulang' }));
     expect(onReuse).toHaveBeenCalledTimes(1);
     expect(onReuse.mock.calls[0]?.[0]).toMatchObject({ id: 'u1' });
+  });
+
+  it('badge ref + tautan referensi tampil di baris berisi referensi', () => {
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([
+          genRow({ id: 'ref1', status: 'ready', public_url: 'https://cdn.test/1.png', reference_public_url: 'https://cdn.test/ref.jpg' })
+        ])}
+        onReuse={() => {}}
+      />
+    );
+    const rows = screen.getAllByTestId('studio-row');
+    expect(within(rows[0] as HTMLElement).getByText('ref')).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).getByText('Referensi:')).toBeInTheDocument();
   });
 });

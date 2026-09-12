@@ -391,6 +391,14 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                 >
                   {img.status === 'ready' ? tHist('ready') : img.status === 'failed' ? tHist('failed') : tHist('pending')}
                 </span>
+                {img.reference_public_url ? (
+                  <span
+                    className="inline-block rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-800"
+                    title={tHist('referenceLabel')}
+                  >
+                    {tHist('referenceBadge')}
+                  </span>
+                ) : null}
                 <span className="text-[11px] text-ink-muted">{metaLabel(img)}</span>
                 <span className="ml-auto text-[11px] tabular-nums text-ink-muted" title={img.created_at}>
                   {formatDateTime(img.created_at, locale, timeZone)}
@@ -425,6 +433,14 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-ink">{tHist('promptLabel')}</p>
                   <p className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink">{img.image_prompt}</p>
+                  {img.reference_public_url ? (
+                    <p className="mt-1 text-[11px] text-ink-muted">
+                      {tHist('referenceLabel')}:{' '}
+                      <a href={img.reference_public_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                        {tHist('view')}
+                      </a>
+                    </p>
+                  ) : null}
                   {img.negative_prompt ? (
                     <p className="mt-1 text-[11px] text-ink-muted">
                       {tHist('negativeLabel')}: {img.negative_prompt}

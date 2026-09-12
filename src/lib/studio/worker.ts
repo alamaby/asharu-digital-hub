@@ -5,10 +5,19 @@ import { createImageAdapter } from '@/lib/image/providers';
 import { markImageModelFailure, markImageModelUsage } from '@/lib/image/config';
 import { mergeImageNegativePrompts } from '@/lib/image/prompt';
 import { fetchRemoteImage } from '@/lib/image/storage';
-import { ImageHttpError, type ImageAspect, type ImageModelRow, type ImageProviderRow, type ImageStylePreset } from '@/lib/image/types';
+import {
+  ImageHttpError,
+  bytesToBase64,
+  clampImg2ImgStrength,
+  modelSupportsReference,
+  type ImageAspect,
+  type ImageModelRow,
+  type ImageProviderRow,
+  type ImageStylePreset
+} from '@/lib/image/types';
 import type { StudioConfig, StudioGenerationRow } from '@/lib/studio/types';
 import { DEFAULT_STUDIO_CONFIG } from '@/lib/studio/types';
-import { uploadUserImage, removeUserImage } from '@/lib/studio/storage';
+import { uploadUserImage, removeUserImage, fetchReferenceBytes } from '@/lib/studio/storage';
 
 const MAX_ATTEMPTS = 3;
 
@@ -65,6 +74,21 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
     ? (aspectRaw as ImageAspect)
     : '1:1';
 
+  const needsReference = Boolean(row.reference_public_url?.trim());
+  if (needsReference && row.model_id) {
+    const found = await findStudioModel(row.model_id);
+    if (!found) {
+      throw new Error('Model pilihan tidak aktif — pilih ulang model lalu coba lagi.');
+    }
+    if (row.provider_id && found.provider.id !== row.provider_id) {
+      throw new Error('Model bukan milik provider terpilih.');
+    }
+    if (!modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
+      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+    }
+    return { provider: found.provider, model: found.model, style, aspect, pinned: true };
+  }
+
   // 1) Model pilihan user (validasi silang provider bila keduanya diisi).
   // Strict-fail: pin manual TIDAK boleh jatuh ke waterfall diam-diam —
   // bila model/provider nonaktif atau tidak cocok → throw jujur.
@@ -80,6 +104,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
   }
 
   // 2) Provider pilihan user → model default provider itu (juga pin: gagal jujur).
+  // Baris referensi: pilih model support dalam provider itu (bila ada).
   if (row.provider_id) {
     const supabase = getServiceClient();
     const { data: prov } = await supabase
@@ -98,19 +123,33 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
       .eq('provider_id', provider.id)
       .eq('is_active', true)
       .order('priority');
-    const rows = (mods ?? []) as unknown as ImageModelRow[];
+    let rows = (mods ?? []) as unknown as ImageModelRow[];
+    if (needsReference) {
+      const supported = rows.filter((m) => modelSupportsReference({ model_id: m.model_id, config: m.config }));
+      if (supported.length > 0) rows = supported;
+    }
     const pick = rows.find((m) => m.is_default) ?? rows[0];
     if (!pick) {
-      throw new Error('Provider pilihan tidak punya model aktif — pilih provider lain lalu coba lagi.');
+      throw new Error(needsReference
+        ? 'Provider pilihan tidak punya model image reference aktif — pilih provider lain atau Auto.'
+        : 'Provider pilihan tidak punya model aktif — pilih provider lain lalu coba lagi.');
+    }
+    if (needsReference && !modelSupportsReference({ model_id: pick.model_id, config: pick.config })) {
+      throw new Error(`Model ${pick.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
     }
     return { provider, model: pick, style, aspect, pinned: true };
   }
 
   // 3) Default config studio (fallback config — boleh waterfall-kan provider,
-  //    tapi pin model bila diisi).
+  //    tapi pin model bila diisi). Default model non-support + referensi → throw.
   if (config.default_model_id) {
     const found = await findStudioModel(config.default_model_id);
-    if (found) return { provider: found.provider, model: found.model, style, aspect, pinned: true };
+    if (found) {
+      if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
+        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      }
+      return { provider: found.provider, model: found.model, style, aspect, pinned: true };
+    }
   }
 
   // 4) Waterfall prioritas.
@@ -127,11 +166,19 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
       .eq('provider_id', provider.id)
       .eq('is_active', true)
       .order('priority');
-    const rows = (mods ?? []) as unknown as ImageModelRow[];
+    let rows = (mods ?? []) as unknown as ImageModelRow[];
+    // Baris dengan referensi img2img: persempit waterfall ke model yang
+    // mendukung reference (bila tidak ada → pin gagal jujur di bawah).
+    if (needsReference) {
+      const supported = rows.filter((m) => modelSupportsReference({ model_id: m.model_id, config: m.config }));
+      if (supported.length > 0) rows = supported;
+    }
     const pick = rows.find((m) => m.is_default) ?? rows[0];
     if (pick) return { provider, model: pick, style, aspect, pinned: false };
   }
-  throw new Error('Tidak ada provider/model image aktif.');
+  throw new Error(needsReference
+    ? 'Tidak ada model image reference aktif — pilih model SD img2img.'
+    : 'Tidak ada provider/model image aktif.');
 }
 
 /** Klaim 1 baris studio pending (atomic via eq status) → attempts+1. */
@@ -233,6 +280,25 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
           a.id === target.provider.id ? -1 : b.id === target.provider.id ? 1 : 0
         );
 
+    // Referensi img2img: fetch bytes SEKALI sebelum loop provider (hemat
+    // bandwidth), teruskan sebagai base64 ke adapter. Gagal fetch → failed
+    // jujur tanpa memanggil provider mana pun.
+    const referenceUrl = row.reference_public_url?.trim() || null;
+    const referenceStrength = clampImg2ImgStrength(
+      typeof row.reference_strength === 'string' ? Number(row.reference_strength) : row.reference_strength
+    );
+    let referenceB64: string | null = null;
+    if (referenceUrl) {
+      try {
+        const fetched = await fetchReferenceBytes(referenceUrl);
+        referenceB64 = bytesToBase64(fetched.bytes);
+      } catch (e) {
+        const message = e instanceof Error ? `referensi gagal diambil: ${e.message}` : 'referensi gagal diambil';
+        await failStudioImage(imageId, message);
+        return { imageId: null, error: message };
+      }
+    }
+
     let lastError: unknown = null;
     for (const provider of providers) {
       let modelRow: ImageModelRow | null = null;
@@ -245,15 +311,28 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
           .eq('provider_id', provider.id)
           .eq('is_active', true)
           .order('priority');
-        const rows = (mods ?? []) as unknown as ImageModelRow[];
+        let rows = (mods ?? []) as unknown as ImageModelRow[];
+        if (referenceB64) {
+          rows = rows.filter((m) => modelSupportsReference({ model_id: m.model_id, config: m.config }));
+        }
         modelRow = rows.find((m) => m.is_default) ?? rows[0] ?? null;
       }
       if (!modelRow) continue;
+      // Guard waterfall: baris referensi tidak boleh jatuh ke model
+      // non-support (mis. Flux) — lewati diam-diam ke kandidat berikut.
+      if (referenceB64 && !modelSupportsReference({ model_id: modelRow.model_id, config: modelRow.config })) {
+        continue;
+      }
       try {
         const pool = new ImageKeyPool(provider);
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const adapter = createImageAdapter(provider, modelRow!.model_id, apiKey);
-          return adapter.generateImage({ prompt: composed, negativePrompt: finalNegative, aspectRatio: target.aspect });
+          return adapter.generateImage({
+            prompt: composed,
+            negativePrompt: finalNegative,
+            aspectRatio: target.aspect,
+            ...(referenceB64 ? { referenceImageB64: referenceB64, strength: referenceStrength } : {})
+          });
         });
         let bytes: Uint8Array;
         let mime = result.mimeType;
@@ -287,7 +366,10 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
             // bisa dibedakan dari bug (kasus cloudflare→pixazo 11 Sep 2026).
             pinned: target.pinned,
             requested_provider_id: row.provider_id,
-            requested_model_id: row.model_id
+            requested_model_id: row.model_id,
+            // Jejak audit img2img: referensi dipakai atau tidak + strength.
+            reference: referenceB64 ? true : false,
+            reference_strength: referenceB64 ? referenceStrength : null
           },
             updated_at: new Date().toISOString()
           })

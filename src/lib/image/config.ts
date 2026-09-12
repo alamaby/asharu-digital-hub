@@ -1,5 +1,6 @@
 import 'server-only';
 import { getServiceClient } from '@/lib/supabase/service';
+import { modelSupportsReference } from './types';
 import type {
   ImageAspect,
   ImageGenDefaults,
@@ -99,12 +100,15 @@ async function getSessionOverride(sessionId: string | null | undefined): Promise
  * Resolve target image (provider + model + style + aspect).
  * Priority: per-draft override > session override > global defaults > waterfall prioritas.
  * `draftOverride` diisi saat admin regenerate dengan pilihan manual di review.
+ * `needsReference` true bila baris membawa referensi img2img: pin/session/
+ * default non-support → throw jujur; waterfall dipersempit ke model support.
  */
 export async function resolveImageTarget(options: {
   sessionId?: string | null;
   draftOverride?: { modelUuid?: string | null; styleSlug?: string | null } | null;
+  needsReference?: boolean;
 }): Promise<ResolvedImageTarget> {
-  const { sessionId, draftOverride } = options;
+  const { sessionId, draftOverride, needsReference = false } = options;
   const session = await getSessionOverride(sessionId);
   const defaults = await getGenDefaults();
   // Style: prioritas manual (picker review) > sesi > global default.
@@ -123,6 +127,9 @@ export async function resolveImageTarget(options: {
     if (!found) {
       throw new Error('Model pilihan tidak aktif — pilih ulang model lalu coba lagi.');
     }
+    if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
+      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+    }
     return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: true };
   }
 
@@ -130,6 +137,9 @@ export async function resolveImageTarget(options: {
   if (session?.image_model_id) {
     const found = await findModel(session.image_model_id);
     if (found) {
+      if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
+        throw new Error(`Model sesi ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      }
       return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
     }
   }
@@ -138,19 +148,30 @@ export async function resolveImageTarget(options: {
   if (defaults?.model_id) {
     const found = await findModel(defaults.model_id);
     if (found) {
+      if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
+        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      }
       return { provider: found.provider, model: found.model, style, aspect: defaults.aspect, pinned: false };
     }
   }
 
-  // 4) Waterfall: provider aktif prioritas teratas + model default/pertama
+  // 4) Waterfall: provider aktif prioritas teratas + model default/pertama.
+  // Baris referensi: persempit ke model support (bila tidak ada → throw).
   const providers = await activeProviders();
   for (const provider of providers) {
-    const models = await activeModels(provider.id);
+    let models = await activeModels(provider.id);
+    if (needsReference) {
+      const supported = models.filter((m) => modelSupportsReference({ model_id: m.model_id, config: m.config }));
+      if (supported.length > 0) models = supported;
+    }
     const pick = models.find((m) => m.is_default) ?? models[0];
     if (!pick) continue;
+    if (needsReference && !modelSupportsReference({ model_id: pick.model_id, config: pick.config })) continue;
     return { provider, model: pick, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
   }
-  throw new Error('No active image provider/model available');
+  throw new Error(needsReference
+    ? 'Tidak ada model image reference aktif — pilih model SD img2img.'
+    : 'No active image provider/model available');
 }
 
 /** Daftar provider + model aktif untuk picker review (tanpa secret). */
@@ -168,7 +189,7 @@ export async function isPerReplyMode(options: {
 
 /** Daftar provider + model aktif untuk picker review (tanpa secret). */export async function listActiveImageOptions(): Promise<{
   providers: ImageProviderRow[];
-  models: (ImageModelRow & { provider_slug: ImageProviderSlug })[];
+  models: (ImageModelRow & { provider_slug: ImageProviderSlug; supports_reference: boolean })[];
   styles: ImageStylePreset[];
 }> {
   const supabase = getServiceClient();
@@ -182,7 +203,11 @@ export async function isPerReplyMode(options: {
     supabase.from('image_style_presets').select('*').eq('is_active', true).order('slug')
   ]);
   const mappedModels = ((models ?? []) as Array<ImageModelRow & { image_providers: { slug: ImageProviderSlug } }>).map(
-    ({ image_providers, ...m }) => ({ ...m, provider_slug: image_providers.slug })
+    ({ image_providers, ...m }) => ({
+      ...m,
+      provider_slug: image_providers.slug,
+      supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config })
+    })
   );
   return {
     providers: (providers ?? []) as ImageProviderRow[],

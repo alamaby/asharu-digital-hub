@@ -4,7 +4,8 @@ import {
   checkStudioQuota,
   quotaExceededMessage,
   studioInputSchema,
-  validateProviderModelLink
+  validateProviderModelLink,
+  validateReferenceModelLink
 } from './validation';
 
 describe('studio validation', () => {
@@ -47,5 +48,29 @@ describe('studio validation', () => {
     expect(checkStudioQuota(20, 20).allowed).toBe(false);
     expect(checkStudioQuota(19, 20)).toEqual({ allowed: true, remaining: 1 });
     expect(quotaExceededMessage(20)).toMatch(/Kuota harian habis/);
+  });
+});
+
+describe('studio reference validation', () => {
+  const models = [
+    { id: 'm-img2img', supports_reference: true, display_name: 'SD 1.5 Img2Img' },
+    { id: 'm-flux', supports_reference: false, display_name: 'Flux 1 Schnell' }
+  ];
+
+  it('strength di luar 0–1 ditolak skema', () => {
+    const bad = studioInputSchema(500).safeParse({ prompt: 'a tidy bedroom with soft light', aspectSlug: '1:1', referenceStrength: 2 });
+    expect(bad.success).toBe(false);
+    const ok = studioInputSchema(500).safeParse({ prompt: 'a tidy bedroom with soft light', aspectSlug: '1:1', referenceStrength: 0.4 });
+    expect(ok.success).toBe(true);
+  });
+
+  it('pin model non-support + referensi ditolak dengan pesan jelas', () => {
+    expect(validateReferenceModelLink('https://cdn.test/ref.jpg', 'm-flux', models)).toMatch(/tidak mendukung image reference/);
+  });
+
+  it('pin model support + referensi lolos; tanpa referensi selalu lolos', () => {
+    expect(validateReferenceModelLink('https://cdn.test/ref.jpg', 'm-img2img', models)).toBeNull();
+    expect(validateReferenceModelLink(null, 'm-flux', models)).toBeNull();
+    expect(validateReferenceModelLink('https://cdn.test/ref.jpg', null, models)).toBeNull();
   });
 });

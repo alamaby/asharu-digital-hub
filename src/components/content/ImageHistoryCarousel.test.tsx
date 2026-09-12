@@ -62,6 +62,9 @@ function row(over: Partial<DraftImageRow> & { id: string }): DraftImageRow {
     last_error: null,
     attempts: 0,
     llm_meta: null,
+    reference_storage_path: null,
+    reference_public_url: null,
+    reference_strength: null,
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',
     ...over
@@ -174,6 +177,33 @@ describe('ImageHistoryCarousel', () => {
     expect(slideAt(container, 0).textContent).toContain(
       'cloudflare · @cf/black-forest-labs/flux-1-schnell (antre)'
     );
+  });
+
+  it('menampilkan badge ref + tombol Jadikan referensi pada hasil ready', () => {
+    const onUseAsReference = vi.fn();
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({
+            id: 'r1',
+            status: 'ready',
+            provider_slug: 'cloudflare',
+            model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img',
+            public_url: 'https://cdn.test/out.png',
+            reference_public_url: 'https://cdn.test/ref.jpg',
+            image_prompt: 'tidy bedroom'
+          })
+        ]}
+        selectedId={null}
+        onUseAsReference={onUseAsReference}
+      />
+    );
+    const slide = slideAt(container, 0);
+    expect(slide.textContent).toContain('ref');
+    const btn = Array.from(slide.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === 'Jadikan referensi');
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn as HTMLButtonElement);
+    expect(onUseAsReference).toHaveBeenCalledWith('https://cdn.test/out.png');
   });
 
   it('downloads the slide image via fetch → blob and revokes the object URL', async () => {

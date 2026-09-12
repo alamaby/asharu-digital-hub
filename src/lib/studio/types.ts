@@ -65,11 +65,25 @@ export interface StudioGenerationRow {
   expires_at: string;
   created_at: string;
   updated_at: string;
+  /** Kolom img2img (migrasi 20260912000001) — NULL = text-to-image biasa. */
+  reference_storage_path: string | null;
+  reference_public_url: string | null;
+  reference_strength: number | string | null;
+}
+
+export interface StudioModelOption {
+  id: string;
+  provider_id: string;
+  model_id: string;
+  display_name: string;
+  provider_slug: string;
+  /** True bila model mendukung image reference (config.supports_reference). */
+  supports_reference: boolean;
 }
 
 export interface StudioOptions {
   providers: { id: string; slug: string; display_name: string }[];
-  models: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  models: StudioModelOption[];
   styles: { slug: string; display_name: string }[];
   subjects: { slug: string; display_name: string }[];
   cameras: { slug: string; display_name: string }[];

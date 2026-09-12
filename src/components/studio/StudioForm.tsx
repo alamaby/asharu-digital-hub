@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
-import { enhanceStudioPrompt, enqueueStudioImage, type EnqueueStudioInput } from '@/lib/studio/actions';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { enhanceStudioPrompt, enqueueStudioImage, uploadStudioReference, type EnqueueStudioInput } from '@/lib/studio/actions';
 import type { StudioGenerationRow, StudioOptions } from '@/lib/studio/types';
 import { useTranslations } from 'next-intl';
 
@@ -35,6 +35,12 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [lastReuseId, setLastReuseId] = useState<string | null>(null);
+  // Referensi img2img: upload baru (preview lokal) atau URL milik user.
+  const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
+  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [referenceStrength, setReferenceStrength] = useState(0.6);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // "Pakai ulang" dari riwayat: isi form dari baris (sekali per klik).
   useEffect(() => {
@@ -48,6 +54,12 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
     setSubjectSlug(reuseRow.subject_slug ?? '');
     setCameraSlug(reuseRow.camera_slug ?? '');
     if (reuseRow.aspect_slug) setAspectSlug(reuseRow.aspect_slug);
+    if (reuseRow.reference_public_url) {
+      setReferenceUrl(reuseRow.reference_public_url);
+      setReferencePreview(reuseRow.reference_public_url);
+    }
+    const s = Number(reuseRow.reference_strength);
+    if (Number.isFinite(s) && s >= 0 && s <= 1) setReferenceStrength(s);
     setProposed(null);
     setNotice(tForm('reused'));
   }, [reuseRow, lastReuseId, tForm]);
@@ -57,6 +69,53 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
 
   const maxPrompt = options?.config.max_prompt_length ?? 500;
   const negativeTrimmed = negative.trim();
+
+  // Model yang mendukung image reference (flag dari server, bukan hardcode).
+  const selectedModel = options?.models.find((m) => m.id === modelId) ?? null;
+  const selectedSupportsReference = selectedModel?.supports_reference ?? false;
+  // Bila provider dipilih: hanya tampilkan model miliknya; bila Auto tanpa
+  // referensi: semua; bila Auto + referensi: persempit ke model support.
+  const visibleImageModels = (options?.models ?? []).filter((m) => {
+    if (providerId && m.provider_id !== providerId) return false;
+    if (!providerId && !modelId && referenceUrl && !m.supports_reference) return false;
+    return true;
+  });
+
+  // Upload file referensi → Storage (server action, ≤5MB JPEG/PNG/WebP).
+  async function handleReferenceFile(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setNotice(tForm('referenceTooBig'));
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+      setNotice(tForm('referenceBadType'));
+      return;
+    }
+    setIsUploadingRef(true);
+    setNotice(tForm('referenceUploading'));
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { publicUrl } = await uploadStudioReference(fd);
+      setReferenceUrl(publicUrl);
+      setReferencePreview(publicUrl);
+      // Bila model terpin non-support → reset ke Auto agar tidak gagal jujur.
+      if (selectedModel && !selectedModel.supports_reference) setModelId('');
+      setNotice(tForm('referenceReady'));
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : tForm('referenceFailed'));
+    } finally {
+      setIsUploadingRef(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function clearReference() {
+    setReferenceUrl(null);
+    setReferencePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,19 +144,22 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
           styleSlug: styleSlug || null,
           subjectSlug: subjectSlug || null,
           cameraSlug: cameraSlug || null,
-          aspectSlug: aspectSlug
+          aspectSlug: aspectSlug,
+          referencePublicUrl: referenceUrl,
+          referenceStrength: referenceUrl ? referenceStrength : null
         };
         await enqueueStudioImage(input);
         setNotice(tNotice('enqueue'));
         setPrompt('');
         setNegative('');
+        clearReference();
       } catch (err) {
         setNotice(err instanceof Error ? err.message : tForm('errorInput'));
       }
     });
   }
 
-  const isSubmitDisabled = isPending || !prompt.trim() || !options || (typeof quota?.remaining === 'number' && quota.remaining <= 0);
+  const isSubmitDisabled = isPending || isUploadingRef || !prompt.trim() || !options || (typeof quota?.remaining === 'number' && quota.remaining <= 0);
   const isSubmitting = isPending;
   // Field input hanya disable saat submit berjalan / opsi belum ada — bukan
   // saat prompt kosong (user harus bisa mengetik dulu).
@@ -219,14 +281,21 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
             className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">{tForm('modelAuto')}</option>
-            {options?.models
-              .filter((m) => !providerId || m.provider_id === providerId)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.provider_slug} · {m.display_name}
-                </option>
-              ))}
+            {visibleImageModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.provider_slug} · {m.display_name}
+                {m.supports_reference ? ' · ref' : ''}
+              </option>
+            ))}
           </select>
+          {referenceUrl && !modelId ? (
+            <p className="text-[11px] text-ink-muted">{tForm('referenceAutoNarrowed')}</p>
+          ) : null}
+          {referenceUrl && selectedModel && !selectedSupportsReference ? (
+            <p role="alert" className="text-[11px] text-red-600">
+              {tForm('referenceModelUnsupported')}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-1">
@@ -309,6 +378,62 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
               ))}
           </select>
         </div>
+      </div>
+
+      {/* Referensi img2img (opsional): upload atau dari histori; tanpa mask. */}
+      <div className="rounded-md border border-line bg-background p-3">
+        <p className="text-sm font-medium text-ink">{tForm('referenceTitle')}</p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{tForm('referenceHint')}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="studio-reference-file"
+            className={`cursor-pointer rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary ${fieldsDisabled || isUploadingRef ? 'pointer-events-none opacity-50' : ''}`}
+          >
+            {isUploadingRef ? tForm('referenceUploading') : tForm('referenceUpload')}
+          </label>
+          <input
+            ref={fileInputRef}
+            id="studio-reference-file"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            disabled={fieldsDisabled || isUploadingRef}
+            onChange={(e) => void handleReferenceFile(e.target.files?.[0])}
+          />
+          {referenceUrl ? (
+            <button
+              type="button"
+              onClick={clearReference}
+              disabled={fieldsDisabled || isUploadingRef}
+              className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink-muted hover:border-primary disabled:opacity-50"
+            >
+              {tForm('referenceRemove')}
+            </button>
+          ) : null}
+        </div>
+        {referencePreview ? (
+          <div className="mt-2 flex items-start gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={referencePreview} alt={tForm('referencePreviewAlt')} className="h-24 w-24 rounded object-cover" />
+            <label className="grid flex-1 gap-1 text-xs" htmlFor="studio-reference-strength">
+              <span className="text-ink-muted">
+                {tForm('referenceStrength', { value: referenceStrength.toFixed(2) })}
+              </span>
+              <input
+                id="studio-reference-strength"
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={referenceStrength}
+                onChange={(e) => setReferenceStrength(Number(e.target.value))}
+                disabled={fieldsDisabled || isUploadingRef}
+                className="w-full"
+              />
+              <span className="text-[11px] text-ink-muted">{tForm('referenceStrengthHint')}</span>
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <button

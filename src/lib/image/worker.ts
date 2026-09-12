@@ -12,7 +12,7 @@ import {
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
 import type { ImageReasoning } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
-import { ImageHttpError } from './types';
+import { ImageHttpError, bytesToBase64, clampImg2ImgStrength, modelSupportsReference } from './types';
 import type {
   DraftImageRow,
   ImageAspect,
@@ -251,7 +251,7 @@ async function orderedProviders(firstProviderId: string): Promise<ImageProviderR
   return rows;
 }
 
-async function defaultModel(providerId: string, preferredModelId?: string): Promise<ImageModelRow | null> {
+async function defaultModel(providerId: string, preferredModelId?: string, needsReference = false): Promise<ImageModelRow | null> {
   const supabase = getServiceClient();
   const { data } = await supabase
     .from('image_models')
@@ -259,7 +259,11 @@ async function defaultModel(providerId: string, preferredModelId?: string): Prom
     .eq('provider_id', providerId)
     .eq('is_active', true)
     .order('priority', { ascending: true });
-  const rows = (data ?? []) as unknown as ImageModelRow[];
+  let rows = (data ?? []) as unknown as ImageModelRow[];
+  if (needsReference) {
+    const supported = rows.filter((m) => modelSupportsReference({ model_id: m.model_id, config: m.config }));
+    if (supported.length > 0) rows = supported;
+  }
   if (preferredModelId) {
     const pinned = rows.find((m) => m.model_id === preferredModelId);
     if (pinned) return pinned;
@@ -302,9 +306,11 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
     }
 
     const override = (row.llm_meta as { override?: { modelUuid?: string | null; styleSlug?: string | null } } | null)?.override;
+    const needsReference = Boolean(row.reference_public_url?.trim());
     const target = await resolveImageTarget({
       sessionId: ctx.sessionId,
-      draftOverride: override ?? null
+      draftOverride: override ?? null,
+      needsReference
     });
 
     // Prompt: pakai yang sudah ada (regenerate simpan prompt / custom edit) atau reasoning-only bila kosong.
@@ -376,18 +382,45 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
     // Pin manual admin (override review): hanya provider terpilih — gagal
     // jujur tanpa fallback lintas-provider. Auto/sesi/global: waterfall.
     const providers = target.pinned ? [target.provider] : await orderedProviders(target.provider.id);
+    // Referensi img2img: fetch bytes SEKALI sebelum loop (hemat bandwidth).
+    // Gagal fetch → failed jujur tanpa memanggil provider mana pun.
+    const referenceUrl = row.reference_public_url?.trim() || null;
+    const referenceStrength = clampImg2ImgStrength(
+      typeof row.reference_strength === 'string' ? Number(row.reference_strength) : row.reference_strength
+    );
+    let referenceB64: string | null = null;
+    if (referenceUrl) {
+      try {
+        const fetched = await fetchRemoteImage(referenceUrl, 30000);
+        referenceB64 = bytesToBase64(fetched.bytes);
+      } catch (e) {
+        const message = e instanceof Error ? `referensi gagal diambil: ${e.message}` : 'referensi gagal diambil';
+        await failImage(imageId, message);
+        return { imageId: null, error: message };
+      }
+    }
     let lastError: unknown = null;
     for (const provider of providers) {
       const modelRow =
         provider.id === target.provider.id
           ? target.model
-          : await defaultModel(provider.id);
+          : await defaultModel(provider.id, undefined, referenceB64 ? true : false);
       if (!modelRow) continue;
+      // Guard waterfall: baris referensi tidak boleh jatuh ke model
+      // non-support — lewati ke kandidat berikut.
+      if (referenceB64 && !modelSupportsReference({ model_id: modelRow.model_id, config: modelRow.config })) {
+        continue;
+      }
       try {
         const pool = new ImageKeyPool(provider);
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const adapter = createImageAdapter(provider, modelRow.model_id, apiKey);
-          return adapter.generateImage({ prompt: finalPrompt, negativePrompt: finalNegative, aspectRatio: aspect });
+          return adapter.generateImage({
+            prompt: finalPrompt,
+            negativePrompt: finalNegative,
+            aspectRatio: aspect,
+            ...(referenceB64 ? { referenceImageB64: referenceB64, strength: referenceStrength } : {})
+          });
         });
         let bytes: Uint8Array;
         let mime = result.mimeType;
@@ -433,7 +466,10 @@ export async function processOneImage(): Promise<{ imageId: string | null; error
               model: modelRow.model_id,
               key_suffix: keyRow.key_suffix,
               // Jejak audit: pin vs waterfall (kasus cloudflare→pixazo 11 Sep 2026).
-              pinned: target.pinned
+              pinned: target.pinned,
+              // Jejak audit img2img: referensi dipakai atau tidak + strength.
+              reference: referenceB64 ? true : false,
+              reference_strength: referenceB64 ? referenceStrength : null
             },
             updated_at: new Date().toISOString()
           })

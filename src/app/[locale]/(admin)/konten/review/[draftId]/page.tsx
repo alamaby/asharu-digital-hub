@@ -135,7 +135,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   let regenModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
   // For image picker: active image providers/models/styles + draft image history
   let imageProviders: { id: string; slug: string; display_name: string }[] = [];
-  let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[] = [];
+  let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string; supports_reference: boolean }[] = [];
   let imageStyles: { slug: string; display_name: string }[] = [];
   let imageSubjects: { slug: string; display_name: string }[] = [];
   let imageCameras: { slug: string; display_name: string }[] = [];
@@ -147,6 +147,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     } | null;
     style_slug: string | null; camera_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
     storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
+    reference_storage_path: string | null; reference_public_url: string | null; reference_strength: number | null;
     status: 'pending' | 'prompt_ready' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
     llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
   }[] = [];
@@ -161,7 +162,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     const { data: iprovs } = await svc.from('image_providers').select('id, slug, display_name').eq('is_active', true).order('priority');
     const { data: imods } = await svc
       .from('image_models')
-      .select('id, provider_id, model_id, display_name, image_providers!inner(slug)')
+      .select('id, provider_id, model_id, display_name, config, image_providers!inner(slug)')
       .eq('is_active', true)
       .order('priority');
     const { data: istlyes } = await svc.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug');
@@ -184,8 +185,13 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     imageMode = draftMode ?? sessionMode ?? globalMode;
     if (iprovs) imageProviders = iprovs as typeof imageProviders;
     if (imods) {
-      imageModels = ((imods ?? []) as unknown as Array<{ id: string; provider_id: string; model_id: string; display_name: string; image_providers: { slug: string } }>).map(
-        ({ image_providers: p, ...m }) => ({ ...m, provider_slug: p.slug })
+      const { modelSupportsReference } = await import('@/lib/image/types');
+      imageModels = ((imods ?? []) as unknown as Array<{ id: string; provider_id: string; model_id: string; display_name: string; config: Record<string, unknown> | null; image_providers: { slug: string } }>).map(
+        ({ image_providers: p, ...m }) => ({
+          ...m,
+          provider_slug: p.slug,
+          supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config })
+        })
       );
     }
     if (istlyes) imageStyles = istlyes as typeof imageStyles;

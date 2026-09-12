@@ -76,6 +76,20 @@ const modelCf: Row = {
   last_used_at: null,
   image_providers: provCf
 };
+const modelSdImg2Img: Row = {
+  id: 'model-sd-uuid',
+  provider_id: 'prov-cf',
+  model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img',
+  display_name: 'SD 1.5 Img2Img',
+  is_default: false,
+  is_active: true,
+  priority: 21,
+  config: { supports_reference: true },
+  usage_count: 0,
+  failure_count: 0,
+  last_used_at: null,
+  image_providers: provCf
+};
 const stylePhoto: Row = {
   slug: 'photorealistic',
   display_name: 'Photorealistic',
@@ -101,10 +115,10 @@ function defaultsRow(over: Row = {}): Row {
   };
 }
 
-function makeTables(over: { session?: Row | null; defaults?: Row; styles?: Row[] } = {}) {
+function makeTables(over: { session?: Row | null; defaults?: Row; styles?: Row[]; models?: Row[] } = {}) {
   return {
     image_providers: [provPixazo, provCf],
-    image_models: [modelFlux, modelCf],
+    image_models: over.models ?? [modelFlux, modelCf],
     image_style_presets: over.styles ?? [stylePhoto, styleAnime],
     image_gen_defaults: [over.defaults ?? defaultsRow()],
     content_research_sessions: over.session ? [over.session] : []
@@ -209,5 +223,43 @@ describe('resolveImageTarget — prioritas style', () => {
     useTables(makeTables({ defaults: defaultsRow({ style_slug: null }) }));
     const t = await resolveImageTarget({ sessionId: null, draftOverride: null });
     expect(t.style).toBeNull();
+  });
+});
+
+describe('resolveImageTarget — needsReference', () => {
+  it('pin model non-support + referensi → throw jujur', async () => {
+    useTables(makeTables());
+    await expect(
+      resolveImageTarget({
+        sessionId: null,
+        draftOverride: { modelUuid: 'model-flux-uuid', styleSlug: null },
+        needsReference: true
+      })
+    ).rejects.toThrow('tidak mendukung image reference');
+  });
+
+  it('pin model support + referensi → pinned', async () => {
+    useTables(makeTables({ models: [modelFlux, modelCf, modelSdImg2Img] }));
+    const t = await resolveImageTarget({
+      sessionId: null,
+      draftOverride: { modelUuid: 'model-sd-uuid', styleSlug: null },
+      needsReference: true
+    });
+    expect(t.model.model_id).toBe('@cf/runwayml/stable-diffusion-v1-5-img2img');
+    expect(t.pinned).toBe(true);
+  });
+
+  it('waterfall + referensi dipersempit ke model support', async () => {
+    useTables(makeTables({ models: [modelFlux, modelCf, modelSdImg2Img], defaults: defaultsRow({ provider_id: null, model_id: null }) }));
+    const t = await resolveImageTarget({ sessionId: null, draftOverride: null, needsReference: true });
+    expect(t.model.model_id).toBe('@cf/runwayml/stable-diffusion-v1-5-img2img');
+    expect(t.pinned).toBe(false);
+  });
+
+  it('tanpa model support sama sekali → throw jelas', async () => {
+    useTables(makeTables({ defaults: defaultsRow({ provider_id: null, model_id: null }) }));
+    await expect(
+      resolveImageTarget({ sessionId: null, draftOverride: null, needsReference: true })
+    ).rejects.toThrow('Tidak ada model image reference aktif');
   });
 });

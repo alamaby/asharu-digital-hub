@@ -17,6 +17,8 @@ interface Props {
   isPending?: boolean;
   onSelect?: (imageId: string) => void;
   onRetry?: (imageId: string) => void;
+  /** Dipanggil saat user memakai hasil sebagai referensi img2img (public_url). */
+  onUseAsReference?: (publicUrl: string) => void;
   /** Katalog model aktif — untuk label request saat antre (bukan "auto"). */
   modelOptions?: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
 }
@@ -88,7 +90,7 @@ function filenameFor(img: DraftImageRow, url: string): string {
  * Tanpa auto-advance — alat review admin. Slide non-aktif diberi inert agar
  * fokus/aksinya tidak bocor ke layar pembaca.
  */
-export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, modelOptions }: Props) {
+export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, onUseAsReference, modelOptions }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set());
@@ -228,6 +230,11 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                   {img.id === selectedId ? (
                     <span className="rounded bg-emerald-600 px-1.5 py-0.5 font-medium text-white">Terpilih</span>
                   ) : null}
+                  {img.reference_public_url ? (
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 font-medium text-violet-800" title="Dibuat dari image reference (img2img)">
+                      ref
+                    </span>
+                  ) : null}
                   <span className={isCover ? 'text-xs text-ink-muted' : 'text-[11px] text-ink-muted'}>
                     {providerModelLabel(img, modelOptions)}
                   </span>
@@ -289,6 +296,17 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                       className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
                     >
                       Ulangi
+                    </button>
+                  ) : null}
+                  {onUseAsReference && hasImage && (img.status === 'ready' || img.status === 'selected') ? (
+                    <button
+                      type="button"
+                      onClick={() => onUseAsReference(img.public_url as string)}
+                      disabled={isPending}
+                      title="Pakai gambar ini sebagai referensi img2img"
+                      className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
+                    >
+                      Jadikan referensi
                     </button>
                   ) : null}
                 </div>

@@ -34,13 +34,14 @@ vi.mock('@/lib/image/providers', () => ({
   })
 }));
 
-vi.mock('@/lib/studio/storage', () => ({
-  uploadUserImage: vi.fn(async () => ({ storagePath: 'u/img.png', publicUrl: 'https://cdn.test/img.png' })),
-  removeUserImage: vi.fn(async () => {})
-}));
-
 vi.mock('@/lib/image/storage', () => ({
   fetchRemoteImage: vi.fn(async () => ({ bytes: new Uint8Array([1]), mimeType: 'image/jpeg' }))
+}));
+
+vi.mock('@/lib/studio/storage', () => ({
+  uploadUserImage: vi.fn(async () => ({ storagePath: 'u/img.png', publicUrl: 'https://cdn.test/img.png' })),
+  removeUserImage: vi.fn(async () => {}),
+  fetchReferenceBytes: vi.fn(async () => ({ bytes: new Uint8Array([9, 9]), mimeType: 'image/jpeg' }))
 }));
 
 vi.mock('@/lib/image/config', () => ({
@@ -152,6 +153,9 @@ function studioRow(over: Row = {}): Row {
     expires_at: '2026-10-11T00:00:00Z',
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',
+    reference_storage_path: null,
+    reference_public_url: null,
+    reference_strength: null,
     ...over
   };
 }
@@ -220,5 +224,20 @@ describe('processOneStudioImage — strict-fail pin user', () => {
     expect(res.imageId).toBeNull();
     expect(res.error).toContain('Provider pilihan tidak aktif');
     expect(calls()).toEqual([]);
+  });
+
+  it('referensi + model non-support terpin → failed jujur tanpa memanggil provider', async () => {
+    const { updates } = useSetup({
+      provider_id: 'prov-pixazo',
+      model_id: 'model-pixazo-uuid',
+      reference_public_url: 'https://cdn.test/ref.jpg',
+      reference_strength: 0.4
+    });
+    const res = await processOneStudioImage();
+    expect(res.imageId).toBeNull();
+    expect(res.error).toContain('tidak mendukung image reference');
+    expect(calls()).toEqual([]);
+    const fin = finalStatus(updates)?.patch as Row;
+    expect(fin.status).toBe('failed');
   });
 });
