@@ -308,4 +308,55 @@ describe('StudioHistory', () => {
     expect(screen.getByText('Worker sedang memproses...')).toBeInTheDocument();
     vi.mocked(listUserImages).mockResolvedValue([]);
   });
+
+  it('UUID tampil per baris dengan tooltip penuh + tombol salin', () => {
+    renderWithMessages(
+      <StudioHistory {...historyProps([genRow({ id: 'abc12345-uuid-penuh-di-sini' })])} />
+    );
+    const row = screen.getByTestId('studio-row');
+    const idBtn = within(row as HTMLElement).getByRole('button', { name: 'Salin ID' });
+    expect(idBtn).toHaveAttribute('title', 'abc12345-uuid-penuh-di-sini');
+    expect(idBtn.textContent).toContain('abc12345');
+  });
+
+  it('tautan Lihat punya icon aksi', () => {
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([genRow({ id: 'v1', status: 'ready', public_url: 'https://cdn.test/1.png' })])}
+      />
+    );
+    const row = screen.getByTestId('studio-row');
+    const view = within(row as HTMLElement).getByRole('link', { name: 'Lihat' });
+    expect(view.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('hapus klik pertama hanya minta konfirmasi (tidak menghapus)', async () => {
+    const user = userEvent.setup();
+    const { deleteStudioImage } = await import('@/lib/studio/actions');
+    vi.mocked(deleteStudioImage).mockClear();
+    renderWithMessages(
+      <StudioHistory {...historyProps([genRow({ id: 'd1', status: 'ready' })])} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+    expect(deleteStudioImage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Yakin hapus?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Batal' })).toBeInTheDocument();
+  });
+
+  it('Batal membatalkan; klik kedua Yakin hapus mengeksekusi', async () => {
+    const user = userEvent.setup();
+    const { deleteStudioImage } = await import('@/lib/studio/actions');
+    vi.mocked(deleteStudioImage).mockClear();
+    renderWithMessages(
+      <StudioHistory {...historyProps([genRow({ id: 'd2', status: 'ready' })])} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+    await user.click(screen.getByRole('button', { name: 'Batal' }));
+    expect(deleteStudioImage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Hapus' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+    await user.click(screen.getByRole('button', { name: 'Yakin hapus?' }));
+    expect(deleteStudioImage).toHaveBeenCalledTimes(1);
+    expect(deleteStudioImage).toHaveBeenCalledWith('d2');
+  });
 });

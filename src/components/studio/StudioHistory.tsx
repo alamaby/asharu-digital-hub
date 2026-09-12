@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { Check, Copy, Download, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, Copy, Download, Eye, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { Locale } from '@/i18n/routing';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
@@ -101,6 +101,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -211,6 +212,21 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     setTimeout(() => setCopiedId((cur) => (cur === img.id ? null : cur)), 2000);
   }
 
+  async function copyId(img: StudioGenerationRow) {
+    try {
+      await navigator.clipboard.writeText(img.id);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = img.id;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedId(`id:${img.id}`);
+    setTimeout(() => setCopiedId((cur) => (cur === `id:${img.id}` ? null : cur)), 2000);
+  }
+
   function retry(imgId: string) {
     setRetryingId(imgId);
     setNotice(tNotice('processing'));
@@ -238,6 +254,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
         setNotice(e instanceof Error ? e.message : tHist('delete'));
       } finally {
         setDeletingId(null);
+        setConfirmDeleteId((cur) => (cur === img.id ? null : cur));
       }
     });
   }
@@ -414,6 +431,16 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                   </span>
                 ) : null}
                 <span className="text-[11px] text-ink-muted">{metaLabel(img)}</span>
+                <button
+                  type="button"
+                  onClick={() => copyId(img)}
+                  title={img.id}
+                  aria-label={tHist('copyId')}
+                  className="inline-flex items-center gap-1 rounded bg-line/20 px-1.5 py-0.5 font-mono text-[11px] text-ink-muted hover:text-primary"
+                >
+                  {copiedId === `id:${img.id}` ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+                  {tHist('idLabel')} {img.id.slice(0, 8)}
+                </button>
                 <span className="ml-auto text-[11px] tabular-nums text-ink-muted" title={img.created_at}>
                   {formatDateTime(img.created_at, locale, timeZone)}
                 </span>
@@ -498,6 +525,7 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
                       >
+                        <Eye className="h-3 w-3" aria-hidden />
                         {tHist('view')}
                       </a>
                     ) : null}
@@ -513,16 +541,40 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                         {retryingId === img.id ? tHist('retrying') : tHist('retry')}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => del(img)}
+                    {/* Hapus dua-tahap: klik pertama minta konfirmasi, klik kedua eksekusi. */}
+                    {confirmDeleteId === img.id ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => del(img)}
                       disabled={isPending || deletingId === img.id}
                       aria-busy={deletingId === img.id}
-                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
                     >
                       <Trash2 className="h-3 w-3" aria-hidden />
-                      {deletingId === img.id ? tHist('deleting') : tHist('delete')}
+                      {deletingId === img.id ? tHist('deleting') : tHist('deleteConfirm')}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      disabled={isPending || deletingId === img.id}
+                      className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-primary disabled:opacity-50"
+                    >
+                      {tHist('cancelDelete')}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(img.id)}
+                    disabled={isPending || deletingId === img.id}
+                    aria-busy={deletingId === img.id}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" aria-hidden />
+                    {tHist('delete')}
+                  </button>
+                )}
                   </div>
                 </div>
               </div>
