@@ -19,7 +19,7 @@ import {
   type StudioEnhanceResult
 } from './types';
 import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink, validateReferenceModelLink } from './validation';
-import { removeUserImage, uploadUserReference } from './storage';
+import { removeUserImage, uploadUserReference, resolveFreshReferenceStoragePath, assertFreshReferenceExists } from './storage';
 import {
   REFERENCE_IMAGE_ALLOWED_MIME,
   REFERENCE_IMAGE_MAX_BYTES,
@@ -206,8 +206,9 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
   }
 
   // Referensi img2img: pastikan URL berasal dari histori milik user sendiri
-  // (public_url hasil generate sendiri ATAU ref/ milik sendiri) — cegah
-  // tempel URL asing yang lolos validasi client.
+  // (public_url hasil generate sendiri) ATAU upload-baru milik sendiri
+  // (`ref/{userId}/` yang file-nya benar ada di Storage) — cegah tempel
+  // URL asing yang lolos validasi client.
   let referenceStoragePath: string | null = input.referenceStoragePath?.trim() || null;
   if (v.referencePublicUrl) {
     const { data: owned } = await supabase
@@ -217,10 +218,23 @@ export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ i
       .or(`public_url.eq.${v.referencePublicUrl},reference_public_url.eq.${v.referencePublicUrl}`)
       .limit(1)
       .maybeSingle();
-    if (!owned) throw new Error('Referensi harus dari upload atau histori milik Anda.');
     const own = owned as { reference_storage_path: string | null; storage_path: string | null } | null;
-    if (!referenceStoragePath) {
-      referenceStoragePath = own?.reference_storage_path ?? own?.storage_path ?? null;
+    if (own) {
+      if (!referenceStoragePath) {
+        referenceStoragePath = own.reference_storage_path ?? own.storage_path ?? null;
+      }
+    } else {
+      // Bukan dari histori → verifikasi upload-baru: URL harus milik
+      // `ref/{userId}/` sendiri dan file-nya ada (kasus prod 12 Sep 2026:
+      // upload baru selalu ditolak karena tak ada baris histori yang cocok).
+      const derived = resolveFreshReferenceStoragePath({
+        userId,
+        publicUrl: v.referencePublicUrl,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+      });
+      if (!derived) throw new Error('Referensi harus dari upload atau histori milik Anda.');
+      await assertFreshReferenceExists(supabase, derived);
+      referenceStoragePath = derived;
     }
   }
 

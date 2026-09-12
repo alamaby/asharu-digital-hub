@@ -1,10 +1,52 @@
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServiceClient } from '@/lib/supabase/service';
 import { assertValidReferenceFile, referenceExtensionFor } from '@/lib/image/types';
 
 export const STUDIO_IMAGES_BUCKET = 'user-images';
 /** Prefix file referensi img2img (`ref/`) — bedakan dari hasil generate. */
 export const STUDIO_REFERENCE_PREFIX = 'ref';
+
+/** Nama file referensi: UUID + ekstensi aman (tanpa path traversal). */
+const FRESH_REFERENCE_FILE_RE = /^[0-9a-fA-F-]{1,64}\.(jpg|jpeg|png|webp)$/;
+
+/**
+ * Turunkan storage path dari public URL upload-baru milik user sendiri.
+ * Syarat: URL == prefix publik bucket + `ref/{userId}/{nama-file}`.
+ * Kembalikan null bila bukan milik user (URL asing / format tak dikenal).
+ * Murni (tanpa I/O) agar mudah diuji; keberadaan file dicek terpisah
+ * via `assertFreshReferenceExists`.
+ */
+export function resolveFreshReferenceStoragePath(args: {
+  userId: string;
+  publicUrl: string;
+  supabaseUrl: string;
+}): string | null {
+  const base = args.supabaseUrl.replace(/\/+$/, '');
+  if (!base || !args.userId) return null;
+  const prefix = `${base}/storage/v1/object/public/${STUDIO_IMAGES_BUCKET}/${STUDIO_REFERENCE_PREFIX}/${args.userId}/`;
+  if (!args.publicUrl.startsWith(prefix)) return null;
+  const file = args.publicUrl.slice(prefix.length);
+  if (!FRESH_REFERENCE_FILE_RE.test(file)) return null;
+  return `${STUDIO_REFERENCE_PREFIX}/${args.userId}/${file}`;
+}
+
+/**
+ * Pastikan file referensi benar ada di Storage (anti URL karangan yang
+ * kebetulan cocok prefix). Service-role: RLS dilewati.
+ */
+export async function assertFreshReferenceExists(
+  supabase: SupabaseClient,
+  storagePath: string
+): Promise<void> {
+  const { data } = await supabase
+    .from('storage.objects')
+    .select('name')
+    .eq('bucket_id', STUDIO_IMAGES_BUCKET)
+    .eq('name', storagePath)
+    .maybeSingle();
+  if (!data) throw new Error('Referensi harus dari upload atau histori milik Anda.');
+}
 
 /** Upload bytes hasil generate studio → Storage publik `user-images/{userId}/{imageId}.ext`. */
 export async function uploadUserImage(

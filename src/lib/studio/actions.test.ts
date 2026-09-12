@@ -15,7 +15,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseService: () => clientRef.current
 }));
 
-import { listUserImages } from './actions';
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn()
+}));
+
+import { enqueueStudioImage, listUserImages } from './actions';
+import { resolveFreshReferenceStoragePath } from './storage';
 import { buildStudioEnhanceMessages } from '@/lib/image/prompt';
 
 /** Client mock yang mencatat rantai query (eq/order/limit) per tabel. */
@@ -45,6 +50,12 @@ function makeClient(tables: Record<string, Row[]>) {
           return builder;
         },
         limit: () => builder,
+        or: () => builder,
+        insert: (patch: Row) => {
+          log.calls.push({ op: 'insert', val: patch });
+          return builder;
+        },
+        single: async () => ({ data: { id: 'new-img', expires_at: '2026-10-11T00:00:00Z' }, error: null }),
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
         then: (onfulfilled: (v: { data: Row[]; error: null }) => unknown) =>
           onfulfilled({ data: rows, error: null })
@@ -126,6 +137,115 @@ describe('listUserImages — filter + sort', () => {
     const rows = await listUserImages({ sortBy: 'updated_at', dir: 'asc' });
     expect(rows.map((r) => r.id)).toEqual(['old', 'new']);
     expect(lastListCalls()).toContainEqual({ op: 'order', col: 'updated_at', ascending: true });
+  });
+});
+
+describe('resolveFreshReferenceStoragePath — upload baru milik sendiri', () => {
+  const base = 'https://xyz.supabase.co';
+  const userId = 'd4406141-00e9-490c-992a-9415c3b32ee1';
+  const good = `${base}/storage/v1/object/public/user-images/ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
+
+  it('URL ref milik sendiri → turunkan storage path', () => {
+    expect(resolveFreshReferenceStoragePath({ userId, publicUrl: good, supabaseUrl: base })).toBe(
+      `ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`
+    );
+  });
+
+  it('user lain / bucket lain / ekstensi liar / traversal → null', () => {
+    const otherUser = `${base}/storage/v1/object/public/user-images/ref/aaaaaaaa-0000-4000-8000-000000000000/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
+    const otherBucket = `${base}/storage/v1/object/public/draft-images/ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
+    const badExt = `${base}/storage/v1/object/public/user-images/ref/${userId}/evil.svg`;
+    const traversal = `${base}/storage/v1/object/public/user-images/ref/${userId}/../u1/x.png`;
+    const args = { userId, supabaseUrl: base };
+    expect(resolveFreshReferenceStoragePath({ ...args, publicUrl: otherUser })).toBeNull();
+    expect(resolveFreshReferenceStoragePath({ ...args, publicUrl: otherBucket })).toBeNull();
+    expect(resolveFreshReferenceStoragePath({ ...args, publicUrl: badExt })).toBeNull();
+    expect(resolveFreshReferenceStoragePath({ ...args, publicUrl: traversal })).toBeNull();
+    expect(resolveFreshReferenceStoragePath({ userId, publicUrl: good, supabaseUrl: '' })).toBeNull();
+  });
+});
+
+describe('enqueueStudioImage — referensi upload baru vs histori', () => {
+  const base = 'https://xyz.supabase.co';
+  const userId = 'u1';
+  const OLD_ENV = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const freshUrl = `${base}/storage/v1/object/public/user-images/ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
+  const freshPath = `ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
+
+  function useEnqueueTables(tables: Record<string, Row[]>) {
+    queryLog.current = [];
+    process.env.NEXT_PUBLIC_SUPABASE_URL = base;
+    clientRef.current = makeClient(tables);
+  }
+
+  function enqueueInput(over: Row = {}) {
+    return {
+      prompt: 'a tidy bedroom with soft morning light',
+      aspectSlug: '1:1',
+      ...over
+    };
+  }
+
+  function insertedPatch() {
+    const found = [...queryLog.current]
+      .reverse()
+      .flatMap((l) => (l.table === 'user_image_generations' ? l.calls : []))
+      .find((c) => c.op === 'insert');
+    return (found?.val ?? {}) as Row;
+  }
+
+  it('upload baru milik sendiri + file ada → lolos dengan storage path turunan', async () => {
+    useEnqueueTables({
+      user_image_generations: [],
+      'storage.objects': [{ bucket_id: 'user-images', name: freshPath }],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    const res = await enqueueStudioImage(
+      enqueueInput({ referencePublicUrl: freshUrl, referenceStrength: 0.6 })
+    );
+    expect(res.imageId).toBe('new-img');
+    const patch = insertedPatch();
+    expect(patch.reference_public_url).toBe(freshUrl);
+    expect(patch.reference_storage_path).toBe(freshPath);
+    expect(patch.reference_strength).toBe(0.6);
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
+  });
+
+  it('URL asing (bukan ref milik sendiri) → ditolak', async () => {
+    useEnqueueTables({
+      user_image_generations: [],
+      'storage.objects': [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    await expect(
+      enqueueStudioImage(enqueueInput({ referencePublicUrl: 'https://evil.test/x.jpg' }))
+    ).rejects.toThrow('Referensi harus dari upload atau histori milik Anda.');
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
+  });
+
+  it('URL ref milik sendiri tapi file tak ada → ditolak', async () => {
+    useEnqueueTables({
+      user_image_generations: [],
+      'storage.objects': [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    await expect(
+      enqueueStudioImage(enqueueInput({ referencePublicUrl: freshUrl }))
+    ).rejects.toThrow('Referensi harus dari upload atau histori milik Anda.');
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
+  });
+
+  it('pakai ulang dari histori tetap lolos (jalur lama)', async () => {
+    const reuseUrl = 'https://xyz.supabase.co/storage/v1/object/public/user-images/u1/old.png';
+    useEnqueueTables({
+      user_image_generations: [row({ id: 'old', user_id: 'u1', public_url: reuseUrl, storage_path: 'u1/old.png' })],
+      'storage.objects': [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: reuseUrl }));
+    expect(res.imageId).toBe('new-img');
+    expect(insertedPatch().reference_storage_path).toBe('u1/old.png');
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 });
 
