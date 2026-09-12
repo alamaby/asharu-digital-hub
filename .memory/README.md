@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-12 22:00 (local time)
+Last updated: 2026-09-12 22:20 (local time)
 
 ## Current State
 
@@ -54,6 +54,7 @@ Last updated: 2026-09-12 22:00 (local time)
 
 ## Recent Entries
 
+- [222000-studio-img2img-fresh-upload.md](2026-09-12/222000-studio-img2img-fresh-upload.md) — RCA img2img upload-baru selalu ditolak ownership check (query histori saja; komentar janji cabang `ref/` yang tak ada) + fix derivasi path server-side + cek `storage.objects`; pesan prod ter-masking digest. Sampingan: `996dcd8c` ready (Avoid live-OK), `f10d58e2` NSFW-8007 (moderasi, bukan bug). Gate 525 tests hijau, pushed `c8b156a`. [USER ACTION] Ulangi generate img2img dari upload baru.
 - [220047-studio-history-uuid-confirm-delete.md](2026-09-12/220047-studio-history-uuid-confirm-delete.md) — Riwayat Studio: tombol UUID per baris (8-char + tooltip penuh + salin) + icon `Eye` di Lihat + hapus dua-tahap ("Yakin hapus?"/Batal, tanpa `window.confirm`); 4 key i18n id/en; gate 519 tests hijau, pushed `537fcd0`.
 - [204500-studio-queue-refresh-flux-negative.md](2026-09-12/204500-studio-queue-refresh-flux-negative.md) — Studio: refresh list otomatis setelah enqueue (`onEnqueued`→`historyRefreshKey`→`refresh()` + `router.refresh()` kuota) + fix Flux `negative_prompt`→klausa `Avoid:` (regresi `2ffc3d4`, 400 prod) + `num_steps` SD text-mode + retry 1x `fetchOrderedImageKeys` transient + mock router `refresh`; gate 515 tests hijau, pushed `4a522ab`. [USER ACTION] Klik "Ulangi" 2 record failed + uji enqueue baru.
 - [124500-cloudflare-img2img-reference.md](2026-09-12/124500-cloudflare-img2img-reference.md) — img2img Cloudflare: image reference (upload + histori) di Studio & review, 2 model SD fase 1, strength slider, adapter toleran JSON/biner, migrasi `20260912000001` **applied prod 12 Sep** (2 model SD aktif), gate 507 tests + build hijau, pushed `6b4dcc4`/`5e6c89d`.
