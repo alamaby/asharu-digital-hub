@@ -24,6 +24,12 @@ interface Props {
   options?: OptionLists | null;
   locale: Locale;
   timeZone: string;
+  /**
+   * Token dari parent (naik tiap enqueue sukses): picu re-fetch agar baris
+   * pending baru tampil di list. Polling otomatis jalan setelahnya.
+   * Lewati 0 agar mount awal tidak double-fetch (data RSC sudah ada).
+   */
+  refreshKey?: number;
   /** Dipanggil saat user menekan "Pakai ulang" — form diisi dari baris ini. */
   onReuse?: (img: StudioGenerationRow) => void;
 }
@@ -85,7 +91,7 @@ function prettyMeta(meta: Record<string, unknown> | null): string {
   }
 }
 
-export function StudioHistory({ images: initialImages, pollingIntervalSec, options, locale, timeZone, onReuse }: Props) {
+export function StudioHistory({ images: initialImages, pollingIntervalSec, options, locale, timeZone, refreshKey = 0, onReuse }: Props) {
   const tHist = useTranslations('studio.history');
   const tNotice = useTranslations('studio.notice');
 
@@ -118,6 +124,14 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
       }
     });
   }
+
+  // Refresh eksplisit dari parent (enqueue sukses): tampilkan baris pending
+  // baru di list dengan filter aktif user. Baris pending yang masuk otomatis
+  // mengaktifkan polling di effect bawah.
+  useEffect(() => {
+    if (refreshKey > 0) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   // Polling hanya saat ada antrean; filter aktif ikut dibawa.
   useEffect(() => {

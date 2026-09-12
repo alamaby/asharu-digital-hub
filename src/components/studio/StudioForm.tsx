@@ -10,9 +10,11 @@ interface Props {
   quota: { used: number; remaining: number | null; limit: number | null | undefined } | null;
   /** Baris histori untuk "Pakai ulang" — form diisi sekali per klik. */
   reuseRow?: StudioGenerationRow | null;
+  /** Dipanggil setelah enqueue sukses — parent me-refresh list riwayat agar baris pending tampil. */
+  onEnqueued?: () => void;
 }
 
-export function StudioForm({ options, quota, reuseRow }: Props) {
+export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
   const t = useTranslations('studio');
   const tForm = useTranslations('studio.form');
   const tNotice = useTranslations('studio.notice');
@@ -153,6 +155,7 @@ export function StudioForm({ options, quota, reuseRow }: Props) {
         setPrompt('');
         setNegative('');
         clearReference();
+        onEnqueued?.();
       } catch (err) {
         setNotice(err instanceof Error ? err.message : tForm('errorInput'));
       }

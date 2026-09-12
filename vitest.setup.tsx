@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 // `@/i18n/navigation` can be rendered in tests.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/id/current-path',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
   redirect: vi.fn()
@@ -20,5 +20,5 @@ vi.mock('@/i18n/navigation', () => ({
     return <a href={hrefString} {...rest}>{children}</a>;
   },
   usePathname: () => '/id/current-path',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() })
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() })
 }));

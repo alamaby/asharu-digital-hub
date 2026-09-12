@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import type { StudioOptions, StudioQuota } from '@/lib/studio/types';
 import { StudioForm } from './StudioForm';
@@ -22,9 +22,19 @@ interface Props {
 export function StudioPageClient({ locale, timeZone, options, quota, images, error }: Props) {
   const t = useTranslations('studio');
   const tNav = useTranslations('nav');
+  const router = useRouter();
+  const [, startTransition] = useTransition();
 
   // "Pakai ulang" dari riwayat → form diisi dari baris ini (sekali per klik).
   const [reuseRow, setReuseRow] = useState<StudioGenerationRow | null>(null);
+  // Setiap enqueue sukses → riwayat refresh agar baris pending tampil di list
+  // (+ router.refresh agar badge kuota ikut akurat).
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+  function handleEnqueued() {
+    setHistoryRefreshKey((k) => k + 1);
+    startTransition(() => router.refresh());
+  }
 
   const pollingIntervalSec = options?.config.polling_interval_sec ?? 10;
   const remaining = quota?.remaining ?? null;
@@ -69,7 +79,7 @@ export function StudioPageClient({ locale, timeZone, options, quota, images, err
       )}
 
       <div className="mt-8 rounded-lg border border-line bg-surface p-6 shadow-card">
-        <StudioForm options={options} quota={quota} reuseRow={reuseRow} />
+        <StudioForm options={options} quota={quota} reuseRow={reuseRow} onEnqueued={handleEnqueued} />
       </div>
 
       <StudioHistory
@@ -78,6 +88,7 @@ export function StudioPageClient({ locale, timeZone, options, quota, images, err
         options={options}
         locale={locale as Locale}
         timeZone={timeZone}
+        refreshKey={historyRefreshKey}
         onReuse={(img) => {
           setReuseRow(img);
           window.scrollTo({ top: 0, behavior: 'smooth' });

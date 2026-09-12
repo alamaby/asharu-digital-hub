@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { NextIntlClientProvider } from 'next-intl';
+import idMessages from '@/messages/id.json';
 import { StudioForm } from './StudioForm';
 import { StudioHistory } from './StudioHistory';
 import { renderWithMessages } from '@/test/utils';
@@ -93,6 +95,20 @@ describe('StudioForm', () => {
     expect(document.body.textContent).not.toMatch(/studio\.(form|title|notice|enhance)/);
     // Counter prompt (maxPrompt config 500) + negative (fix 500) sama-sama "0/500 karakter".
     expect(screen.getAllByText('0/500 karakter')).toHaveLength(2);
+  });
+
+  it('submit sukses memanggil onEnqueued agar parent me-refresh list', async () => {
+    const user = userEvent.setup();
+    const onEnqueued = vi.fn();
+    const { enqueueStudioImage } = await import('@/lib/studio/actions');
+    vi.mocked(enqueueStudioImage).mockClear();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} onEnqueued={onEnqueued} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(enqueueStudioImage).toHaveBeenCalled();
+    expect(onEnqueued).toHaveBeenCalledTimes(1);
   });
 
   it('prompt <10 karakter menampilkan peringatan inline', async () => {
@@ -268,5 +284,28 @@ describe('StudioHistory', () => {
     const rows = screen.getAllByTestId('studio-row');
     expect(within(rows[0] as HTMLElement).getByText('ref')).toBeInTheDocument();
     expect(within(rows[0] as HTMLElement).getByText('Referensi:')).toBeInTheDocument();
+  });
+
+  it('refreshKey berubah memicu listUserImages + baris pending tampil', async () => {
+    const { listUserImages } = await import('@/lib/studio/actions');
+    vi.mocked(listUserImages).mockClear();
+    const pending = [genRow({ id: 'n1', status: 'pending', provider_slug: '', model_slug: '' })];
+    vi.mocked(listUserImages).mockResolvedValueOnce(pending);
+    const view = render(
+      <NextIntlClientProvider locale="id" messages={idMessages}>
+        <StudioHistory {...historyProps([])} refreshKey={0} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByTestId('studio-row')).not.toBeInTheDocument();
+    expect(listUserImages).not.toHaveBeenCalled();
+    view.rerender(
+      <NextIntlClientProvider locale="id" messages={idMessages}>
+        <StudioHistory {...historyProps([])} refreshKey={1} />
+      </NextIntlClientProvider>
+    );
+    expect(await screen.findByTestId('studio-row')).toBeInTheDocument();
+    expect(listUserImages).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Worker sedang memproses...')).toBeInTheDocument();
+    vi.mocked(listUserImages).mockResolvedValue([]);
   });
 });

@@ -85,7 +85,7 @@ describe('CloudflareImageAdapter', () => {
     expect(calls[0]?.[0] as string).toContain('/accounts/acc1/ai/v1/run/@cf/black-forest-labs/flux-1-schnell');
     expect(() => new CloudflareImageAdapter({ baseUrl: 'https://x.test', model: 'm', accountId: '' }, 't')).toThrow(/account_id/);
   });
-  it('sends negative_prompt when provided', async () => {
+  it('Flux: negative dilipat jadi klausa Avoid di prompt (bukan field negative_prompt)', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
     vi.stubGlobal('fetch', fetchMock);
     const adapter = new CloudflareImageAdapter(
@@ -95,7 +95,41 @@ describe('CloudflareImageAdapter', () => {
     await adapter.generateImage({ prompt: 'cat', negativePrompt: 'blurry, text' });
     const calls = fetchMock.mock.calls as unknown[][];
     const init = calls[0]?.[1] as { body: string };
-    expect(JSON.parse(init.body).negative_prompt).toBe('blurry, text');
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    // Skema Flux menolak properti tambahan → tidak boleh ada field ini (kasus 400 prod 12 Sep 2026).
+    expect(body).not.toHaveProperty('negative_prompt');
+    expect(body['prompt']).toBe('cat Avoid: blurry, text');
+    expect(body['steps']).toBe(4);
+  });
+  it('Flux tanpa negative: prompt utuh + steps', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1', model: '@cf/black-forest-labs/flux-1-schnell', accountId: 'acc1' },
+      'tok'
+    );
+    await adapter.generateImage({ prompt: 'cat' });
+    const calls = fetchMock.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body['prompt']).toBe('cat');
+    expect(body).not.toHaveProperty('negative_prompt');
+  });
+  it('SDXL tanpa referensi: text-to-image pakai num_steps + negative_prompt native', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai', model: '@cf/bytedance/stable-diffusion-xl-lightning', accountId: 'acc1' },
+      'tok'
+    );
+    await adapter.generateImage({ prompt: 'cat', negativePrompt: 'blurry, text' });
+    const calls = fetchMock.mock.calls as unknown[][];
+    const init = calls[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body['negative_prompt']).toBe('blurry, text');
+    expect(body['num_steps']).toBe(10);
+    expect(body).not.toHaveProperty('steps');
+    expect(body['prompt']).toBe('cat');
   });
 });
 

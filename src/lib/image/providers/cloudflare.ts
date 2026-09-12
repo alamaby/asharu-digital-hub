@@ -71,13 +71,19 @@ export class CloudflareImageAdapter implements ImageGenerationProvider {
     if (refB64) return this.generateImg2Img(input, refB64);
 
     const url = this.buildUrl();
-    // Flux: steps 1–8 (perilaku lama dipertahankan). SD tanpa referensi:
-    // text-to-image dengan num_steps 1–20.
-    const steps = isImg2ImgModel(this.model)
+    // Flux: steps 1–8 (perilaku lama dipertahankan), TANPA field
+    // `negative_prompt` (skema Flux menolak properti tambahan → HTTP 400).
+    // Negative dilipat jadi klausa "Avoid: ..." seperti adapter
+    // gemini/bynara/pollinations. SD tanpa referensi: text-to-image dengan
+    // `num_steps` 1–20 + `negative_prompt` native.
+    const isSD = isImg2ImgModel(this.model);
+    const steps = isSD
       ? clampImg2ImgSteps(input.numSteps ?? input.parameters?.['num_steps'] ?? input.parameters?.['steps'])
       : Math.min(8, Math.max(1, (input.parameters?.['steps'] as number) ?? 4));
-    const body: Record<string, unknown> = { prompt: input.prompt, steps };
-    if (input.negativePrompt?.trim()) body['negative_prompt'] = input.negativePrompt.trim();
+    const avoid = input.negativePrompt?.trim() || '';
+    const prompt = !avoid || isSD ? input.prompt : `${input.prompt} Avoid: ${avoid}`.slice(0, 2048);
+    const body: Record<string, unknown> = isSD ? { prompt, num_steps: steps } : { prompt, steps };
+    if (avoid && isSD) body['negative_prompt'] = avoid;
     if (typeof input.parameters?.['seed'] === 'number') body['seed'] = input.parameters['seed'];
     if (typeof input.seed === 'number') body['seed'] = input.seed;
 

@@ -30,19 +30,46 @@ async function getApiKeyForImageRow(row: ImageKeyRow): Promise<string> {
   }
 }
 
+/**
+ * Error DB/network transient layak 1x percobaan ulang (kasus prod 12 Sep 2026:
+ * `fetchOrderedImageKeys: Gateway Timeout` langsung menggagalkan job padahal
+ * infra. Auth/validasi/PostgREST non-timeout TIDAK di-retry.
+ */
+function isTransientKeyFetchError(e: unknown): boolean {
+  const msg =
+    e instanceof Error
+      ? e.message
+      : typeof e === 'object' && e !== null && typeof (e as { message?: unknown }).message === 'string'
+        ? (e as { message: string }).message
+        : String(e);
+  return /timeout|timed out|gateway|network|fetch failed|ECONN|EAI_AGAIN|socket|temporarily|503|502|504/i.test(msg);
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchOrderedImageKeys(providerId: string): Promise<ImageKeyRow[]> {
   const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('image_provider_keys')
-    .select('*')
-    .eq('provider_id', providerId)
-    .eq('is_active', true)
-    .order('priority', { ascending: true })
-    .order('last_used_at', { ascending: true, nullsFirst: true })
-    .order('usage_count', { ascending: true })
-    .order('failure_count', { ascending: true });
-  if (error) throw new Error(`fetchOrderedImageKeys: ${error.message}`);
-  return (data ?? []) as unknown as ImageKeyRow[];
+  const query = () =>
+    supabase
+      .from('image_provider_keys')
+      .select('*')
+      .eq('provider_id', providerId)
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true })
+      .order('usage_count', { ascending: true })
+      .order('failure_count', { ascending: true });
+  const first = await query();
+  if (!first.error) return (first.data ?? []) as unknown as ImageKeyRow[];
+  if (isTransientKeyFetchError(first.error)) {
+    await sleepMs(500);
+    const retry = await query();
+    if (!retry.error) return (retry.data ?? []) as unknown as ImageKeyRow[];
+    throw new Error(`fetchOrderedImageKeys: ${retry.error.message}`);
+  }
+  throw new Error(`fetchOrderedImageKeys: ${first.error.message}`);
 }
 
 export async function markImageKeyUsage(keyId: string): Promise<void> {
