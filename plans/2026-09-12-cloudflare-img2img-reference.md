@@ -27,8 +27,8 @@ User bisa generate image memakai image reference (upload file atau pilih dari hi
 - [x] M3: Studio end-to-end (types, validation, actions+upload, worker, StudioForm, options config).
 - [x] M4: Review end-to-end (actions+upload, worker, DraftImageCard, PostImageControl, ReferencePicker, carousel badge + "Jadikan referensi").
 - [x] M5: i18n id/en + test + gate typecheck/lint/test/build (507 tests + build hijau).
-- [ ] Commit submodule + parent, push.
-- [ ] Apply migrasi ke prod (user action / via MCP setelah review).
+- [x] Commit submodule + parent, push (`5e6c89d`/`6b4dcc4` + memory `4103d79`).
+- [x] Apply migrasi ke prod (MCP, 2026-09-12): 6 kolom referensi terverifikasi + 2 model SD aktif (`SD 1.5 Img2Img` p21, `SDXL Lightning` p22, keduanya `supports_reference:true`, non-default).
 
 ## Risks
 
@@ -43,7 +43,7 @@ User bisa generate image memakai image reference (upload file atau pilih dari hi
 - 2026-09-12 07:30 — Plan disimpan; mulai M1.
 - 2026-09-12 — Keputusan user: fase 1 img2img saja; sumber upload+histori; rollout bertahap 1-2 model (`stable-diffusion-v1-5-img2img` + `stable-diffusion-xl-lightning`).
 - 2026-09-12 — M1–M5 selesai: adapter Cloudflare img2img (JSON + biner + clamp), migrasi DB, Studio + review end-to-end, ReferencePicker bersama, badge ref, "Jadikan referensi" dari histori, i18n id/en. Gate: typecheck + lint + 507 tests + build hijau. Catatan: build sempat menangkap `export const` di file `'use server'` (STUDIO_REFERENCE_LIMITS) yang lolos typecheck — dihapus.
-- 2026-09-12 — Menunggu: commit/push + apply migrasi prod + verifikasi live format respons REST model SD.
+- 2026-09-12 — Migrasi `20260912000001` di-apply ke prod via MCP + terverifikasi (6 kolom nullable, 2 model SD aktif non-default dengan `supports_reference:true`). Advisor keamanan tidak memunculkan temuan baru (semua pre-existing). Sisa: verifikasi live format respons REST SD + uji strength saat generate pertama di prod.
 
 ## Notes
 

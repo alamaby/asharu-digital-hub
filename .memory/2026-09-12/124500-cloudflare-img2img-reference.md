@@ -41,8 +41,8 @@
 
 ## Blockers / Unresolved
 
-- Migrasi `20260912000001` belum di-apply ke prod (submodule sudah di-push; apply menyusul).
-- Verifikasi live format respons SD + kualitas strength perlu dicoba setelah migrasi applied.
+- Migrasi `20260912000001` **sudah di-apply ke prod** (MCP, 2026-09-12, tercatat `20260912085121`): 6 kolom referensi nullable terverifikasi + 2 model SD aktif (`SD 1.5 Img2Img` p21, `SDXL Lightning` p22, `supports_reference:true`, non-default). Advisor keamanan: tanpa temuan baru (semua pre-existing).
+- Verifikasi live format respons SD + kualitas strength perlu dicoba setelah generate pertama di prod.
 
 ## Commit
 
