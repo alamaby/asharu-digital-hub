@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-12 20:50 (local time)
+Last updated: 2026-09-12 22:00 (local time)
 
 ## Current State
 
@@ -54,6 +54,7 @@ Last updated: 2026-09-12 20:50 (local time)
 
 ## Recent Entries
 
+- [220047-studio-history-uuid-confirm-delete.md](2026-09-12/220047-studio-history-uuid-confirm-delete.md) — Riwayat Studio: tombol UUID per baris (8-char + tooltip penuh + salin) + icon `Eye` di Lihat + hapus dua-tahap ("Yakin hapus?"/Batal, tanpa `window.confirm`); 4 key i18n id/en; gate 519 tests hijau, pushed `537fcd0`.
 - [204500-studio-queue-refresh-flux-negative.md](2026-09-12/204500-studio-queue-refresh-flux-negative.md) — Studio: refresh list otomatis setelah enqueue (`onEnqueued`→`historyRefreshKey`→`refresh()` + `router.refresh()` kuota) + fix Flux `negative_prompt`→klausa `Avoid:` (regresi `2ffc3d4`, 400 prod) + `num_steps` SD text-mode + retry 1x `fetchOrderedImageKeys` transient + mock router `refresh`; gate 515 tests hijau, pushed `4a522ab`. [USER ACTION] Klik "Ulangi" 2 record failed + uji enqueue baru.
 - [124500-cloudflare-img2img-reference.md](2026-09-12/124500-cloudflare-img2img-reference.md) — img2img Cloudflare: image reference (upload + histori) di Studio & review, 2 model SD fase 1, strength slider, adapter toleran JSON/biner, migrasi `20260912000001` **applied prod 12 Sep** (2 model SD aktif), gate 507 tests + build hijau, pushed `6b4dcc4`/`5e6c89d`.
 - [070700-studio-history-enhance.md](2026-09-12/070700-studio-history-enhance.md) — Studio: carousel → daftar kronologis (filter server-side 7 dimensi + sort created/updated, timestamp zona-user, prompt penuh + Salin + Pakai ulang, detail log `<details>`) + enhance prompt LLM (stage enhance_image_prompt, bucket rate-limit sendiri 30/jam, picker provider/model LLM, side-by-side Terima/Batal); 489 tests + build hijau, pushed `8adb83d`.
