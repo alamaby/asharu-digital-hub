@@ -32,8 +32,8 @@ Created: 2026-09-12 15:30:00
 - [x] Workstream A: `onEnqueued` → `historyRefreshKey` → `refresh()` + `router.refresh()` kuota
 - [x] Test UI: submit sukses panggil `onEnqueued`; `refreshKey` memicu `listUserImages` + baris pending tampil
 - [x] Gate: `npm run typecheck`, `npm run lint`, `npm test` hijau
-- [ ] Commit (Conventional Commits, 1 baris) + push origin/main
-- [ ] Entri `.memory/` + update `.memory/README.md`
+- [x] Commit (Conventional Commits, 1 baris) + push origin/main
+- [x] Entri `.memory/` + update `.memory/README.md`
 - [ ] Panduan verifikasi live via tombol "Ulangi" (user action)
 
 ## Risks
@@ -47,6 +47,7 @@ Created: 2026-09-12 15:30:00
 
 - 2026-09-12 15:30:00 — Plan dibuat dari fase plan-mode; investigasi baca-saja selesai (DB prod via MCP, docs Cloudflare, git history). Menunggu eksekusi workstream B → C2 → A.
 - 2026-09-12 20:45:00 — Eksekusi selesai: B (Flux Avoid + SD num_steps), C2 (retry key 1x), A (onEnqueued→refreshKey→refresh + router.refresh kuota). Gate hijau: typecheck + lint + 515 tests/63 files. Siap commit.
+- 2026-09-12 21:05:00 — Commit `4a522ab` pushed origin/main (10 files +300/-26). Memory entry `204500-studio-queue-refresh-flux-negative.md` + README index updated, siap commit terpisah. Ditemukan saat implementasi: klasifikasi transient awal gagal untuk error PostgREST non-`Error` (ditangkap test sebelum fix); `rerender` RTL butuh provider i18n eksplisit.
 
 ## Notes
 
