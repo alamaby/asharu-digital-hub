@@ -58,8 +58,35 @@ topik/draf.
 ## Progress Log
 - 2026-09-13 — RCA selesai (validasi MCP: sessions/topics/logs/drafts/llm_call_logs/
   affiliate_products), keputusan user terkumpul, eksekusi dimulai.
-- 2026-09-13 — Implementasi + test selesai; gate hijau; commit `8c6cd6d` pushed;
-  sesi di-resume via MCP; verifikasi: 8/8 draf `needs_review`, status `completed`.
+- 2026-09-13 14:00 — Implementasi + test selesai; gate hijau (typecheck ✓ lint ✓
+  536/536 test); commit `3fafebe` pushed (origin/main, 6 files +356/-9).
+- 2026-09-13 14:01 — Sesi `9a24c768` di-resume via MCP: status `failed` →
+  `developing`, `error_message=NULL`, `current_stage_started_at` backdate 10 mnt,
+  log audit ditulis. Menunggu cron tick (*/5) memproses 2 pasangan sisa
+  (rank5 × twitter × ASH-242/243) → verifikasi pasca-deploy.
+- 2026-09-13 14:25 — Tick cron 07:00–07:20 UTC `advancePendingSessions: Gateway
+  Timeout` (Supabase 504 transient, fail-loud; sesi tetap `developing` — bukti
+  fix baru bekerja: tidak ada false-failed). Tick 07:25 `{"advanced":1}`:
+  2 draf sisa dibuat, sesi `completed`, 8/8 draf `needs_review`. 1 draf
+  OVER-LIMIT (290/280) sudah ber-flag `llm_meta.over_limit` + log warn
+  (perilaku by-design: simpan + tandai, edit sebelum posting). Selesai.
+- 2026-09-13 14:35 — Memory entry + index update: commit `5d5a272` pushed.
+  Tugas selesai penuh (RCA → fix → resume → verifikasi → dokumentasi).
+
+## Notes
+- Non-telecom, bugfix rutin → TOGAF proporsional saja (AGENTS.md §3).
+- Tanpa migrasi DB (submodule supabase tidak berubah): cap memakai hitungan
+  `content_research_logs` (pola `retryOwnSession`), `updated_at` diset eksplisit
+  di kode — non-destruktif.
+- RLS/keamanan tidak berubah.
+- Temuan RCA tambahan (post-resume): akar transient terkonfirmasi = Supabase
+  Gateway Timeout (504) yang intermiten di tick cron — `fetchFixedProducts`
+  lama menelan error via destructuring `data=null`; gate lama salah klasifikasi
+  `failed`. `advancePendingSessions` sendiri juga kena 504 yang sama tapi
+  fail-loud tanpa merusak sesi — pemulihan otomatis via cron.
+- Follow-up opsional: retry `advancePendingSessions` 1x pada Gateway Timeout
+  (pola `fetchOrderedImageKeys`, insiden 2026-09-12 f10d58e2) — tidak dikerjakan
+  di skop ini.
 
 ## Notes
 - Non-telecom, bugfix rutin → TOGAF proporsional saja (AGENTS.md §3).
