@@ -232,7 +232,11 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     setNotice(tNotice('processing'));
     startTransition(async () => {
       try {
-        await retryFailedStudioImage(imgId);
+        const res = await retryFailedStudioImage(imgId);
+        if (!res.ok) {
+          setNotice(res.error);
+          return;
+        }
         refresh();
         setNotice(tNotice('enqueue'));
       } catch (e) {
@@ -247,7 +251,11 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     setDeletingId(img.id);
     startTransition(async () => {
       try {
-        await deleteStudioImage(img.id);
+        const res = await deleteStudioImage(img.id);
+        if (!res.ok) {
+          setNotice(res.error);
+          return;
+        }
         setImages((prev) => prev.filter((i) => i.id !== img.id));
         setNotice(tHist('deleted'));
       } catch (e) {

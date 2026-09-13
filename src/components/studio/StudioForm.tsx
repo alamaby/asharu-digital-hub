@@ -99,7 +99,12 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const { publicUrl } = await uploadStudioReference(fd);
+      const res = await uploadStudioReference(fd);
+      if (!res.ok) {
+        setNotice(res.error);
+        return;
+      }
+      const { publicUrl } = res.data;
       setReferenceUrl(publicUrl);
       setReferencePreview(publicUrl);
       // Bila model terpin non-support → reset ke Auto agar tidak gagal jujur.
@@ -150,7 +155,11 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
           referencePublicUrl: referenceUrl,
           referenceStrength: referenceUrl ? referenceStrength : null
         };
-        await enqueueStudioImage(input);
+        const res = await enqueueStudioImage(input);
+        if (!res.ok) {
+          setNotice(res.error);
+          return;
+        }
         setNotice(tNotice('enqueue'));
         setPrompt('');
         setNegative('');
@@ -187,7 +196,11 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
         styleSlug: styleSlug || null,
         llmModelId: llmModelId || null
       });
-      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt });
+      if (!res.ok) {
+        setNotice(`Gagal enhance: ${res.error}`);
+        return;
+      }
+      setProposed({ prompt: res.data.image_prompt, negative: res.data.negative_prompt });
       setNotice(tEnhance('ready'));
     } catch (e) {
       setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : tEnhance('failed'));

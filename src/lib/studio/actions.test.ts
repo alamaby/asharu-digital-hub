@@ -212,7 +212,9 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
     const res = await enqueueStudioImage(
       enqueueInput({ referencePublicUrl: freshUrl, referenceStrength: 0.6 })
     );
-    expect(res.imageId).toBe('new-img');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(res.data.imageId).toBe('new-img');
     const patch = insertedPatch();
     expect(patch.reference_public_url).toBe(freshUrl);
     expect(patch.reference_storage_path).toBe(freshPath);
@@ -220,14 +222,15 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 
-  it('URL asing (bukan ref milik sendiri) → ditolak', async () => {
+  it('URL asing (bukan ref milik sendiri) → ditolak dengan pesan asli', async () => {
     useEnqueueTables({
       user_image_generations: [],
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
-    await expect(
-      enqueueStudioImage(enqueueInput({ referencePublicUrl: 'https://evil.test/x.jpg' }))
-    ).rejects.toThrow('Referensi harus dari upload atau histori milik Anda.');
+    const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: 'https://evil.test/x.jpg' }));
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('harus gagal');
+    expect(res.error).toContain('Referensi harus dari upload atau histori milik Anda.');
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 
@@ -236,9 +239,10 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
       user_image_generations: [],
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
-    await expect(
-      enqueueStudioImage(enqueueInput({ referencePublicUrl: freshUrl }))
-    ).rejects.toThrow('Referensi harus dari upload atau histori milik Anda.');
+    const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: freshUrl }));
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('harus gagal');
+    expect(res.error).toContain('Referensi harus dari upload atau histori milik Anda.');
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 
@@ -249,7 +253,9 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
     const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: reuseUrl }));
-    expect(res.imageId).toBe('new-img');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(res.data.imageId).toBe('new-img');
     expect(insertedPatch().reference_storage_path).toBe('u1/old.png');
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
@@ -263,8 +269,22 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
       from: () => ({ exists: () => Promise.reject(new Error('network down')) })
     };
     const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: freshUrl }));
-    expect(res.imageId).toBe('new-img');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(res.data.imageId).toBe('new-img');
     expect(insertedPatch().reference_storage_path).toBe(freshPath);
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
+  });
+
+  it('error validasi mengembalikan pesan asli sebagai data (bukan throw → masking prod)', async () => {
+    useEnqueueTables({
+      user_image_generations: [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    const res = await enqueueStudioImage(enqueueInput({ prompt: 'pendek' }));
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('harus gagal');
+    expect(res.error).toContain('Prompt minimal 10 karakter');
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 });

@@ -10,10 +10,11 @@ import type { StudioGenerationRow, StudioOptions } from '@/lib/studio/types';
 import { DEFAULT_STUDIO_CONFIG } from '@/lib/studio/types';
 
 vi.mock('@/lib/studio/actions', () => ({
-  enqueueStudioImage: vi.fn(async () => ({ imageId: 'new-id', expiresAt: '2026-10-11T00:00:00Z' })),
-  enhanceStudioPrompt: vi.fn(async () => ({ image_prompt: 'polished prompt', negative_prompt: 'blurry', reasoning: { visual_strategy: 'after' } })),
-  retryFailedStudioImage: vi.fn(async () => ({ imageId: 'x' })),
-  deleteStudioImage: vi.fn(async () => {}),
+  uploadStudioReference: vi.fn(async () => ({ ok: true, data: { storagePath: 'ref/u1/x.png', publicUrl: 'https://cdn.test/ref.png' } })),
+  enqueueStudioImage: vi.fn(async () => ({ ok: true, data: { imageId: 'new-id', expiresAt: '2026-10-11T00:00:00Z' } })),
+  enhanceStudioPrompt: vi.fn(async () => ({ ok: true, data: { image_prompt: 'polished prompt', negative_prompt: 'blurry', reasoning: { visual_strategy: 'after' } } })),
+  retryFailedStudioImage: vi.fn(async () => ({ ok: true, data: { imageId: 'x' } })),
+  deleteStudioImage: vi.fn(async () => ({ ok: true, data: null })),
   listUserImages: vi.fn(async () => [])
 }));
 

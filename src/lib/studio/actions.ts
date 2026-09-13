@@ -33,6 +33,18 @@ function svc() {
   return supabase;
 }
 
+/**
+ * Hasil server action Studio. Error dikembalikan sebagai data (`ok:false`),
+ * BUKAN di-throw: Next.js production menyamarkan error yang dilempar dari
+ * Server Action menjadi digest generik ("An error occurred in the Server
+ * Components render"), sehingga pesan asli tak sampai ke UI.
+ */
+export type StudioActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };
+
+function fail(e: unknown): { ok: false; error: string } {
+  return { ok: false, error: e instanceof Error ? e.message : String(e) };
+}
+
 /** Baca config studio (service_role; fallback default bila tabel belum ada). */
 export async function getStudioConfig(): Promise<StudioConfig> {
   try {
@@ -129,27 +141,41 @@ export interface EnqueueStudioInput {
  */
 export async function uploadStudioReference(
   formData: FormData
-): Promise<{ storagePath: string; publicUrl: string }> {
-  const { id: userId } = await requireUser();
-  const file = formData.get('file');
-  if (!(file instanceof File)) throw new Error('File referensi wajib diisi.');
-  if (!file.size || file.size <= 0) throw new Error('File referensi kosong.');
-  if (file.size > REFERENCE_IMAGE_MAX_BYTES) {
-    throw new Error('Referensi maksimal 5MB — kecilkan dulu.');
+): Promise<StudioActionResult<{ storagePath: string; publicUrl: string }>> {
+  try {
+    const { id: userId } = await requireUser();
+    const file = formData.get('file');
+    if (!(file instanceof File)) throw new Error('File referensi wajib diisi.');
+    if (!file.size || file.size <= 0) throw new Error('File referensi kosong.');
+    if (file.size > REFERENCE_IMAGE_MAX_BYTES) {
+      throw new Error('Referensi maksimal 5MB — kecilkan dulu.');
+    }
+    if (!(REFERENCE_IMAGE_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
+      throw new Error('Referensi harus gambar JPEG/PNG/WebP.');
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const refId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
+    return { ok: true, data: await uploadUserReference(userId, refId, bytes, file.type) };
+  } catch (e) {
+    return fail(e);
   }
-  if (!(REFERENCE_IMAGE_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
-    throw new Error('Referensi harus gambar JPEG/PNG/WebP.');
-  }
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const refId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
-  return uploadUserReference(userId, refId, bytes, file.type);
 }
 
 /**
  * Enqueue generate studio (tidak blocking — worker cron proses ≤5 menit).
  * Validasi: panjang prompt ikut config, FK harus aktif, kuota harian.
  */
-export async function enqueueStudioImage(input: EnqueueStudioInput): Promise<{ imageId: string; expiresAt: string }> {
+export async function enqueueStudioImage(
+  input: EnqueueStudioInput
+): Promise<StudioActionResult<{ imageId: string; expiresAt: string }>> {
+  try {
+    return { ok: true, data: await enqueueStudioImageImpl(input) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function enqueueStudioImageImpl(input: EnqueueStudioInput): Promise<{ imageId: string; expiresAt: string }> {
   const { id: userId } = await requireUser();
   const supabase = svc();
   const config = await getStudioConfig();
@@ -320,7 +346,17 @@ export interface EnhanceStudioInput {
  * Stage: enhance_image_prompt; rate limit 30/jam TERPISAH dari kuota
  * generate harian agar eksplorasi prompt tidak memotong kuota.
  */
-export async function enhanceStudioPrompt(input: EnhanceStudioInput): Promise<StudioEnhanceResult> {
+export async function enhanceStudioPrompt(
+  input: EnhanceStudioInput
+): Promise<StudioActionResult<StudioEnhanceResult>> {
+  try {
+    return { ok: true, data: await enhanceStudioPromptImpl(input) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<StudioEnhanceResult> {
   await requireUser();
   const config = await getStudioConfig();
   const maxPrompt = config.max_prompt_length;
@@ -424,7 +460,17 @@ export async function getStudioImage(imageId: string): Promise<StudioGenerationR
 }
 
 /** Ulangi hasil failed milik user (kembali ke antrean). */
-export async function retryFailedStudioImage(imageId: string): Promise<{ imageId: string }> {
+export async function retryFailedStudioImage(
+  imageId: string
+): Promise<StudioActionResult<{ imageId: string }>> {
+  try {
+    return { ok: true, data: await retryFailedStudioImageImpl(imageId) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function retryFailedStudioImageImpl(imageId: string): Promise<{ imageId: string }> {
   const { id: userId } = await requireUser();
   if (!imageId) throw new Error('imageId wajib diisi.');
   const supabase = svc();
@@ -448,7 +494,16 @@ export async function retryFailedStudioImage(imageId: string): Promise<{ imageId
 }
 
 /** Hapus histori milik user (row + file Storage atomik via service_role). */
-export async function deleteStudioImage(imageId: string): Promise<void> {
+export async function deleteStudioImage(imageId: string): Promise<StudioActionResult> {
+  try {
+    await deleteStudioImageImpl(imageId);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function deleteStudioImageImpl(imageId: string): Promise<void> {
   const { id: userId } = await requireUser();
   if (!imageId) throw new Error('imageId wajib diisi.');
   const supabase = svc();
