@@ -72,6 +72,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   const d = draft as {
     id: string;
     request_id: string;
+    platform_slug?: string | null;
+    article_draft?: import('@/lib/llm/prompt').ParsedArticleDraft | null;
     generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
     affiliate_injections: Array<{
       id?: string;
@@ -121,6 +123,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
   // Link ke riset sumber via research_topic_id (draf legacy tanpa topik → disembunyikan).
   let sourceSessionId: string | null = null;
+  let sessionLanguage: string | null = null;
   if (d.research_topic_id) {
     const { data: topicRow } = await supabase!
       .from('content_research_topics')
@@ -128,6 +131,25 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       .eq('id', d.research_topic_id)
       .maybeSingle();
     sourceSessionId = (topicRow as { session_id: string | null } | null)?.session_id ?? null;
+    if (sourceSessionId) {
+      const { data: sessionRow } = await supabase!
+        .from('content_research_sessions')
+        .select('language')
+        .eq('id', sourceSessionId)
+        .maybeSingle();
+      sessionLanguage = (sessionRow as { language: string | null } | null)?.language ?? null;
+    }
+  }
+
+  // Baris articles yang sudah terbit dari draf ini (untuk kartu artikel).
+  let publishedArticles: { locale: string; slug: string }[] = [];
+  if (d.platform_slug === 'artikel') {
+    const { data: pubRows } = await supabase!
+      .from('articles')
+      .select('locale, slug')
+      .eq('draft_id', draftId)
+      .eq('status', 'published');
+    if (pubRows) publishedArticles = pubRows as typeof publishedArticles;
   }
 
   // For regen_affiliate picker: fetch active providers/models (admin only, service client)
@@ -234,6 +256,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           regenProviders={regenProviders}
           regenModels={regenModels}
           queue={queueInfo}
+          sessionLanguage={sessionLanguage}
+          publishedArticles={publishedArticles}
           replyImages={draftImages.filter((i) => (i.post_index ?? 0) >= 1)}
           perReplyEnabled={imageMode === 'per-reply-opt-in'}
           coverImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}

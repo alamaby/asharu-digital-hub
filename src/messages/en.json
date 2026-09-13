@@ -15,6 +15,11 @@
       "description": "Properties for sale or rent through official Asharu channels. General locations, clear specifications, and no unverified data.",
       "intro": "Current listings we are marketing. We only publish information we have verified; pricing and full details are available through our official contact."
     },
+    "artikel": {
+      "title": "Articles | Asharu",
+      "description": "Asharu guides and tips: informative, verified, and easy to put into practice.",
+      "intro": "Guides and tips written from research. Every article containing product links clearly labels them as affiliate links."
+    },
     "about": {
       "title": "About Asharu | Asharu",
       "description": "Get to know Asharu: a digital hub for online shops, affiliate products, social media, and properties built on transparency."
@@ -66,6 +71,7 @@
     "stores": "Shops",
     "products": "Affiliate Products",
     "properties": "Properties",
+    "articles": "Articles",
     "about": "About",
     "adminLabel": "Admin",
     "adminDashboard": "Dashboard",
@@ -132,6 +138,21 @@
     "cta": "Visit Store"
   },
   "socials": {},
+  "articles": {
+    "empty": "No published articles yet.",
+    "readMore": "Read more",
+    "backToList": "Back to article list",
+    "breadcrumbList": "Articles",
+    "publishedOn": "Published {date}",
+    "faqHeading": "Frequently Asked Questions",
+    "affiliateBoxTitle": "Product mentioned in this article",
+    "affiliateBoxBody": "This article mentions {product} — the link below is an affiliate link to the official seller platform.",
+    "affiliateBoxBodyNoName": "The link below is an affiliate link to the official seller platform.",
+    "affiliateBoxCta": "View product on the seller platform",
+    "affiliateNote": "Affiliate link: if you buy through this link, Asharu may earn a commission at no extra cost to you.",
+    "disclosureNote": "Some links on this site are affiliate links.",
+    "disclosureLink": "Read the affiliate disclosure"
+  },
   "categories": {
     "automotive": "Automotive",
     "electronics": "Electronics",
@@ -442,6 +463,17 @@
       "approveNoQueue": "Approved (auto-queue off).",
       "queueBadge": "Queue: {status} · {when}",
       "realtime": "Auto-refreshing",
+      "articleEmpty": "Article draft is empty or failed to parse.",
+      "articleWords": "{words} words",
+      "articleThin": "Thin article: {words} words (minimum {min}) — improve before publishing.",
+      "articleFaq": "FAQ",
+      "articlePublished": "Published",
+      "articlePublish": "Publish to articles",
+      "articlePublishId": "Indonesian",
+      "articlePublishEn": "English",
+      "articlePublishAction": "Publish selected",
+      "articlePublishOk": "Published",
+      "articleMissingLang": "content missing",
       "affiliate": {
         "title": "Affiliate Product",
         "relevance": {

@@ -147,8 +147,7 @@ export function buildThreadPrompt(
   return { system, user };
 }
 
-export function countProductPlaceholders(text: string): number {
-  const m = text.match(/\{\{PRODUCT_URL\}\}/g);
+export function countProductPlaceholders(text: string): number {  const m = text.match(/\{\{PRODUCT_URL\}\}/g);
   return m ? m.length : 0;
 }
 
@@ -213,4 +212,204 @@ export function buildSingleReplyRewritePrompt(
   ].join('\n');
 
   return { system, user };
+}
+
+/* ------------------------------------------------------------------ */
+/* Artikel long-form (platform `artikel`, tujuan SEO)                  */
+/* ------------------------------------------------------------------ */
+
+export interface ArticlePromptInput {
+  topic: string;
+  tone: string;
+  audience: string;
+  ctaStyle: string;
+  purpose: string;
+  constraints?: string | null;
+  keywords?: string | null;
+  /** 'id' | 'en' | 'both' — bahasa yang wajib diisi. */
+  language: string;
+  targetCategory?: string | null;
+  hooks?: string[] | null;
+  keyFacts?: string[] | null;
+  uniqueAngle?: string | null;
+  /** Struktur template riset pilihan user (opsional). */
+  templateStructure?: string | null;
+}
+
+export interface ArticleSection {
+  h2: string;
+  body: string;
+}
+
+export interface ArticleFaq {
+  q: string;
+  a: string;
+}
+
+/** Satu artikel dalam satu bahasa. */
+export interface ArticleLangDraft {
+  title: string;
+  slug: string;
+  excerpt: string;
+  sections: ArticleSection[];
+  faq: ArticleFaq[];
+  meta_title: string;
+  meta_desc: string;
+}
+
+/** Hasil parse draf artikel: tiap bahasa terisi atau null. */
+export interface ParsedArticleDraft {
+  id: ArticleLangDraft | null;
+  en: ArticleLangDraft | null;
+}
+
+/** Batas minimum kata agar layak publish (anti thin-content). */
+export const ARTICLE_MIN_WORDS = 600;
+
+function articleLangKeys(language: string): Array<'id' | 'en'> {
+  if (language === 'en') return ['en'];
+  if (language === 'id') return ['id'];
+  return ['id', 'en'];
+}
+
+export function buildArticlePrompt(
+  input: ArticlePromptInput,
+  product: AffiliateProductForPrompt
+): { system: string; user: string } {
+  const langs = articleLangKeys(input.language);
+  const langRule =
+    langs.length === 2
+      ? '- BAHASA: isi BOTH "id" dan "en" — keduanya artikel penuh yang dilokalkan natural (bukan terjemahan kata-per-kata kaku).'
+      : `- BAHASA: isi HANYA "${langs[0]}" (isi bahasa lain dengan null).`;
+
+  const templateRule = input.templateStructure
+    ? `- TEMPLATE STRUKTUR (WAJIB diikuti — atur urutan section H2 sesuai alur ini): ${input.templateStructure}`
+    : null;
+
+  const system = [
+    'You are a senior SEO copywriter for Asharu (asharu.id), bilingual ID+EN, helpful and authentic.',
+    'You write long-form articles that rank on Google: clear H1-title, scannable H2 sections, FAQ, natural affiliate mention.',
+    'Rules:',
+    '- Output JSON ONLY with shape: {"id": <article|null>, "en": <article|null>} where <article> = {"title":"...","slug":"...","excerpt":"...","sections":[{"h2":"...","body":"..."}],"faq":[{"q":"...","a":"..."}],"meta_title":"...","meta_desc":"..."}',
+    '- PANJANG: total isi (excerpt + semua body section) 800-1500 kata per bahasa. Tiap section body 150-300 kata, 4-7 sections. Jangan bertele-tele, tiap paragraf menambah informasi baru.',
+    '- STRUKTUR: title = H1 yang memancing klik (10-70 karakter, masukkan keyword utama). excerpt 50-160 kata sebagai pengantar. sections = jawaban bertahap dari umum ke spesifik, H2 deskriptif (bukan "Pendahuluan"/"Kesimpulan" yang generik). faq 3-5 pasang Q&A yang benar-benar ditanyakan orang.',
+    '- FAKTA: gunakan HANYA fakta dari blok konteks (key facts). Jangan mengarang data, angka, harga, atau klaim medis/finansial. Bila tidak yakin, tulis secara umum yang aman.',
+    '- AFFILIATE: sisipkan {{PRODUCT_URL}} TEPAT 1 kali, inline di dalam body salah satu section tengah (bukan section pertama/terakhir), dibungkus 1-2 kalimat jembatan natural yang menjelaskan kenapa produk relevan + NAMA PRODUK persis seperti di blok produk. Jangan bare link tanpa konteks. Jangan hard-sell.',
+    '- SLUG: huruf kecil, alfanumerik + strip saja (contoh: "tips-memilih-keyboard-mekanik-wfh"), 3-8 kata dari keyword utama.',
+    '- META: meta_title ≤ 60 karakter (boleh = title bila sudah bagus), meta_desc 120-160 karakter yang memancing klik.',
+    '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK. Tulis ID & EN yang benar dan natural.',
+    langRule,
+    ...(templateRule ? [templateRule] : []),
+    '- Tone, audience, CTA style, purpose, dan constraints harus dihormati. CTA diletakkan natural di paragraf penutup.'
+  ].join('\n');
+
+  const user = [
+    `Topic/angle: ${input.topic}`,
+    `Tone: ${input.tone}`,
+    `Audience: ${input.audience}`,
+    `CTA style: ${input.ctaStyle}`,
+    `Purpose: ${input.purpose}`,
+    input.targetCategory ? `Target category hint: ${input.targetCategory}` : null,
+    input.constraints ? `Constraints: ${input.constraints}` : null,
+    input.keywords ? `Keywords (sebarkan natural di title/H2/body): ${input.keywords}` : null,
+    input.hooks && input.hooks.length > 0 ? `Hooks (satu boleh jadi pembuka excerpt): ${input.hooks.join(' | ')}` : null,
+    input.keyFacts && input.keyFacts.length > 0 ? `Key facts (fakta terverifikasi — HANYA ini yang boleh dipakai sebagai fakta): ${input.keyFacts.join(' | ')}` : null,
+    input.uniqueAngle ? `Unique angle: ${input.uniqueAngle}` : null,
+    `Language: ${input.language}`,
+    '',
+    `Available affiliate product (MUST mention exactly once via {{PRODUCT_URL}} with product name):`,
+    `- ${product.friendlyCode}: ${product.name} — {{PRODUCT_URL}} — category ${product.category}`,
+    `- URL placeholder: {{PRODUCT_URL}} (verbatim, will be replaced with ${product.url})`,
+    '',
+    'Generate now.'
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return { system, user };
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.trim().length > 0;
+}
+
+function parseArticleLang(raw: unknown): ArticleLangDraft | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (!isNonEmptyString(r.title) || r.title.trim().length > 200) return null;
+  if (!isNonEmptyString(r.slug) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(r.slug.trim())) return null;
+  if (!isNonEmptyString(r.excerpt) || r.excerpt.trim().length < 50 || r.excerpt.trim().length > 2000) return null;
+  if (!Array.isArray(r.sections) || r.sections.length < 3 || r.sections.length > 8) return null;
+  const sections: ArticleSection[] = [];
+  for (const s of r.sections) {
+    if (!s || typeof s !== 'object') return null;
+    const h2 = (s as Record<string, unknown>).h2;
+    const body = (s as Record<string, unknown>).body;
+    if (!isNonEmptyString(h2) || !isNonEmptyString(body)) return null;
+    sections.push({ h2: h2.trim(), body: body.trim() });
+  }
+  const faqRaw = Array.isArray(r.faq) ? r.faq : [];
+  if (faqRaw.length > 6) return null;
+  const faq: ArticleFaq[] = [];
+  for (const f of faqRaw) {
+    if (!f || typeof f !== 'object') return null;
+    const q = (f as Record<string, unknown>).q;
+    const a = (f as Record<string, unknown>).a;
+    if (!isNonEmptyString(q) || !isNonEmptyString(a)) return null;
+    faq.push({ q: q.trim(), a: a.trim() });
+  }
+  if (!isNonEmptyString(r.meta_title) || r.meta_title.trim().length > 70) return null;
+  if (!isNonEmptyString(r.meta_desc) || r.meta_desc.trim().length > 200) return null;
+  return {
+    title: (r.title as string).trim(),
+    slug: (r.slug as string).trim(),
+    excerpt: (r.excerpt as string).trim(),
+    sections,
+    faq,
+    meta_title: (r.meta_title as string).trim(),
+    meta_desc: (r.meta_desc as string).trim()
+  };
+}
+
+/** Parse output LLM menjadi draf artikel. Null bila struktur tidak valid. */
+export function parseArticleDraft(text: string): ParsedArticleDraft | null {
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        parsed = JSON.parse(m[0]) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const id = parseArticleLang(parsed.id);
+  const en = parseArticleLang(parsed.en);
+  if (!id && !en) return null;
+  return { id, en };
+}
+
+/** Hitung kata (excerpt + body semua section) untuk gate thin-content. */
+export function countArticleWords(article: ArticleLangDraft): number {
+  const text = [article.excerpt, ...article.sections.map((s) => s.body)].join(' ');
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+/** Slugify judul sebagai fallback bila LLM memberi slug tak valid. */
+export function slugifyTitle(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : 'artikel';
 }

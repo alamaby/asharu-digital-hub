@@ -26,6 +26,14 @@ export const routing = defineRouting({
       id: '/tentang',
       en: '/about'
     },
+    '/artikel': {
+      id: '/artikel',
+      en: '/articles'
+    },
+    '/artikel/[slug]': {
+      id: '/artikel/[slug]',
+      en: '/articles/[slug]'
+    },
     '/privacy-policy': {
       id: '/kebijakan-privasi',
       en: '/privacy-policy'

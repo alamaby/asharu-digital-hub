@@ -44,7 +44,7 @@ function dateFromNow(period: string): string | null {
 }
 
 const DRAFT_SELECT =
-  'id, status, created_at, platform_slug, research_topic_id, generated_thread, affiliate_injections, llm_meta';
+  'id, status, created_at, platform_slug, research_topic_id, generated_thread, article_draft, affiliate_injections, llm_meta';
 
 export default async function ReviewPage({ params, searchParams }: PageProps) {
   const rawLocale = (await params).locale;
@@ -166,6 +166,7 @@ interface DraftListCardImport {
   platform_slug?: string | null;
   research_topic_id?: string | null;
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+  article_draft?: { id: { title: string } | null; en: { title: string } | null } | null;
   affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[];
   llm_meta?: { provider: string; model: string; platform?: string };
 }

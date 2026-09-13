@@ -8,6 +8,7 @@ export interface NavItem {
     | 'stores'
     | 'products'
     | 'properties'
+    | 'articles'
     | 'about'
     | 'adminDashboard'
     | 'adminKonten'
@@ -25,6 +26,8 @@ export interface NavItem {
     | '/products'
     | '/properties'
     | '/properties/[slug]'
+    | '/artikel'
+    | '/artikel/[slug]'
     | '/about'
     | '/admin'
     | '/admin/konten'
@@ -49,6 +52,7 @@ export const mainNavItems: readonly NavItem[] = [
   { key: 'stores', pathname: '/', hash: 'online-stores', isAnchor: true },
   { key: 'products', pathname: '/products' },
   { key: 'properties', pathname: '/properties' },
+  { key: 'articles', pathname: '/artikel' },
   { key: 'about', pathname: '/about' }
 ];
 

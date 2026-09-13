@@ -19,6 +19,7 @@ const intlMiddleware = createMiddleware(routing);
 const PUBLIC_INTERNAL_PATHS: readonly string[] = [
   '/products',
   '/properties',
+  '/artikel',
   '/about',
   '/privacy-policy',
   '/affiliate-disclosure',

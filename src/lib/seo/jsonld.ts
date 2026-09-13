@@ -198,9 +198,62 @@ export function realEstateListingSchema(
   return listing;
 }
 
+export interface ArticleSeoInput {
+  title: string;
+  description: string;
+  slug: string;
+  locale: Locale;
+  publishedAt: string | null;
+  updatedAt: string;
+  image?: string | null;
+}
+
+/** Article markup untuk halaman detail artikel (long-form SEO). */
+export function articleSchema(input: ArticleSeoInput): Record<string, unknown> {
+  const url = `${env.siteUrl}${localizedPathname('/artikel/[slug]', input.locale, { slug: input.slug })}`;
+  const schema: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: input.title,
+    description: input.description,
+    url,
+    inLanguage: input.locale === 'id' ? 'id-ID' : 'en-US',
+    author: {
+      '@type': 'Organization',
+      name: siteConfig.name,
+      url: env.siteUrl
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: siteConfig.name,
+      url: env.siteUrl,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${env.siteUrl}/icon.svg`
+      }
+    }
+  };
+  if (input.publishedAt) schema.datePublished = input.publishedAt;
+  schema.dateModified = input.updatedAt;
+  if (input.image) schema.image = [input.image];
+  return schema;
+}
+
+/** FAQPage untuk FAQ artikel (bentuk {q,a} per locale). */
+export function articleFaqSchema(faq: { q: string; a: string }[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a }
+    }))
+  };
+}
+
 /** FAQPage markup; only emit alongside visibly rendered Q&A content (per locale). */
-export function faqSchema(
-  faq: NonNullable<Property['faq']>,
+export function faqSchema(  faq: NonNullable<Property['faq']>,
   locale: Locale
 ): Record<string, unknown> {
   return {

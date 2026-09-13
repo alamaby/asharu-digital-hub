@@ -17,6 +17,7 @@ export function Footer({ showAnalyticsPrefs }: FooterProps) {
     { href: '/', label: tNav('home') },
     { href: '/products', label: tNav('products') },
     { href: '/properties', label: tNav('properties') },
+    { href: '/artikel', label: tNav('articles') },
     { href: '/about', label: tNav('about') }
   ] as const;
 

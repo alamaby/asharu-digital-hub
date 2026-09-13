@@ -3,23 +3,26 @@ import sitemap from '../../app/sitemap';
 import robots from '../../app/robots';
 
 describe('sitemap', () => {
-  const entries = sitemap();
-  const urls = entries.map((entry) => entry.url);
-
-  it('contains both locales for every public route', () => {
+  it('contains both locales for every public route', async () => {
+    const entries = await sitemap();
+    const urls = entries.map((entry) => entry.url);
     expect(urls).toContain('https://asharu.id/id');
     expect(urls).toContain('https://asharu.id/en');
     expect(urls).toContain('https://asharu.id/id/produk');
     expect(urls).toContain('https://asharu.id/en/products');
     expect(urls).toContain('https://asharu.id/id/properti');
     expect(urls).toContain('https://asharu.id/en/properties');
+    expect(urls).toContain('https://asharu.id/id/artikel');
+    expect(urls).toContain('https://asharu.id/en/articles');
     expect(urls).toContain('https://asharu.id/id/tentang');
     expect(urls).toContain('https://asharu.id/en/about');
     expect(urls).toContain('https://asharu.id/id/kebijakan-privasi');
     expect(urls).toContain('https://asharu.id/id/disclosure-afiliasi');
   });
 
-  it('includes every published property listing in both locales', () => {
+  it('includes every published property listing in both locales', async () => {
+    const entries = await sitemap();
+    const urls = entries.map((entry) => entry.url);
     expect(
       urls.filter((url) => url.startsWith('https://asharu.id/id/properti/')).length
     ).toBe(3);
@@ -30,7 +33,8 @@ describe('sitemap', () => {
     expect(urls.join('\n')).not.toContain('contoh');
   });
 
-  it('declares id/en/x-default alternates', () => {
+  it('declares id/en/x-default alternates', async () => {
+    const entries = await sitemap();
     const home = entries.find((entry) => entry.url === 'https://asharu.id/id');
     expect(home?.alternates?.languages).toMatchObject({
       en: 'https://asharu.id/en',
@@ -38,7 +42,9 @@ describe('sitemap', () => {
     });
   });
 
-  it('never exposes error or internal routes', () => {
+  it('never exposes error or internal routes', async () => {
+    const entries = await sitemap();
+    const urls = entries.map((entry) => entry.url);
     for (const url of urls) {
       expect(url).not.toMatch(/404|not-found|_next|api/);
     }

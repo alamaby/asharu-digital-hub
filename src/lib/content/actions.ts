@@ -488,7 +488,7 @@ export async function generateIdea(formData: FormData): Promise<GenerateIdeaResu
 WAJIB kembalikan JSON valid tanpa teks tambahan dengan schema:
 {
   "topic": "judul topik 10-500 karakter, hook kuat",
-  "platform": "threads|twitter|instagram|tiktok|linkedin|facebook|all",
+  "platform": "threads|twitter|instagram|tiktok|linkedin|facebook|artikel|all",
   "tone": "casual|formal|witty|professional|friendly|edukatif",
   "language": "id|en|both",
   "targetCategory": "automotive|electronics|home-living|fashion|sports-hobby|others",

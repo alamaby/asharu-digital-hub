@@ -1,6 +1,13 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
+import {
+  ARTICLE_MIN_WORDS,
+  buildArticlePrompt,
+  countArticleWords,
+  parseArticleDraft,
+  type ParsedArticleDraft
+} from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
 import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, auditThreadEmoji, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
@@ -85,6 +92,24 @@ export async function countFixedProductDeferrals(
   return countFn(sessionId);
 }
 
+/** Bahasa artikel yang wajib terisi dari nilai kolom session.language. */
+export function requiredArticleLangs(language: string | null): Array<'id' | 'en'> {
+  if (language === 'en') return ['en'];
+  if (language === 'id') return ['id'];
+  return ['id', 'en'];
+}
+
+/** Thread minimal yang valid (CHECK thread_shape) untuk draf artikel. */
+export function buildArticleMinimalThread(parsed: ParsedArticleDraft): { main: { id: string; en: string }; replies: never[] } {
+  return {
+    main: {
+      id: parsed.id?.title ?? parsed.en?.title ?? '(artikel)',
+      en: parsed.en?.title ?? parsed.id?.title ?? '(article)'
+    },
+    replies: []
+  };
+}
+
 /** Kunci idempotensi pasangan draf: topik × platform × produk (null = mekanisme satu). */
 export function pairKey(topicId: string | null, platformSlug: string | null, productId: string | null): string {
   return `${topicId}|${platformSlug ?? 'all'}|${productId ?? '-'}`;
@@ -158,7 +183,7 @@ export async function runDevelopment(
 ): Promise<number> {
   const { data: session, error: sessionError } = await supabase
     .from('content_research_sessions')
-    .select('id, mechanism, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count, template_slug')
+    .select('id, mechanism, platform_slug, platform_slugs, tone, account_goal, audience_age, audience_interests, target_location, target_reply_count, template_slug, language')
     .eq('id', sessionId)
     .single();
   if (sessionError || !session) throw new Error('session not found');
@@ -172,6 +197,7 @@ export async function runDevelopment(
     audience_age: string | null;
     target_reply_count: number | null;
     template_slug: string | null;
+    language: string | null;
   };
   const isDua = sess.mechanism === 'dua';
 
@@ -378,7 +404,11 @@ export async function runDevelopment(
 
     // Per-pasangan guard: 1 pasangan gagal tidak boleh menggagalkan sisanya.
     try {
-      await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId, isDua ? productId : null, templateStructure);
+      if (platform.slug === 'artikel') {
+        await generateArticleAndInsertDraft(supabase, sessionId, topic.id, sess, topic, affiliate, pinnedModelId, isDua ? productId : null, templateStructure);
+      } else {
+        await generateAndInsertDraft(supabase, sessionId, topic.id, platform, sess, topic, affiliate, pinnedModelId, isDua ? productId : null, templateStructure);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await supabase.from('content_research_logs').insert({
@@ -424,6 +454,60 @@ export async function runDevelopment(
     });
   }
   return remaining;
+}
+
+/** Resolve model developing: pinnedModelId > stage default > global. */
+async function resolveDevelopingModel(
+  supabase: SupabaseClient,
+  pinnedModelId?: string | null
+): Promise<{ providerId: string | null; modelUuid: string | null }> {
+  if (pinnedModelId) {
+    const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).eq('is_active', true).maybeSingle();
+    const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
+    if (mr) return { providerId: mr.provider_id, modelUuid: mr.id };
+  }
+  try {
+    const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+    return await resolveStageModel('developing', null);
+  } catch { return { providerId: null, modelUuid: null }; }
+}
+
+/** Provider slug LLM → id FK (untuk kolom provider_id). */
+async function lookupProviderId(supabase: SupabaseClient, providerSlug: string): Promise<string | null> {
+  const { data: providerRow } = await supabase
+    .from('llm_providers')
+    .select('id')
+    .eq('slug', providerSlug)
+    .maybeSingle();
+  return (providerRow as { id: string } | null)?.id ?? null;
+}
+
+// Eventual cover: enqueue 1 pending post_index=0 agar worker cron
+// memproses otomatis tanpa tunggu lazy scan. Idempoten via count guard.
+async function enqueueCoverImage(supabase: SupabaseClient, sessionId: string, draftId: string): Promise<void> {
+  try {
+    const { count } = await supabase
+      .from('content_draft_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('draft_id', draftId)
+      .eq('post_index', 0);
+    if ((count ?? 0) === 0) {
+      await supabase.from('content_draft_images').insert({
+        draft_id: draftId,
+        post_index: 0,
+        image_prompt: '',
+        provider_slug: '',
+        model_id: ''
+      });
+    }
+  } catch (e) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'image_enqueue',
+      level: 'warn',
+      message: `image enqueue cover failed for draft ${draftId}: ${e instanceof Error ? e.message : String(e)}`
+    });
+  }
 }
 
 async function generateAndInsertDraft(
@@ -489,17 +573,7 @@ async function generateAndInsertDraft(
   );
 
   // Resolve developing model: pinnedModelId > stage default > global
-  let devModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };
-  if (pinnedModelId) {
-    const { data: m } = await supabase.from('llm_models').select('id, provider_id, is_active').eq('id', pinnedModelId).eq('is_active', true).maybeSingle();
-    const mr = m as { id: string; provider_id: string; is_active: boolean } | null;
-    if (mr) devModel = { providerId: mr.provider_id, modelUuid: mr.id };
-  } else {
-    try {
-      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
-      devModel = await resolveStageModel('developing', null);
-    } catch { void 0; }
-  }
+  const devModel = await resolveDevelopingModel(supabase, pinnedModelId);
 
   const llmResult = await runLLMCompletion(supabase, {
     requestId: null,
@@ -672,12 +746,7 @@ async function generateAndInsertDraft(
   }
 
   // Look up provider_id from slug (for the foreign key).
-  const { data: providerRow } = await supabase
-    .from('llm_providers')
-    .select('id')
-    .eq('slug', resolvedLlm.providerSlug)
-    .maybeSingle();
-  const providerId = (providerRow as { id: string } | null)?.id ?? null;
+  const providerId = await lookupProviderId(supabase, resolvedLlm.providerSlug);
 
   const injection = affiliate
     ? [
@@ -737,29 +806,7 @@ async function generateAndInsertDraft(
 
   // Eventual cover: enqueue 1 pending post_index=0 agar worker cron (*/5)
   // memproses otomatis tanpa tunggu lazy scan. Idempoten via count guard.
-  try {
-    const { count } = await supabase
-      .from('content_draft_images')
-      .select('id', { count: 'exact', head: true })
-      .eq('draft_id', newDraftId)
-      .eq('post_index', 0);
-    if ((count ?? 0) === 0) {
-      await supabase.from('content_draft_images').insert({
-        draft_id: newDraftId,
-        post_index: 0,
-        image_prompt: '',
-        provider_slug: '',
-        model_id: ''
-      });
-    }
-  } catch (e) {
-    await supabase.from('content_research_logs').insert({
-      session_id: sessionId,
-      stage: 'image_enqueue',
-      level: 'warn',
-      message: `image enqueue cover failed for draft ${newDraftId}: ${e instanceof Error ? e.message : String(e)}`
-    });
-  }
+  await enqueueCoverImage(supabase, sessionId, newDraftId);
 
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,
@@ -768,5 +815,225 @@ async function generateAndInsertDraft(
     message: affiliate
       ? `draft generated [${platform.slug}]${fixedProductId ? ' [fixed]' : ''} with affiliate ${affiliate.product.friendly_code} (match ${fixedProductId ? 'fixed' : affiliate.matchScore}${affiliate.signals.fallback_random ? ' fallback random' : ''})${overLimit ? ' OVER-LIMIT' : ''}${emojiMissing ? ' EMOJI-MISSING' : ''}`
       : `draft generated [${platform.slug}] without affiliate (empty pool)`
+  });
+}
+
+/**
+ * Generate draf ARTIKEL long-form (platform `artikel`, tujuan SEO).
+ * Beda dari thread: tanpa audit panjang/emoji per-post; gate-nya jumlah
+ * kata (lunak — di bawah minimum tetap disimpan + ditandai, publish
+ * yang menolak) dan kelengkapan bahasa sesi.
+ */
+async function generateArticleAndInsertDraft(
+  supabase: SupabaseClient,
+  sessionId: string,
+  topicId: string,
+  sess: { tone: string | null; account_goal: string | null; audience_age: string | null; language: string | null },
+  topic: ShortlistedTopic,
+  affiliate: SelectedAffiliate | null,
+  pinnedModelId?: string | null,
+  fixedProductId?: string | null,
+  templateStructure?: string | null
+): Promise<void> {
+  const tone = sess.tone ?? 'casual';
+  const audience = sess.audience_age ?? 'umum';
+  const purpose = sess.account_goal ?? 'membagikan informasi bermanfaat';
+  const language = sess.language ?? 'both';
+  const required = requiredArticleLangs(language);
+
+  const topicHooks = Array.isArray(topic.hooks)
+    ? (topic.hooks as Array<{ text?: string; type?: string }>).map((h) => h.text ?? '').filter(Boolean)
+    : null;
+  const topicKeyFacts = Array.isArray(topic.key_facts) ? (topic.key_facts as string[]) : null;
+
+  const promptProduct = affiliate
+    ? {
+        friendlyCode: affiliate.product.friendly_code,
+        name: affiliate.product.name_id,
+        url: affiliate.product.url,
+        category: affiliate.product.category
+      }
+    : {
+        friendlyCode: 'NONE',
+        name: 'tanpa afiliasi',
+        url: 'https://example.com',
+        category: '-'
+      };
+
+  const { system, user } = buildArticlePrompt(
+    {
+      topic: topic.topic,
+      tone,
+      audience,
+      ctaStyle: 'soft_sell',
+      purpose,
+      language,
+      hooks: topicHooks,
+      keyFacts: topicKeyFacts,
+      uniqueAngle: topic.unique_angle,
+      templateStructure: templateStructure ?? null
+    },
+    promptProduct
+  );
+
+  const devModel = await resolveDevelopingModel(supabase, pinnedModelId);
+
+  const llmResult = await runLLMCompletion(supabase, {
+    requestId: null,
+    sessionId,
+    stage: 'developing',
+    providerId: devModel.providerId,
+    modelUuid: devModel.modelUuid,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user }
+    ],
+    temperature: 0.7,
+    // Artikel long-form 800-1500 kata × 2 bahasa butuh headroom besar.
+    maxTokens: 4000
+  }).catch(() => null);
+  let activeLlm: Awaited<ReturnType<typeof runLLMCompletion>> | null = llmResult;
+
+  const missingLangs = (p: ParsedArticleDraft | null): Array<'id' | 'en'> =>
+    p ? required.filter((l) => !p[l]) : [...required];
+  let parsed = llmResult ? parseArticleDraft(llmResult.output.text) : null;
+  if (!parsed || missingLangs(parsed).length > 0) {
+    const retry = await runLLMCompletion(supabase, {
+      requestId: null,
+      sessionId,
+      stage: 'developing',
+      providerId: devModel.providerId,
+      modelUuid: devModel.modelUuid,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `${user}\n\nPENTING: output sebelumnya gagal diparse atau bahasa ${missingLangs(parsed).join('/')} kosong. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan, dengan SEMUA bahasa wajib terisi penuh.` }
+      ],
+      temperature: 0.3,
+      maxTokens: 4000
+    }).catch(() => null);
+    parsed = retry ? parseArticleDraft(retry.output.text) : null;
+    if (!parsed || missingLangs(parsed).length > 0) {
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'error',
+        message: `development LLM raw article topic ${topicId} (first 2000 chars, attempt 2): ${(retry?.output.text ?? llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
+      });
+      throw new Error(
+        !parsed ? 'article parse failed' : `article language missing: ${missingLangs(parsed).join(',')}`
+      );
+    }
+    activeLlm = retry;
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'info',
+      message: `article topic ${topicId} parsed on retry`
+    });
+  }
+  if (!activeLlm) throw new Error('article parse failed');
+
+  const article = parsed!;
+  const resolvedLlm = activeLlm!;
+
+  // Ganti placeholder dengan URL afiliasi asli (per bahasa).
+  const finalArticle: ParsedArticleDraft = { id: article.id, en: article.en };
+  if (affiliate) {
+    for (const lang of required) {
+      const a = finalArticle[lang];
+      if (a) {
+        const replaced = JSON.parse(
+          JSON.stringify(a).split('{{PRODUCT_URL}}').join(affiliate.product.url)
+        ) as typeof a;
+        finalArticle[lang] = replaced;
+      }
+    }
+  }
+
+  // Gate lunak jumlah kata: di bawah minimum tetap disimpan + ditandai
+  // (publish yang menolak) agar sesi tidak gagal sunyi.
+  const wordCount: Record<string, number> = {};
+  for (const lang of required) {
+    const a = finalArticle[lang];
+    if (a) wordCount[lang] = countArticleWords(a);
+  }
+  const thinContent = Object.values(wordCount).some((w) => w < ARTICLE_MIN_WORDS);
+  if (thinContent) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'warn',
+      message: `article topic ${topicId} thin content (${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata, minimum ${ARTICLE_MIN_WORDS}) — draf disimpan dengan tanda, perbaiki sebelum publish`
+    });
+  }
+
+  const providerId = await lookupProviderId(supabase, resolvedLlm.providerSlug);
+
+  const injection = affiliate
+    ? [
+        {
+          friendly_code: affiliate.product.friendly_code,
+          url: affiliate.product.url,
+          post_index: 0,
+          match_score: fixedProductId ? null : affiliate.matchScore,
+          match_signals: affiliate.signals,
+          product_name_id: affiliate.product.name_id,
+          product_name_en: affiliate.product.name_en,
+          product_image: affiliate.product.image,
+          product_category: affiliate.product.category,
+          product_merchant: affiliate.product.merchant
+        }
+      ]
+    : [];
+
+  const minimalThread = buildArticleMinimalThread(finalArticle);
+
+  const { data: createdDraft, error: draftError } = await supabase.from('content_drafts').insert({
+    request_id: sessionId,
+    provider_id: providerId,
+    model_id: resolvedLlm.model,
+    research_topic_id: topicId,
+    platform_slug: 'artikel',
+    product_id: fixedProductId ?? null,
+    generated_thread: minimalThread as unknown as Record<string, unknown>,
+    article_draft: finalArticle as unknown as Record<string, unknown>,
+    affiliate_injections: injection as unknown as Record<string, unknown>[],
+    status: 'needs_review',
+    llm_meta: {
+      provider: resolvedLlm.providerSlug,
+      model: resolvedLlm.model,
+      latency_ms: resolvedLlm.latencyMs,
+      key_hash: resolvedLlm.keyHash,
+      platform: 'artikel',
+      word_count: wordCount,
+      thin_content: thinContent,
+      language
+    },
+    affiliate_match_score: fixedProductId ? null : (affiliate?.matchScore ?? null),
+    affiliate_match_signals: affiliate
+      ? (affiliate.signals as unknown as Record<string, unknown>)
+      : null
+  }).select('id').single();
+  if (draftError || !createdDraft) {
+    const msg = draftError?.message ?? 'draft insert returned no id';
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'error',
+      message: `article draft insert failed: ${msg}`
+    });
+    throw new Error(`draft insert failed: ${msg}`);
+  }
+  const newDraftId = (createdDraft as { id: string }).id;
+
+  await enqueueCoverImage(supabase, sessionId, newDraftId);
+
+  await supabase.from('content_research_logs').insert({
+    session_id: sessionId,
+    stage: 'developing',
+    level: 'info',
+    message: affiliate
+      ? `article draft generated [artikel]${fixedProductId ? ' [fixed]' : ''} with affiliate ${affiliate.product.friendly_code} (${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata)${thinContent ? ' THIN-CONTENT' : ''}`
+      : `article draft generated [artikel] without affiliate (empty pool)`
   });
 }

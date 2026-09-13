@@ -28,7 +28,11 @@ export function LanguageSwitcher({ className }: { className?: string }) {
     document.cookie = `${LOCALE_COOKIE}=${nextLocale}; path=/; max-age=31536000; samesite=lax`;
     startTransition(() => {
       const slug = routeParams.slug;
-      if (pathname === '/properties/[slug]' && typeof slug === 'string') {
+      if (pathname === '/artikel/[slug]') {
+        // Slug artikel berbeda per locale (slug_id vs slug_en) sehingga tidak
+        // bisa dipetakan 1:1 — arahkan ke daftar artikel locale tujuan.
+        router.replace('/artikel', { locale: nextLocale });
+      } else if (pathname === '/properties/[slug]' && typeof slug === 'string') {
         router.replace(
           { pathname, params: { slug } },
           { locale: nextLocale }

@@ -4,6 +4,7 @@ import { Fragment, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CopyButton } from './CopyButton';
 import { AffiliateProductCard } from './AffiliateProductCard';
+import { ArticleDraftCard } from './ArticleDraftCard';
 import { PostImageControl } from './PostImageControl';
 import { DraftImageCard, type ImageOption } from './DraftImageCard';
 import type { DraftImageRow } from '@/lib/image/types';
@@ -27,9 +28,10 @@ interface Draft {
   affiliate_match_score?: number | null;
   research_topic_id?: string | null;
   platform_slug?: string | null;
+  article_draft?: import('@/lib/llm/prompt').ParsedArticleDraft | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], replyImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], replyImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null, sessionLanguage = null, publishedArticles = [] }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
@@ -43,6 +45,10 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   imageOptions?: ImageOption;
   /** Info antrean posting (dari server, null bila belum terjadwal). */
   queue?: DraftQueueInfo | null;
+  /** Bahasa sesi riset (untuk batasan publish artikel). */
+  sessionLanguage?: string | null;
+  /** Baris articles yang sudah terbit dari draf ini. */
+  publishedArticles?: { locale: string; slug: string }[];
 }) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
@@ -67,6 +73,20 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   if (prevQueue.current !== queue) {
     prevQueue.current = queue;
     setQueueInfo(queue);
+  }
+
+  // Draf artikel long-form dirender kartu khusus (publish ke tabel articles,
+  // bukan antrean Threads).
+  if (draft.platform_slug === 'artikel' && draft.article_draft) {
+    return (
+      <ArticleDraftCard
+        draftId={draft.id}
+        status={draft.status}
+        article={draft.article_draft}
+        sessionLanguage={sessionLanguage}
+        published={publishedArticles}
+      />
+    );
   }
 
   const injections = draft.affiliate_injections[0];

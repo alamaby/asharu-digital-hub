@@ -44,7 +44,8 @@ export default async function KontenBaruPage({ params }: PageProps) {
     { slug: 'instagram', display_name: 'Instagram' },
     { slug: 'tiktok', display_name: 'TikTok' },
     { slug: 'linkedin', display_name: 'LinkedIn' },
-    { slug: 'facebook', display_name: 'Facebook' }
+    { slug: 'facebook', display_name: 'Facebook' },
+    { slug: 'artikel', display_name: 'Artikel' }
   ];
 
   let categories: { slug: string; display_name: string }[] = [

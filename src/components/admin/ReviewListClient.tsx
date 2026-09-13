@@ -13,6 +13,7 @@ interface DraftItem {
   platform_slug?: string | null;
   research_topic_id?: string | null;
   generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+  article_draft?: { id: { title: string } | null; en: { title: string } | null } | null;
   affiliate_injections: { friendly_code: string; product_name_id?: string; product_image?: string; match_score?: number }[];
   llm_meta?: { provider: string; model: string; platform?: string };
 }
@@ -205,7 +206,10 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
           <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-sm text-ink-muted">{t('empty')}</p>
         ) : (
           drafts.map((d) => {
-            const snippet = d.generated_thread.main.id.slice(0, 120);
+            const snippet =
+              d.platform_slug === 'artikel'
+                ? (d.article_draft?.id?.title ?? d.article_draft?.en?.title ?? d.generated_thread.main.id).slice(0, 120)
+                : d.generated_thread.main.id.slice(0, 120);
             const inj = d.affiliate_injections[0];
             const sessionId = (d.research_topic_id && topicSessionMap[d.research_topic_id]) || null;
             const platform = d.platform_slug ?? d.llm_meta?.platform ?? 'all';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
-import { classifyFixedProducts, countFixedProductDeferrals, estimatePendingPairsExact, FIXED_PRODUCT_DEFER_LIMIT } from './development';
+import { classifyFixedProducts, countFixedProductDeferrals, estimatePendingPairsExact, FIXED_PRODUCT_DEFER_LIMIT, buildArticleMinimalThread, requiredArticleLangs } from './development';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -529,5 +529,28 @@ describe('estimatePendingPairsExact', () => {
   it('returns 0 when all pairs already have drafts (no false deferral)', () => {
     const done = new Set(['t1|threads|p1', 't1|twitter|p1']);
     expect(estimatePendingPairsExact([{ id: 't1' }], targets, done, ['p1'])).toBe(0);
+  });
+});
+
+describe('artikel helpers', () => {
+  it('requiredArticleLangs: both/null -> id+en, tunggal -> itu saja', () => {
+    expect(requiredArticleLangs('both')).toEqual(['id', 'en']);
+    expect(requiredArticleLangs(null)).toEqual(['id', 'en']);
+    expect(requiredArticleLangs('id')).toEqual(['id']);
+    expect(requiredArticleLangs('en')).toEqual(['en']);
+  });
+
+  it('buildArticleMinimalThread memakai judul id+en', () => {
+    const t = buildArticleMinimalThread({
+      id: { title: 'Judul ID', slug: 'a', excerpt: 'e', sections: [], faq: [], meta_title: 'm', meta_desc: 'd' },
+      en: null
+    });
+    expect(t).toEqual({ main: { id: 'Judul ID', en: 'Judul ID' }, replies: [] });
+  });
+
+  it('buildArticleMinimalThread fallback bila dua-duanya null', () => {
+    const t = buildArticleMinimalThread({ id: null, en: null });
+    expect(t.main.id).toBe('(artikel)');
+    expect(t.main.en).toBe('(article)');
   });
 });

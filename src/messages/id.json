@@ -15,6 +15,11 @@
       "description": "Daftar properti dijual dan disewakan melalui kanal resmi Asharu. Lokasi umum, spesifikasi jelas, tanpa data yang belum diverifikasi.",
       "intro": "Daftar properti yang saat ini kami pasarkan. Kami hanya menampilkan informasi yang telah kami verifikasi; harga dan detail lengkap tersedia melalui kontak resmi."
     },
+    "artikel": {
+      "title": "Artikel | Asharu",
+      "description": "Kumpulan artikel panduan dan tips dari Asharu: informatif, terverifikasi, dan mudah dipraktikkan.",
+      "intro": "Panduan dan tips yang kami tulis berdasarkan riset. Setiap artikel yang memuat tautan produk menandainya secara jelas sebagai tautan afiliasi."
+    },
     "about": {
       "title": "Tentang Asharu | Asharu",
       "description": "Mengenal Asharu: pusat digital untuk toko online, produk afiliasi, media sosial, dan properti dengan prinsip transparansi."
@@ -66,6 +71,7 @@
     "stores": "Toko",
     "products": "Produk Afiliasi",
     "properties": "Properti",
+    "articles": "Artikel",
     "about": "Tentang",
     "adminLabel": "Admin",
     "adminDashboard": "Dasbor",
@@ -132,6 +138,21 @@
     "cta": "Kunjungi Toko"
   },
   "socials": {},
+  "articles": {
+    "empty": "Belum ada artikel yang terbit.",
+    "readMore": "Baca selengkapnya",
+    "backToList": "Kembali ke daftar artikel",
+    "breadcrumbList": "Artikel",
+    "publishedOn": "Diterbitkan {date}",
+    "faqHeading": "Pertanyaan Umum",
+    "affiliateBoxTitle": "Produk yang disebut di artikel ini",
+    "affiliateBoxBody": "Artikel ini menyebut {product} — tautan di bawah adalah tautan afiliasi ke platform penjual resmi.",
+    "affiliateBoxBodyNoName": "Tautan di bawah adalah tautan afiliasi ke platform penjual resmi.",
+    "affiliateBoxCta": "Lihat produk di platform penjual",
+    "affiliateNote": "Tautan afiliasi: bila Anda membeli melalui tautan ini, Asharu dapat menerima komisi tanpa menambah harga yang Anda bayar.",
+    "disclosureNote": "Sebagian tautan di situs ini adalah tautan afiliasi.",
+    "disclosureLink": "Baca disclosure afiliasi"
+  },
   "categories": {
     "automotive": "Otomotif",
     "electronics": "Elektronik",
@@ -442,6 +463,17 @@
       "approveNoQueue": "Disetujui (auto-queue nonaktif).",
       "queueBadge": "Antrean: {status} · {when}",
       "realtime": "Memperbarui otomatis",
+      "articleEmpty": "Draf artikel kosong atau gagal diparse.",
+      "articleWords": "{words} kata",
+      "articleThin": "Artikel tipis: {words} kata (minimum {min}) — perbaiki sebelum publish.",
+      "articleFaq": "FAQ",
+      "articlePublished": "Sudah terbit",
+      "articlePublish": "Publish ke artikel",
+      "articlePublishId": "Indonesia",
+      "articlePublishEn": "Inggris",
+      "articlePublishAction": "Publish yang dipilih",
+      "articlePublishOk": "Terbit",
+      "articleMissingLang": "konten kosong",
       "affiliate": {
         "title": "Produk Afiliasi",
         "relevance": {
