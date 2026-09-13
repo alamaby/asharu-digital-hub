@@ -28,6 +28,10 @@ function argValue(flag, fallback) {
 }
 const limit = dryRun ? Number(argValue('--limit', 5)) : Number(argValue('--limit', Infinity));
 const maxWidth = Number(argValue('--max-width', 800));
+// Guard mass-deactivation (P3 audit 2026-08-30): scrape sepi jangan nonaktifkan
+// mayoritas produk DB. Bila removal > 20% aktif → abort (override eksplisit).
+const allowMassDeactivation = args.includes('--allow-mass-deactivation');
+const MASS_DEACTIVATION_THRESHOLD = 0.2;
 
 const URL_SUFFIX = 'asharu';
 const API_URL = `https://collshp.com/api/v3/gql/graphql`;
@@ -200,8 +204,16 @@ async function main() {
       // Soft-delete: mark missing as inactive
       const remoteIds = new Set(rows.map((r) => r.external_id));
       const { data: existing } = await supabase.from('affiliate_products').select('external_id').eq('is_active', true);
+      const activeCount = (existing ?? []).length;
       const toDeactivate = (existing ?? []).filter((r) => !remoteIds.has(r.external_id)).map((r) => r.external_id);
       if (toDeactivate.length > 0) {
+        const removalRatio = activeCount > 0 ? toDeactivate.length / activeCount : 1;
+        if (removalRatio > MASS_DEACTIVATION_THRESHOLD && !allowMassDeactivation) {
+          throw new Error(
+            `Soft-delete guard: ${toDeactivate.length}/${activeCount} produk aktif (${Math.round(removalRatio * 100)}%) akan dinonaktifkan — scrape mungkin sepi/transient. ` +
+            'Perbaiki scrape atau jalankan ulang dengan --allow-mass-deactivation untuk override.'
+          );
+        }
         await supabase.from('affiliate_products').update({ is_active: false }).in('external_id', toDeactivate);
         console.error(`  deactivated ${toDeactivate.length} removed products`);
       }

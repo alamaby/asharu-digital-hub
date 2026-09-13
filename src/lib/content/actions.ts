@@ -915,6 +915,49 @@ export async function advanceToDevelopment(
     if (!count || count === 0) {
       return { success: false, error: 'no shortlisted topics' };
     }
+    // Mekanisme dua: validasi produk tetap aktif SEBELUM advance agar user
+    // melihat error di UI, bukan sesi gagal sunyi di cron (RCA 9a24c768).
+    const { data: sessionRow } = await supabase
+      .from('content_research_sessions')
+      .select('mechanism')
+      .eq('id', sessionId)
+      .maybeSingle();
+    const mechanism = (sessionRow as unknown as { mechanism: string | null } | null)?.mechanism;
+    if (mechanism === 'dua') {
+      const { data: fixedRows } = await supabase
+        .from('content_research_session_products')
+        .select('position, product_id, product:affiliate_products(friendly_code, is_active)')
+        .eq('session_id', sessionId)
+        .order('position', { ascending: true });
+      const rows = (fixedRows ?? []) as unknown as Array<{
+        position: number;
+        product_id: string;
+        product: { friendly_code: string; is_active: boolean } | null;
+      }>;
+      if (rows.length === 0) {
+        return { success: false, error: 'produk tetap tidak terdaftar — pilih 1-2 produk lagi' };
+      }
+      const missing = rows.filter((r) => !r.product);
+      const inactive = rows.filter((r) => r.product && !r.product.is_active);
+      if (missing.length > 0 || inactive.length === rows.length) {
+        const detail = [...missing, ...inactive]
+          .map((r) => r.product?.friendly_code ?? r.product_id.slice(0, 8))
+          .join(', ');
+        return {
+          success: false,
+          error: `produk tetap tidak valid/nonaktif (${detail}) — pilih ulang produk`
+        };
+      }
+      // Snapshot produk tetap ke log audit (forensik: status produk saat advance).
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'awaiting_selection',
+        level: 'info',
+        message: `fixed products snapshot at advance: ${rows
+          .map((r) => `${r.product?.friendly_code ?? r.product_id.slice(0, 8)}(pos${r.position}${r.product?.is_active ? '' : ',inactive'})`)
+          .join(', ')}`
+      });
+    }
     // Conditional update so we don't accidentally advance a non-pending session.
     // current_stage_started_at di-backdate agar cron (guard 5 mnt) langsung
     // memungut sesi ini — UI tidak menunggu LLM, backend lanjut via cron.

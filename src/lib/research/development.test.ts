@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { classifyFixedProducts, countFixedProductDeferrals, estimatePendingPairsExact, FIXED_PRODUCT_DEFER_LIMIT } from './development';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -460,5 +461,73 @@ describe('auditThreadEmoji', () => {
     expect(
       auditThreadEmoji({ main: { id: 'a 🛒', en: 'b 📦' }, replies: [] })
     ).toEqual([]);
+  });
+});
+
+describe('classifyFixedProducts', () => {
+  const fp = (id: string) => ({
+    id,
+    friendly_code: `ASH-${id.slice(0, 3)}`,
+    external_id: `ext-${id}`,
+    name_id: 'n id',
+    name_en: 'n en',
+    category: 'tips',
+    merchant: 'm',
+    url: 'https://example.com',
+    image: 'https://example.com/i.jpg'
+  });
+
+  it('returns noneConfigured when session registered 0 products', () => {
+    const c = classifyFixedProducts(0, [fp('a')], new Set(['a']));
+    expect(c.noneConfigured).toBe(true);
+    expect(c.active).toEqual([]);
+    expect(c.inactive).toEqual([]);
+  });
+
+  it('returns noneConfigured when join read empty (transient — RCA 9a24c768)', () => {
+    const c = classifyFixedProducts(2, [], new Set());
+    expect(c.noneConfigured).toBe(true);
+  });
+
+  it('classifies active products', () => {
+    const c = classifyFixedProducts(2, [fp('a'), fp('b')], new Set(['a', 'b']));
+    expect(c.noneConfigured).toBe(false);
+    expect(c.active).toHaveLength(2);
+    expect(c.inactive).toEqual([]);
+  });
+
+  it('classifies partial inactive with warn list', () => {
+    const c = classifyFixedProducts(2, [fp('a'), fp('b')], new Set(['a']));
+    expect(c.active).toHaveLength(1);
+    expect(c.inactive.map((p) => p.id)).toEqual(['b']);
+  });
+
+  it('classifies all inactive (permanent condition)', () => {
+    const c = classifyFixedProducts(2, [fp('a'), fp('b')], new Set());
+    expect(c.noneConfigured).toBe(false);
+    expect(c.active).toEqual([]);
+    expect(c.inactive).toHaveLength(2);
+  });
+
+  it('exposes defer limit constant', () => {
+    expect(FIXED_PRODUCT_DEFER_LIMIT).toBe(5);
+  });
+
+  it('counts deferrals via injected counter', async () => {
+    await expect(countFixedProductDeferrals('sess', async () => 3)).resolves.toBe(3);
+  });
+});
+
+describe('estimatePendingPairsExact', () => {
+  const targets = [{ slug: 'threads', maxChars: 500 }, { slug: 'twitter', maxChars: 280 }];
+
+  it('counts pending per registered product id', () => {
+    const done = new Set(['t1|threads|p1']);
+    expect(estimatePendingPairsExact([{ id: 't1' }], targets, done, ['p1', 'p2'])).toBe(3);
+  });
+
+  it('returns 0 when all pairs already have drafts (no false deferral)', () => {
+    const done = new Set(['t1|threads|p1', 't1|twitter|p1']);
+    expect(estimatePendingPairsExact([{ id: 't1' }], targets, done, ['p1'])).toBe(0);
   });
 });

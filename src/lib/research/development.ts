@@ -26,9 +26,86 @@ export interface TargetPlatform {
   maxChars: number | null;
 }
 
+/** Batas deferral produk-tetap (transient) per sesi dalam window 24 jam — melebihi → failed. */
+export const FIXED_PRODUCT_DEFER_LIMIT = 5;
+const FIXED_PRODUCT_DEFER_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Hasil klasifikasi kandidat produk-tetap mekanisme dua. */
+export interface FixedProductClassification {
+  /** Produk yang lolos dan siap dipakai developing. */
+  active: FixedProduct[];
+  /** Produk terdaftar tapi is_active=false — kondisi permanen, bukan transient. */
+  inactive: FixedProduct[];
+  /** Sesi mendaftarkan produk tapi semua baris join hilang/nonaktif. */
+  noneConfigured: boolean;
+}
+
+interface FixedProduct {
+  id: string;
+  friendly_code: string;
+  external_id: string;
+  name_id: string;
+  name_en: string;
+  category: string;
+  merchant: string;
+  url: string;
+  image: string;
+}
+
+/**
+ * Klasifikasi murni kandidat produk-tetap: bedakan "sesi tanpa produk
+ * terdaftar" (konfigurasi rusak — gagal permanen), "produk nonaktif"
+ * (permanen), dan "join kosong" (transient — layak defer ke tick berikut).
+ */
+export function classifyFixedProducts(
+  registeredCount: number,
+  fetched: Array<{ id: string }>,
+  activeIds: Set<string>
+): FixedProductClassification {
+  if (registeredCount === 0 || fetched.length === 0) {
+    return { active: [], inactive: [], noneConfigured: true };
+  }
+  const active: FixedProduct[] = [];
+  const inactive: FixedProduct[] = [];
+  for (const p of fetched) {
+    if (activeIds.has(p.id)) active.push(p as FixedProduct);
+    else inactive.push(p as FixedProduct);
+  }
+  return { active, inactive, noneConfigured: false };
+}
+
+/**
+ * Hitung deferral produk-tetap sebelumnya (log warn transient) dalam window 24 jam.
+ * Murni: supabase disuntik sebagai counter async agar testable.
+ */
+export async function countFixedProductDeferrals(
+  sessionId: string,
+  countFn: (sessionId: string) => Promise<number>
+): Promise<number> {
+  return countFn(sessionId);
+}
+
 /** Kunci idempotensi pasangan draf: topik × platform × produk (null = mekanisme satu). */
 export function pairKey(topicId: string | null, platformSlug: string | null, productId: string | null): string {
   return `${topicId}|${platformSlug ?? 'all'}|${productId ?? '-'}`;
+}
+
+/** Pasangan pending eksak (produk-tetap belum terbaca): hitung per ID terdaftar. */
+export function estimatePendingPairsExact(
+  topics: Array<{ id: string }>,
+  targets: TargetPlatform[],
+  donePairs: Set<string>,
+  productIds: string[]
+): number {
+  let count = 0;
+  for (const topic of topics) {
+    for (const platform of targets) {
+      for (const productId of productIds) {
+        if (!donePairs.has(pairKey(topic.id, platform.slug, productId))) count++;
+      }
+    }
+  }
+  return count;
 }
 
 /**
@@ -113,7 +190,7 @@ export async function runDevelopment(
   if (!topics || topics.length === 0) {
     await supabase
       .from('content_research_sessions')
-      .update({ status: 'failed', error_message: 'no shortlisted topics' })
+      .update({ status: 'failed', error_message: 'no shortlisted topics', updated_at: new Date().toISOString() })
       .eq('id', sessionId);
     return 0;
   }
@@ -137,22 +214,95 @@ export async function runDevelopment(
   );
 
   // Mekanisme dua: produk tetap pilihan user (tanpa seleksi acak).
-  let fixedProducts: Array<{ id: string; friendly_code: string; external_id: string; name_id: string; name_en: string; category: string; merchant: string; url: string; image: string }> = [];
+  // Klasifikasi 3 kasus (join kosong/transient vs nonaktif/permanen vs
+  // tanpa konfigurasi) — jangan samakan lagi (RCA 9a24c768).
+  let fixedProducts: FixedProduct[] = [];
   if (isDua) {
     const { fetchFixedProducts } = await import('./orchestrator');
-    fixedProducts = await fetchFixedProducts(supabase, sessionId);
-    // Hanya yang masih aktif.
+    const { data: registeredRows } = await supabase
+      .from('content_research_session_products')
+      .select('product_id')
+      .eq('session_id', sessionId);
+    const registeredIds = ((registeredRows ?? []) as { product_id: string }[]).map((r) => r.product_id);
+    const fetchedRaw = await fetchFixedProducts(supabase, sessionId);
     const { data: activeRows } = await supabase
       .from('affiliate_products')
       .select('id')
-      .in('id', fixedProducts.map((p) => p.id))
+      .in(
+        'id',
+        fetchedRaw.map((p) => p.id)
+      )
       .eq('is_active', true);
     const activeIds = new Set(((activeRows ?? []) as { id: string }[]).map((r) => r.id));
-    fixedProducts = fixedProducts.filter((p) => activeIds.has(p.id));
+    const classification = classifyFixedProducts(registeredIds.length, fetchedRaw, activeIds);
+    fixedProducts = classification.active;
+
+    if (classification.noneConfigured) {
+      // Sesi mendaftarkan 0 produk ATAU join kosong: sebelumnya transient
+      // (RCA 9a24c768). Defer + cap 5/24j — hanya gagal permanen saat cap habis.
+      // Pending dihitung eksak dari ID terdaftar: bila 0 (semua draf sudah
+      // ada), jangan defer — biarkan sesi selesai.
+      const pendingExact = estimatePendingPairsExact(allTopics, targets, donePairs, registeredIds);
+      if (pendingExact === 0) {
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'info',
+          message: `all ${allTopics.length} shortlisted topics already have drafts for ${targets.length} platform(s) × ${registeredIds.length} product(s); nothing to do`
+        });
+        return 0;
+      }
+      const deferredCount = await countFixedProductDeferrals(sessionId, async (id) => {
+        const { count } = await supabase
+          .from('content_research_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('session_id', id)
+          .eq('stage', 'developing')
+          .eq('level', 'warn')
+          .ilike('message', '%fixed products read empty%')
+          .gte('created_at', new Date(Date.now() - FIXED_PRODUCT_DEFER_WINDOW_MS).toISOString());
+        return count ?? 0;
+      });
+      if (deferredCount >= FIXED_PRODUCT_DEFER_LIMIT) {
+        await supabase
+          .from('content_research_sessions')
+          .update({
+            status: 'failed',
+            error_message: 'developing: produk tetap tidak terbaca setelah 5x deferral 24 jam — cek content_research_session_products',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', sessionId);
+        return 0;
+      }
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'warn',
+        message: `fixed products read empty (registered=${registeredIds.length}, fetched=${fetchedRaw.length}) — ${pendingExact} pasangan ditunda ke tick berikut (deferral ${deferredCount + 1}/${FIXED_PRODUCT_DEFER_LIMIT})`
+      });
+      return pendingExact;
+    }
+
+    if (classification.inactive.length > 0) {
+      const inactiveDesc = classification.inactive
+        .map((p) => `${p.friendly_code}/${p.id.slice(0, 8)}`)
+        .join(', ');
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'warn',
+        message: `fixed products inactive: ${inactiveDesc} — lanjut dengan ${fixedProducts.length} aktif`
+      });
+    }
     if (fixedProducts.length === 0) {
+      // Semua terdaftar tapi is_active=false — kondisi permanen (bukan transient).
       await supabase
         .from('content_research_sessions')
-        .update({ status: 'failed', error_message: 'developing: produk tetap tidak aktif/hilang' })
+        .update({
+          status: 'failed',
+          error_message: `developing: semua produk tetap nonaktif (${classification.inactive.map((p) => p.friendly_code).join(', ')}) — aktifkan kembali atau pilih produk lain`,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', sessionId);
       return 0;
     }
@@ -256,7 +406,11 @@ export async function runDevelopment(
   if (newDraftCount <= 0) {
     await supabase
       .from('content_research_sessions')
-      .update({ status: 'failed', error_message: `developing: ${batch.length} pasangan gagal (lihat log warn per-pasangan)` })
+      .update({
+        status: 'failed',
+        error_message: `developing: ${batch.length} pasangan gagal (lihat log warn per-pasangan)`,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', sessionId);
     return 0;
   }

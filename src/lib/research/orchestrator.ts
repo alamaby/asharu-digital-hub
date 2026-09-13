@@ -246,7 +246,7 @@ export async function advanceStage(
     // we don't accidentally mark a non-active session as failed.
     await supabase
       .from('content_research_sessions')
-      .update({ status: 'failed', error_message: message })
+      .update({ status: 'failed', error_message: message, updated_at: new Date().toISOString() })
       .eq('id', sessionId)
       .in('status', ['pending', 'discovering', 'verifying', 'scoring', 'developing']);
     await supabase.from('content_research_logs').insert({
