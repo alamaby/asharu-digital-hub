@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-13 01:35 (local time)
+Last updated: 2026-09-13 02:00 (local time)
 
 ## Current State
 
@@ -54,6 +54,7 @@ Last updated: 2026-09-13 01:35 (local time)
 
 ## Recent Entries
 
+- [020000-studio-surface-real-errors.md](2026-09-13/020000-studio-surface-real-errors.md) — Studio: action client-facing (upload ref/enqueue/enhance/retry/delete) kini kembalikan `{ok,data}|{ok,error}` (pola `ActionResult` konten) agar pesan error asli tampil, bukan digest generik Next.js; gate 527 tests hijau, pushed `b222157`.
 - [013500-studio-img2img-storage-exists-fix.md](2026-09-13/013500-studio-img2img-storage-exists-fix.md) — Fix lanjutan img2img: `assertFreshReferenceExists` salah API (`from('storage.objects')` → schema `storage` tak diekspos PostgREST, PGRST205/106, terbukti via REST prod) → ganti `storage.from().exists()` best-effort; mock test ikut dibetulkan; gate 526 tests hijau, pushed `c2f7bad`. [USER ACTION] Ulangi generate img2img dari upload baru.
 - [222000-studio-img2img-fresh-upload.md](2026-09-12/222000-studio-img2img-fresh-upload.md) — RCA img2img upload-baru selalu ditolak ownership check (query histori saja; komentar janji cabang `ref/` yang tak ada) + fix derivasi path server-side + cek `storage.objects`; pesan prod ter-masking digest. Sampingan: `996dcd8c` ready (Avoid live-OK), `f10d58e2` NSFW-8007 (moderasi, bukan bug). Gate 525 tests hijau, pushed `c8b156a`. [USER ACTION] Ulangi generate img2img dari upload baru.
 - [220047-studio-history-uuid-confirm-delete.md](2026-09-12/220047-studio-history-uuid-confirm-delete.md) — Riwayat Studio: tombol UUID per baris (8-char + tooltip penuh + salin) + icon `Eye` di Lihat + hapus dua-tahap ("Yakin hapus?"/Batal, tanpa `window.confirm`); 4 key i18n id/en; gate 519 tests hijau, pushed `537fcd0`.
