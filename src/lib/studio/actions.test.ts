@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, unknown>;
 
-const { clientRef, queryLog } = vi.hoisted(() => ({
+const { clientRef, queryLog, storageRef } = vi.hoisted(() => ({
   clientRef: { current: null as unknown },
+  storageRef: { current: new Set<string>() },
   queryLog: { current: [] as Array<{ table: string; calls: Array<{ op: string; col?: string; val?: unknown; ascending?: boolean }> }> }
 }));
 
@@ -26,6 +27,11 @@ import { buildStudioEnhanceMessages } from '@/lib/image/prompt';
 /** Client mock yang mencatat rantai query (eq/order/limit) per tabel. */
 function makeClient(tables: Record<string, Row[]>) {
   return {
+    storage: {
+      from: () => ({
+        exists: async (path: string) => ({ data: storageRef.current.has(path), error: null })
+      })
+    },
     from(table: string) {
       let rows: Row[] = [...(tables[table] ?? [])];
       const log = { table, calls: [] as Array<{ op: string; col?: string; val?: unknown; ascending?: boolean }> };
@@ -172,8 +178,9 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
   const freshUrl = `${base}/storage/v1/object/public/user-images/ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
   const freshPath = `ref/${userId}/02a5e512-2181-4441-b6bc-1f3ed94c7d23.png`;
 
-  function useEnqueueTables(tables: Record<string, Row[]>) {
+  function useEnqueueTables(tables: Record<string, Row[]>, existingStorage: string[] = []) {
     queryLog.current = [];
+    storageRef.current = new Set(existingStorage);
     process.env.NEXT_PUBLIC_SUPABASE_URL = base;
     clientRef.current = makeClient(tables);
   }
@@ -195,11 +202,13 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
   }
 
   it('upload baru milik sendiri + file ada → lolos dengan storage path turunan', async () => {
-    useEnqueueTables({
-      user_image_generations: [],
-      'storage.objects': [{ bucket_id: 'user-images', name: freshPath }],
-      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
-    });
+    useEnqueueTables(
+      {
+        user_image_generations: [],
+        image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+      },
+      [freshPath]
+    );
     const res = await enqueueStudioImage(
       enqueueInput({ referencePublicUrl: freshUrl, referenceStrength: 0.6 })
     );
@@ -214,7 +223,6 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
   it('URL asing (bukan ref milik sendiri) → ditolak', async () => {
     useEnqueueTables({
       user_image_generations: [],
-      'storage.objects': [],
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
     await expect(
@@ -226,7 +234,6 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
   it('URL ref milik sendiri tapi file tak ada → ditolak', async () => {
     useEnqueueTables({
       user_image_generations: [],
-      'storage.objects': [],
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
     await expect(
@@ -239,12 +246,25 @@ describe('enqueueStudioImage — referensi upload baru vs histori', () => {
     const reuseUrl = 'https://xyz.supabase.co/storage/v1/object/public/user-images/u1/old.png';
     useEnqueueTables({
       user_image_generations: [row({ id: 'old', user_id: 'u1', public_url: reuseUrl, storage_path: 'u1/old.png' })],
-      'storage.objects': [],
       image_aspect_ratios: [{ slug: '1:1', is_active: true }]
     });
     const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: reuseUrl }));
     expect(res.imageId).toBe('new-img');
     expect(insertedPatch().reference_storage_path).toBe('u1/old.png');
+    process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
+  });
+
+  it('exists() error transient → best-effort lanjut (tidak blokir enqueue)', async () => {
+    useEnqueueTables({
+      user_image_generations: [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }]
+    });
+    (clientRef.current as { storage: { from: () => { exists: () => Promise<never> } } }).storage = {
+      from: () => ({ exists: () => Promise.reject(new Error('network down')) })
+    };
+    const res = await enqueueStudioImage(enqueueInput({ referencePublicUrl: freshUrl }));
+    expect(res.imageId).toBe('new-img');
+    expect(insertedPatch().reference_storage_path).toBe(freshPath);
     process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_ENV;
   });
 });

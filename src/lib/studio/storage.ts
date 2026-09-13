@@ -33,19 +33,26 @@ export function resolveFreshReferenceStoragePath(args: {
 
 /**
  * Pastikan file referensi benar ada di Storage (anti URL karangan yang
- * kebetulan cocok prefix). Service-role: RLS dilewati.
+ * kebetulan cocok prefix). Best-effort: `exists()` → false = tolak; error
+ * jaringan/Storage transient = lanjut (prefix `ref/{userId}/` + regex URL
+ * sudah jadi batas keamanan, jangan blokir enqueue karena gangguan infra).
+ *
+ * PENTING: pakai Storage API (`storage.from().exists()`), BUKAN
+ * `.from('storage.objects')` — schema `storage` tidak diekspos PostgREST
+ * (PGRST106/PGRST205), itu yang membuat upload-baru selalu ditolak 12 Sep 2026.
  */
 export async function assertFreshReferenceExists(
   supabase: SupabaseClient,
   storagePath: string
 ): Promise<void> {
-  const { data } = await supabase
-    .from('storage.objects')
-    .select('name')
-    .eq('bucket_id', STUDIO_IMAGES_BUCKET)
-    .eq('name', storagePath)
-    .maybeSingle();
-  if (!data) throw new Error('Referensi harus dari upload atau histori milik Anda.');
+  let found: boolean;
+  try {
+    const { data } = await supabase.storage.from(STUDIO_IMAGES_BUCKET).exists(storagePath);
+    found = data;
+  } catch {
+    return;
+  }
+  if (!found) throw new Error('Referensi harus dari upload atau histori milik Anda.');
 }
 
 /** Upload bytes hasil generate studio → Storage publik `user-images/{userId}/{imageId}.ext`. */
