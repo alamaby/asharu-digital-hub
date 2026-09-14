@@ -30,6 +30,12 @@ interface Props {
   hasPlaceholderWarning: boolean;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
+  /**
+   * False untuk draf artikel: rewrite LLM per-reply (regen) tidak kompatibel
+   * dengan shape article_draft — hanya Ganti (swap meta + patch body) dan
+   * Hapus yang tersedia.
+   */
+  allowRegen?: boolean;
 }
 
 const BAND_CLASS: Record<string, string> = {
@@ -39,7 +45,7 @@ const BAND_CLASS: Record<string, string> = {
   none: 'bg-surface text-ink-muted'
 };
 
-export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceholderWarning, regenProviders = [], regenModels = [] }: Props) {
+export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceholderWarning, regenProviders = [], regenModels = [], allowRegen = true }: Props) {
   const t = useTranslations('content.review.affiliate');
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -213,16 +219,18 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
             </a>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
-              disabled={busy !== null}
-              aria-busy={busy === 'regen'}
-              title={t('reselectRethinkHint')}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy === 'regen' ? '...' : t('reselectRethink')}
-            </button>
+            {allowRegen ? (
+              <button
+                type="button"
+                onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
+                disabled={busy !== null}
+                aria-busy={busy === 'regen'}
+                title={t('reselectRethinkHint')}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy === 'regen' ? '...' : t('reselectRethink')}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => { setPickerMode('swap'); setPickerOpen(true); }}
@@ -247,19 +255,21 @@ export function AffiliateProductCard({ draftId, injection, matchScore, hasPlaceh
       ) : (
         <div className="mt-3 space-y-2">
           <p className="text-sm text-ink-muted">{t('noProduct')}</p>
-          <button
-            type="button"
-            onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
-            disabled={busy !== null}
-            aria-busy={busy === 'regen'}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {busy === 'regen' ? '...' : t('pickAndGenerate')}
-          </button>
+          {allowRegen ? (
+            <button
+              type="button"
+              onClick={() => { setPickerMode('regen'); setPickerOpen(true); }}
+              disabled={busy !== null}
+              aria-busy={busy === 'regen'}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy === 'regen' ? '...' : t('pickAndGenerate')}
+            </button>
+          ) : null}
         </div>
       )}
 
-      {regenProviders.length > 0 ? (
+      {allowRegen && regenProviders.length > 0 ? (
         <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-dashed border-line bg-surface p-3 sm:grid-cols-2">
           <div>
             <label htmlFor="regen-provider" className="block text-[11px] font-medium text-ink-muted">Provider (regen)</label>

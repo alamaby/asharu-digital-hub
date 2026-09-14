@@ -1,0 +1,24 @@
+# Fix review artikel 419a2dc8 — 5 temuan (length, visual, upload, affiliate image, emoji)
+
+- Task: perbaiki review artikel `419a2dc8` (488 kata/thin, cover failed tak terlihat, tanpa upload final, section afiliasi tanpa gambar, minim emoji).
+- Key files:
+  - `src/lib/llm/prompt.ts` — prompt hardening (budget per-section + anti-berhenti-dini) + rule emoji 1/section + `auditArticleEmoji` + `buildArticleExpandPrompt` + `findAffiliateSectionIndex`.
+  - `src/lib/research/development.ts` — thin-repair 1x (expand, maxTokens 6000) + audit emoji lunak + `llm_meta.expanded/emoji_missing`.
+  - `src/components/content/ContentDraftCard.tsx` — cabang artikel render `ArticleDraftCard` + `DraftImageCard` cover + `AffiliateProductCard` (`allowRegen=false`).
+  - `src/components/content/ArticleDraftCard.tsx` — box produk, highlight section afiliasi, tombol expand.
+  - `src/lib/articles/actions.ts` — publish wiring `cover_image_url` + `expandArticleDraft`.
+  - `src/lib/image/actions.ts` + `storage.ts` — `uploadDraftCoverImage` (manual, selected langsung) + ext webp.
+  - `src/app/[locale]/(public)/artikel/[slug]/page.tsx` — render cover + thumbnail afiliasi.
+  - `src/lib/content/actions.ts` — swap produk patch URL+nama di `article_draft`.
+  - `src/messages/id.json` + `en.json` — 6 key `articleAffiliate*/articleExpand*` (paritas terjaga).
+- Decisions:
+  - Gate tetap 600 kata, prompt 800–1500 (konfirmasi user); repair loop bukan gate keras.
+  - Scope gambar cover + afiliasi dulu; per-section fase 2 (butuh model data baru).
+  - Reuse `affiliate_products.image`, tanpa fetch og:image live (Shopee blokir) dan tanpa migrasi.
+  - Emoji 1/section (SEO-safe); audit lunak, repair menyusul bila masih minim.
+  - Swap untuk artikel patch body (URL+nama inline); regen LLM disembunyikan (`allowRegen=false`, tak kompatibel shape artikel).
+- Assumptions/risks: gemma-sea-lion bisa tetap under-generate → repair + evaluasi model; worker image timeout intermiten → upload manual; `articles` masih 0 rows → tanpa backfill.
+- Blockers: none. Follow-up: edit manual per-section artikel; repair loop emoji; image per-section.
+- Verification: `npm run typecheck` ✓, `npm run lint` ✓ (0 warning), `npm test` ✓ (569 passed, 66 files; prompt-article 15 tests incl. 6 baru), `npm run build` ✓ (63 static pages).
+- Commit: `fix(artikel): review 419a2dc8 — length repair, cover, upload, affiliate visual, emoji` (pending push saat ditulis).
+- Plan: `plans/2026-09-14-review-artikel-419a2dc8-fix.md`.

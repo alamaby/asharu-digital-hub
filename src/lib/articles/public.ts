@@ -74,11 +74,11 @@ export async function getArticleProduct(productId: string | null): Promise<Artic
   if (!supabase) return null;
   const { data } = await supabase
     .from('affiliate_products')
-    .select('name_id, name_en, url')
+    .select('name_id, name_en, url, image')
     .eq('id', productId)
     .eq('is_active', true)
     .maybeSingle();
-  const p = data as { name_id: string; name_en: string; url: string } | null;
+  const p = data as { name_id: string; name_en: string; url: string; image: string | null } | null;
   if (!p) return null;
-  return { name: p.name_id, url: p.url };
+  return { name: p.name_id, url: p.url, image: p.image };
 }

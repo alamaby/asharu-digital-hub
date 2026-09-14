@@ -474,6 +474,12 @@
       "articlePublishAction": "Publish selected",
       "articlePublishOk": "Published",
       "articleMissingLang": "content missing",
+      "articleAffiliateVisual": "Visual for this section: affiliate product image",
+      "articleAffiliateBox": "Affiliate product in this article",
+      "articleExpand": "Expand to ≥{min} words",
+      "articleExpandWorking": "Expanding article…",
+      "articleExpandOk": "Article expanded: {words} words",
+      "articleExpandError": "Expand failed",
       "affiliate": {
         "title": "Affiliate Product",
         "relevance": {

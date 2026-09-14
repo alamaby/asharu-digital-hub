@@ -75,17 +75,45 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
     setQueueInfo(queue);
   }
 
-  // Draf artikel long-form dirender kartu khusus (publish ke tabel articles,
-  // bukan antrean Threads).
+  // Draf artikel long-form: kartu artikel (pratinjau + publish ke tabel
+  // articles) + cover visual + kartu produk afiliasi. Sebelumnya cabang ini
+  // early-return tanpa cover maupun produk (kasus 419a2dc8: cover failed
+  // tak terlihat, produk hanya URL mentah di body).
   if (draft.platform_slug === 'artikel' && draft.article_draft) {
+    const artInjection = draft.affiliate_injections[0] ?? null;
+    const artJson = JSON.stringify(draft.article_draft);
     return (
-      <ArticleDraftCard
-        draftId={draft.id}
-        status={draft.status}
-        article={draft.article_draft}
-        sessionLanguage={sessionLanguage}
-        published={publishedArticles}
-      />
+      <div className="space-y-4">
+        <ArticleDraftCard
+          draftId={draft.id}
+          status={draft.status}
+          article={draft.article_draft}
+          sessionLanguage={sessionLanguage}
+          published={publishedArticles}
+          affiliate={artInjection ? {
+            url: artInjection.url,
+            name: artInjection.product_name_id,
+            image: artInjection.product_image,
+            merchant: artInjection.product_merchant,
+            friendlyCode: artInjection.friendly_code
+          } : null}
+        />
+        <DraftImageCard
+          draftId={draft.id}
+          initialImages={coverImages}
+          initialSelectedId={coverSelectedId}
+          options={imageOptions}
+        />
+        <AffiliateProductCard
+          draftId={draft.id}
+          injection={artInjection}
+          matchScore={draft.affiliate_match_score ?? null}
+          hasPlaceholderWarning={artJson.includes('{{PRODUCT_URL}}') && draft.affiliate_injections.length === 0}
+          regenProviders={regenProviders}
+          regenModels={regenModels}
+          allowRegen={false}
+        />
+      </div>
     );
   }
 

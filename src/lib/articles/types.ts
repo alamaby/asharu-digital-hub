@@ -25,6 +25,8 @@ export interface PublishedArticle {
 export interface ArticleProduct {
   name: string;
   url: string;
+  /** Gambar produk afiliasi (reuse affiliate_products.image) untuk visual box. */
+  image: string | null;
 }
 
 /** Render konten artikel per-bahasa menjadi markdown untuk kolom body_md. */

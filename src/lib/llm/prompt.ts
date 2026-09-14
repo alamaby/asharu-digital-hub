@@ -291,7 +291,8 @@ export function buildArticlePrompt(
     'You write long-form articles that rank on Google: clear H1-title, scannable H2 sections, FAQ, natural affiliate mention.',
     'Rules:',
     '- Output JSON ONLY with shape: {"id": <article|null>, "en": <article|null>} where <article> = {"title":"...","slug":"...","excerpt":"...","sections":[{"h2":"...","body":"..."}],"faq":[{"q":"...","a":"..."}],"meta_title":"...","meta_desc":"..."}',
-    '- PANJANG: total isi (excerpt + semua body section) 800-1500 kata per bahasa. Tiap section body 150-300 kata, 4-7 sections. Jangan bertele-tele, tiap paragraf menambah informasi baru.',
+    '- PANJANG (WAJIB, anti thin-content): total isi (excerpt + semua body section) 800-1500 kata per bahasa. Tiap section body 150-300 kata — hitung sendiri sebelum output (±1 kata ≈ 5-6 karakter; 150 kata ≈ 900+ karakter). 4-7 sections berarti total body ≥ 600 kata SELALU. Jangan berhenti dini: bila total masih < 800 kata, tambah contoh konkret, tips praktis, atau sub-poin sampai cukup. Jangan bertele-tele, tiap paragraf menambah informasi baru.',
+    '- EMOJI (WAJIB, natural): excerpt memuat 1 emoji relevan + tiap section body memuat TEPAT 1 emoji relevan yang inline menyatu dengan kalimat (mis. di akhir kalimat pembuka). Emoji harus berkaitan dengan isi; jangan mengganti kata dengan emoji; jangan lebih dari 1 per section agar tetap pantas untuk SEO.',
     '- STRUKTUR: title = H1 yang memancing klik (10-70 karakter, masukkan keyword utama). excerpt 50-160 kata sebagai pengantar. sections = jawaban bertahap dari umum ke spesifik, H2 deskriptif (bukan "Pendahuluan"/"Kesimpulan" yang generik). faq 3-5 pasang Q&A yang benar-benar ditanyakan orang.',
     '- FAKTA: gunakan HANYA fakta dari blok konteks (key facts). Jangan mengarang data, angka, harga, atau klaim medis/finansial. Bila tidak yakin, tulis secara umum yang aman.',
     '- AFFILIATE: sisipkan {{PRODUCT_URL}} TEPAT 1 kali, inline di dalam body salah satu section tengah (bukan section pertama/terakhir), dibungkus 1-2 kalimat jembatan natural yang menjelaskan kenapa produk relevan + NAMA PRODUK persis seperti di blok produk. Jangan bare link tanpa konteks. Jangan hard-sell.',
@@ -412,4 +413,96 @@ export function slugifyTitle(title: string): string {
     .replace(/-+/g, '-')
     .slice(0, 80);
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : 'artikel';
+}
+
+// Regex emoji sama seperti thread.ts (duplikat sengaja — thread.ts import
+// dari file ini sehingga import balik akan circular).
+const ARTICLE_EMOJI_RE = /\p{Extended_Pictographic}/u;
+
+export interface ArticleEmojiGap {
+  /** 'excerpt' atau index section yang tanpa emoji. */
+  part: 'excerpt' | number;
+  lang: 'id' | 'en';
+}
+
+/**
+ * Audit emoji artikel long-form (aturan: excerpt 1 emoji + tiap section
+ * body 1 emoji per bahasa yang terisi). Lunak — untuk log peringatan,
+ * bukan gate publish.
+ */
+export function auditArticleEmoji(article: ParsedArticleDraft): ArticleEmojiGap[] {
+  const gaps: ArticleEmojiGap[] = [];
+  for (const lang of ['id', 'en'] as const) {
+    const a = article[lang];
+    if (!a) continue;
+    if (!ARTICLE_EMOJI_RE.test(a.excerpt ?? '')) gaps.push({ part: 'excerpt', lang });
+    a.sections.forEach((s, i) => {
+      if (!ARTICLE_EMOJI_RE.test(s.body ?? '')) gaps.push({ part: i, lang });
+    });
+  }
+  return gaps;
+}
+
+export interface ArticleExpandInput {
+  topic: string;
+  language: string;
+  /** Jumlah kata saat ini per bahasa (untuk instruksi tambah). */
+  wordCount: Record<string, number>;
+}
+
+/**
+ * Prompt repair thin-content: kembangkan artikel yang sudah ada hingga
+ * ≥800 kata per bahasa tanpa mengubah fakta/afiliasi/struktur JSON.
+ * Output shape SAMA dengan buildArticlePrompt (parse via parseArticleDraft).
+ */
+export function buildArticleExpandPrompt(
+  input: ArticleExpandInput,
+  current: ParsedArticleDraft,
+  product: AffiliateProductForPrompt
+): { system: string; user: string } {
+  const langs = articleLangKeys(input.language);
+  const langRule =
+    langs.length === 2
+      ? '- BAHASA: isi BOTH "id" dan "en" — keduanya artikel penuh yang dilokalkan natural.'
+      : `- BAHASA: isi HANYA "${langs[0]}" (isi bahasa lain dengan null).`;
+  const system = [
+    'You are a senior SEO copywriter for Asharu (asharu.id), bilingual ID+EN, helpful and authentic.',
+    'TASK: EXPAND artikel long-form di bawah yang THIN (di bawah minimum kata) hingga 800-1500 kata per bahasa.',
+    'Rules:',
+    '- Output JSON ONLY dengan shape yang SAMA PERSIS seperti input ({"id": <article|null>, "en": <article|null>} — field dan slug TIDAK BOLEH berubah).',
+    '- KEMBANGKAN tiap section body hingga 150-300 kata: tambah contoh konkret, tips praktis, detail use-case, atau sub-poin yang relevan — tiap kalimat baru menambah informasi, bukan pengulangan.',
+    '- PERTAHANKAN: title, slug, H2, faq, meta, fakta/key-facts, CTA, dan 1 sisipan {{PRODUCT_URL}} + NAMA PRODUK di section yang sama (jangan pindah/tambah/kurangi). Jangan mengarang data, angka, harga, atau klaim medis/finansial baru.',
+    '- EMOJI: excerpt 1 emoji relevan + tiap section body TEPAT 1 emoji relevan inline (jangan ganti kata dengan emoji).',
+    '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK.',
+    langRule
+  ].join('\n');
+  const deficit = langs.map((l) => `${l}: ${input.wordCount[l] ?? 0} → target 800+`).join(', ');
+  const user = [
+    `Topic/angle: ${input.topic}`,
+    `Kata saat ini (${deficit}, minimum publish ${ARTICLE_MIN_WORDS}):`,
+    '',
+    '```json',
+    JSON.stringify(current),
+    '```',
+    '',
+    `Available affiliate product (tetap tepat 1x via {{PRODUCT_URL}} + nama, JANGAN ubah posisi):`,
+    `- ${product.friendlyCode}: ${product.name} — {{PRODUCT_URL}} — category ${product.category}`,
+    '',
+    'Expand now — output only the expanded JSON.'
+  ].join('\n');
+  return { system, user };
+}
+
+/**
+ * Index section yang memuat URL afiliasi (visual = gambar produk).
+ * -1 bila tidak ketemu (fallback: tampilkan di box afiliasi saja).
+ */
+export function findAffiliateSectionIndex(
+  sections: Array<{ h2: string; body: string }>,
+  affiliateUrl: string | null | undefined
+): number {
+  if (!affiliateUrl) return -1;
+  const needle = affiliateUrl.trim();
+  if (!needle) return -1;
+  return sections.findIndex((s) => (s.body ?? '').includes(needle));
 }

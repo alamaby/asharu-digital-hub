@@ -126,16 +126,43 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
         ) : null}
       </header>
 
+      {article.cover_image_url ? (
+        <div className="mt-6 overflow-hidden rounded-xl border border-line bg-surface">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={article.cover_image_url}
+            alt={article.title}
+            className="aspect-video w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      ) : null}
+
       <div className="mt-6">
         <MarkdownBody md={article.body_md} />
       </div>
 
       {article.affiliate_url ? (
         <aside className="mt-8 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <p className="text-sm font-semibold text-ink">{t('affiliateBoxTitle')}</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            {product ? t('affiliateBoxBody', { product: product.name }) : t('affiliateBoxBodyNoName')}
-          </p>
+          <div className="flex items-center gap-3">
+            {product?.image ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={product.image}
+                alt={product.name}
+                width={64}
+                height={64}
+                className="size-16 shrink-0 rounded-lg border border-line object-cover"
+                loading="lazy"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">{t('affiliateBoxTitle')}</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                {product ? t('affiliateBoxBody', { product: product.name }) : t('affiliateBoxBodyNoName')}
+              </p>
+            </div>
+          </div>
           <ExternalLink
             href={product?.url ?? article.affiliate_url}
             className="btn-primary mt-3 inline-flex"

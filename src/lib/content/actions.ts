@@ -1015,12 +1015,19 @@ export async function swapAffiliateProduct(
     const prod = product as { id: string; friendly_code: string; url: string; name_id: string; name_en: string; image: string; category: string; merchant: string };
     const { data: draft, error: draftError } = await supabase
       .from('content_drafts')
-      .select('id, affiliate_injections, affiliate_swap_history')
+      .select('id, platform_slug, article_draft, affiliate_injections, affiliate_swap_history')
       .eq('id', draftId)
       .maybeSingle();
     if (draftError || !draft) {
       return { success: false, error: draftError?.message ?? 'draft not found' };
     }
+    const draftRow = draft as {
+      platform_slug: string | null;
+      article_draft: Record<string, unknown> | null;
+      affiliate_injections: Array<{ id?: string; url?: string; product_name_id?: string }>;
+      affiliate_swap_history: Array<unknown>;
+    };
+    const oldInjection = Array.isArray(draftRow.affiliate_injections) ? draftRow.affiliate_injections[0] : undefined;
     // Compute a match signal against the draft's topic (best-effort scoring).
     let matchScore = 0;
     let matchSignals: {
@@ -1058,9 +1065,9 @@ export async function swapAffiliateProduct(
         }
       }
     }
-    const currentId = (draft.affiliate_injections as Array<{ id?: string }>)[0]?.id;
-    const oldHistory = Array.isArray(draft.affiliate_swap_history)
-      ? (draft.affiliate_swap_history as Array<unknown>)
+    const currentId = oldInjection?.id;
+    const oldHistory = Array.isArray(draftRow.affiliate_swap_history)
+      ? (draftRow.affiliate_swap_history as Array<unknown>)
       : [];
     const history = [
       ...oldHistory,
@@ -1096,6 +1103,22 @@ export async function swapAffiliateProduct(
       })
       .eq('id', draftId);
     if (updateError) return { success: false, error: updateError.message };
+    // Draf artikel: URL + nama produk tertulis inline di body section
+    // (bukan reply terpisah) — patch agar body ikut produk baru.
+    if (draftRow.platform_slug === 'artikel' && draftRow.article_draft) {
+      const before = JSON.stringify(draftRow.article_draft);
+      let after = before;
+      if (oldInjection?.url) after = after.split(oldInjection.url).join(prod.url);
+      if (oldInjection?.product_name_id && oldInjection.product_name_id !== prod.name_id) {
+        after = after.split(oldInjection.product_name_id).join(prod.name_id);
+      }
+      if (after !== before) {
+        await supabase
+          .from('content_drafts')
+          .update({ article_draft: JSON.parse(after) as Record<string, unknown> })
+          .eq('id', draftId);
+      }
+    }
     return { success: true, draftId };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) };

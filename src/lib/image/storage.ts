@@ -14,7 +14,8 @@ export async function uploadDraftImage(
   mimeType: string
 ): Promise<{ storagePath: string; publicUrl: string }> {
   const supabase = getServiceClient();
-  const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
+  const lower = mimeType.toLowerCase();
+  const ext = lower.includes('jpeg') || lower.includes('jpg') ? 'jpg' : lower.includes('webp') ? 'webp' : 'png';
   const storagePath = `${draftId}/${imageId}.${ext}`;
   const { error } = await supabase.storage
     .from(DRAFT_IMAGES_BUCKET)

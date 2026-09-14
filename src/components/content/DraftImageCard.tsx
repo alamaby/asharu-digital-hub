@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftImageReference } from '@/lib/image/actions';
+import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftCoverImage, uploadDraftImageReference } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
 import { ReferencePicker, type ReferenceModelOption } from './ReferencePicker';
@@ -59,6 +59,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   });
   const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverNotice, setCoverNotice] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(() => {
     const latest = latestOf(initialImages);
     const hasVisual = initialImages.some((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url);
@@ -169,6 +171,34 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       setReferenceNotice(e instanceof Error ? e.message : 'Upload referensi gagal.');
     } finally {
       setIsUploadingRef(false);
+    }
+  }
+
+  async function handleCoverUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setCoverNotice('Cover maksimal 5MB — kecilkan dulu.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+      setCoverNotice('Cover harus gambar JPEG/PNG/WebP.');
+      return;
+    }
+    setIsUploadingCover(true);
+    setCoverNotice('Mengunggah cover...');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await uploadDraftCoverImage(draftId, fd);
+      const rows = await listDraftImages(draftId);
+      const cover = rows.filter((r) => (r.post_index ?? 0) === 0);
+      setImages(cover);
+      const sel = cover.find((r) => r.status === 'selected') ?? null;
+      setSelectedId(sel?.id ?? null);
+      setCoverNotice('Cover terpasang — jadi visual review, publish & antrean social.');
+    } catch (e) {
+      setCoverNotice(e instanceof Error ? e.message : 'Upload cover gagal.');
+    } finally {
+      setIsUploadingCover(false);
     }
   }
 
@@ -396,6 +426,26 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           {isPending ? 'Memproses...' : hasVisual ? 'Regenerate' : 'Generate ilustrasi'}
         </button>
         <span className="ml-2 text-[11px] text-ink-muted">Sempurnakan = side-by-side (prompt+negative) → Terima/Batal → Regenerate.</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-background px-3 py-2">
+        <label className="text-xs text-ink">
+          <span className="mb-1 block font-medium">Upload cover manual (alternatif bila generate gagal)</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={isPending || isUploadingCover}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void handleCoverUpload(f);
+            }}
+            className="block text-xs text-ink-muted file:mr-2 file:rounded-lg file:border file:border-line file:bg-surface file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink hover:file:border-primary disabled:opacity-50"
+          />
+        </label>
+        {isUploadingCover ? <span className="text-xs text-ink-muted">Mengunggah…</span> : null}
+        {coverNotice && !isUploadingCover ? (
+          <span role="status" className="text-xs text-ink-muted">{coverNotice}</span>
+        ) : null}
       </div>
 
       {proposed ? (

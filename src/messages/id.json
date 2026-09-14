@@ -474,6 +474,12 @@
       "articlePublishAction": "Publish yang dipilih",
       "articlePublishOk": "Terbit",
       "articleMissingLang": "konten kosong",
+      "articleAffiliateVisual": "Visual section ini: gambar produk afiliasi",
+      "articleAffiliateBox": "Produk afiliasi di artikel ini",
+      "articleExpand": "Kembangkan hingga ≥{min} kata",
+      "articleExpandWorking": "Mengembangkan artikel…",
+      "articleExpandOk": "Artikel dikembangkan: {words} kata",
+      "articleExpandError": "Expand gagal",
       "affiliate": {
         "title": "Produk Afiliasi",
         "relevance": {

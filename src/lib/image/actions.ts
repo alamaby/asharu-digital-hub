@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { REFERENCE_IMAGE_ALLOWED_MIME, REFERENCE_IMAGE_MAX_BYTES, clampImg2ImgStrength } from './types';
-import { uploadDraftReference } from './storage';
+import { uploadDraftImage, uploadDraftReference } from './storage';
 import type { DraftImageRow } from './types';
 
 async function requireAdmin() {
@@ -82,6 +82,67 @@ export async function uploadDraftImageReference(
   const bytes = new Uint8Array(await file.arrayBuffer());
   const refId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
   return uploadDraftReference(draftId, refId, bytes, file.type);
+}
+
+/**
+ * Upload gambar cover final (post 0) untuk draf — alternatif manual bila
+ * generate gagal (kasus 419a2dc8: Gateway Timeout) atau admin punya visual
+ * sendiri. Validasi: admin, mime JPEG/PNG/WebP, size ≤5MB. Hasil langsung
+ * berstatus selected (jadi cover review + publish + antrean social).
+ */
+export async function uploadDraftCoverImage(
+  draftId: string,
+  formData: FormData
+): Promise<{ imageId: string; publicUrl: string }> {
+  const supabase = await requireAdmin();
+  if (!draftId) throw new Error('draftId required');
+  const { data: draft } = await supabase.from('content_drafts').select('id').eq('id', draftId).maybeSingle();
+  if (!draft) throw new Error('draft not found');
+  const file = formData.get('file');
+  if (!(file instanceof File)) throw new Error('File gambar wajib diisi.');
+  if (!file.size || file.size <= 0) throw new Error('File gambar kosong.');
+  if (file.size > REFERENCE_IMAGE_MAX_BYTES) {
+    throw new Error('Gambar maksimal 5MB — kecilkan dulu.');
+  }
+  if (!(REFERENCE_IMAGE_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
+    throw new Error('Gambar harus JPEG/PNG/WebP.');
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const imageId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
+  const { storagePath, publicUrl } = await uploadDraftImage(draftId, imageId, bytes, file.type);
+  const { data: created, error } = await supabase
+    .from('content_draft_images')
+    .insert({
+      draft_id: draftId,
+      post_index: 0,
+      image_prompt: '(upload manual)',
+      provider_slug: 'manual',
+      model_id: 'manual-upload',
+      storage_path: storagePath,
+      public_url: publicUrl,
+      reasoning: { visual_strategy: 'manual_upload', justification: 'admin_upload' },
+      status: 'selected'
+    })
+    .select('id')
+    .single();
+  if (error || !created) throw new Error(error?.message ?? 'cover upload save failed');
+  // Satu cover terpilih: demote selected lama + catat di draf + antrean queued.
+  await supabase
+    .from('content_draft_images')
+    .update({ status: 'ready', updated_at: new Date().toISOString() })
+    .eq('draft_id', draftId)
+    .eq('post_index', 0)
+    .eq('status', 'selected')
+    .neq('id', (created as { id: string }).id);
+  await supabase.from('content_drafts').update({ selected_image_id: (created as { id: string }).id }).eq('id', draftId);
+  await supabase
+    .from('social_post_queue')
+    .update({ image_url: publicUrl })
+    .eq('draft_id', draftId)
+    .eq('status', 'queued');
+  revalidatePath('/konten/review');
+  revalidatePath('/konten/review/[draftId]', 'page');
+  return { imageId: (created as { id: string }).id, publicUrl };
 }
 
 /**

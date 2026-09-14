@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildThreadPrompt } from '@/lib/llm/prompt';
 import {
   ARTICLE_MIN_WORDS,
+  auditArticleEmoji,
+  buildArticleExpandPrompt,
   buildArticlePrompt,
   countArticleWords,
   parseArticleDraft,
@@ -933,30 +935,93 @@ async function generateArticleAndInsertDraft(
   }
   if (!activeLlm) throw new Error('article parse failed');
 
-  const article = parsed!;
-  const resolvedLlm = activeLlm!;
-
   // Ganti placeholder dengan URL afiliasi asli (per bahasa).
-  const finalArticle: ParsedArticleDraft = { id: article.id, en: article.en };
-  if (affiliate) {
+  // Expand pakai bentuk ber-placeholder agar repair tidak merusak URL final.
+  let workingArticle: ParsedArticleDraft = { id: parsed!.id, en: parsed!.en };
+  const replaceAffiliateUrls = (src: ParsedArticleDraft): ParsedArticleDraft => {
+    if (!affiliate) return { id: src.id, en: src.en };
+    const out: ParsedArticleDraft = { id: src.id, en: src.en };
     for (const lang of required) {
-      const a = finalArticle[lang];
+      const a = out[lang];
       if (a) {
-        const replaced = JSON.parse(
+        out[lang] = JSON.parse(
           JSON.stringify(a).split('{{PRODUCT_URL}}').join(affiliate.product.url)
         ) as typeof a;
-        finalArticle[lang] = replaced;
       }
     }
+    return out;
+  };
+
+  const countWords = (src: ParsedArticleDraft): Record<string, number> => {
+    const wc: Record<string, number> = {};
+    for (const lang of required) {
+      const a = src[lang];
+      if (a) wc[lang] = countArticleWords(a);
+    }
+    return wc;
+  };
+
+  // Repair thin-content 1x: kembangkan hingga ≥800 kata (pola repair emoji
+  // thread — kasus 419a2dc8: 488 kata lolos tanpa perlawanan).
+  let wordCount = countWords(workingArticle);
+  let expanded = false;
+  if (Object.values(wordCount).some((w) => w < ARTICLE_MIN_WORDS)) {
+    const expandPrompt = buildArticleExpandPrompt(
+      { topic: topic.topic, language, wordCount },
+      workingArticle,
+      promptProduct
+    );
+    const expandResult = await runLLMCompletion(supabase, {
+      requestId: null,
+      sessionId,
+      stage: 'developing',
+      providerId: devModel.providerId,
+      modelUuid: devModel.modelUuid,
+      messages: [
+        { role: 'system', content: expandPrompt.system },
+        { role: 'user', content: expandPrompt.user }
+      ],
+      temperature: 0.7,
+      maxTokens: 6000
+    }).catch(() => null);
+    const expandedParsed = expandResult ? parseArticleDraft(expandResult.output.text) : null;
+    if (expandedParsed && required.every((l) => expandedParsed[l])) {
+      workingArticle = expandedParsed;
+      activeLlm = expandResult;
+      expanded = true;
+      wordCount = countWords(workingArticle);
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'info',
+        message: `article topic ${topicId} expanded (thin repair): ${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata`
+      });
+    } else {
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'warn',
+        message: `article topic ${topicId} expand repair gagal diparse — pakai draf awal`
+      });
+    }
+  }
+
+  const finalArticle = replaceAffiliateUrls(workingArticle);
+  const resolvedLlm = activeLlm!;
+
+  // Audit emoji lunak (aturan baru: excerpt + tiap section 1 emoji).
+  const emojiGaps = auditArticleEmoji(finalArticle);
+  if (emojiGaps.length > 0) {
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'warn',
+      message: `article topic ${topicId} emoji kurang di ${emojiGaps.length} bagian (${emojiGaps.slice(0, 6).map((g) => `${g.lang}:${g.part}`).join(', ')}) — draf disimpan dengan tanda`
+    });
   }
 
   // Gate lunak jumlah kata: di bawah minimum tetap disimpan + ditandai
   // (publish yang menolak) agar sesi tidak gagal sunyi.
-  const wordCount: Record<string, number> = {};
-  for (const lang of required) {
-    const a = finalArticle[lang];
-    if (a) wordCount[lang] = countArticleWords(a);
-  }
   const thinContent = Object.values(wordCount).some((w) => w < ARTICLE_MIN_WORDS);
   if (thinContent) {
     await supabase.from('content_research_logs').insert({
@@ -1007,6 +1072,9 @@ async function generateArticleAndInsertDraft(
       platform: 'artikel',
       word_count: wordCount,
       thin_content: thinContent,
+      expanded,
+      emoji_missing: emojiGaps.length > 0,
+      emoji_gaps: emojiGaps.slice(0, 12),
       language
     },
     affiliate_match_score: fixedProductId ? null : (affiliate?.matchScore ?? null),
@@ -1033,7 +1101,7 @@ async function generateArticleAndInsertDraft(
     stage: 'developing',
     level: 'info',
     message: affiliate
-      ? `article draft generated [artikel]${fixedProductId ? ' [fixed]' : ''} with affiliate ${affiliate.product.friendly_code} (${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata)${thinContent ? ' THIN-CONTENT' : ''}`
+      ? `article draft generated [artikel]${fixedProductId ? ' [fixed]' : ''} with affiliate ${affiliate.product.friendly_code} (${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata)${thinContent ? ' THIN-CONTENT' : ''}${expanded ? ' EXPANDED' : ''}${emojiGaps.length > 0 ? ' EMOJI-MISSING' : ''}`
       : `article draft generated [artikel] without affiliate (empty pool)`
   });
 }

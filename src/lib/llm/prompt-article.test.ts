@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ARTICLE_MIN_WORDS,
+  auditArticleEmoji,
+  buildArticleExpandPrompt,
   buildArticlePrompt,
   countArticleWords,
+  findAffiliateSectionIndex,
   parseArticleDraft,
   slugifyTitle,
   type ArticleLangDraft
@@ -47,6 +50,16 @@ describe('buildArticlePrompt', () => {
     );
     expect(system).toContain('HANYA "id"');
   });
+
+  it('meminta emoji 1 per section + excerpt dan budget kata eksplisit', () => {
+    const { system } = buildArticlePrompt(
+      { topic: 'keyboard', tone: 'casual', audience: 'pekerja', ctaStyle: 'soft_sell', purpose: 'edukasi', language: 'id' },
+      product
+    );
+    expect(system).toContain('EMOJI');
+    expect(system).toContain('800-1500 kata');
+    expect(system).toContain('900+ karakter');
+  });
 });
 
 describe('parseArticleDraft', () => {
@@ -87,5 +100,64 @@ describe('slugifyTitle', () => {
 
   it('fallback artikel untuk input kosong', () => {
     expect(slugifyTitle('!!!')).toBe('artikel');
+  });
+});
+
+describe('auditArticleEmoji', () => {
+  it('menandai excerpt dan section tanpa emoji', () => {
+    const gaps = auditArticleEmoji({
+      id: validLang({
+        excerpt: 'Pengantar tanpa emoji sama sekali cukup panjang untuk lolos validasi parse artikel ini',
+        sections: [
+          { h2: 'A', body: 'Body tanpa emoji. '.repeat(30) },
+          { h2: 'B', body: 'Body beremoji 🎉. '.repeat(30) }
+        ]
+      }),
+      en: null
+    });
+    expect(gaps).toContainEqual({ part: 'excerpt', lang: 'id' });
+    expect(gaps).toContainEqual({ part: 0, lang: 'id' });
+    expect(gaps).not.toContainEqual({ part: 1, lang: 'id' });
+  });
+
+  it('kosong bila semua bagian beremoji', () => {
+    const gaps = auditArticleEmoji({
+      id: validLang({
+        excerpt: 'Pengantar beremoji 🎉 cukup panjang untuk lolos validasi parse artikel ini ya',
+        sections: [{ h2: 'A', body: 'Isi 🎉. '.repeat(30) }, { h2: 'B', body: 'Isi ✨. '.repeat(30) }, { h2: 'C', body: 'Isi 🔥. '.repeat(30) }]
+      }),
+      en: null
+    });
+    expect(gaps).toEqual([]);
+  });
+});
+
+describe('buildArticleExpandPrompt', () => {
+  it('mempertahankan shape + melarang ubah slug/afiliasi', () => {
+    const current = { id: validLang(), en: null };
+    const { system, user } = buildArticleExpandPrompt(
+      { topic: 'keyboard', language: 'id', wordCount: { id: 488 } },
+      current,
+      product
+    );
+    expect(system).toContain('EXPAND');
+    expect(system).toContain('TIDAK BOLEH berubah');
+    expect(system).toContain('{{PRODUCT_URL}}');
+    expect(user).toContain('488');
+    expect(user).toContain(JSON.stringify(current).slice(0, 50));
+  });
+});
+
+describe('findAffiliateSectionIndex', () => {
+  const sections = [
+    { h2: 'A', body: 'Umum saja.' },
+    { h2: 'B', body: 'Beli di https://s.shopee.co.id/xyz sekarang.' }
+  ];
+  it('ketemu index section ber-URL afiliasi', () => {
+    expect(findAffiliateSectionIndex(sections, 'https://s.shopee.co.id/xyz')).toBe(1);
+  });
+  it('-1 bila URL kosong/tak ketemu', () => {
+    expect(findAffiliateSectionIndex(sections, null)).toBe(-1);
+    expect(findAffiliateSectionIndex(sections, 'https://lain.example/x')).toBe(-1);
   });
 });

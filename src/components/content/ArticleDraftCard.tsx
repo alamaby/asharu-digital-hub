@@ -1,11 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import type { ParsedArticleDraft } from '@/lib/llm/prompt';
-import { ARTICLE_MIN_WORDS, countArticleWords } from '@/lib/llm/prompt';
-import { approveArticleAndPublish } from '@/lib/articles/actions';
+import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex } from '@/lib/llm/prompt';
+import { approveArticleAndPublish, expandArticleDraft } from '@/lib/articles/actions';
 import type { ArticleLocale } from '@/lib/articles/types';
+
+export interface ArticleAffiliateInfo {
+  url: string | null;
+  name?: string | null;
+  image?: string | null;
+  merchant?: string | null;
+  friendlyCode?: string | null;
+}
 
 interface Props {
   draftId: string;
@@ -14,6 +24,8 @@ interface Props {
   /** Bahasa sesi riset: 'id' | 'en' | 'both' | null (null = boleh keduanya). */
   sessionLanguage: string | null;
   published: { locale: string; slug: string }[];
+  /** Info produk afiliasi (dari affiliate_injections) untuk visual section. */
+  affiliate?: ArticleAffiliateInfo | null;
 }
 
 /**
@@ -21,18 +33,23 @@ interface Props {
  * per bahasa ke tabel `articles`. Pengganti ContentDraftCard (thread)
  * khusus platform `artikel`.
  */
-export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published }: Props) {
+export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published, affiliate = null }: Props) {
   const t = useTranslations('content.review');
+  const router = useRouter();
   const available = (['id', 'en'] as const).filter((l) => article[l]);
   const [lang, setLang] = useState<'id' | 'en'>(available[0] ?? 'id');
   const [selected, setSelected] = useState<ArticleLocale[]>(() => [...available]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishOk, setPublishOk] = useState<{ locale: string; slug: string }[] | null>(null);
+  const [expanding, setExpanding] = useState(false);
+  const [expandError, setExpandError] = useState<string | null>(null);
+  const [expandOk, setExpandOk] = useState<string | null>(null);
 
   const content = article[lang];
   const words = content ? countArticleWords(content) : 0;
   const thin = words < ARTICLE_MIN_WORDS;
+  const affiliateIdx = content ? findAffiliateSectionIndex(content.sections, affiliate?.url) : -1;
   const allowed: ArticleLocale[] =
     !sessionLanguage || sessionLanguage === 'both'
       ? ['id', 'en']
@@ -58,6 +75,29 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
     }
   }
 
+  async function handleExpand() {
+    setExpanding(true);
+    setExpandError(null);
+    setExpandOk(null);
+    try {
+      const result = await expandArticleDraft(draftId);
+      if (!result.success) {
+        setExpandError(result.error ?? t('articleExpandError'));
+      } else if (result.expanded) {
+        const total = Object.values(result.words ?? {}).join('/');
+        setExpandOk(t('articleExpandOk', { words: total }));
+        router.refresh();
+      } else {
+        const total = Object.values(result.words ?? {}).join('/');
+        setExpandOk(t('articleExpandOk', { words: total }));
+      }
+    } catch (e) {
+      setExpandError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExpanding(false);
+    }
+  }
+
   if (!content) {
     return (
       <article className="rounded-xl border border-line bg-surface p-4 shadow-card sm:p-6">
@@ -76,9 +116,43 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
       </div>
 
       {thin ? (
-        <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
-          {t('articleThin', { min: ARTICLE_MIN_WORDS, words })}
-        </p>
+        <div role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p>{t('articleThin', { min: ARTICLE_MIN_WORDS, words })}</p>
+          <button
+            type="button"
+            onClick={handleExpand}
+            disabled={expanding || publishing}
+            aria-busy={expanding}
+            className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {expanding ? t('articleExpandWorking') : t('articleExpand', { min: ARTICLE_MIN_WORDS })}
+          </button>
+          {expandError ? <p className="mt-1 font-medium">{t('articleExpandError')}: {expandError}</p> : null}
+          {expandOk ? <p className="mt-1 font-medium text-green-800">{expandOk}</p> : null}
+        </div>
+      ) : null}
+
+      {affiliate?.url ? (
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+          {affiliate.image ? (
+            <Image
+              src={affiliate.image}
+              alt={affiliate.name ?? affiliate.friendlyCode ?? 'produk afiliasi'}
+              width={64}
+              height={64}
+              className="size-16 shrink-0 rounded-lg border border-line object-cover"
+              loading="lazy"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t('articleAffiliateBox')}</p>
+            {affiliate.name ? <p className="truncate text-sm font-medium text-ink">{affiliate.name}</p> : null}
+            {affiliate.merchant ? <p className="text-xs text-ink-muted">{affiliate.merchant}</p> : null}
+            <a href={affiliate.url} target="_blank" rel="noreferrer noopener" className="break-words text-xs text-primary underline">
+              {affiliate.url} ↗
+            </a>
+          </div>
+        </div>
       ) : null}
 
       <div className="mt-3 flex gap-2">
@@ -102,12 +176,33 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
       <p className="mt-3 leading-relaxed text-ink-muted">{content.excerpt}</p>
 
       <div className="mt-4 space-y-4">
-        {content.sections.map((s, i) => (
-          <section key={i} className="rounded-lg border border-line bg-background p-3">
-            <h3 className="text-sm font-semibold text-ink">{s.h2}</h3>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">{s.body}</p>
-          </section>
-        ))}
+        {content.sections.map((s, i) => {
+          const isAffiliate = i === affiliateIdx;
+          return (
+            <section
+              key={i}
+              className={`rounded-lg border p-3 ${isAffiliate ? 'border-primary/40 bg-primary/5' : 'border-line bg-background'}`}
+            >
+              <h3 className="text-sm font-semibold text-ink">{s.h2}</h3>
+              {isAffiliate ? (
+                <p className="mt-1 flex items-center gap-2 text-[11px] font-medium text-primary">
+                  {affiliate?.image ? (
+                    <Image
+                      src={affiliate.image}
+                      alt={affiliate.name ?? ''}
+                      width={24}
+                      height={24}
+                      className="size-6 rounded object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  {t('articleAffiliateVisual')}
+                </p>
+              ) : null}
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">{s.body}</p>
+            </section>
+          );
+        })}
       </div>
 
       {content.faq.length > 0 ? (
