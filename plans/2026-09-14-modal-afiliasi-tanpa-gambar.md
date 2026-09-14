@@ -104,6 +104,7 @@ Contoh hasil akhir per baris (multi):
 ## Progress Log
 
 - 2026-09-14 12:30:00 — Plan detail dibuat untuk dieksekusi small model; implementasi belum dimulai.
+- 2026-09-14 12:46:00 — Implementasi selesai pada `src/components/content/AffiliateProductPicker.tsx`: +`FALLBACK_IMAGE`, `handleImgError`, thumbnail `<img size-10>` di mode single+multi, cache `productById` (merge dari tiap fetch) + `multiSelected: Set<string>`, `onConfirmSelect` memakai cache. Test tambahan `AffiliateProductPicker.test.tsx` (4 kasus) — thumbnail, fallback, multi, cache-cross-confirm. Gate hijau: `tsc --noEmit` 0 error; `eslint` bersih; `npm test` 561/561 sukses.
 
 ## Notes
 
