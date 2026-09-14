@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-13 21:45 (local time)
+Last updated: 2026-09-14 09:05 (local time)
 
 ## Current State
 
@@ -34,7 +34,7 @@ Last updated: 2026-09-13 21:45 (local time)
 
 ## Open Items / Blockers
 
-- [ ] **Apply migrasi artikel ke prod [USER ACTION]:** migrasi `20260913000001_artikel_platform` sudah di-commit (submodule `4b91d56`, parent `739ea40`) tapi BELUM di-apply (linkungan MCP read-only untuk DDL). Apply → verifikasi `platforms` ada `artikel` + tabel `articles` → submit sesi riset ☑ Artikel pertama → review → publish → cek `/id/artikel/[slug]` → GSC request indexing.
+- [ ] **Sesi riset Artikel pertama [USER ACTION]:** migrasi prod SUDAH applied (14 Sep, terverifikasi). Submit form `/konten/baru` dengan ☑ Artikel → pantau `/admin/riset` → review → publish → cek `/id/artikel/[slug]` → GSC request indexing.
 - [ ] **Verifikasi live Studio pasca-fix Flux+refresh (12 Sep, commit `4a522ab`) [USER ACTION]:** di `/id/studio` klik "Ulangi" pada 2 record failed (`996dcd8c` user-negative, `f10d58e2` timeout) → keduanya harus `ready` (prompt Flux terkirim sebagai `... Avoid: ...`). Lalu uji enqueue baru → baris `pending` harus langsung tampil di list tanpa reload.
 - [ ] **Verifikasi live img2img Cloudflare [USER ACTION]** — migrasi `20260912000001` sudah applied prod (2 model SD aktif, `supports_reference:true`). Sisa: generate pertama dengan referensi di Studio/review untuk konfirmasi format respons REST SD (JSON vs biner) + tuning strength.
 - [x] **Setup P0 cron SELESAI (2 Sep, updated 4 Sep 20:40):** (1) Vault `asharu_cron_secret` sudah di-seed (terverifikasi via MCP, created 2026-09-01 04:22 UTC), (2) `CRON_SECRET` diset di Vercel Production + redeploy (user). Cron `asharu-content-research` (*/5 after `research_cron_5min` drift fix) + `asharu-content-legacy` (*/5) baca Vault → kirim Bearer → endpoint validasi. **Migrasi `20260831000001` applied 2026-09-04 13:33 as no-op** (`processor_cron_bearer`, `20260904133359`, unschedule old job; superseded by `research_pipeline`). **Drift restored + per-stage LLM live:** `20260902041349`/`20260902055944` + `stage_llm_defaults`/`stage_llm_review_fixes` (`20260904133453`/`20260904133505`) verified (llm_stage_defaults 6 rows, 5 *_model_id, last_regen, trigger, RLS).
@@ -55,7 +55,7 @@ Last updated: 2026-09-13 21:45 (local time)
 
 ## Recent Entries
 
-- [214500-artikel-platform-seo.md](2026-09-13/214500-artikel-platform-seo.md) — Route Artikel sebagai platform riset baru (SEO): migrasi platform+tabel `articles` + prompt long-form + cabang development + publish per bahasa + halaman publik `/artikel`/`/articles` (SSG/ISR, JSON-LD, sitemap); gate hijau 555 tests + build, pushed `739ea40`/`4b91d56`. [USER ACTION] Apply migrasi ke prod + uji sesi Artikel pertama.
+- [214500-artikel-platform-seo.md](2026-09-13/214500-artikel-platform-seo.md) — Route Artikel sebagai platform riset baru (SEO): migrasi platform+tabel `articles` + prompt long-form + cabang development + publish per bahasa + halaman publik `/artikel`/`/articles` (SSG/ISR, JSON-LD, sitemap); gate hijau 555 tests + build, pushed `739ea40`/`4b91d56`. **Migrasi APPLIED prod 14 Sep** (terverifikasi: seed, 17 kolom, RLS 2 policy; advisors tanpa temuan baru). [USER ACTION] Uji sesi Artikel pertama.
 - [143000-riset-9a24c768-developing-gate-fix.md](2026-09-13/143000-riset-9a24c768-developing-gate-fix.md) — RCA riset `9a24c768` (mekanisme dua) failed "produk tetap tidak aktif/hilang": gate lama menyatukan 3 kasus tanpa log; akar transient = Supabase 504 intermiten di tick cron. Fix: `classifyFixedProducts` 3-kasus + defer cap 5/24j (bukan failed) + pending eksak + `updated_at` di semua UPDATE failed + validasi produk di `advanceToDevelopment` + guard soft-delete scraper 20%; sesi di-resume → 8/8 draf, `completed`; gate 536 tests hijau, pushed `3fafebe`.
 - [020000-studio-surface-real-errors.md](2026-09-13/020000-studio-surface-real-errors.md) — Studio: action client-facing (upload ref/enqueue/enhance/retry/delete) kini kembalikan `{ok,data}|{ok,error}` (pola `ActionResult` konten) agar pesan error asli tampil, bukan digest generik Next.js; gate 527 tests hijau, pushed `b222157`.
 - [013500-studio-img2img-storage-exists-fix.md](2026-09-13/013500-studio-img2img-storage-exists-fix.md) — Fix lanjutan img2img: `assertFreshReferenceExists` salah API (`from('storage.objects')` → schema `storage` tak diekspos PostgREST, PGRST205/106, terbukti via REST prod) → ganti `storage.from().exists()` best-effort; mock test ikut dibetulkan; gate 526 tests hijau, pushed `c2f7bad`. [USER ACTION] Ulangi generate img2img dari upload baru.

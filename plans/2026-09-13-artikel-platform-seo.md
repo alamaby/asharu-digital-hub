@@ -36,6 +36,7 @@ Keluar dari scope: komentar, multi-author, tag/kategori, RSS, auto-post medsos, 
 - [x] `ArticleDraftCard` + cabang di `ContentDraftCard` + snippet list + detail page
 - [x] `routing.ts`, `middleware.ts`, halaman publik list/detail, `articleSchema` JSON-LD, `sitemap.ts`, messages, nav
 - [x] Gate (`typecheck`, `lint`, `test` 555, `build`) hijau
+- [x] Apply migrasi `20260913000001` ke prod + verifikasi + advisors
 
 ## Risks
 
@@ -43,13 +44,13 @@ Keluar dari scope: komentar, multi-author, tag/kategori, RSS, auto-post medsos, 
 - Slug tabrakan → unique per `(locale, slug)` + suffix otomatis + idempoten per `(draft_id, locale)`.
 - Afiliasi hard-sell merusak E-E-A-T → maks 2 sisipan inline + disclosure di halaman.
 - Halaman tipis lolos index → tolak publish bila <600 kata dengan pesan jelas.
-- Migrasi hanya di-commit, apply ke prod via pipeline/user (linkungan MCP read-only untuk DDL).
 
 ## Progress Log
 
 - 2026-09-13 15:30:00 — Plan dibuat (Plan Mode), dikonfirmasi 4 keputusan desain via question tool.
 - 2026-09-13 15:45:00 — Build Mode aktif, investigasi selesai, mulai implementasi.
-- 2026-09-13 21:40:00 — Implementasi selesai: migrasi + pipeline + review/publish + route publik/SEO. Gate hijau (typecheck, lint, 555 tests/65 files, build; sitemap test verifikasi /id/artikel + /en/articles). Siap commit submodule → parent → push. Follow-up: apply migrasi ke prod [USER ACTION], seed/pantau sesi riset Artikel pertama, GSC request indexing.
+- 2026-09-13 21:40:00 — Implementasi selesai: migrasi + pipeline + review/publish + route publik/SEO. Gate hijau (typecheck, lint, 555 tests/65 files, build; sitemap test verifikasi /id/artikel + /en/articles). Commit submodule `4b91d56` + parent `739ea40` + memory, pushed.
+- 2026-09-14 09:00:00 — Migrasi `20260913000001` APPLIED ke prod via MCP `apply_migration` ✓. Verifikasi: `platforms('artikel', aktif)` ✓, 17 kolom `articles` ✓, `article_draft` jsonb ✓, 2 policy RLS ✓. Advisors: tidak ada temuan baru dari migrasi ini (security WARN lama: mutable search_path 3 fungsi, SECURITY DEFINER callable anon/authenticated 3 fungsi — pre-existing; performance: FK articles tanpa index + multiple permissive SELECT = pola standar repo, dicatat follow-up P2/P3).
 
 ## Notes
 
