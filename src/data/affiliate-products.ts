@@ -7,6 +7,126 @@ import type { AffiliateProduct } from './schemas';
 
 export const affiliateProducts: AffiliateProduct[] = [
   {
+    id: 'affiliate-42373719',
+    name: { id: 'Jet Fan Turbo/Mini Turbo Jet Fan Turbo Violent Fan 3 Gear Adjustable 130000RPM Wind Speed 53m/s Car', en: 'Jet Fan Turbo/Mini Turbo Jet Fan Turbo Violent Fan 3 Gear Adjustable 130000RPM Wind Speed 53m/s Car' },
+    category: 'others',
+    description: { id: 'Jet Fan Turbo/Mini Turbo Jet Fan Turbo Violent Fan 3 Gear Adjustable 130000RPM Wind Speed 53m/s Car', en: 'Jet Fan Turbo/Mini Turbo Jet Fan Turbo Violent Fan 3 Gear Adjustable 130000RPM Wind Speed 53m/s Car' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/5AsPeC5olG',
+    image: '/images/products/affiliate/42373719-8c7474a926ad.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373661',
+    name: { id: 'Nanhayu Glam - Box KWH Meter Listrik Prabayar Pulsa Dan Panel Listrik MCB Tempat Meteran Listrik Kay', en: 'Nanhayu Glam - Box KWH Meter Listrik Prabayar Pulsa Dan Panel Listrik MCB Tempat Meteran Listrik Kay' },
+    category: 'others',
+    description: { id: 'Nanhayu Glam - Box KWH Meter Listrik Prabayar Pulsa Dan Panel Listrik MCB Tempat Meteran Listrik Kay', en: 'Nanhayu Glam - Box KWH Meter Listrik Prabayar Pulsa Dan Panel Listrik MCB Tempat Meteran Listrik Kay' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/5VVG2bNTqT',
+    image: '/images/products/affiliate/42373661-0ff5024ffda4.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373431',
+    name: { id: '[COD] 900ML SUS 316 Thermos Tumbler Premium Aesthetic Dengan Gantungan Tumbler Gagang Vacuum Insula', en: '[COD] 900ML SUS 316 Thermos Tumbler Premium Aesthetic Dengan Gantungan Tumbler Gagang Vacuum Insula' },
+    category: 'home-living',
+    description: { id: '[COD] 900ML SUS 316 Thermos Tumbler Premium Aesthetic Dengan Gantungan Tumbler Gagang Vacuum Insula', en: '[COD] 900ML SUS 316 Thermos Tumbler Premium Aesthetic Dengan Gantungan Tumbler Gagang Vacuum Insula' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/5LBppn9gmq',
+    image: '/images/products/affiliate/42373431-fe0a17841ea2.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373422',
+    name: { id: '[Penawaran Terbatas] Kipas Angin Mini Genggam High Speed Kipas Mini Portable 20000Rpm 199Level', en: '[Penawaran Terbatas] Kipas Angin Mini Genggam High Speed Kipas Mini Portable 20000Rpm 199Level' },
+    category: 'home-living',
+    description: { id: '[Penawaran Terbatas] Kipas Angin Mini Genggam High Speed Kipas Mini Portable 20000Rpm 199Level', en: '[Penawaran Terbatas] Kipas Angin Mini Genggam High Speed Kipas Mini Portable 20000Rpm 199Level' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/W6a4tOmU6',
+    image: '/images/products/affiliate/42373422-40e76a62af0b.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373396',
+    name: { id: 'Kursi Lipat Lesehan Sofa Lantai Minimalis Floor Chair', en: 'Kursi Lipat Lesehan Sofa Lantai Minimalis Floor Chair' },
+    category: 'home-living',
+    description: { id: 'Kursi Lipat Lesehan Sofa Lantai Minimalis Floor Chair', en: 'Kursi Lipat Lesehan Sofa Lantai Minimalis Floor Chair' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/9fKozfmcQw',
+    image: '/images/products/affiliate/42373396-bff0d1957c92.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373392',
+    name: { id: 'Goojodoq GFS025 Kipas Camera 180° Adjustable 1.3-inch screen Mengambil foto dan video Turbo kipas an', en: 'Goojodoq GFS025 Kipas Camera 180° Adjustable 1.3-inch screen Mengambil foto dan video Turbo kipas an' },
+    category: 'electronics',
+    description: { id: 'Goojodoq GFS025 Kipas Camera 180° Adjustable 1.3-inch screen Mengambil foto dan video Turbo kipas an', en: 'Goojodoq GFS025 Kipas Camera 180° Adjustable 1.3-inch screen Mengambil foto dan video Turbo kipas an' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/W6a4oVL06',
+    image: '/images/products/affiliate/42373392-409bcc6f7ef4.webp',
+    featured: true
+  },
+  {
+    id: 'affiliate-42373351',
+    name: { id: 'rak dinding 35 cm rak buku serbaguna ukuran 36 cm jumbo', en: 'rak dinding 35 cm rak buku serbaguna ukuran 36 cm jumbo' },
+    category: 'home-living',
+    description: { id: 'rak dinding 35 cm rak buku serbaguna ukuran 36 cm jumbo', en: 'rak dinding 35 cm rak buku serbaguna ukuran 36 cm jumbo' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/3g3bqVUQ5a',
+    image: '/images/products/affiliate/42373351-2b65b88a32ea.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-42373347',
+    name: { id: 'GOOJODOQ GFS007 Mini Turbo kipas angin Adjustable High Speed 20000RPM untuk olahraga luar ruangan', en: 'GOOJODOQ GFS007 Mini Turbo kipas angin Adjustable High Speed 20000RPM untuk olahraga luar ruangan' },
+    category: 'home-living',
+    description: { id: 'GOOJODOQ GFS007 Mini Turbo kipas angin Adjustable High Speed 20000RPM untuk olahraga luar ruangan', en: 'GOOJODOQ GFS007 Mini Turbo kipas angin Adjustable High Speed 20000RPM untuk olahraga luar ruangan' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/112qfaWS1r',
+    image: '/images/products/affiliate/42373347-b597a4b23dd0.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-42373332',
+    name: { id: 'Mikroskop Anak Portable 200X Mainan Luar Ruangan Mainan Edukatif untuk Anak-anak', en: 'Mikroskop Anak Portable 200X Mainan Luar Ruangan Mainan Edukatif untuk Anak-anak' },
+    category: 'sports-hobby',
+    description: { id: 'Mikroskop Anak Portable 200X Mainan Luar Ruangan Mainan Edukatif untuk Anak-anak', en: 'Mikroskop Anak Portable 200X Mainan Luar Ruangan Mainan Edukatif untuk Anak-anak' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/gQ0GviDEx',
+    image: '/images/products/affiliate/42373332-b58ca624b1b4.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-42373324',
+    name: { id: 'KayuArta Rak Mukena, Ladder Hanger, Rak Tangga Kayu, Gantungan Sajadah, Sarung, Kerudung Aesthetic', en: 'KayuArta Rak Mukena, Ladder Hanger, Rak Tangga Kayu, Gantungan Sajadah, Sarung, Kerudung Aesthetic' },
+    category: 'home-living',
+    description: { id: 'KayuArta Rak Mukena, Ladder Hanger, Rak Tangga Kayu, Gantungan Sajadah, Sarung, Kerudung Aesthetic', en: 'KayuArta Rak Mukena, Ladder Hanger, Rak Tangga Kayu, Gantungan Sajadah, Sarung, Kerudung Aesthetic' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/Ln9sHcetm',
+    image: '/images/products/affiliate/42373324-7fff6938083b.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-42373309',
+    name: { id: 'Gantungan Kunci Rumah baru Minimalis Rak Dinding Multifungsi Tempat Kunci Estetik', en: 'Gantungan Kunci Rumah baru Minimalis Rak Dinding Multifungsi Tempat Kunci Estetik' },
+    category: 'home-living',
+    description: { id: 'Gantungan Kunci Rumah baru Minimalis Rak Dinding Multifungsi Tempat Kunci Estetik', en: 'Gantungan Kunci Rumah baru Minimalis Rak Dinding Multifungsi Tempat Kunci Estetik' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/8KpROwDP0d',
+    image: '/images/products/affiliate/42373309-d2627790815e.webp',
+    featured: false
+  },
+  {
+    id: 'affiliate-42373303',
+    name: { id: 'Wall Key Holder Kayu Mini Rumah | Gantungan Kunci Dinding Aesthetic | Dekorasi Rumah Kekinian ( A )', en: 'Wall Key Holder Kayu Mini Rumah | Gantungan Kunci Dinding Aesthetic | Dekorasi Rumah Kekinian ( A )' },
+    category: 'home-living',
+    description: { id: 'Wall Key Holder Kayu Mini Rumah | Gantungan Kunci Dinding Aesthetic | Dekorasi Rumah Kekinian ( A )', en: 'Wall Key Holder Kayu Mini Rumah | Gantungan Kunci Dinding Aesthetic | Dekorasi Rumah Kekinian ( A )' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/AKaVmas1yd',
+    image: '/images/products/affiliate/42373303-496b0e8e1c8c.webp',
+    featured: false
+  },
+  {
     id: 'affiliate-42321348',
     name: { id: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse', en: 'Goojodoq Dual Mode 2.4Ghz Wireless Bluetooth 2 In 1 Cordless Mouse' },
     category: 'electronics',
@@ -14,7 +134,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/50YyClbvr8',
     image: '/images/products/affiliate/42321348-7b8149a63aca.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-42269466',
@@ -24,7 +144,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4fw6o2XB6G',
     image: '/images/products/affiliate/42269466-89378b28c340.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-42084244',
@@ -34,7 +154,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9zxZAWxm5N',
     image: '/images/products/affiliate/42084244-3034891347d8.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-42083635',
@@ -44,7 +164,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4fw2nuCHTt',
     image: '/images/products/affiliate/42083635-3c2aa090f7f7.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-42083554',
@@ -54,7 +174,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/1LfapjfEoY',
     image: '/images/products/affiliate/42083554-9b1f6fcabe6b.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-42083528',
@@ -64,7 +184,7 @@ export const affiliateProducts: AffiliateProduct[] = [
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/1qbrQbptC7',
     image: '/images/products/affiliate/42083528-7a8ab187833e.webp',
-    featured: true
+    featured: false
   },
   {
     id: 'affiliate-41926248',
@@ -338,9 +458,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-40278369',
-    name: { id: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL  & Anak 2th-1', en: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL  & Anak 2th-1' },
+    name: { id: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL & Anak 2th-1', en: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL & Anak 2th-1' },
     category: 'fashion',
-    description: { id: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL  & Anak 2th-1', en: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL  & Anak 2th-1' },
+    description: { id: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL & Anak 2th-1', en: 'ACC WIJAYA | PREMIUM QUALITY | Baju/ Atasan / Kaos Lengan Panjang Unisex Dewasa XS-5XL & Anak 2th-1' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8fRY6NwUqb',
     image: '/images/products/affiliate/40278369-e2c2b5d25b18.webp',
@@ -358,9 +478,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-40139129',
-    name: { id: 'SANDISK Phone Drive for Android USB Type C - A  32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10', en: 'SANDISK Phone Drive for Android USB Type C - A  32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10' },
+    name: { id: 'SANDISK Phone Drive for Android USB Type C - A 32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10', en: 'SANDISK Phone Drive for Android USB Type C - A 32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10' },
     category: 'electronics',
-    description: { id: 'SANDISK Phone Drive for Android USB Type C - A  32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10', en: 'SANDISK Phone Drive for Android USB Type C - A  32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10' },
+    description: { id: 'SANDISK Phone Drive for Android USB Type C - A 32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10', en: 'SANDISK Phone Drive for Android USB Type C - A 32GB / 64GB / 128GB / 256GB / 512GB USB 3.2 Up To 10' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/W5nLA1Rmy',
     image: '/images/products/affiliate/40139129-dec6b477249d.webp',
@@ -408,9 +528,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-39857203',
-    name: { id: 'KEMEJA  MERAH KATUN POPLIN PRENIUM', en: 'KEMEJA  MERAH KATUN POPLIN PRENIUM' },
+    name: { id: 'KEMEJA MERAH KATUN POPLIN PRENIUM', en: 'KEMEJA MERAH KATUN POPLIN PRENIUM' },
     category: 'fashion',
-    description: { id: 'KEMEJA  MERAH KATUN POPLIN PRENIUM', en: 'KEMEJA  MERAH KATUN POPLIN PRENIUM' },
+    description: { id: 'KEMEJA MERAH KATUN POPLIN PRENIUM', en: 'KEMEJA MERAH KATUN POPLIN PRENIUM' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/2gABoC8G7Q',
     image: '/images/products/affiliate/39857203-4bfc33b1289c.webp',
@@ -878,9 +998,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-31394429',
-    name: { id: 'Little Me - Jubah Anak Laki Laki  Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki', en: 'Little Me - Jubah Anak Laki Laki  Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki' },
+    name: { id: 'Little Me - Jubah Anak Laki Laki Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki', en: 'Little Me - Jubah Anak Laki Laki Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki' },
     category: 'fashion',
-    description: { id: 'Little Me - Jubah Anak Laki Laki  Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki', en: 'Little Me - Jubah Anak Laki Laki  Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki' },
+    description: { id: 'Little Me - Jubah Anak Laki Laki Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki', en: 'Little Me - Jubah Anak Laki Laki Usia 6 bulan - 10 tahun Arsya Gamis / baju muslim anak laki laki' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4LFJckLhlw',
     image: '/images/products/affiliate/31394429-ebf6d40408ba.webp',
@@ -1118,9 +1238,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-24529826',
-    name: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
+    name: { id: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
     category: 'fashion',
-    description: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
+    description: { id: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun', en: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 10 tahun' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/4AtFwW1FzC',
     image: '/images/products/affiliate/24529826-8d28f0c8c46a.webp',
@@ -1198,9 +1318,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-21884689',
-    name: { id: 'Celah langit Yuriko Sleeve  | Tas laptop', en: 'Celah langit Yuriko Sleeve  | Tas laptop' },
+    name: { id: 'Celah langit Yuriko Sleeve | Tas laptop', en: 'Celah langit Yuriko Sleeve | Tas laptop' },
     category: 'electronics',
-    description: { id: 'Celah langit Yuriko Sleeve  | Tas laptop', en: 'Celah langit Yuriko Sleeve  | Tas laptop' },
+    description: { id: 'Celah langit Yuriko Sleeve | Tas laptop', en: 'Celah langit Yuriko Sleeve | Tas laptop' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/5Akcq3eFFo',
     image: '/images/products/affiliate/21884689-bcd48989e97a.webp',
@@ -1888,9 +2008,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-16260055',
-    name: { id: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561', en: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561' },
+    name: { id: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561', en: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561' },
     category: 'fashion',
-    description: { id: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561', en: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561' },
+    description: { id: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561', en: 'Decathlon NABAIJI Topi Renang Polos Uk. S - Pink - 8861561' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/5Kzna7Auva',
     image: '/images/products/affiliate/16260055-73c9ea8a9895.webp',
@@ -2208,9 +2328,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-16259765',
-    name: { id: 'Kemeja KOKO AMMIGOZ  Anak laki Laki', en: 'Kemeja KOKO AMMIGOZ  Anak laki Laki' },
+    name: { id: 'Kemeja KOKO AMMIGOZ Anak laki Laki', en: 'Kemeja KOKO AMMIGOZ Anak laki Laki' },
     category: 'fashion',
-    description: { id: 'Kemeja KOKO AMMIGOZ  Anak laki Laki', en: 'Kemeja KOKO AMMIGOZ  Anak laki Laki' },
+    description: { id: 'Kemeja KOKO AMMIGOZ Anak laki Laki', en: 'Kemeja KOKO AMMIGOZ Anak laki Laki' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/8zt5vZgbvV',
     image: '/images/products/affiliate/16259765-d51fcbcc1146.webp',
@@ -2238,9 +2358,9 @@ export const affiliateProducts: AffiliateProduct[] = [
   },
   {
     id: 'affiliate-16259726',
-    name: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun' },
+    name: { id: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun', en: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun' },
     category: 'fashion',
-    description: { id: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun', en: 'Little Me - Piyama Anak Salur Michi/  Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun' },
+    description: { id: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun', en: 'Little Me - Piyama Anak Salur Michi/ Setelan Baju Tidur Rayon Anak usia 6 bulan - 8 tahun' },
     merchant: 'Racun outfit asharu (Shopee)',
     url: 'https://s.shopee.co.id/9UpMWEFxaC',
     image: '/images/products/affiliate/16259726-f1f6bb11a61d.webp',
