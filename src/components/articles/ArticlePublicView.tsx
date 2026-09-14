@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
 export interface ArticleViewFaq {
@@ -33,6 +34,44 @@ interface Props {
   disclosureHref: string | null;
 }
 
+const URL_RE = /(https?:\/\/[^\s<>"')\]]+)/g;
+const TRAILING_PUNCT_RE = /[.,;:!?)\]]+$/;
+
+/**
+ * Pecah teks polos menjadi teks + anchor per URL (http/https) agar tautan
+ * afiliasi inline di body bisa diklik. Tanda baca akhir kalimat
+ * (mis. titik) tidak ikut jadi href. Sengaja anchor polos (bukan
+ * ExternalLink) agar 1 URL aneh tak meledakkan seluruh render.
+ */
+export function linkifyText(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    const raw = m[0]!;
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const trail = raw.match(TRAILING_PUNCT_RE)?.[0] ?? '';
+    const href = trail ? raw.slice(0, -trail.length) : raw;
+    out.push(
+      <a
+        key={`${m.index}-${href}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-words text-primary underline"
+      >
+        {href}
+      </a>
+    );
+    if (trail) out.push(trail);
+    last = m.index + raw.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  if (out.length === 0) out.push(text);
+  return out;
+}
+
 /** Render markdown sederhana (## → h2, baris lain → paragraf). Tanpa HTML mentah. */
 export function ArticleMarkdownBody({ md }: { md: string }) {
   const blocks: { type: 'h2' | 'p'; text: string }[] = [];
@@ -62,7 +101,7 @@ export function ArticleMarkdownBody({ md }: { md: string }) {
           </h2>
         ) : (
           <p key={i} className="mt-4 leading-relaxed text-ink">
-            {b.text}
+            {linkifyText(b.text)}
           </p>
         )
       )}
