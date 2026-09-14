@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-14 14:50 (local time)
+Last updated: 2026-09-14 15:35 (local time)
 
 ## Current State
 
@@ -55,6 +55,7 @@ Last updated: 2026-09-14 14:50 (local time)
 
 ## Recent Entries
 
+- [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
 - [144500-review-artikel-419a2dc8-fix.md](2026-09-14/144500-review-artikel-419a2dc8-fix.md) — Fix 5 temuan review artikel `419a2dc8` (488 kata/thin): prompt hardening + thin-repair 1x + emoji 1/section; cover tampil di review + wiring `cover_image_url` saat publish; upload cover manual; box produk + highlight section afiliasi (reuse `affiliate_products.image`); `expandArticleDraft` untuk repair manual; swap patch body artikel. Gate hijau 569 tests + build, tanpa migrasi.
 - [120000-riset-9a24c768-gambar-produk-404.md](2026-09-14/120000-riset-9a24c768-gambar-produk-404.md) — RCA gambar produk 404 di `/admin/riset/9a24c768`: scrape 12 Sep sukses upsert DB + download 12 gambar tapi gagal gate `npm test` (fixture carousel `slice(0,3)` vs nama ber-spasi ganda) → step commit tak jalan → 12 `.webp` tak pernah masuk repo. Fix: fixture lokal test + normalisasi whitespace writer + fallback `onError` FixedProductCard + guard aset CI; workflow dispatch memulihkan 12 gambar (`e9cd7d0`), verifikasi produksi 200. Gate 556 tests hijau, `db0de1b`.
 - [214500-artikel-platform-seo.md](2026-09-13/214500-artikel-platform-seo.md) — Route Artikel sebagai platform riset baru (SEO): migrasi platform+tabel `articles` + prompt long-form + cabang development + publish per bahasa + halaman publik `/artikel`/`/articles` (SSG/ISR, JSON-LD, sitemap); gate hijau 555 tests + build, pushed `739ea40`/`4b91d56`. **Migrasi APPLIED prod 14 Sep** (terverifikasi: seed, 17 kolom, RLS 2 policy; advisors tanpa temuan baru). [USER ACTION] Uji sesi Artikel pertama.

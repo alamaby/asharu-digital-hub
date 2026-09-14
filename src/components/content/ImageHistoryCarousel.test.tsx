@@ -157,6 +157,24 @@ describe('ImageHistoryCarousel', () => {
     expect(slideAt(container, 1).textContent).toContain('Draf prompt otomatis siap');
   });
 
+  it('menampilkan label status Indonesia, bukan slug mentah', () => {
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({ id: 'p', status: 'pending' }),
+          row({ id: 'pr', status: 'prompt_ready', image_prompt: 'draf otomatis' }),
+          row({ id: 'f', status: 'failed', last_error: 'boom' })
+        ]}
+        selectedId={null}
+      />
+    );
+    const text = container.textContent ?? '';
+    expect(text).toContain('Antre');
+    expect(text).toContain('Draf prompt');
+    expect(text).toContain('Gagal');
+    expect(text).not.toContain('prompt_ready');
+  });
+
   it('shows the requested model for a queued pin instead of auto', () => {
     const modelOptions = [
       { id: 'm-cf', provider_id: 'p-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare' }

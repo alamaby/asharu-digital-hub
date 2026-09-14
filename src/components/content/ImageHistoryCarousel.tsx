@@ -31,6 +31,15 @@ const STATUS_BADGE: Record<string, string> = {
   failed: 'bg-red-100 text-red-800'
 };
 
+/** Label badge berbahasa Indonesia (jangan tampilkan slug mentah DB). */
+export const IMAGE_STATUS_LABEL: Record<string, string> = {
+  pending: 'Antre',
+  prompt_ready: 'Draf prompt',
+  ready: 'Siap',
+  selected: 'Dipilih',
+  failed: 'Gagal'
+};
+
 function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string; text: string } {
   if (img.status === 'failed') {
     return {
@@ -225,7 +234,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${STATUS_BADGE[img.status] ?? 'bg-surface text-ink-muted'}`}>
-                    {img.status}
+                    {IMAGE_STATUS_LABEL[img.status] ?? img.status}
                   </span>
                   {img.id === selectedId ? (
                     <span className="rounded bg-emerald-600 px-1.5 py-0.5 font-medium text-white">Terpilih</span>

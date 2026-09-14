@@ -82,6 +82,9 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   if (draft.platform_slug === 'artikel' && draft.article_draft) {
     const artInjection = draft.affiliate_injections[0] ?? null;
     const artJson = JSON.stringify(draft.article_draft);
+    const selectedCoverUrl = coverImages.find((i) => i.id === coverSelectedId)?.public_url
+      ?? coverImages.find((i) => (i.status === 'ready' || i.status === 'selected') && i.public_url)?.public_url
+      ?? null;
     return (
       <div className="space-y-4">
         <ArticleDraftCard
@@ -97,6 +100,9 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
             merchant: artInjection.product_merchant,
             friendlyCode: artInjection.friendly_code
           } : null}
+          coverUrl={selectedCoverUrl}
+          expandProviders={regenProviders}
+          expandModels={regenModels}
         />
         <DraftImageCard
           draftId={draft.id}

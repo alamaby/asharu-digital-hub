@@ -203,13 +203,28 @@ export interface ArticleExpandResult {
  * afiliasi final dikembalikan ke placeholder sebelum dikirim ke LLM lalu
  * dipulihkan setelah parse. Untuk repair manual kasus 419a2dc8 (488 kata).
  */
-export async function expandArticleDraft(draftId: string): Promise<ArticleExpandResult> {
+export async function expandArticleDraft(
+  draftId: string,
+  opts?: { modelId?: string | null }
+): Promise<ArticleExpandResult> {
   if (!(await isAdmin())) {
     return { success: false, error: 'forbidden' };
   }
   const supabase = createSupabaseService();
   if (!supabase) return { success: false, error: 'Supabase not configured' };
   if (!draftId) return { success: false, error: 'draftId required' };
+
+  // Rate limit 10/jam untuk non-admin (admin bypass — pola enhanceImagePrompt).
+  // Halaman review admin-only, tapi action tetap dijaga bila dipanggil di luar.
+  const { headers } = await import('next/headers');
+  const hdrs = await headers();
+  const { getClientIp, checkRateLimit, incrementRateLimit } = await import('@/lib/content/rate-limit');
+  const ip = getClientIp(hdrs);
+  const isAdminUser = await isAdmin().catch(() => false);
+  if (!isAdminUser) {
+    const { allowed, count } = await checkRateLimit(ip, 'expand_article', 10);
+    if (!allowed) return { success: false, error: `rate_limit:${count} — expand 10/jam` };
+  }
 
   const { data: draft, error: draftError } = await supabase
     .from('content_drafts')
@@ -292,7 +307,22 @@ export async function expandArticleDraft(draftId: string): Promise<ArticleExpand
   );
   const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
   const { runLLMCompletion } = await import('@/lib/llm/completion');
-  const { providerId, modelUuid } = await resolveStageModel('developing', null);
+  // Model pin pilihan admin (dropdown review) > default stage > waterfall
+  // global. Pin yang nonaktif ditolak eksplisit (jangan silent-fallback).
+  const pinnedModelId = opts?.modelId?.trim() || null;
+  let expandModelLabel: string | null = null;
+  if (pinnedModelId) {
+    const { data: pinned } = await supabase
+      .from('llm_models')
+      .select('id, model_id, is_active')
+      .eq('id', pinnedModelId)
+      .maybeSingle();
+    const pinnedRow = pinned as { id: string; model_id: string; is_active: boolean } | null;
+    if (!pinnedRow) return { success: false, error: 'model pilihan tidak ditemukan — refresh pilihan' };
+    if (!pinnedRow.is_active) return { success: false, error: 'model pilihan nonaktif — pilih model lain' };
+    expandModelLabel = pinnedRow.model_id;
+  }
+  const { providerId, modelUuid } = await resolveStageModel('developing', pinnedModelId);
   let out: string;
   try {
     const res = await runLLMCompletion(supabase, {
@@ -333,11 +363,14 @@ export async function expandArticleDraft(draftId: string): Promise<ArticleExpand
         word_count: newWords,
         thin_content: Object.values(newWords).some((w) => w < ARTICLE_MIN_WORDS),
         expanded: true,
-        expanded_at: new Date().toISOString()
+        expanded_at: new Date().toISOString(),
+        expand_model: expandModelLabel
       }
     })
     .eq('id', draftId);
   if (updateError) return { success: false, error: updateError.message };
+
+  if (!isAdminUser) await incrementRateLimit(ip, 'expand_article').catch(() => {});
 
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');

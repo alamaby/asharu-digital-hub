@@ -7,7 +7,9 @@ import { useRouter } from '@/i18n/navigation';
 import type { ParsedArticleDraft } from '@/lib/llm/prompt';
 import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex } from '@/lib/llm/prompt';
 import { approveArticleAndPublish, expandArticleDraft } from '@/lib/articles/actions';
-import type { ArticleLocale } from '@/lib/articles/types';
+import { renderArticleMarkdown, type ArticleLocale } from '@/lib/articles/types';
+import { ArticlePublicView } from '@/components/articles/ArticlePublicView';
+import { StageModelPicker } from './StageModelPicker';
 
 export interface ArticleAffiliateInfo {
   url: string | null;
@@ -26,6 +28,11 @@ interface Props {
   published: { locale: string; slug: string }[];
   /** Info produk afiliasi (dari affiliate_injections) untuk visual section. */
   affiliate?: ArticleAffiliateInfo | null;
+  /** URL cover terpilih (untuk pratinjau); null = tanpa cover seperti publik. */
+  coverUrl?: string | null;
+  /** Katalog provider/model aktif untuk picker model expand. */
+  expandProviders?: { id: string; slug: string; display_name: string }[];
+  expandModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
 }
 
 /**
@@ -33,11 +40,12 @@ interface Props {
  * per bahasa ke tabel `articles`. Pengganti ContentDraftCard (thread)
  * khusus platform `artikel`.
  */
-export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published, affiliate = null }: Props) {
+export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published, affiliate = null, coverUrl = null, expandProviders = [], expandModels = [] }: Props) {
   const t = useTranslations('content.review');
   const router = useRouter();
   const available = (['id', 'en'] as const).filter((l) => article[l]);
   const [lang, setLang] = useState<'id' | 'en'>(available[0] ?? 'id');
+  const [view, setView] = useState<'draft' | 'preview'>('draft');
   const [selected, setSelected] = useState<ArticleLocale[]>(() => [...available]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -45,6 +53,8 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
   const [expanding, setExpanding] = useState(false);
   const [expandError, setExpandError] = useState<string | null>(null);
   const [expandOk, setExpandOk] = useState<string | null>(null);
+  const [expandProviderId, setExpandProviderId] = useState('');
+  const [expandModelId, setExpandModelId] = useState('');
 
   const content = article[lang];
   const words = content ? countArticleWords(content) : 0;
@@ -80,7 +90,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
     setExpandError(null);
     setExpandOk(null);
     try {
-      const result = await expandArticleDraft(draftId);
+      const result = await expandArticleDraft(draftId, expandModelId ? { modelId: expandModelId } : undefined);
       if (!result.success) {
         setExpandError(result.error ?? t('articleExpandError'));
       } else if (result.expanded) {
@@ -118,6 +128,21 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
       {thin ? (
         <div role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
           <p>{t('articleThin', { min: ARTICLE_MIN_WORDS, words })}</p>
+          {expandProviders.length > 0 ? (
+            <div className="mt-2">
+              <StageModelPicker
+                stage="expand_article"
+                label={t('articleExpandModelLabel')}
+                providers={expandProviders}
+                models={expandModels}
+                providerId={expandProviderId}
+                modelId={expandModelId}
+                onProviderChange={setExpandProviderId}
+                onModelChange={setExpandModelId}
+                disabled={expanding || publishing}
+              />
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={handleExpand}
@@ -155,7 +180,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
         </div>
       ) : null}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {(['id', 'en'] as const).map((l) =>
           article[l] ? (
             <button
@@ -169,8 +194,22 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
             </button>
           ) : null
         )}
+        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
+        {(['draft', 'preview'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            aria-pressed={view === v}
+            className={view === v ? 'chip bg-primary text-white' : 'chip border border-line bg-surface text-ink'}
+          >
+            {v === 'draft' ? t('articleTabDraft') : t('articleTabPreview')}
+          </button>
+        ))}
       </div>
 
+      {view === 'draft' ? (
+      <>
       <h2 className="mt-4 text-xl font-bold tracking-tight text-ink">{content.title}</h2>
       <p className="mt-1 text-xs text-ink-muted">/{content.slug}</p>
       <p className="mt-3 leading-relaxed text-ink-muted">{content.excerpt}</p>
@@ -239,6 +278,38 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
           ))}
         </p>
       ) : null}
+
+      </>
+      ) : (
+        <div className="mt-4 rounded-xl border border-dashed border-primary/50 bg-background p-4 sm:p-6">
+          <p role="status" className="rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
+            {t('articlePreviewBadge')}
+          </p>
+          <div className="mx-auto max-w-3xl">
+            <ArticlePublicView
+              title={content.title}
+              excerpt={content.excerpt}
+              dateLine={null}
+              coverUrl={coverUrl}
+              bodyMd={renderArticleMarkdown(content)}
+              affiliate={affiliate?.url ? {
+                name: affiliate.name ?? null,
+                url: affiliate.url,
+                image: affiliate.image ?? null
+              } : null}
+              affiliateTitle={t('articlePreviewAffiliateTitle')}
+              affiliateBody={affiliate?.name ? t('articlePreviewAffiliateBody', { product: affiliate.name }) : t('articlePreviewAffiliateBodyNoName')}
+              affiliateCta={t('articlePreviewAffiliateCta')}
+              affiliateNote={t('articlePreviewAffiliateNote')}
+              faqHeading={t('articlePreviewFaq')}
+              faq={content.faq}
+              disclosureNote={t('articlePreviewDisclosure')}
+              disclosureLinkLabel={null}
+              disclosureHref={null}
+            />
+          </div>
+        </div>
+      )}
 
       <fieldset className="mt-4 rounded-lg border border-line bg-background p-3">
         <legend className="px-1 text-xs font-medium text-ink">{t('articlePublish')}</legend>
