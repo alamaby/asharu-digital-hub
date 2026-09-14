@@ -36,6 +36,8 @@ interface Props {
 
 const URL_RE = /(https?:\/\/[^\s<>"')\]]+)/g;
 const TRAILING_PUNCT_RE = /[.,;:!?)\]]+$/;
+// **tebal**, *miring*, atau URL — inline ringan (bukan parser markdown penuh).
+const RICH_RE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|https?:\/\/[^\s<>"')\]]+)/g;
 
 /**
  * Pecah teks polos menjadi teks + anchor per URL (http/https) agar tautan
@@ -72,6 +74,47 @@ export function linkifyText(text: string): ReactNode[] {
   return out;
 }
 
+/**
+ * Render inline ringan untuk body artikel: **tebal**, *miring*, dan URL
+ * otomatis jadi tautan. Tanda `*` yang tak berpasangan dibiarkan literal.
+ * Batasan disengaja: bukan parser markdown penuh (tanpa list, heading
+ * inline, nesting bold-italic, code) — cukup untuk output LLM artikel.
+ */
+export function renderRichText(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  RICH_RE.lastIndex = 0;
+  while ((m = RICH_RE.exec(text)) !== null) {
+    const tok = m[0]!;
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (tok.startsWith('http')) {
+      const trail = tok.match(TRAILING_PUNCT_RE)?.[0] ?? '';
+      const href = trail ? tok.slice(0, -trail.length) : tok;
+      out.push(
+        <a
+          key={`${m.index}-${href}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-words text-primary underline"
+        >
+          {href}
+        </a>
+      );
+      if (trail) out.push(trail);
+    } else if (tok.startsWith('**')) {
+      out.push(<strong key={m.index}>{tok.slice(2, -2)}</strong>);
+    } else {
+      out.push(<em key={m.index}>{tok.slice(1, -1)}</em>);
+    }
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  if (out.length === 0) out.push(text);
+  return out;
+}
+
 /** Render markdown sederhana (## → h2, baris lain → paragraf). Tanpa HTML mentah. */
 export function ArticleMarkdownBody({ md }: { md: string }) {
   const blocks: { type: 'h2' | 'p'; text: string }[] = [];
@@ -101,7 +144,7 @@ export function ArticleMarkdownBody({ md }: { md: string }) {
           </h2>
         ) : (
           <p key={i} className="mt-4 leading-relaxed text-ink">
-            {linkifyText(b.text)}
+            {renderRichText(b.text)}
           </p>
         )
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ArticleMarkdownBody, linkifyText } from './ArticlePublicView';
+import { ArticleMarkdownBody, linkifyText, renderRichText } from './ArticlePublicView';
 
 describe('linkifyText', () => {
   it('teks polos tanpa URL kembali utuh tanpa anchor', () => {
@@ -30,5 +30,27 @@ describe('ArticleMarkdownBody', () => {
     expect(screen.getByRole('heading', { level: 2 }).textContent).toContain('https://example.com');
     const link = screen.getByRole('link', { name: 'https://s.shopee.co.id/xyz' });
     expect(link.getAttribute('href')).toBe('https://s.shopee.co.id/xyz');
+  });
+
+  it('me-render **tebal** dan *miring* di paragraf', () => {
+    render(<ArticleMarkdownBody md={'Jangan **terpaku harga murah**, prioritaskan *kualitas* ya'} />);
+    expect(screen.getByText('terpaku harga murah').tagName).toBe('STRONG');
+    expect(screen.getByText('kualitas').tagName).toBe('EM');
+  });
+});
+
+describe('renderRichText', () => {
+  it('kombinasi bold + link dalam satu paragraf', () => {
+    const { container } = render(<p>{renderRichText('Coba **Kipas Genggam** di https://s.shopee.co.id/xyz!')}</p>);
+    expect(container.querySelector('strong')?.textContent).toBe('Kipas Genggam');
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('https://s.shopee.co.id/xyz');
+    expect(container.textContent).toContain('!');
+  });
+
+  it('tanda bintang tak berpasangan dibiarkan literal', () => {
+    const { container } = render(<p>{renderRichText('Nilai 5*3 sama dengan 15')}</p>);
+    expect(container.querySelector('strong')).toBeNull();
+    expect(container.querySelector('em')).toBeNull();
+    expect(container.textContent).toBe('Nilai 5*3 sama dengan 15');
   });
 });

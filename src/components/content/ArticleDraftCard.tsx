@@ -8,7 +8,7 @@ import type { ParsedArticleDraft } from '@/lib/llm/prompt';
 import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex } from '@/lib/llm/prompt';
 import { approveArticleAndPublish, expandArticleDraft } from '@/lib/articles/actions';
 import { renderArticleMarkdown, type ArticleLocale } from '@/lib/articles/types';
-import { ArticlePublicView, linkifyText } from '@/components/articles/ArticlePublicView';
+import { ArticlePublicView, renderRichText } from '@/components/articles/ArticlePublicView';
 import { StageModelPicker } from './StageModelPicker';
 
 export interface ArticleAffiliateInfo {
@@ -238,7 +238,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
                   {t('articleAffiliateVisual')}
                 </p>
               ) : null}
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">{linkifyText(s.body)}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">{renderRichText(s.body)}</p>
             </section>
           );
         })}
