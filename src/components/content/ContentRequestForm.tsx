@@ -268,7 +268,11 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
         <div className="mt-5 flex flex-wrap gap-2">
           {sessionId ? (
             <Link
-              href={{ pathname: '/konten/riset/[sessionId]', params: { sessionId } }}
+              href={
+                isAdmin
+                  ? { pathname: '/admin/riset/[sessionId]', params: { sessionId } }
+                  : { pathname: '/konten/riset/[sessionId]', params: { sessionId } }
+              }
               className="btn-primary px-4 py-2 text-sm"
             >
               {t('successViewList')}

@@ -14,9 +14,29 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ children, href, ...rest }: { children: React.ReactNode; href: unknown; [k: string]: unknown }) => {
-    const hrefString = typeof href === 'string' ? href : typeof href === 'object' && href !== null && 'pathname' in href
-      ? String((href as { pathname: string }).pathname)
-      : '#';
+    let hrefString: string;
+    if (typeof href === 'string') {
+      hrefString = href;
+    } else if (href !== null && typeof href === 'object' && 'pathname' in href) {
+      const { pathname, params, query, hash } = href as {
+        pathname: string;
+        params?: Record<string, string>;
+        query?: Record<string, string>;
+        hash?: string;
+      };
+      // Resolve [param] path segments so tests can assert concrete session URLs.
+      const resolvedPath = params
+        ? pathname.replace(/\[([^\]]+)\]/g, (_m, key: string) =>
+            params[key] != null ? String(params[key]) : `[${key}]`
+          )
+        : pathname;
+      hrefString =
+        resolvedPath +
+        (query ? `?${new URLSearchParams(query).toString()}` : '') +
+        (hash ? `#${hash}` : '');
+    } else {
+      hrefString = '#';
+    }
     return <a href={hrefString} {...rest}>{children}</a>;
   },
   usePathname: () => '/id/current-path',
