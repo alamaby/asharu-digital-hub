@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-14 16:05 (local time)
+Last updated: 2026-09-14 16:25 (local time)
 
 ## Current State
 
@@ -55,6 +55,7 @@ Last updated: 2026-09-14 16:05 (local time)
 
 ## Recent Entries
 
+- [162500-image-worker-dua-jalur.md](2026-09-14/162500-image-worker-dua-jalur.md) — Worker image 2-jalur per tick (1 generate manual prioritas + 1 reasoning cover auto); kasus e5866cc7 tak lagi diblokir cover auto. Gate 583 tests + build hijau, tanpa migrasi. Perlu deploy agar tick berikut pakai jalur baru.
 - [160500-visual-timeline.md](2026-09-14/160500-visual-timeline.md) — Timeline per slide visualisasi (masuk antrean + status + percobaan, zona user). Berlaku cover + per-reply. Carousel 13/13, build hijau; 1 flaky timeout tak terkait (lolos run ulang).
 - [155500-artikel-rich-text.md](2026-09-14/155500-artikel-rich-text.md) — `*`/`**` kini dirender miring/tebal di body artikel (publik + pratinjau + draf) via `renderRichText`. Gate 577 tests + build hijau.
 - [155000-artikel-linkify-afiliasi.md](2026-09-14/155000-artikel-linkify-afiliasi.md) — URL inline di body artikel kini anchor bisa diklik (publik + pratinjau + draf review) via `linkifyText`; tanda baca akhir tak ikut href. Gate 574 tests + build hijau.

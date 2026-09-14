@@ -66,14 +66,27 @@ export async function enqueueNextMissingImage(): Promise<string | null> {
   return null;
 }
 
-/** Klaim 1 baris pending (atomic via eq status) → attempts+1. */
-export async function claimPendingImage(): Promise<DraftImageRow | null> {
+/**
+ * Klaim 1 baris pending per jalur (atomic via eq status) → attempts+1.
+ * - 'generate': prompt terisi (Generate manual/review) — prioritas user.
+ * - 'reasoning': prompt kosong (cover auto) — reasoning LLM saja.
+ * Semua writer mengisi image_prompt eksplisit ('' = auto), jadi eq/neq
+ * cukup tanpa OR-null.
+ */
+export type ImageQueueLane = 'generate' | 'reasoning';
+export async function claimPendingImage(
+  lane: ImageQueueLane,
+  excludeId?: string | null
+): Promise<DraftImageRow | null> {
   const supabase = getServiceClient();
-  const { data: pending } = await supabase
+  let query = supabase
     .from('content_draft_images')
     .select('*')
     .eq('status', 'pending')
-    .lt('attempts', MAX_ATTEMPTS)
+    .lt('attempts', MAX_ATTEMPTS);
+  query = lane === 'generate' ? query.neq('image_prompt', '') : query.eq('image_prompt', '');
+  if (excludeId) query = query.neq('id', excludeId);
+  const { data: pending } = await query
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -279,14 +292,34 @@ async function defaultModel(providerId: string, preferredModelId?: string, needs
  *   waterfall → upload Storage → selected.
  * Kembalikan image id bila sukses, null bila tidak ada kerja / gagal jujur.
  */
-export async function processOneImage(): Promise<{ imageId: string | null; error?: string }> {
-  let row = await claimPendingImage();
-  if (!row) {
+export async function processImageTick(): Promise<{ imageId: string | null; processed: number; error?: string }> {
+  // Dua jalur per tick agar Generate manual tak diblokir reasoning cover
+  // auto (kasus e5866cc7: manual antre di belakang 20 cover). Generate
+  // diproses dulu (prioritas user), lalu 1 reasoning bila ada.
+  const rows: DraftImageRow[] = [];
+  const genRow = await claimPendingImage('generate');
+  if (genRow) rows.push(genRow);
+  const reasonRow = await claimPendingImage('reasoning', genRow?.id ?? null);
+  if (reasonRow) rows.push(reasonRow);
+  if (rows.length === 0) {
     const enqueued = await enqueueNextMissingImage();
-    if (!enqueued) return { imageId: null };
-    row = await claimPendingImage();
-    if (!row) return { imageId: null };
+    if (!enqueued) return { imageId: null, processed: 0 };
+    const fresh = await claimPendingImage('reasoning');
+    if (!fresh) return { imageId: null, processed: 0 };
+    rows.push(fresh);
   }
+  let firstId: string | null = null;
+  let lastError: string | undefined;
+  for (const claimed of rows) {
+    const res = await processClaimedImage(claimed);
+    if (res.imageId && !firstId) firstId = res.imageId;
+    if (res.error) lastError = res.error;
+  }
+  return { imageId: firstId, processed: rows.length, ...(lastError ? { error: lastError } : {}) };
+}
+
+/** Proses 1 baris yang sudah diklaim (klaim milik caller). */
+async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: string | null; error?: string }> {
   const imageId = row.id;
 
   try {

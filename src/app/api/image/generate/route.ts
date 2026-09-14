@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '@/lib/content/cron-auth';
-import { processOneImage } from '@/lib/image/worker';
+import { processImageTick } from '@/lib/image/worker';
 
 export const maxDuration = 300;
 
-/** Cron worker image: klaim 1 pending (atau enqueue auto) per tick. */
+/** Cron worker image: 1 generate manual (prioritas) + 1 reasoning cover per tick. */
 async function handle(request: Request) {
   if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const result = await processOneImage();
+    const result = await processImageTick();
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
