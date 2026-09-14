@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-14 09:05 (local time)
+Last updated: 2026-09-14 12:00 (local time)
 
 ## Current State
 
@@ -44,7 +44,7 @@ Last updated: 2026-09-14 09:05 (local time)
 - [ ] **Seed Tavily key ke Vault [USER ACTION]:** `node --env-file=.env.local scripts/seed-tavily-key.mjs` (atau `node scripts/seed-tavily-key.mjs` lalu paste key). Menyimpan sebagai Vault `tavily_api_key`; processor baca via RPC `vault_decrypt_secret_by_name` (service_role). Env `TAVILY_API_KEY` tetap fallback (dev). Tanpa key → Discovery throw → session `failed` (fail-safe). Rotasi: re-run script / tambah entri Vault nama sama (RPC ambil terbaru).
 - [ ] **Pipeline riset E2E di production** — P0 cron sudah aktif; tinggal seed Tavily (atas) lalu submit form `/konten/baru` → pantau `/admin/riset` (cron */10 advance Discovery→Verification→Scoring→awaiting_selection).
 - [ ] **Discovery iteratif** — `maximum_iterations`/`required_winners`/`minimum_score` tersimpan di session tapi discovery masih single-pass (belum loop). Future enhancement.
-- [ ] **P2/P3 audit lain belum:** ContentDraftCard error surfacing, duplikasi `getServiceClient`, `rate_limits` cleanup, realtime review (`supabase.channel`), middleware matcher persempit, INSERT anon limit, `target_category` validasi saat submit. (Soft-delete guard scraper selesai 13 Sep - guard 20% + override `--allow-mass-deactivation`; admin consolidation P2 #12 sudah ditutup 1 Sep.)
+- [ ] **P2/P3 audit lain belum:** ContentDraftCard error surfacing, duplikasi `getServiceClient`, `rate_limits` cleanup, realtime review (`supabase.channel`), middleware matcher persempit, INSERT anon limit, `target_category` validasi saat submit. (Soft-delete guard scraper selesai 13 Sep - guard 20% + override `--allow-mass-deactivation`; guard aset gambar pre-commit ditambahkan 14 Sep; admin consolidation P2 #12 sudah ditutup 1 Sep.)
 - [ ] **Magic-link `token_hash` flow [USER STEP RE-PASTE]:** kode + template local di-push (`0cab152` parent, `2a8215d` submodule). Template base URL diubah `{{ .SiteURL }}/id/auth/exchange?...` → `{{ .RedirectTo }}?...` (fix bug email production bawa URL localhost — `.SiteURL` resolve ke Dashboard Site URL default `http://localhost:3000`). User **re-paste** body `supabase/templates/magic_link.html` ke Supabase Dashboard → Auth → Email Templates → Magic Link (template lama di Dashboard masih `{{ .SiteURL }}`). Verifikasi: request magic link → link harus `https://asharu.id/id/auth/exchange?token_hash=...` (bukan localhost). [HYGIENE opsional] Set Dashboard Site URL = `https://asharu.id`.
 - [x] Verifikasi env produksi: `CRON_SECRET` diset di Vercel Production (user, 2 Sep) ✓; `NEXT_PUBLIC_*` live (domain aktif) ✓. Sisa: `TAVILY_API_KEY` (via Vault, lihat item seed di atas).
 - [x] Verifikasi DB live via MCP asharu (blocker lama "tersambung albot-be" teratasi 31 Agu): key storage = semua 4 di Vault (0 plaintext) ✓; distribusi `content_requests` = {needs_review:1, processing:3 nyangkut} ✓; `get_llm_key` grants ✓ (kini service_role saja). Sisa: cek error `llm_call_logs` terakhir.
@@ -55,6 +55,7 @@ Last updated: 2026-09-14 09:05 (local time)
 
 ## Recent Entries
 
+- [120000-riset-9a24c768-gambar-produk-404.md](2026-09-14/120000-riset-9a24c768-gambar-produk-404.md) — RCA gambar produk 404 di `/admin/riset/9a24c768`: scrape 12 Sep sukses upsert DB + download 12 gambar tapi gagal gate `npm test` (fixture carousel `slice(0,3)` vs nama ber-spasi ganda) → step commit tak jalan → 12 `.webp` tak pernah masuk repo. Fix: fixture lokal test + normalisasi whitespace writer + fallback `onError` FixedProductCard + guard aset CI; workflow dispatch memulihkan 12 gambar (`e9cd7d0`), verifikasi produksi 200. Gate 556 tests hijau, `db0de1b`.
 - [214500-artikel-platform-seo.md](2026-09-13/214500-artikel-platform-seo.md) — Route Artikel sebagai platform riset baru (SEO): migrasi platform+tabel `articles` + prompt long-form + cabang development + publish per bahasa + halaman publik `/artikel`/`/articles` (SSG/ISR, JSON-LD, sitemap); gate hijau 555 tests + build, pushed `739ea40`/`4b91d56`. **Migrasi APPLIED prod 14 Sep** (terverifikasi: seed, 17 kolom, RLS 2 policy; advisors tanpa temuan baru). [USER ACTION] Uji sesi Artikel pertama.
 - [143000-riset-9a24c768-developing-gate-fix.md](2026-09-13/143000-riset-9a24c768-developing-gate-fix.md) — RCA riset `9a24c768` (mekanisme dua) failed "produk tetap tidak aktif/hilang": gate lama menyatukan 3 kasus tanpa log; akar transient = Supabase 504 intermiten di tick cron. Fix: `classifyFixedProducts` 3-kasus + defer cap 5/24j (bukan failed) + pending eksak + `updated_at` di semua UPDATE failed + validasi produk di `advanceToDevelopment` + guard soft-delete scraper 20%; sesi di-resume → 8/8 draf, `completed`; gate 536 tests hijau, pushed `3fafebe`.
 - [020000-studio-surface-real-errors.md](2026-09-13/020000-studio-surface-real-errors.md) — Studio: action client-facing (upload ref/enqueue/enhance/retry/delete) kini kembalikan `{ok,data}|{ok,error}` (pola `ActionResult` konten) agar pesan error asli tampil, bukan digest generik Next.js; gate 527 tests hijau, pushed `b222157`.
