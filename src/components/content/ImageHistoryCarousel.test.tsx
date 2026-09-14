@@ -261,4 +261,47 @@ describe('ImageHistoryCarousel', () => {
     fireEvent.click(unduh as HTMLButtonElement);
     await waitFor(() => expect(openSpy).toHaveBeenCalledWith('https://cdn.test/1.png', '_blank', 'noreferrer'));
   });
+
+  it('menampilkan timeline antre/proses/selesai per slide', () => {
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({
+            id: 'q',
+            status: 'pending',
+            attempts: 2,
+            created_at: '2026-09-14T06:40:00Z',
+            updated_at: '2026-09-14T06:40:00Z'
+          }),
+          row({
+            id: 'done',
+            status: 'ready',
+            public_url: 'https://cdn.test/1.png',
+            created_at: '2026-09-14T06:40:00Z',
+            updated_at: '2026-09-14T06:47:00Z'
+          }),
+          row({
+            id: 'fail',
+            status: 'failed',
+            last_error: 'boom',
+            created_at: '2026-09-14T06:40:00Z',
+            updated_at: '2026-09-14T06:45:00Z'
+          })
+        ]}
+        selectedId={null}
+        locale="id"
+        timeZone="Asia/Jakarta"
+      />
+    );
+    const text = container.textContent ?? '';
+    // 06:40 UTC = 13:40 WIB — id-ID memakai titik (13.40.00).
+    expect(text).toContain('Masuk antrean:');
+    expect(text).toContain('13.40');
+    expect(text).toContain('percobaan 2');
+    expect(text).toContain('Menunggu diproses worker');
+    expect(text).toContain('Selesai dibuat:');
+    expect(text).toContain('13.47');
+    expect(text).toContain('Terakhir dicoba:');
+    expect(text).toContain('13.45');
+  });
 });

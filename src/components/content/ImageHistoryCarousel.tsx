@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DraftImageRow } from '@/lib/image/types';
+import { DEFAULT_TIMEZONE, formatDateTimeSeconds } from '@/lib/utils/format';
 import { requestedImageModelUuid } from '@/lib/image/requested-label';
 
 export type ImageCarouselVariant = 'cover' | 'reply';
@@ -21,6 +22,9 @@ interface Props {
   onUseAsReference?: (publicUrl: string) => void;
   /** Katalog model aktif — untuk label request saat antre (bukan "auto"). */
   modelOptions?: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
+  /** Locale + timezone zona-user untuk timeline antre/proses/selesai. */
+  locale?: string | null;
+  timeZone?: string | null;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -82,6 +86,14 @@ function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptio
   }
   return `${model.provider_slug} · ${model.model_id} (antre)${img.style_slug ? ` · ${img.style_slug}` : ''}`;
 }
+/** Baris kedua timeline per status (selain "Masuk antrean"). Null = tak ada. */
+function stageLineFor(status: string, updatedAt: string): string | null {
+  if (status === 'pending') return 'Menunggu diproses worker…';
+  if (status === 'prompt_ready') return `Draf prompt siap: ${updatedAt}`;
+  if (status === 'ready' || status === 'selected') return `Selesai dibuat: ${updatedAt}`;
+  if (status === 'failed') return `Terakhir dicoba: ${updatedAt}`;
+  return null;
+}
 /** Nama file unduhan: basename URL Storage bila berekstensi, else visual-<id>.png. */
 function filenameFor(img: DraftImageRow, url: string): string {
   try {
@@ -99,7 +111,7 @@ function filenameFor(img: DraftImageRow, url: string): string {
  * Tanpa auto-advance — alat review admin. Slide non-aktif diberi inert agar
  * fokus/aksinya tidak bocor ke layar pembaca.
  */
-export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, onUseAsReference, modelOptions }: Props) {
+export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, onUseAsReference, modelOptions, locale = null, timeZone = null }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set());
@@ -109,6 +121,10 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
 
   const count = rows.length;
   const isCover = variant === 'cover';
+  const fmtLocale = locale === 'en' ? 'en' : 'id';
+  const fmtTz = timeZone || DEFAULT_TIMEZONE;
+  const fmtTime = (iso: string | null | undefined): string =>
+    iso ? formatDateTimeSeconds(iso, fmtLocale, fmtTz) : '—';
 
   // Sinkron index + id slide aktif saat user geser/klik dots.
   useEffect(() => {
@@ -210,6 +226,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
             const imageBroken = broken.has(img.id);
             const ph = placeholderFor(img, imageBroken);
             const hasImage = Boolean(img.public_url) && !imageBroken;
+            const stageLine = stageLineFor(img.status, fmtTime(img.updated_at));
             return (
               <div
                 key={img.id}
@@ -248,6 +265,16 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                     {providerModelLabel(img, modelOptions)}
                   </span>
                 </div>
+
+                <p className={`mt-1 tabular-nums text-ink-muted ${isCover ? 'text-xs' : 'text-[11px]'}`}>
+                  Masuk antrean: {fmtTime(img.created_at)}
+                  {img.attempts > 0 ? ` · percobaan ${img.attempts}` : ''}
+                </p>
+                {stageLine ? (
+                  <p className={`tabular-nums text-ink-muted ${isCover ? 'text-xs' : 'text-[11px]'}`}>
+                    {stageLine}
+                  </p>
+                ) : null}
 
                 <p className={`mt-1 whitespace-pre-wrap break-words text-ink ${isCover ? 'text-xs' : 'text-[11px] line-clamp-3'}`}>
                   {img.image_prompt || 'Menunggu worker...'}

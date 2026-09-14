@@ -21,13 +21,16 @@ interface Props {
   options: ImageOption;
   /** True bila dirender di dalam thread (margin ringkas, tanpa mt-6). */
   compact?: boolean;
+  /** Locale + timezone zona-user untuk timeline carousel. */
+  locale?: string | null;
+  timeZone?: string | null;
 }
 
 function latestOf(rows: DraftImageRow[]): DraftImageRow | null {
   return [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
 }
 
-export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false }: Props) {
+export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false, locale = null, timeZone = null }: Props) {
   const [images, setImages] = useState<DraftImageRow[]>(initialImages);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
@@ -287,6 +290,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
               setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
             }}
             modelOptions={options.models}
+            locale={locale}
+            timeZone={timeZone}
           />
         </div>
       ) : (

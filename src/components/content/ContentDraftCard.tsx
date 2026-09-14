@@ -31,7 +31,7 @@ interface Draft {
   article_draft?: import('@/lib/llm/prompt').ParsedArticleDraft | null;
 }
 
-export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], replyImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null, sessionLanguage = null, publishedArticles = [] }: {
+export function ContentDraftCard({ draft: initial, regenProviders = [], regenModels = [], replyImages = [], perReplyEnabled = false, coverImages = [], coverSelectedId = null, imageOptions = { providers: [], models: [], styles: [], subjects: [] }, queue = null, sessionLanguage = null, publishedArticles = [], locale = null, timeZone = null }: {
   draft: Draft;
   regenProviders?: { id: string; slug: string; display_name: string }[];
   regenModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
@@ -49,6 +49,9 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
   sessionLanguage?: string | null;
   /** Baris articles yang sudah terbit dari draf ini. */
   publishedArticles?: { locale: string; slug: string }[];
+  /** Locale + timezone zona-user untuk timeline visual. */
+  locale?: string | null;
+  timeZone?: string | null;
 }) {
   const t = useTranslations('content.review');
   const [draft, setDraft] = useState(initial);
@@ -109,6 +112,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           initialImages={coverImages}
           initialSelectedId={coverSelectedId}
           options={imageOptions}
+          locale={locale}
+          timeZone={timeZone}
         />
         <AffiliateProductCard
           draftId={draft.id}
@@ -324,6 +329,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   isAffiliate={isInjected}
                   perReplyEnabled={perReplyEnabled}
                   options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects, cameras: imageOptions.cameras }}
+                  locale={locale}
+                  timeZone={timeZone}
                 />
               )}
             </div>
@@ -334,6 +341,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                 initialSelectedId={coverSelectedId}
                 options={imageOptions}
                 compact
+                locale={locale}
+                timeZone={timeZone}
               />
             ) : null}
             </Fragment>

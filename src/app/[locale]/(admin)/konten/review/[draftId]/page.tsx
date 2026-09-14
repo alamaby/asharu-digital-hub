@@ -263,6 +263,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           coverImages={draftImages.filter((i) => (i.post_index ?? 0) === 0)}
           coverSelectedId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
           imageOptions={{ providers: imageProviders, models: imageModels, styles: imageStyles, subjects: imageSubjects, cameras: imageCameras }}
+          locale={locale}
+          timeZone={tz}
         />
       </div>
     </div>

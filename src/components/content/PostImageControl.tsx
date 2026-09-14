@@ -23,10 +23,13 @@ interface Props {
   /** True bila mode per-reply aktif (global/sesi/draf). Cover (0) selalu boleh. */
   perReplyEnabled: boolean;
   options: ReplyImageOption;
+  /** Locale + timezone zona-user untuk timeline carousel. */
+  locale?: string | null;
+  timeZone?: string | null;
 }
 
 /** Carousel riwayat + tombol generate per reply (opt-in, skip afiliasi) di dalam kartu post. */
-export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options }: Props) {
+export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options, locale = null, timeZone = null }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<DraftImageRow[]>(initialHistory);
   const [modelUuid, setModelUuid] = useState('');
@@ -251,6 +254,8 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
               setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
             }}
             modelOptions={options.models}
+            locale={locale}
+            timeZone={timeZone}
           />
         </div>
       ) : (
