@@ -30,6 +30,8 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 const PRODUCT_COLUMNS = 'id, friendly_code, name_id, name_en, category, merchant, url, image';
 
+const FALLBACK_IMAGE = '/images/products/product-placeholder-1.svg';
+
 /** Escape LIKE wildcards so keyword search is a literal substring match. */
 function escapeIlike(s: string): string {
   return s.replace(/[\\%_]/g, (m) => `\\${m}`);
@@ -56,10 +58,21 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [multiSelected, setMultiSelected] = useState<Map<string, string>>(
-    () => new Map(initialSelectedIds.map((id) => [id, id]))
+  const [productById, setProductById] = useState<Map<string, Product>>(
+    () => new Map(initialSelectedIds.map((id) => [id, { id, name_id: id } as Product]))
+  );
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(
+    () => new Set(initialSelectedIds)
   );
   const requestId = useRef(0);
+
+  const mergeProducts = (rows: Product[]) => {
+    setProductById((prev) => {
+      const next = new Map(prev);
+      for (const r of rows) next.set(r.id, r);
+      return next;
+    });
+  };
 
   // Initial load: 20 newest (cached for when the query is cleared).
   useEffect(() => {
@@ -77,7 +90,11 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
       .limit(LATEST_LIMIT)
       .then(({ data, error }) => {
         if (error) setError(error.message);
-        else setLatest((data ?? []) as Product[]);
+        else {
+          const rows = (data ?? []) as Product[];
+          setLatest(rows);
+          mergeProducts(rows);
+        }
         setLoading(false);
       });
   }, []);
@@ -118,6 +135,7 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
             setResults((data ?? []) as Product[]);
             setIsSearchMode(true);
             setError(null);
+            mergeProducts((data ?? []) as Product[]);
           }
           setSearching(false);
         });
@@ -182,6 +200,21 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
                         onClick={() => onSelect(p.id, p.name_id)}
                         className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.image || FALLBACK_IMAGE}
+                          alt={p.name_id}
+                          width={40}
+                          height={40}
+                          loading="lazy"
+                          className="size-10 shrink-0 rounded-lg border border-line object-cover"
+                          onError={(event) => {
+                            const img = event.currentTarget;
+                            if (img.dataset.fallback === 'true') return;
+                            img.dataset.fallback = 'true';
+                            img.src = FALLBACK_IMAGE;
+                          }}
+                        />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-ink">
                             {p.name_id}
@@ -208,14 +241,29 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
                         disabled={atMax}
                         onChange={(e) => {
                           setMultiSelected((prev) => {
-                            const next = new Map(prev);
+                            const next = new Set(prev);
                             if (e.target.checked) {
-                              if (next.size < maxSelect) next.set(p.id, p.name_id);
+                              if (next.size < maxSelect) next.add(p.id);
                             } else next.delete(p.id);
                             return next;
                           });
                         }}
                         className="size-4 shrink-0"
+                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.image || FALLBACK_IMAGE}
+                        alt={p.name_id}
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                        className="size-10 shrink-0 rounded-lg border border-line object-cover"
+                        onError={(event) => {
+                          const img = event.currentTarget;
+                          if (img.dataset.fallback === 'true') return;
+                          img.dataset.fallback = 'true';
+                          img.src = FALLBACK_IMAGE;
+                        }}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-ink">
@@ -241,13 +289,12 @@ export function AffiliateProductPicker({ currentProductId, onSelect, onClose, mu
               type="button"
               disabled={multiSelected.size === 0}
               onClick={() => {
-                const byId = new Map(products.map((p) => [p.id, p]));
                 onConfirmSelect?.(
-                  [...multiSelected.keys()].map((id) => {
-                    const p = byId.get(id);
+                  [...multiSelected].map((id) => {
+                    const p = productById.get(id);
                     return {
                       id,
-                      name: p?.name_id ?? multiSelected.get(id) ?? id,
+                      name: p?.name_id ?? id,
                       image: p?.image ?? '',
                       category: p?.category ?? '',
                       merchant: p?.merchant ?? '',
