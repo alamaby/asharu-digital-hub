@@ -15,7 +15,9 @@ import { mapCategory } from './category-mapper.mjs';
  */
 export function toAffiliateProduct(item, info) {
   const linkId = String(item.linkId);
-  const name = String(item.linkName ?? '').trim();
+  // Collapse internal whitespace: Shopee titles occasionally contain double
+  // spaces, which break exact-name matchers (CI incident 2026-09-12).
+  const name = String(item.linkName ?? '').replace(/\s+/g, ' ').trim();
   const merchant = info?.name ? `${info.name} (Shopee)` : 'Shopee';
 
   return {

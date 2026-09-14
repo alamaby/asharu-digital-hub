@@ -1,3 +1,7 @@
+'use client';
+
+const FALLBACK_IMAGE = '/images/products/product-placeholder-1.svg';
+
 interface FixedProduct {
   id: string;
   friendly_code: string;
@@ -26,6 +30,12 @@ export function FixedProductCard({ title, products }: { title: string; products:
                 height={48}
                 loading="lazy"
                 className="size-12 shrink-0 rounded-lg border border-line object-cover"
+                onError={(event) => {
+                  const img = event.currentTarget;
+                  if (img.dataset.fallback === 'true') return;
+                  img.dataset.fallback = 'true';
+                  img.src = FALLBACK_IMAGE;
+                }}
               />
             ) : null}
             <span className="min-w-0 flex-1">

@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { ProductCard } from './ProductCard';
-import { affiliateProducts } from '@/data/affiliate-products';
+import type { AffiliateProduct } from '@/data/schemas';
 import { renderWithMessages } from '@/test/utils';
 
-// Choose a deterministic product for assertions from the (scraped) dataset.
-const product = affiliateProducts[0]!;
+// Local fixture: assertions must not depend on the scraped dataset.
+const product: AffiliateProduct = {
+  id: 'affiliate-test-1',
+  name: { id: 'Produk Uji Satu', en: 'Test Product One' },
+  category: 'home-living',
+  description: { id: 'Deskripsi uji satu', en: 'Test description one' },
+  merchant: 'Toko Uji (Shopee)',
+  url: 'https://s.shopee.co.id/test1',
+  image: '/images/products/product-placeholder-1.svg',
+  featured: true
+};
 // Expected category label in the id locale.
-const categoryLabel = { automotive: 'Otomotif', electronics: 'Elektronik', 'home-living': 'Rumah Tangga', fashion: 'Fashion', 'sports-hobby': 'Olahraga & Hobi', others: 'Lainnya' }[product.category];
+const categoryLabel = 'Rumah Tangga';
 
 describe('ProductCard', () => {
   it('renders localized name, category and merchant', () => {

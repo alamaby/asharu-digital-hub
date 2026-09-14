@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { FixedProductCard } from './FixedProductCard';
 
 const products = [
@@ -22,5 +22,15 @@ describe('FixedProductCard', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', 'https://toko.test/a');
     expect(screen.getByText('ASH-001')).toBeInTheDocument();
     expect(screen.getByText('Teh Manis')).toBeInTheDocument();
+  });
+
+  it('falls back to the placeholder image when the product image fails to load', () => {
+    render(<FixedProductCard title="Produk tetap" products={products} />);
+    const img = screen.getByRole('img', { name: 'Kopi Susu' });
+    fireEvent.error(img);
+    expect(img).toHaveAttribute('src', '/images/products/product-placeholder-1.svg');
+    // A second error must not loop into another fallback assignment.
+    fireEvent.error(img);
+    expect(img).toHaveAttribute('src', '/images/products/product-placeholder-1.svg');
   });
 });

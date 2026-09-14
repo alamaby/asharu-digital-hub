@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { ProductCarousel } from './ProductCarousel';
 import { renderWithMessages } from '@/test/utils';
-import { affiliateProducts } from '@/data/affiliate-products';
+import type { AffiliateProduct } from '@/data/schemas';
 
 function mockMatchMedia(matches = false) {
   const listeners = new Set<(event: MediaQueryListEvent) => void>();
@@ -40,8 +40,40 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// Use a small fixture so assertions don't depend on the scraped dataset size.
-const products = affiliateProducts.slice(0, 3);
+// Local fixture: assertions must not depend on the scraped dataset (a scrape
+// can change product names/counts and break CI — incident 2026-09-12).
+const products: AffiliateProduct[] = [
+  {
+    id: 'affiliate-test-1',
+    name: { id: 'Produk Uji Satu', en: 'Test Product One' },
+    category: 'home-living',
+    description: { id: 'Deskripsi uji satu', en: 'Test description one' },
+    merchant: 'Toko Uji (Shopee)',
+    url: 'https://s.shopee.co.id/test1',
+    image: '/images/products/product-placeholder-1.svg',
+    featured: true
+  },
+  {
+    id: 'affiliate-test-2',
+    name: { id: 'Produk Uji Dua', en: 'Test Product Two' },
+    category: 'electronics',
+    description: { id: 'Deskripsi uji dua', en: 'Test description two' },
+    merchant: 'Toko Uji (Shopee)',
+    url: 'https://s.shopee.co.id/test2',
+    image: '/images/products/product-placeholder-2.svg',
+    featured: false
+  },
+  {
+    id: 'affiliate-test-3',
+    name: { id: 'Produk Uji Tiga', en: 'Test Product Three' },
+    category: 'fashion',
+    description: { id: 'Deskripsi uji tiga', en: 'Test description three' },
+    merchant: 'Toko Uji (Shopee)',
+    url: 'https://s.shopee.co.id/test3',
+    image: '/images/products/product-placeholder-3.svg',
+    featured: false
+  }
+];
 
 describe('ProductCarousel', () => {
   it('renders the first product card', () => {

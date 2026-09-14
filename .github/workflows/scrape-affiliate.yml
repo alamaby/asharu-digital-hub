@@ -33,6 +33,21 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: npm run scrape:affiliate
 
+      - name: Verify image assets exist
+        # Guard against the 2026-09-12 incident: a scrape can write DB rows and
+        # a data file that reference local images the runner never committed.
+        # Every referenced /images/ path must exist on disk before we proceed.
+        run: |
+          node --input-type=module -e "
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const s = fs.readFileSync('src/data/affiliate-products.ts', 'utf8');
+          const images = [...s.matchAll(/image: '([^']+)'/g)].map((m) => m[1]);
+          const missing = images.filter((img) => !img.startsWith('/images/') || !fs.existsSync(path.join('public', img.replace(/^\//, ''))));
+          if (missing.length > 0) { console.error('::error::missing image assets: ' + missing.length + ' -> ' + missing.slice(0, 10).join(',')); process.exit(1); }
+          console.log('asset check ok: ' + images.length + ' referenced images exist on disk.');
+          "
+
       - name: Verify DB sync (no file-vs-DB drift)
         # Scrape exits non-zero on sync failure, but double-check coverage here
         # so a partial sync can never be committed file-only.
