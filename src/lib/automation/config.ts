@@ -123,16 +123,22 @@ export function resolveRunLocales(language: string | null): ArticleLocale[] {
 /**
  * Penerima email: `notify_emails` config bila ada; jika kosong fallback ke
  * seluruh `profiles.email` yang `is_admin = true`. Di-dedupe + lowercase.
+ * Tidak pernah melempar: kegagalan query diperlakukan sebagai tanpa penerima
+ * (email di-skip) agar tidak menghentikan tick automation.
  */
 export async function resolveRecipients(
   supabase: SupabaseClient,
   cfg: AutomationConfig
 ): Promise<string[]> {
-  const configured = cfg.notifyEmails.map((e) => e.trim()).filter(Boolean);
-  if (configured.length > 0) return [...new Set(configured)];
-  const { data } = await supabase.from('profiles').select('email').eq('is_admin', true);
-  const emails = ((data ?? []) as { email: string | null }[])
-    .map((r) => r.email?.trim() ?? '')
-    .filter(Boolean);
-  return [...new Set(emails)];
+  try {
+    const configured = cfg.notifyEmails.map((e) => e.trim()).filter(Boolean);
+    if (configured.length > 0) return [...new Set(configured)];
+    const { data } = await supabase.from('profiles').select('email').eq('is_admin', true);
+    const emails = ((data ?? []) as { email: string | null }[])
+      .map((r) => r.email?.trim() ?? '')
+      .filter(Boolean);
+    return [...new Set(emails)];
+  } catch {
+    return [];
+  }
 }

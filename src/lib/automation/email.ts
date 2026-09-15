@@ -26,16 +26,22 @@ export interface SendResult {
 /**
  * Resolve Resend API key: Vault `resend_api_key` (preferred, rotasi Dashboard)
  * → env `RESEND_API_KEY` (dev). Service-role client wajib untuk RPC.
+ * Tidak pernah melempar — RPC bisa gagal jaringan; caller memperlakukannya
+ * sebagai "email di-skip", bukan error fatal bagi alur automation.
  */
 export async function resolveResendKey(supabase: SupabaseClient): Promise<string | null> {
-  const fromEnv = env.resendApiKey?.trim();
-  if (fromEnv) return fromEnv;
-  const { data, error } = await supabase.rpc('vault_decrypt_secret_by_name', {
-    p_name: 'resend_api_key'
-  });
-  if (error) return null;
-  const key = typeof data === 'string' ? data.trim() : '';
-  return key || null;
+  try {
+    const fromEnv = env.resendApiKey?.trim();
+    if (fromEnv) return fromEnv;
+    const { data, error } = await supabase.rpc('vault_decrypt_secret_by_name', {
+      p_name: 'resend_api_key'
+    });
+    if (error) return null;
+    const key = typeof data === 'string' ? data.trim() : '';
+    return key || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Kirim 1 email via Resend REST (tanpa dependency baru). */
@@ -102,6 +108,36 @@ function emailShell(title: string, bodyHtml: string): string {
 }
 
 /**
+ * Satu-satunya jalan keluar pengiriman email. Menangkap SEMUA error
+ * (key resolution, render payload, fetch) dan selalu mengembalikan
+ * `SendResult` — tidak pernah melempar. Kontrak ini yang menjaga workflow
+ * tetap berjalan meski pengiriman email gagal total.
+ */
+async function deliver(
+  supabase: SupabaseClient,
+  cfg: AutomationConfig,
+  input: { recipients: string[]; subject: string; html: string }
+): Promise<SendResult> {
+  try {
+    if (input.recipients.length === 0) {
+      return { ok: false, skipped: true, error: 'no recipients' };
+    }
+    const apiKey = await resolveResendKey(supabase);
+    if (!apiKey) return { ok: false, skipped: true, error: 'resend key not configured' };
+    return await sendViaResend(apiKey, {
+      to: input.recipients,
+      subject: input.subject,
+      html: input.html,
+      from: cfg.emailFrom,
+      replyTo: cfg.emailReplyTo
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `email gagal: ${message}` };
+  }
+}
+
+/**
  * Email "draft siap": daftar draf per platform + link review. Tidak pernah
  * melempar — kegagalan email tidak boleh memblok alur publish.
  */
@@ -116,31 +152,32 @@ export async function sendDraftReadyEmail(
     siteUrl: string;
   }
 ): Promise<SendResult> {
-  if (input.recipients.length === 0) return { ok: false, skipped: true, error: 'no recipients' };
-  const apiKey = await resolveResendKey(supabase);
-  if (!apiKey) return { ok: false, skipped: true, error: 'resend key not configured' };
-  const rows = input.drafts
-    .map(
-      (d) =>
-        `<li>${escapeHtml(d.platform)} — <a href="${escapeHtml(
-          `${input.siteUrl}/id/konten/review/${d.draftId}`
-        )}">buka draf ${escapeHtml(d.draftId.slice(0, 8))}</a></li>`
-    )
-    .join('');
-  const html = emailShell(
-    `Draf riset ${input.runDate} siap direview`,
-    [
-      `<p>Produk terpilih: <strong>${escapeHtml(input.productName)}</strong>.</p>`,
-      `<ul>${rows}</ul>`,
-      `<p><a href="${escapeHtml(`${input.siteUrl}/id/konten/review`)}">Buka halaman review</a></p>`
-    ].join('\n')
-  );
-  return sendViaResend(apiKey, {
-    to: input.recipients,
+  let rows: string;
+  let shell: string;
+  try {
+    rows = input.drafts
+      .map(
+        (d) =>
+          `<li>${escapeHtml(d.platform)} — <a href="${escapeHtml(
+            `${input.siteUrl}/id/konten/review/${d.draftId}`
+          )}">buka draf ${escapeHtml(d.draftId.slice(0, 8))}</a></li>`
+      )
+      .join('');
+    shell = emailShell(
+      `Draf riset ${input.runDate} siap direview`,
+      [
+        `<p>Produk terpilih: <strong>${escapeHtml(input.productName)}</strong>.</p>`,
+        `<ul>${rows}</ul>`,
+        `<p><a href="${escapeHtml(`${input.siteUrl}/id/konten/review`)}">Buka halaman review</a></p>`
+      ].join('\n')
+    );
+  } catch (e) {
+    return { ok: false, error: `render draft_ready gagal: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  return deliver(supabase, cfg, {
+    recipients: input.recipients,
     subject: `[Asharu] Draf riset ${input.runDate} siap`,
-    html,
-    from: cfg.emailFrom,
-    replyTo: cfg.emailReplyTo
+    html: shell
   });
 }
 
@@ -158,30 +195,30 @@ export async function sendPublishedEmail(
     siteUrl: string;
   }
 ): Promise<SendResult> {
-  if (input.recipients.length === 0) return { ok: false, skipped: true, error: 'no recipients' };
-  const apiKey = await resolveResendKey(supabase);
-  if (!apiKey) return { ok: false, skipped: true, error: 'resend key not configured' };
-  const links = input.articles
-    .map(
-      (a) =>
-        `<li><a href="${escapeHtml(`${input.siteUrl}/${a.locale}/artikel/${a.slug}`)}">${escapeHtml(
-          a.locale.toUpperCase()
-        )}: ${escapeHtml(a.slug)}</a></li>`
-    )
-    .join('');
-  const html = emailShell(
-    `Artikel ${input.runDate} sudah terbit`,
-    [
-      `<p>Produk: <strong>${escapeHtml(input.productName)}</strong>.</p>`,
-      `<ul>${links}</ul>`
-    ].join('\n')
-  );
-  return sendViaResend(apiKey, {
-    to: input.recipients,
+  let shell: string;
+  try {
+    const links = input.articles
+      .map(
+        (a) =>
+          `<li><a href="${escapeHtml(`${input.siteUrl}/${a.locale}/artikel/${a.slug}`)}">${escapeHtml(
+            a.locale.toUpperCase()
+          )}: ${escapeHtml(a.slug)}</a></li>`
+      )
+      .join('');
+    shell = emailShell(
+      `Artikel ${input.runDate} sudah terbit`,
+      [
+        `<p>Produk: <strong>${escapeHtml(input.productName)}</strong>.</p>`,
+        `<ul>${links}</ul>`
+      ].join('\n')
+    );
+  } catch (e) {
+    return { ok: false, error: `render published gagal: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  return deliver(supabase, cfg, {
+    recipients: input.recipients,
     subject: `[Asharu] Artikel ${input.runDate} sudah terbit`,
-    html,
-    from: cfg.emailFrom,
-    replyTo: cfg.emailReplyTo
+    html: shell
   });
 }
 
@@ -191,22 +228,22 @@ export async function sendFailureEmail(
   cfg: AutomationConfig,
   input: { recipients: string[]; runDate: string; stage: string; error: string; siteUrl: string }
 ): Promise<SendResult> {
-  if (input.recipients.length === 0) return { ok: false, skipped: true, error: 'no recipients' };
-  const apiKey = await resolveResendKey(supabase);
-  if (!apiKey) return { ok: false, skipped: true, error: 'resend key not configured' };
-  const html = emailShell(
-    `Automation riset ${input.runDate} gagal`,
-    [
-      `<p>Tahap: <strong>${escapeHtml(input.stage)}</strong></p>`,
-      `<p style="color:#b91c1c">${escapeHtml(input.error)}</p>`,
-      `<p><a href="${escapeHtml(`${input.siteUrl}/id/admin/automation`)}">Buka halaman automation</a></p>`
-    ].join('\n')
-  );
-  return sendViaResend(apiKey, {
-    to: input.recipients,
+  let shell: string;
+  try {
+    shell = emailShell(
+      `Automation riset ${input.runDate} gagal`,
+      [
+        `<p>Tahap: <strong>${escapeHtml(input.stage)}</strong></p>`,
+        `<p style="color:#b91c1c">${escapeHtml(input.error)}</p>`,
+        `<p><a href="${escapeHtml(`${input.siteUrl}/id/admin/automation`)}">Buka halaman automation</a></p>`
+      ].join('\n')
+    );
+  } catch (e) {
+    return { ok: false, error: `render failure gagal: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  return deliver(supabase, cfg, {
+    recipients: input.recipients,
     subject: `[Asharu] Automation gagal (${input.runDate})`,
-    html,
-    from: cfg.emailFrom,
-    replyTo: cfg.emailReplyTo
+    html: shell
   });
 }

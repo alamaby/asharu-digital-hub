@@ -203,8 +203,7 @@ describe('runAutomationTick (guards)', () => {
     expect(tables.automation_runs[0]?.attempts).toBe(0);
   });
 
-  it('run failed dengan sesi hidup di-retry: cover_started_at direset', async () => {
-    const tables = {
+  it('run failed dengan sesi hidup di-retry: cover_started_at direset', async () => {    const tables = {
       automation_configs: [baseConfig({ max_retry_attempts: 3 })],
       automation_runs: [
         {

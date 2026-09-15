@@ -95,16 +95,20 @@ async function loadSessionStatus(
   return (data as { status: string } | null)?.status ?? null;
 }
 
-/** Produk name untuk email (fallback friendly_code). */
+/** Produk name untuk email (fallback friendly_code). Tidak pernah melempar. */
 async function productLabel(supabase: SupabaseClient, productId: string | null): Promise<string> {
   if (!productId) return '(produk)';
-  const { data } = await supabase
-    .from('affiliate_products')
-    .select('name_id, friendly_code')
-    .eq('id', productId)
-    .maybeSingle();
-  const row = data as { name_id: string | null; friendly_code: string | null } | null;
-  return row?.name_id ?? row?.friendly_code ?? '(produk)';
+  try {
+    const { data } = await supabase
+      .from('affiliate_products')
+      .select('name_id, friendly_code')
+      .eq('id', productId)
+      .maybeSingle();
+    const row = data as { name_id: string | null; friendly_code: string | null } | null;
+    return row?.name_id ?? row?.friendly_code ?? '(produk)';
+  } catch {
+    return '(produk)';
+  }
 }
 
 /** Draft per platform untuk sesi ini (terurut artikel → twitter → threads). */
@@ -388,20 +392,31 @@ async function advanceRun(
       await notifyFailure(supabase, cfg, run, 'developing', 'Draf artikel tidak ditemukan.');
       return { status: 'failed', changed: true };
     }
-    // Email "draft siap" (best-effort, sebelum publish).
+    // Email "draft siap" (best-effort, sebelum publish). Kegagalan apa pun
+    // di sini tidak boleh mencegah alur lanjut ke cover/publish.
     if (wantsNotification(cfg, 'draft_ready') && !run.draft_ready_notified_at) {
-      const recipients = await resolveRecipients(supabase, cfg);
-      const res = await sendDraftReadyEmail(supabase, cfg, {
-        recipients,
-        runDate: run.run_date,
-        productName: await productLabel(supabase, run.product_id),
-        drafts: drafts.map((d) => ({ platform: d.platform ?? '?', draftId: d.id })),
-        siteUrl: env.siteUrl
-      });
-      if (!res.ok && !res.skipped) {
-        await log(supabase, sessionId, 'automation', 'warn', `email draft_ready gagal: ${res.error}`);
-      } else {
-        await updateRun(supabase, run.id, { draft_ready_notified_at: new Date().toISOString() });
+      try {
+        const recipients = await resolveRecipients(supabase, cfg);
+        const res = await sendDraftReadyEmail(supabase, cfg, {
+          recipients,
+          runDate: run.run_date,
+          productName: await productLabel(supabase, run.product_id),
+          drafts: drafts.map((d) => ({ platform: d.platform ?? '?', draftId: d.id })),
+          siteUrl: env.siteUrl
+        });
+        if (!res.ok && !res.skipped) {
+          await log(supabase, sessionId, 'automation', 'warn', `email draft_ready gagal: ${res.error}`);
+        } else {
+          await updateRun(supabase, run.id, { draft_ready_notified_at: new Date().toISOString() });
+        }
+      } catch (e) {
+        await log(
+          supabase,
+          sessionId,
+          'automation',
+          'warn',
+          `notifikasi draft_ready error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
     }
     const next: AutomationRunStatus = cfg.requireCover ? 'awaiting_cover' : 'publishing';
@@ -469,18 +484,31 @@ async function advanceRun(
 
   // 6) Notifikasi published → selesai.
   if (run.status === 'published') {
+    // Seluruh langkah notifikasi dibungkus try/catch: kegagalan (query data,
+    // render, pengiriman) harus membuat run tetap maju ke `completed` —
+    // status artikel sudah benar-benar published di titik ini.
     if (wantsNotification(cfg, 'published') && !run.notified_at) {
-      const recipients = await resolveRecipients(supabase, cfg);
-      const articles = await loadArticleLinks(supabase, run.article_ids ?? []);
-      const res = await sendPublishedEmail(supabase, cfg, {
-        recipients,
-        runDate: run.run_date,
-        productName: await productLabel(supabase, run.product_id),
-        articles,
-        siteUrl: env.siteUrl
-      });
-      if (!res.ok && !res.skipped) {
-        await log(supabase, sessionId, 'automation', 'warn', `email published gagal: ${res.error}`);
+      try {
+        const recipients = await resolveRecipients(supabase, cfg);
+        const articles = await loadArticleLinks(supabase, run.article_ids ?? []);
+        const res = await sendPublishedEmail(supabase, cfg, {
+          recipients,
+          runDate: run.run_date,
+          productName: await productLabel(supabase, run.product_id),
+          articles,
+          siteUrl: env.siteUrl
+        });
+        if (!res.ok && !res.skipped) {
+          await log(supabase, sessionId, 'automation', 'warn', `email published gagal: ${res.error}`);
+        }
+      } catch (e) {
+        await log(
+          supabase,
+          sessionId,
+          'automation',
+          'warn',
+          `notifikasi published error: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
     }
     await updateRun(supabase, run.id, {
@@ -509,16 +537,28 @@ async function notifyFailure(
   stage: string,
   error: string
 ): Promise<void> {
-  const recipients = await resolveRecipients(supabase, cfg);
-  const res = await sendFailureEmail(supabase, cfg, {
-    recipients,
-    runDate: run.run_date,
-    stage,
-    error,
-    siteUrl: env.siteUrl
-  });
-  if (!res.ok && !res.skipped) {
-    await log(supabase, run.session_id, 'automation', 'warn', `email failure gagal: ${res.error}`);
+  // Best-effort penuh: ini dipanggil dari jalur kegagalan, jadi ia tidak boleh
+  // menambah kegagalan baru (run sudah/akan ditandai failed oleh pemanggil).
+  try {
+    const recipients = await resolveRecipients(supabase, cfg);
+    const res = await sendFailureEmail(supabase, cfg, {
+      recipients,
+      runDate: run.run_date,
+      stage,
+      error,
+      siteUrl: env.siteUrl
+    });
+    if (!res.ok && !res.skipped) {
+      await log(supabase, run.session_id, 'automation', 'warn', `email failure gagal: ${res.error}`);
+    }
+  } catch (e) {
+    await log(
+      supabase,
+      run.session_id,
+      'automation',
+      'warn',
+      `notifikasi failure error: ${e instanceof Error ? e.message : String(e)}`
+    );
   }
 }
 

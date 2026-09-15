@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendViaResend, type AutomationEmailInput } from './email';
+import {
+  sendDraftReadyEmail,
+  sendFailureEmail,
+  sendPublishedEmail,
+  sendViaResend,
+  type AutomationEmailInput
+} from './email';
+import type { AutomationConfig } from './config';
 
 const input: AutomationEmailInput = {
   to: ['admin@asharu.id'],
@@ -8,6 +15,46 @@ const input: AutomationEmailInput = {
   from: 'Asharu <notifikasi@asharu.id>',
   replyTo: 'balas@asharu.id'
 };
+
+function cfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
+  return {
+    id: 1,
+    isEnabled: true,
+    scheduleHour: 10,
+    scheduleMinute: 0,
+    timezone: 'Asia/Jakarta',
+    scheduleWindowMinutes: 180,
+    mechanism: 'dua',
+    platformSlugs: ['artikel'],
+    templateSlug: null,
+    maxTopics: 1,
+    language: 'both',
+    tone: 'casual',
+    audience: 'umum',
+    purpose: 'x',
+    ctaStyle: 'soft_sell',
+    targetReplyCount: null,
+    productPoolSize: 50,
+    productCategory: null,
+    requireCover: true,
+    coverMaxWaitMinutes: 60,
+    coverMaxAttempts: 3,
+    autoPublishArticle: true,
+    maxRetryAttempts: 3,
+    notifyOn: 'both',
+    notifyEmails: ['admin@asharu.id'],
+    emailFrom: 'Asharu <notifikasi@asharu.id>',
+    emailReplyTo: null,
+    ...over
+  };
+}
+
+/** Client yang RPC-nya melempar (simulasi gangguan jaringan Supabase). */
+const throwingClient = {
+  rpc: () => {
+    throw new Error('network down');
+  }
+} as never;
 
 function mockFetch(status: number, body: string): typeof fetch {
   return vi.fn(async () =>
@@ -63,5 +110,62 @@ describe('sendViaResend', () => {
     const res = await sendViaResend('re_test', input, fetchImpl);
     expect(res.ok).toBe(false);
     expect(res.error).toContain('network down');
+  });
+});
+
+/**
+ * Kontrak penting: sender publik TIDAK PERNAH melempar, apa pun yang terjadi
+ * (RPC gagal, tidak ada penerima, tidak ada key). Kalau ini pecah, kegagalan
+ * email bisa menghentikan workflow automation.
+ */
+describe('sender publik selalu best-effort', () => {
+  const draftInput = {
+    recipients: ['admin@asharu.id'],
+    runDate: '2026-09-16',
+    productName: 'Produk X',
+    drafts: [{ platform: 'artikel', draftId: 'd4e5f6a7-0000-0000-0000-000000000000' }],
+    siteUrl: 'https://asharu.id'
+  };
+  const publishedInput = {
+    recipients: ['admin@asharu.id'],
+    runDate: '2026-09-16',
+    productName: 'Produk X',
+    articles: [{ locale: 'id', slug: 'tips-x' }],
+    siteUrl: 'https://asharu.id'
+  };
+  const failureInput = {
+    recipients: ['admin@asharu.id'],
+    runDate: '2026-09-16',
+    stage: 'publishing',
+    error: 'boom',
+    siteUrl: 'https://asharu.id'
+  };
+
+  it('RPC melempar → resolve ke skipped, tidak throw (draft_ready)', async () => {
+    const res = await sendDraftReadyEmail(throwingClient, cfg(), draftInput);
+    expect(res).toMatchObject({ ok: false, skipped: true });
+  });
+
+  it('RPC melempar → resolve ke skipped, tidak throw (published)', async () => {
+    const res = await sendPublishedEmail(throwingClient, cfg(), publishedInput);
+    expect(res).toMatchObject({ ok: false, skipped: true });
+  });
+
+  it('RPC melempar → resolve ke skipped, tidak throw (failure)', async () => {
+    const res = await sendFailureEmail(throwingClient, cfg(), failureInput);
+    expect(res).toMatchObject({ ok: false, skipped: true });
+  });
+
+  it('tanpa penerima → skipped tanpa menyentuh Vault', async () => {
+    const res = await sendDraftReadyEmail(throwingClient, cfg(), { ...draftInput, recipients: [] });
+    expect(res).toMatchObject({ ok: false, skipped: true, error: 'no recipients' });
+  });
+
+  it('tidak ada key (RPC error biasa) → skipped', async () => {
+    const noKeyClient = {
+      rpc: async () => ({ data: null, error: { message: 'not found' } })
+    } as never;
+    const res = await sendPublishedEmail(noKeyClient, cfg(), publishedInput);
+    expect(res).toMatchObject({ ok: false, skipped: true, error: 'resend key not configured' });
   });
 });
