@@ -98,6 +98,14 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
   melewati verify/scoring dan berhenti di `awaiting_selection`; `approveArticleAndPublish`
   admin-gated dan tidak mewajibkan cover; worker image auto-cover hanya sampai `prompt_ready`
   (belum render); tidak ada integrasi email sama sekali; pola config-by-table sudah mapan.
+- 2026-09-15 20:12:00 — Hardening pasca-review sendiri (commit `d220acb`): (1) insert
+  `automation_runs` gagal tidak lagi meninggalkan sesi orphan — sesi dibuang bila kalah balapan
+  `UNIQUE(run_date)`, atau ditandai `failed` bila error lain; (2) **bug retry**: `cover_started_at`
+  tidak pernah di-persist saat null, sehingga batas tunggu cover ter-reset tiap tick dan tidak
+  pernah timeout — kini di-persist; (3) retry otomatis & manual me-reset `cover_started_at` dan
+  menolak retry bila sesi riset sendiri `failed` (butuh intervensi di halaman Riset); (4) guard
+  `article_draft_id` kosong di `ensureCover`. +2 test regresi (10 total runner). Gate: typecheck ✓
+  lint ✓ **657 tests** ✓ build ✓.
 - 2026-09-15 19:35:00 — Implementasi selesai + migrasi applied prod. Keputusan saat eksekusi:
   (1) runner **tidak** memanggil `advanceStage` (hanya mengamati) untuk menghindari balapan
   dengan cron riset; (2) cover auto di-flip `prompt_ready → pending` agar worker merender

@@ -86,6 +86,22 @@ artikel + kirim email notifikasi via Resend. Semua knob harus configurable by ta
 
 - `873e8f0` (submodule) — `feat(db): tabel automation_configs + automation_runs + cron harian`
 - `24e3bdb` (parent) — `feat(automation): riset harian otomatis ke artikel + notifikasi Resend`
+- `d220acb` (parent) — `fix(automation): cegah orphan sesi + reset batas tunggu cover saat retry`
+
+## Hardening Pasca-Review (commit `d220acb`)
+
+Review sendiri menemukan 3 bug nyata setelah push pertama:
+1. Insert `automation_runs` gagal → sesi riset orphan (dipungut cron riset, jalan discovery
+   tanpa pengelola). Fix: buang sesi bila kalah balapan `UNIQUE(run_date)`, atau tandai
+   `failed` bila error lain.
+2. **Bug retry cover:** `ensureCover` me-default `cover_started_at` ke `now` tanpa
+   mem-persist-nya → batas tunggu ter-reset tiap tick dan **tidak pernah timeout**.
+   Fix: persist saat null.
+3. Retry (auto & manual) tidak me-reset `cover_started_at` → retry langsung timeout lagi.
+   Fix: reset di kedua jalur + tolak retry bila sesi riset sendiri `failed`.
+
+Plus guard `article_draft_id` kosong di `ensureCover`. +2 test regresi (runner 10 test).
+
 
 ## Rencana / Spec Terkait
 
