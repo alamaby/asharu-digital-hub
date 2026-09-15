@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, SyntheticEvent } from 'react';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
 export interface ArticleViewFaq {
@@ -36,6 +36,17 @@ interface Props {
 
 const URL_RE = /(https?:\/\/[^\s<>"')\]]+)/g;
 const TRAILING_PUNCT_RE = /[.,;:!?)\]]+$/;
+
+/** Placeholder lokal bila `affiliate.image` kosong/rusak (konsisten dengan picker/card). */
+const FALLBACK_IMAGE = '/images/products/product-placeholder-1.svg';
+
+/** Sekali saja: gambar rusak → placeholder, tanpa loop (guard dataset). */
+function handleAffiliateImgError(event: SyntheticEvent<HTMLImageElement>) {
+  const img = event.currentTarget;
+  if (img.dataset.fallback === 'true') return;
+  img.dataset.fallback = 'true';
+  img.src = FALLBACK_IMAGE;
+}
 // **tebal**, *miring*, atau URL — inline ringan (bukan parser markdown penuh).
 const RICH_RE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|https?:\/\/[^\s<>"')\]]+)/g;
 
@@ -116,7 +127,14 @@ export function renderRichText(text: string): ReactNode[] {
 }
 
 /** Render markdown sederhana (## → h2, baris lain → paragraf). Tanpa HTML mentah. */
-export function ArticleMarkdownBody({ md }: { md: string }) {
+export function ArticleMarkdownBody({
+  md,
+  affiliate
+}: {
+  md: string;
+  /** Opsional agar caller lama/test existing tanpa prop tetap lolos. */
+  affiliate?: ArticleViewAffiliate | null;
+}) {
   const blocks: { type: 'h2' | 'p'; text: string }[] = [];
   let para: string[] = [];
   const flush = () => {
@@ -137,17 +155,42 @@ export function ArticleMarkdownBody({ md }: { md: string }) {
   flush();
   return (
     <>
-      {blocks.map((b, i) =>
-        b.type === 'h2' ? (
-          <h2 key={i} className="mt-8 text-xl font-semibold text-ink">
-            {b.text}
-          </h2>
-        ) : (
-          <p key={i} className="mt-4 leading-relaxed text-ink">
-            {renderRichText(b.text)}
-          </p>
-        )
-      )}
+      {blocks.map((b, i) => {
+        if (b.type === 'h2') {
+          return (
+            <h2 key={i} className="mt-8 text-xl font-semibold text-ink">
+              {b.text}
+            </h2>
+          );
+        }
+        // Hanya paragraf yang memuat URL afiliasi dapat thumbnail kecil di
+        // kiri teks; h2 tidak pernah bergambar walau mengandung URL.
+        const affiliateUrl = affiliate?.url;
+        const isAffiliatePara =
+          Boolean(affiliateUrl) && b.text.includes(affiliateUrl ?? '');
+        if (!isAffiliatePara || !affiliate) {
+          return (
+            <p key={i} className="mt-4 leading-relaxed text-ink">
+              {renderRichText(b.text)}
+            </p>
+          );
+        }
+        return (
+          <div key={i} className="mt-4 flex items-start gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={affiliate.image || FALLBACK_IMAGE}
+              alt={affiliate.name ?? ''}
+              width={48}
+              height={48}
+              loading="lazy"
+              className="size-12 shrink-0 rounded-lg border border-line object-cover"
+              onError={handleAffiliateImgError}
+            />
+            <p className="leading-relaxed text-ink">{renderRichText(b.text)}</p>
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -199,23 +242,22 @@ export function ArticlePublicView({
       ) : null}
 
       <div className="mt-6">
-        <ArticleMarkdownBody md={bodyMd} />
+        <ArticleMarkdownBody md={bodyMd} affiliate={affiliate} />
       </div>
 
       {affiliate ? (
         <aside className="mt-8 rounded-xl border border-primary/30 bg-primary/5 p-4">
           <div className="flex items-center gap-3">
-            {affiliate.image ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={affiliate.image}
-                alt={affiliate.name ?? title}
-                width={64}
-                height={64}
-                className="size-16 shrink-0 rounded-lg border border-line object-cover"
-                loading="lazy"
-              />
-            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={affiliate.image || FALLBACK_IMAGE}
+              alt={affiliate.name ?? title}
+              width={64}
+              height={64}
+              className="size-16 shrink-0 rounded-lg border border-line object-cover"
+              loading="lazy"
+              onError={handleAffiliateImgError}
+            />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">{affiliateTitle}</p>
               <p className="mt-1 text-sm text-ink-muted">{affiliateBody}</p>

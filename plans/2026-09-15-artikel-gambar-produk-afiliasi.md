@@ -96,12 +96,12 @@ Contoh hasil akhir inline (paragraf yang memuat URL afiliasi):
 
 ## Tasks
 
-- [ ] T0. Baca wajib sebelum coding (penuh, bukan potongan):
+- [x] T0. Baca wajib sebelum coding (penuh, bukan potongan):
   - `src/components/articles/ArticlePublicView.tsx` (262 baris) — lokasi edit utama.
   - `src/components/articles/ArticlePublicView.test.tsx` (56 baris) — pola test existing.
   - `src/components/admin/FixedProductCard.tsx:1-40` — pola fallback canonical.
   - `src/components/content/ArticleDraftCard.tsx:283-312` — pastikan preview reuse tanpa perlu edit (baca saja).
-- [ ] T1. Panel "Produk yang disebut di artikel ini" (`ArticlePublicView.tsx:205-232`):
+- [x] T1. Panel "Produk yang disebut di artikel ini" (`ArticlePublicView.tsx:205-232`):
   - Tambah di level modul (di atas `ArticleMarkdownBody`, dekat `URL_RE`):
     ```ts
     const FALLBACK_IMAGE = '/images/products/product-placeholder-1.svg';
@@ -128,7 +128,7 @@ Contoh hasil akhir inline (paragraf yang memuat URL afiliasi):
     ```
   - Jangan ubah teks/CTA/note, jangan ganti ke `next/image`, jangan ubah ukuran (tetap `size-16` agar hierarki vs picker `size-10` / form `size-12` terjaga).
   - Kriteria: `affiliate.image=null` → `src` placeholder; `affiliate.image=url-rusak` → `onError` → placeholder, tanpa loop (guard dataset).
-- [ ] T2. Gambar inline paragraf afiliasi (`ArticleMarkdownBody`, `ArticlePublicView.tsx:118-153`):
+- [x] T2. Gambar inline paragraf afiliasi (`ArticleMarkdownBody`, `ArticlePublicView.tsx:118-153`):
   - Ubah signature menjadi:
     ```tsx
     export function ArticleMarkdownBody({ md, affiliate }: { md: string; affiliate?: ArticleViewAffiliate | null }) {
@@ -158,16 +158,16 @@ Contoh hasil akhir inline (paragraf yang memuat URL afiliasi):
   - Hanya paragraf (`type==='p'`); `h2` tidak pernah bergambar walau mengandung URL.
   - Bila beberapa paragraf mengandung URL (jarang; normalnya 1), gambar di setiap paragraf yang cocok — sederhana, stateless, tanpa pelacakan "first only".
   - Tanpa `affiliate` / URL tak cocok → render persis seperti sekarang (tidak ada perubahan visual paragraf lain).
-- [ ] T3. Wiring di `ArticlePublicView` (`:201-203`):
+- [x] T3. Wiring di `ArticlePublicView` (`:201-203`):
   - Ganti `<ArticleMarkdownBody md={bodyMd} />` menjadi `<ArticleMarkdownBody md={bodyMd} affiliate={affiliate} />`.
   - Tidak perlu ubah caller (`page.tsx:74-100`, `ArticleDraftCard.tsx:289-309`) — mereka sudah passing `affiliate`; preview review ikut sembuh otomatis.
-- [ ] T4. Test (`src/components/articles/ArticlePublicView.test.tsx`, tambah describe baru, jangan ubah test existing kecuali perlu):
+- [x] T4. Test (`src/components/articles/ArticlePublicView.test.tsx`, tambah describe baru, jangan ubah test existing kecuali perlu):
   - (a) Panel: render `ArticlePublicView` dengan `affiliate={{ name: 'Kipas', url: 'https://s.shopee.co.id/xyz', image: null }}` (+ props string minimal) → `img[alt]` ada dengan `src` placeholder. Lihat pola `AffiliateProductPicker.test.tsx:72-81`.
   - (b) Panel `onError` → placeholder tanpa loop: render dengan `image='https://example.com/rusak.jpg'`, fire `error` pada img, assert `src` jadi placeholder; fire `error` kedua, assert tetap placeholder (guard `dataset.fallback`). Pakai `fireEvent.error` dari `@testing-library/react`.
   - (c) Inline: render `<ArticleMarkdownBody md={'Intro\n\nBeli https://s.shopee.co.id/xyz di sini\n\nOutro'} affiliate={{ name: 'Kipas', url: 'https://s.shopee.co.id/xyz', image: null }} />` → tepat 1 `img` (di paragraf tengah), 2 paragraf lain tanpa img.
   - (d) Inline negatif: `md` tanpa URL afiliasi + `affiliate` ada → tidak ada `img` di body.
   - (e) Regresi: `<ArticleMarkdownBody md={...} />` tanpa prop `affiliate` tetap render seperti dulu (test existing harus hijau tanpa modifikasi).
-- [ ] T5. Gate (berurutan, di root repo):
+- [x] T5. Gate (berurutan, di root repo):
   1. `npm run typecheck`
   2. `npm run lint`
   3. `npm test -- src/components/articles/ArticlePublicView.test.tsx` (dulu, cepat), lalu `npm test` penuh.
@@ -193,6 +193,7 @@ Contoh hasil akhir inline (paragraf yang memuat URL afiliasi):
 ## Progress Log
 
 - 2026-09-15 19:05:00 — Plan detail dibuat untuk small model; implementasi belum dimulai. Investigasi read-only selesai: snapshot live + query `articles`/`affiliate_products` + baca CSP + pola fallback picker/card.
+- 2026-09-15 ~13:05 — T0–T5 dieksekusi: panel selalu render img + fallback placeholder sekali-guard; `ArticleMarkdownBody` terima `affiliate` opsional + thumbnail `size-12` di paragraf ber-URL afiliasi (h2 dikecualikan); wiring di `ArticlePublicView`; 5 test baru (12/12 file); gate typecheck ✓ lint ✓ test 608/608 ✓ build ✓. Catatan: asumsi plan "240 eksternal" sudah kedaluwarsa — scrape CI hijau → 240/240 Storage; panel live sudah sembuh via data, fallback tetap dipasang untuk null/rusak. Sisa T6 manual + T7 commit.
 
 ## Notes
 
