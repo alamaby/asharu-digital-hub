@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-15 16:36 (local time)
+Last updated: 2026-09-15 19:40 (local time)
 
 ## Current State
 
@@ -31,8 +31,11 @@ Last updated: 2026-09-15 16:36 (local time)
 12. Cron processor berjalan di Supabase pg_cron tiap 5 menit (Vercel Hobby limit) → POST `https://asharu.id/api/content/process`; `vercel.json` crons kosong.
 13. Katalog afiliasi **DB-only selesai** (15 Sep): scraper menulis ke Postgres `affiliate_products` + Storage bucket `affiliate-images` (240/240 URL Storage, 6 `is_featured`); halaman publik baca DB via `anonClient` + ISR 3600; file statis + 256 webp lokal dihapus. Workflow scrape **tidak lagi commit/push** (hapus race `fetch first`). Pelajaran insiden: `storage.exists()` objek-hilang = `{data:false,error:400}`, bukan reject — hanya `data===true` = hit. Lihat entry memori 2026-09-15.
 14. Admin membership = `profiles.is_admin` (single source of truth, 1 Sep 2026). `is_admin()` SQL baca profiles; `handle_new_user` default `is_admin=false`; middleware & review page lookup via profiles (tidak ada hardcoded email di kode). Admin baru di-elevate via `UPDATE profiles SET is_admin = true`. (P2 audit #12 ditutup.)
+15. **Automation riset harian (15 Sep, `24e3bdb`/`873e8f0`):** cron `asharu-automation-run` (*/5) → `/api/automation/run`, gated ke 10:00 `Asia/Jakarta` + 1 run/hari (`automation_runs.run_date UNIQUE`). Runner **mengamati** sesi riset (tidak panggil `advanceStage`, hindari balapan cron riset); shortlist+advance hanya di `awaiting_selection`. Semua knob di `automation_configs` (singleton, seed `is_enabled=false`). Cover gate: flip `prompt_ready → pending` agar worker merender gambar; publish hanya saat `selected`. `publishArticleDraftCore` dipakai ulang tanpa gate admin. Email Resend via `fetch` + Vault `resend_api_key` (best-effort, tak memblok publish). Fix excerpt: `clampArticleExcerpt` (parser-level, tanpa migrasi CHECK).
 
 ## Open Items / Blockers
+
+- [ ] **Automation harian — seed Resend + dry-run [USER ACTION]:** `node --env-file=.env.local scripts/seed-resend-key.mjs` (Vault `resend_api_key`) + verifikasi domain Resend. Lalu di `/id/admin/automation` aktifkan kill-switch + `Run now` dengan `auto_publish_article=false` untuk uji 1 hari → baru nyalakan auto-publish. Deploy Vercel wajib agar endpoint + cron live.
 
 - [ ] **Sesi riset Artikel pertama [USER ACTION]:** migrasi prod SUDAH applied (14 Sep, terverifikasi). Submit form `/konten/baru` dengan ☑ Artikel → pantau `/admin/riset` → review → publish → cek `/id/artikel/[slug]` → GSC request indexing.
 - [ ] **Verifikasi live Studio pasca-fix Flux+refresh (12 Sep, commit `4a522ab`) [USER ACTION]:** di `/id/studio` klik "Ulangi" pada 2 record failed (`996dcd8c` user-negative, `f10d58e2` timeout) → keduanya harus `ready` (prompt Flux terkirim sebagai `... Avoid: ...`). Lalu uji enqueue baru → baris `pending` harus langsung tampil di list tanpa reload.
@@ -55,6 +58,8 @@ Last updated: 2026-09-15 16:36 (local time)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [193500-automation-riset-harian-artikel.md](2026-09-15/193500-automation-riset-harian-artikel.md) — Automation riset harian 10:00 WIB: cron `asharu-automation-run` → `/api/automation/run`, config-by-table (`automation_configs` singleton + `automation_runs` 1/hari), runner mengamati sesi `dua` (shortlist→develop), cover gate `prompt_ready→pending→selected`, auto-publish via `publishArticleDraftCore`, email Resend, UI `/admin/automation`; fix excerpt `clampArticleExcerpt`. Migrasi applied prod, gate 655 tests + build hijau, pushed `873e8f0`/`24e3bdb`. [USER ACTION] Seed Resend + dry-run.
 
 - [163500-riset-tambah-platform-rerun.md](2026-09-15/163500-riset-tambah-platform-rerun.md) — Admin bisa menambah platform yang belum dipilih pada sesi `completed`/`failed` (`/admin/riset/[sessionId]`) lalu rerun tahap `developing` saja: modul murni `platform-additions.ts` (effective ∪ active-minus + normalisasi `platform_slugs`) + action `addPlatformsAndRerun` (guard status/shortlisted, back-date agar cron memungut, tanpa LLM inline) + komponen `AddPlatformRerun` + 10 key i18n; idempotensi per-pasangan dari `runDevelopment` mencegah duplikat draf. Tanpa migrasi. Gate typecheck ✓ lint ✓ test 618/618 ✓ build ✓.
 - [134500-artikel-inline-fullwidth.md](2026-09-15/134500-artikel-inline-fullwidth.md) — Feedback screenshot: inline 48px → figure full-width + caption (`max-h-96 object-contain`). Runtime `next start` → HTTP 200, figure=1. Gate typecheck ✓ lint ✓ test 610/610 ✓ build ✓. [USER ACTION] Tunggu deploy → cek visual live.

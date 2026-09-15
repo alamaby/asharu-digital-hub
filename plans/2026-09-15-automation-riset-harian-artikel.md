@@ -36,46 +36,52 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
 ## Tasks
 
 ### Fase 0 — Migrasi (submodule `supabase/` dulu, lalu parent)
-- [ ] `20260915000003_automation_config.sql`: tabel `automation_configs` (singleton `id=1`, seed **disabled**)
+- [x] `20260915000003_automation_config.sql`: tabel `automation_configs` (singleton `id=1`, seed **disabled**)
       — `is_enabled`, `schedule_hour`=10, `schedule_minute`=0, `timezone`='Asia/Jakarta',
       `platform_slugs`='{artikel,twitter,threads}', `product_pool_size`=50, `product_category`,
       `max_topics`=1, `language`, `tone`, `audience`, `purpose`, `cta_style`, `target_reply_count`,
       `require_cover`=true, `cover_max_wait_minutes`=60, `cover_max_attempts`=3,
       `auto_publish_article`=true, `notify_on`='both', `notify_emails text[]`, `email_from`,
-      `email_reply_to`, `last_run_at`; RLS admin-only (`is_admin()`).
-- [ ] Tabel `automation_runs`: `run_date date UNIQUE`, `status` CHECK
+      `email_reply_to`, `last_run_at`; RLS admin-only (`is_admin()`). (+ `schedule_window_minutes`,
+      `max_retry_attempts` ditambah saat implementasi) **APPLIED prod 15 Sep, terverifikasi.**
+- [x] Tabel `automation_runs`: `run_date date UNIQUE`, `status` CHECK
       (`session_created|developing|awaiting_cover|publishing|published|notifying|completed|failed`),
       `config_snapshot jsonb`, `product_id`, `session_id`, `article_draft_id`, `article_ids uuid[]`,
       `cover_attempts`, `draft_ready_notified_at`, `published_at`, `notified_at`, `error_message`;
-      RLS admin-only; index `(status)`, `(run_date)`.
-- [ ] `20260915000004_automation_cron.sql`: `cron.schedule('asharu-automation-run','*/5 * * * *',
-      net.http_post https://asharu.id/api/automation/run Bearer dari Vault, timeout 290000)`.
-- [ ] `scripts/seed-resend-key.mjs` → Vault `resend_api_key`.
-- [ ] `env.ts` + `.env.example`: `RESEND_API_KEY` opsional (fallback dev).
+      RLS admin-only; index `(status)`, `(run_date)`. **APPLIED prod, 2 policies.**
+- [x] `20260915000004_automation_cron.sql`: `cron.schedule('asharu-automation-run','*/5 * * * *',
+      net.http_post https://asharu.id/api/automation/run Bearer dari Vault, timeout 290000)`. **APPLIED prod.**
+- [x] `scripts/seed-resend-key.mjs` → Vault `resend_api_key`.
+- [x] `env.ts` + `.env.example`: `RESEND_API_KEY` opsional (fallback dev) + `env.test.ts` sync.
 
 ### Fase 1 — Core
-- [ ] `src/lib/automation/config.ts`: `loadAutomationConfig`, `resolveRunLocales`, `resolveRecipients`.
-- [ ] `src/lib/automation/scheduler.ts` (pure): `localDateString`, `localMinutes`, `isRunDue`,
+- [x] `src/lib/automation/config.ts`: `loadAutomationConfig`, `resolveRunLocales`, `resolveRecipients`.
+- [x] `src/lib/automation/scheduler.ts` (pure): `localDateString`, `localMinutes`, `isRunDue`,
       `pickRandomProduct` (crypto `randomInt`).
-- [ ] `src/lib/automation/runner.ts`: `runAutomationTick` + `advanceRun` (amati status sesi,
-      jangan panggil `advanceStage`; shortlist+advance di `awaiting_selection`; render cover;
-      publish; email best-effort; log).
-- [ ] `src/lib/articles/publish.ts`: `publishArticleDraftCore`; `actions.ts` wrapper admin-gated.
-- [ ] `src/lib/automation/email.ts`: Resend via `fetch` + key Vault → env.
-- [ ] Fix excerpt: `clampArticleExcerpt` + normalisasi parse + repair 1x di
-      `generateArticleAndInsertDraft` + test regresi.
+- [x] `src/lib/automation/runner.ts`: `runAutomationTick` + `advanceRun`. Mekanisme disempurnakan:
+      runner **mengamati** status sesi (tidak panggil `advanceStage`, tanpa tabrakan cron riset),
+      shortlist/advance hanya di `awaiting_selection`; hapus state `notifying` yang tak terpakai.
+- [x] `src/lib/articles/publish.ts`: `publishArticleDraftCore`; `actions.ts` wrapper admin-gated (dikurangi 151 baris).
+- [x] `src/lib/automation/email.ts`: Resend via `fetch` + key Vault → env, timeout AbortController.
+- [x] Fix excerpt: `clampArticleExcerpt` + `ARTICLE_EXCERPT_MAX` + normalisasi parse + test regresi.
 
 ### Fase 2 — Endpoint
-- [ ] `src/app/api/automation/run/route.ts` (`GET`/`POST`, `isCronAuthorized`, `maxDuration=300`).
+- [x] `src/app/api/automation/run/route.ts` (`GET`/`POST`, `isCronAuthorized`, `maxDuration=300`).
 
 ### Fase 3 — Admin UI
-- [ ] `/admin/automation`: form config + tabel `automation_runs` + Run now/Retry, nav, i18n id/en.
+- [x] `/admin/automation`: form config lengkap + tabel `automation_runs` + Run now/Retry, nav
+      (`adminAutomation` di `admin-nav.ts` + `navigation.ts` + `routing.ts` pathname), i18n id/en.
 
 ### Fase 4 — Verifikasi
-- [ ] Tests: `scheduler.test.ts`, `runner.test.ts`, `email.test.ts`, excerpt clamp + publish regression.
-- [ ] `npm run typecheck && npm run lint && npm test && npm run build`.
-- [ ] Dry-run → aktivasi (`is_enabled=true` + auto-publish).
-- [ ] Update `.memory/` + commit/push (submodule → parent).
+- [x] Tests: `scheduler.test.ts` (13), `config.test.ts` (6), `email.test.ts` (5), `runner.test.ts` (8),
+      excerpt clamp (5). Total suite **655 tests hijau**.
+- [x] `npm run typecheck` ✓ `npm run lint` ✓ `npm test` ✓ `npm run build` ✓ (rute `/api/automation/run`
+      + `/[locale]/admin/automation` ter-build).
+- [x] Migrasi applied prod + advisor keamanan diperiksa (hanya temuan pra-eksisting; tabel baru tanpa temuan).
+- [x] Commit/push submodule (`873e8f0`) → parent (`24e3bdb`).
+- [ ] **Dry-run produksi [USER ACTION]:** di `/id/admin/automation` aktifkan kill-switch + `Run now`
+      dengan `auto_publish_article=false`/`require_cover=true` untuk uji 1 hari, lalu nyalakan auto-publish.
+- [ ] Seed Resend key ke Vault (`node --env-file=.env.local scripts/seed-resend-key.mjs`) + verifikasi domain Resend.
 
 ## Risks
 
@@ -92,6 +98,15 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
   melewati verify/scoring dan berhenti di `awaiting_selection`; `approveArticleAndPublish`
   admin-gated dan tidak mewajibkan cover; worker image auto-cover hanya sampai `prompt_ready`
   (belum render); tidak ada integrasi email sama sekali; pola config-by-table sudah mapan.
+- 2026-09-15 19:35:00 — Implementasi selesai + migrasi applied prod. Keputusan saat eksekusi:
+  (1) runner **tidak** memanggil `advanceStage` (hanya mengamati) untuk menghindari balapan
+  dengan cron riset; (2) cover auto di-flip `prompt_ready → pending` agar worker merender
+  gambar sungguhan (bukan hanya menyiapkan prompt); (3) `notifying` dihapus dari alur (disimpan
+  di CHECK untuk kompatibilitas); (4) ditambah `schedule_window_minutes` (jendela jadwal) dan
+  `max_retry_attempts` (retry harian) — mencegah run tengah malam saat kill-switch baru dinyalakan;
+  (5) fix excerpt dilakukan di parser (`clampArticleExcerpt`) sehingga draf tersimpan selalu
+  DB-valid, tanpa perlu migrasi pelebaran CHECK. Gate: typecheck ✓ lint ✓ 655 tests ✓ build ✓.
+  Dipush submodule `873e8f0`, parent `24e3bdb`.
 
 ## Notes
 
