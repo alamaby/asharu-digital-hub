@@ -123,18 +123,21 @@ describe('ArticleMarkdownBody affiliate inline', () => {
     image: null
   };
 
-  it('tepat 1 img di paragraf ber-URL afiliasi, paragraf lain tanpa img', () => {
+  it('tepat 1 figure full-width di atas paragraf ber-URL afiliasi', () => {
     const { container } = render(
       <ArticleMarkdownBody
         md={'Intro\n\nBeli https://s.shopee.co.id/xyz di sini\n\nOutro'}
         affiliate={affiliate}
       />
     );
-    const imgs = container.querySelectorAll('img');
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0]?.getAttribute('src')).toBe(PLACEHOLDER_SRC);
-    // Paragraf tengah (dengan img) + Intro + Outro = 3 <p>.
+    const figures = container.querySelectorAll('figure');
+    expect(figures).toHaveLength(1);
+    const img = figures[0]?.querySelector('img');
+    expect(img?.getAttribute('src')).toBe(PLACEHOLDER_SRC);
+    expect(figures[0]?.querySelector('figcaption')?.textContent).toBe('Kipas');
+    // Paragraf tengah + Intro + Outro = 3 <p>, tidak ada img di dalam <p>.
     expect(container.querySelectorAll('p')).toHaveLength(3);
+    expect(container.querySelector('p img')).toBeNull();
   });
 
   it('h2 ber-URL afiliasi tidak bergambar', () => {

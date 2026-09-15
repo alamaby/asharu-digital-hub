@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import {
   AFFILIATE_FALLBACK_IMAGE,
@@ -156,8 +156,9 @@ export function ArticleMarkdownBody({
             </h2>
           );
         }
-        // Hanya paragraf yang memuat URL afiliasi dapat thumbnail kecil di
-        // kiri teks; h2 tidak pernah bergambar walau mengandung URL.
+        // Paragraf yang memuat URL afiliasi dapat figure full-width di
+        // atas teks (foto produk asli, bukan thumbnail kecil); h2 tidak
+        // pernah bergambar walau mengandung URL.
         const affiliateUrl = affiliate?.url;
         const isAffiliatePara =
           Boolean(affiliateUrl) && b.text.includes(affiliateUrl ?? '');
@@ -169,16 +170,23 @@ export function ArticleMarkdownBody({
           );
         }
         return (
-          <div key={i} className="mt-4 flex items-start gap-3">
-            <AffiliateImage
-              src={affiliate.image || AFFILIATE_FALLBACK_IMAGE}
-              alt={affiliate.name ?? ''}
-              width={48}
-              height={48}
-              className="size-12 shrink-0 rounded-lg border border-line object-cover"
-            />
-            <p className="leading-relaxed text-ink">{renderRichText(b.text)}</p>
-          </div>
+          <Fragment key={i}>
+            <figure className="mt-4 overflow-hidden rounded-xl border border-line bg-surface">
+              <AffiliateImage
+                src={affiliate.image || AFFILIATE_FALLBACK_IMAGE}
+                alt={affiliate.name ?? ''}
+                width={800}
+                height={450}
+                className="max-h-96 w-full object-contain"
+              />
+              {affiliate.name ? (
+                <figcaption className="border-t border-line px-4 py-2 text-xs text-ink-muted">
+                  {affiliate.name}
+                </figcaption>
+              ) : null}
+            </figure>
+            <p className="mt-4 leading-relaxed text-ink">{renderRichText(b.text)}</p>
+          </Fragment>
         );
       })}
     </>
