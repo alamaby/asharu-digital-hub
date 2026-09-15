@@ -34,7 +34,7 @@ function argValue(flag, fallback) {
 const limit = dryRun ? Number(argValue('--limit', 5)) : Number(argValue('--limit', Infinity));
 const maxWidth = Number(argValue('--max-width', 800));
 // Guard mass-deactivation (P3 audit 2026-08-30): scrape sepi jangan nonaktifkan
-// mayoritas produk DB. Bila removal > 20% aktif → abort (override eksplisit).
+// mayoritas produk DB. Bila removal > 20% aktif -> abort (override eksplisit).
 const allowMassDeactivation = args.includes('--allow-mass-deactivation');
 const MASS_DEACTIVATION_THRESHOLD = 0.2;
 
@@ -136,6 +136,8 @@ async function main() {
 
   // Single Supabase client shared by Storage upload + DB upsert (dry-run tidak butuhnya).
   let supabase = null;
+  /** external_id -> baris DB, di-fetch di depan agar upload gagal bisa fallback ke gambar lama. */
+  let prevById = new Map();
   if (!dryRun) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
     const supabaseKey =
@@ -145,17 +147,23 @@ async function main() {
     }
     const { createClient } = await import('@supabase/supabase-js');
     supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+    const { data: prevRows, error: prevError } = await supabase
+      .from('affiliate_products')
+      .select('external_id, name_id, name_en, category, merchant, url, image, is_active, is_featured');
+    if (prevError) throw new Error(`Supabase fetch existing: ${prevError.message}`);
+    prevById = new Map((prevRows ?? []).map((r) => [r.external_id, r]));
   }
 
-  let uploadFailed = false;
+  /** external_id produk BARU yang upload gambarnya gagal (tidak ada fallback DB). */
+  const failedUploadIds = new Set();
   const products = [];
   for (const [index, item] of items.entries()) {
     const featured = index < 6;
     const product = toAffiliateProduct({ ...item, featured }, info);
 
     if (!dryRun && supabase) {
+      const externalId = String(item.linkId);
       try {
-        const externalId = String(item.linkId);
         const { publicUrl } = await uploadAffiliateImage(item.image, externalId, {
           maxWidth,
           insecure,
@@ -163,11 +171,21 @@ async function main() {
         });
         product.image = publicUrl;
       } catch (err) {
-        console.error(`  [warn] image upload failed for ${item.linkId}: ${err.message}`);
-        // Jangan fallback ke remote (schema akan menolak; gate sengaja ketat).
-        // Ambil image existing dari DB bila ada, agar rerun tidak kehilangan gambar.
-        product.image = item.image;
-        uploadFailed = true;
+        const prevImage = prevById.get(externalId)?.image;
+        if (prevImage) {
+          // Produk lama: pakai gambar DB yang sudah ada — baris aman di-upsert
+          // (kemungkinan identik -> di-skip), run tidak perlu gagal.
+          console.error(`  [warn] image upload failed for ${item.linkId}, reusing previous DB image: ${err.message}`);
+          product.image = prevImage;
+        } else {
+          // Produk benar-benar baru tanpa gambar: JANGAN tulis URL remote ke DB
+          // (schema menolak; next/image 400). Kecualikan dari upsert di bawah
+          // dan gagalkan run dengan keras (insiden 2026-09-15: 240 URL remote
+          // sempat tertulis ke kolom image).
+          console.error(`  [warn] image upload failed for new product ${item.linkId}: ${err.message}`);
+          product.image = item.image; // interim file only; never upserted (see failedUploadIds filter)
+          failedUploadIds.add(externalId);
+        }
       }
     }
 
@@ -206,17 +224,22 @@ async function main() {
       // Upsert hanya baris baru/berubah: tiap baris upsert memicu trigger
       // BEFORE INSERT spekulatif yang membakar 1 nilai sequence meski akhirnya
       // UPDATE — full-upsert 221 baris/hari menghabiskan sequence sia-sia.
-      const { data: existingRows, error: fetchError } = await supabase
-        .from('affiliate_products')
-        .select('external_id, name_id, name_en, category, merchant, url, image, is_active, is_featured');
-      if (fetchError) throw new Error(`Supabase fetch existing: ${fetchError.message}`);
-      const byId = new Map((existingRows ?? []).map((r) => [r.external_id, r]));
+      // Pakai prevById yang di-fetch sebelum loop gambar (tidak ada penulis
+      // konkuren berkat concurrency group workflow).
+      const byId = prevById;
       const COMPARE_KEYS = ['name_id', 'name_en', 'category', 'merchant', 'url', 'image', 'is_active', 'is_featured'];
       const changed = rows.filter((r) => {
+        // Produk baru yang upload gambarnya gagal: JANGAN upsert (DB tidak
+        // boleh menyimpan URL remote yang schema-invalid). Run tetap gagal
+        // di bawah via failedUploadIds.
+        if (failedUploadIds.has(r.external_id)) return false;
         const e = byId.get(r.external_id);
         if (!e) return true;
         return COMPARE_KEYS.some((k) => (e[k] ?? null) !== (r[k] ?? null));
       });
+      if (failedUploadIds.size > 0) {
+        console.error(`  excluding ${failedUploadIds.size} new product(s) with failed image uploads from upsert: ${[...failedUploadIds].slice(0, 10).join(',')}`);
+      }
       console.error(`  ${changed.length}/${rows.length} new or changed, skipping ${rows.length - changed.length} identical (saves sequence burns)`);
       for (let i = 0; i < changed.length; i += 50) {
         const batch = changed.slice(i, i + 50);
@@ -251,11 +274,11 @@ async function main() {
     console.error('Supabase env not set — skipping DB sync (file-only).');
     syncFailed = true;
   }
-  if (uploadFailed && !syncFailed) {
-    // Image uploads partially failed: DB upserts to `image` may point at remote
-    // URLs that are no longer valid schema-wise. Fail loud so M3 fetch tidak
-    // menulis image rusak, dan workflow tidak commit.
-    console.error('Some affiliate image uploads failed — see warnings above.');
+  if (failedUploadIds.size > 0 && !syncFailed) {
+    // Produk baru tanpa gambar Storage: DB sengaja tidak di-upsert untuknya
+    // (lihat filter di atas) — gagalkan run dengan keras agar terlihat di CI
+    // dan diperbaiki, bukan diam-diam menyimpan URL remote yang invalid.
+    console.error(`Image uploads failed for ${failedUploadIds.size} new product(s) — see warnings above.`);
     syncFailed = true;
   }
   if (syncFailed) {

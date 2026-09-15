@@ -56,13 +56,18 @@ export async function uploadAffiliateImage(remoteUrl, externalId, opts) {
   const storagePath = `${externalId}-${hash}.webp`;
 
   // Skip-if-exists (storage.exists, NOT a PostgREST query on storage.objects).
-  const { data: exists, error: existsErr } = await supabase.storage
+  // PENTING — semantik SDK (@supabase/storage-js): objek yang BELUM ada
+  // me-resolve (bukan reject) sebagai `{ data: false, error }` — Supabase
+  // mengembalikan 400 "Bad Request" untuk HEAD objek yang hilang, dan SDK
+  // memetakan 400/404 → data:false. Jadi HANYA `data === true` artinya hit;
+  // `error` pada data:false adalah sinyal "belum ada", bukan kegagalan.
+  // Kegagalan nyata (network/auth/5xx) me-reject promise dan propagate ke caller.
+  // (Insiden 2026-09-15: `if (existsErr) throw` menggagalkan SEMUA 240 upload
+  // pertama karena bucket masih kosong.)
+  const { data: alreadyExists } = await supabase.storage
     .from(AFFILIATE_BUCKET)
     .exists(storagePath);
-  if (existsErr) {
-    throw new Error(`storage exists check failed: ${existsErr.message}`);
-  }
-  if (!exists) {
+  if (!alreadyExists) {
     const { error: uploadError } = await supabase.storage
       .from(AFFILIATE_BUCKET)
       .upload(storagePath, webp, { contentType: 'image/webp', upsert: true });

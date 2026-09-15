@@ -3,10 +3,8 @@ name: Scrape affiliate products
 on:
   workflow_dispatch:
   schedule:
-    # Daily at 03:00 UTC — moved from 03:00 UTC (10:00 WIB office hours) to
-    # reduce contention with human pushes; kept 03:00 UTC to avoid changing
-    # the daily cadence documented in README. (Interim: concurrency group below
-    # prevents overlapping runs.)
+    # Daily at 03:00 UTC (= 10:00 WIB). Concurrency group below prevents
+    # overlapping runs; no git push happens in this workflow anymore.
     - cron: '0 3 * * *'
 
 # Prevent concurrent scrape runs trampling each other's file/DB writes.
@@ -52,11 +50,17 @@ jobs:
           const { data, error } = await supabase.from('affiliate_products').select('external_id, image').eq('is_active', true);
           if (error) { console.error('::error::asset check query failed: ' + error.message); process.exit(1); }
           const rows = data || [];
-          const remote = rows.filter((r) => r.image && r.image.startsWith('https://'));
-          const invalid = rows.filter((r) => !r.image || (!r.image.startsWith('/images/') && !r.image.startsWith('https://')));
-          if (invalid.length > 0) { console.error('::error::invalid image refs: ' + invalid.length); process.exit(1); }
-          if (remote.length > 0) {
-            const sample = remote.slice(0, Math.min(remote.length, 20));
+          // Hanya dua bentuk yang valid: URL bucket affiliate-images ATAU path
+          // lokal /images/ (interim, menuju M4). URL remote lain (mis. CDN
+          // Shopee — insiden 2026-09-15: 240 baris) WAJIB gagal di sini.
+          const isStorage = (img) => img && img.includes('.supabase.co/storage/');
+          const isLocal = (img) => img && img.startsWith('/images/');
+          const storage = rows.filter((r) => isStorage(r.image));
+          const local = rows.filter((r) => isLocal(r.image));
+          const invalid = rows.filter((r) => !isStorage(r.image) && !isLocal(r.image));
+          if (invalid.length > 0) { console.error('::error::non-Storage image refs (must be affiliate-images bucket URLs): ' + invalid.length + ' e.g. ' + invalid.slice(0, 3).map((r) => r.external_id + ':' + String(r.image).slice(0, 80)).join(' | ')); process.exit(1); }
+          if (storage.length > 0) {
+            const sample = storage.slice(0, Math.min(storage.length, 20));
             for (const r of sample) {
               const url = new URL(r.image);
               const path = url.pathname.replace('/storage/v1/object/public/affiliate-images/', '');
@@ -64,7 +68,7 @@ jobs:
               if (!exists) { console.error('::error::missing Storage image: ' + r.image); process.exit(1); }
             }
           }
-          console.log('asset check ok: ' + rows.length + ' active rows, ' + remote.length + ' remote (Storage) images, ' + (rows.length - remote.length) + ' local /images/ (interim).');
+          console.log('asset check ok: ' + rows.length + ' active rows, ' + storage.length + ' Storage images, ' + local.length + ' local /images/ (interim).');
           "
 
       - name: Verify DB sync (no file-vs-DB drift)

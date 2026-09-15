@@ -385,6 +385,24 @@ hash + pesan + file kunci).
   `idx_affiliate_products_active_featured` muncul "unused" karena baru dibuat
   sebelum prod memakainya — expected. GC orphan Storage **deferred** sampai
   bucket terisi dan M4.1 verified.
+- 2026-09-15 19:00:00 — **RCA run CI gagal (exists Bad Request).** Bucket
+  kosong → `storage.exists()` me-resolve `{ data:false, error: 400 }`
+  (Supabase HEAD objek hilang = 400; SDK 2.114.0 memetakan 400/404 →
+  data:false, verified `node_modules/@supabase/storage-js/dist/index.mjs:1259`).
+  Kode lama `if (existsErr) throw` menggagalkan SEMUA 240 upload, lalu fallback
+  `product.image = item.image` (URL remote Shopee) **ter-upsert ke DB**
+  (MCP: 240/240 `remote_other`, featured tetap 6) — situs baca URL remote
+  tanpa remotePattern (broken image) sampai run perbaikan hijau.
+- 2026-09-15 19:05:00 — **Fix committed:** `storage-uploader.mjs` hanya
+  `data===true` = hit (error pada data:false = sinyal belum-ada; reject =
+  failure nyata). `scrape-affiliate.mjs`: fetch existing di depan loop,
+  fallback gambar DB lama untuk produk existing, produk BARU yang gagal
+  dikecualikan dari upsert + gagalkan run (DB tak pernah simpan URL remote).
+  Workflow asset-check diketatkan: hanya URL bucket / path /images/ lolos;
+  URL remote lain langsung merah. **Verifikasi infra prod (one-off, test
+  objek dihapus):** exists-missing=false, upload ok, exists-present=true,
+  public-url ok, remove ok, bucket kembali 0 objek. Gate: typecheck ✓
+  lint ✓ test 583/583 ✓. Next: `workflow_dispatch` CI untuk repair penuh.
 
 ## Notes
 
