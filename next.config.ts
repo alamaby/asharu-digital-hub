@@ -64,6 +64,12 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Kecilkan bundle lambda: hanya impor ikon/wrapper yang dipakai, bukan
+  // barrel penuh. Menurunkan ukuran tiap serverless function (~2 MB × 95
+  // outputs) sehingga deployment storage per-deploy menyusut.
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'apexcharts']
+  },
   // Allow <Image/> to optimize Supabase public Storage URLs (affiliate-images
   // bucket). CSP img-src already permits the Supabase host — this only enables
   // the Next.js optimizer for it. See M1.3 / M3 DB-only migration.
