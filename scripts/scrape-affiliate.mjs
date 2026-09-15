@@ -1,25 +1,21 @@
 /**
  * Scrape the "Asharu" Shopee affiliate linktree (collshp.com/asharu) via its
- * public GraphQL API, download + optimize product images, and dual-write to
- * Supabase (`affiliate_products` Postgres + `affiliate-images` Storage bucket).
+ * public GraphQL API, upload optimized product images to the
+ * `affiliate-images` Storage bucket, and upsert `affiliate_products`.
  *
- * INTERIM (M2–M3): `src/data/affiliate-products.ts` is still regenerated so the
- * old static readers / workflow checks keep working while they are migrated to
- * DB (M3) and the commit step is removed (M4). Once M4 lands this file write is
- * deleted.
+ * DB-only (M4): no static file is written and no git commit happens — the
+ * workflow only scrapes, verifies, and gates.
  *
  * Usage:
  *   node scripts/scrape-affiliate.mjs [--dry-run] [--limit N] [--max-width N]
  *
- *   --dry-run     print the transformed products instead of writing files/DB
+ *   --dry-run     print the transformed products as JSON (no upload, no DB write)
  *   --limit N     cap the number of products fetched (default: all scraped)
  *   --max-width N image resize width (default: 800)
  *   --first-page  only fetch the first page (skip pagination)
  *   --insecure    skip TLS verification (only for corporate-MITM networks)
  */
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import { toAffiliateProduct, renderDataFile } from './lib/data-writer.mjs';
+import { toAffiliateProduct } from './lib/data-writer.mjs';
 import { uploadAffiliateImage } from './lib/storage-uploader.mjs';
 import { postJson } from './lib/http.mjs';
 
@@ -194,18 +190,14 @@ async function main() {
   }
 
   if (dryRun) {
-    console.log(renderDataFile(products, { urlSuffix: URL_SUFFIX }));
+    console.log(JSON.stringify(products, null, 2));
     return;
   }
 
-  const outPath = path.join(process.cwd(), 'src', 'data', 'affiliate-products.ts');
-  await fs.writeFile(outPath, renderDataFile(products, { urlSuffix: URL_SUFFIX }), 'utf8');
-  console.error(`\nWrote ${outPath} with ${products.length} products.`);
-
-  // Dual-write to Supabase (incremental, friendly_code ASH-XXX auto-generated)
-  // Fail-loud: file-only runs mask DB drift (kasus Sep 2026: 9 produk hilang
-  // karena friendly_code collision, run tetap hijau). Non-dry-run tanpa sync
-  // sukses = exit non-zero agar workflow merah dan tidak commit file-only.
+  // Write to Supabase (incremental, friendly_code ASH-XXX auto-generated)
+  // Fail-loud: partial syncs must never look green (kasus Sep 2026: 9 produk
+  // hilang karena friendly_code collision, run tetap hijau). Non-dry-run
+  // tanpa sync sukses = exit non-zero agar workflow merah.
   let syncFailed = false;
   if (supabase) {
     try {
@@ -265,13 +257,13 @@ async function main() {
       }
       console.error('Supabase sync done.');
     } catch (e) {
-      console.error(`Supabase sync failed (file still written): ${e.message}`);
+      console.error(`Supabase sync failed: ${e.message}`);
       syncFailed = true;
     }
   } else if (!dryRun && !supabase) {
     // Surface as a visible annotation so the stale-DB issue is no longer silent.
-    console.log('::warning::Supabase env (SUPABASE_URL, SUPABASE_SECRET_KEY) not set — skipped DB sync (file-only). affiliate_products table will go stale until secrets are added.');
-    console.error('Supabase env not set — skipping DB sync (file-only).');
+    console.log('::warning::Supabase env (SUPABASE_URL, SUPABASE_SECRET_KEY) not set — skipped DB sync. affiliate_products table will go stale until secrets are added.');
+    console.error('Supabase env not set — skipping DB sync.');
     syncFailed = true;
   }
   if (failedUploadIds.size > 0 && !syncFailed) {
@@ -282,7 +274,7 @@ async function main() {
     syncFailed = true;
   }
   if (syncFailed) {
-    console.error('DB sync did not complete — exiting non-zero so CI fails loudly instead of committing file-only data.');
+    console.error('DB sync did not complete — exiting non-zero so CI fails loudly.');
     process.exit(1);
   }
 }

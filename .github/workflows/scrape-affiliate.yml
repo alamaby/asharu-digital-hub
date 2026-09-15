@@ -37,9 +37,9 @@ jobs:
         run: npm run scrape:affiliate
 
       - name: Verify image assets exist
-        # Guard 2026-09-12: scrape must write valid image refs, not broken URLs.
-        # M2: read from DB (no file dependency). For Storage URLs, verify a
-        # sample exists; local /images/ paths skipped (being retired in M4).
+        # Guard 2026-09-12 + 2026-09-15: setiap baris aktif WAJIB menunjuk URL
+        # bucket affiliate-images (M4 DB-only). URL remote lain (mis. CDN
+        # Shopee — insiden 2026-09-15: 240 baris) langsung merah.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -50,31 +50,21 @@ jobs:
           const { data, error } = await supabase.from('affiliate_products').select('external_id, image').eq('is_active', true);
           if (error) { console.error('::error::asset check query failed: ' + error.message); process.exit(1); }
           const rows = data || [];
-          // Hanya dua bentuk yang valid: URL bucket affiliate-images ATAU path
-          // lokal /images/ (interim, menuju M4). URL remote lain (mis. CDN
-          // Shopee — insiden 2026-09-15: 240 baris) WAJIB gagal di sini.
-          const isStorage = (img) => img && img.includes('.supabase.co/storage/');
-          const isLocal = (img) => img && img.startsWith('/images/');
-          const storage = rows.filter((r) => isStorage(r.image));
-          const local = rows.filter((r) => isLocal(r.image));
-          const invalid = rows.filter((r) => !isStorage(r.image) && !isLocal(r.image));
+          const invalid = rows.filter((r) => !r.image || !String(r.image).includes('.supabase.co/storage/'));
           if (invalid.length > 0) { console.error('::error::non-Storage image refs (must be affiliate-images bucket URLs): ' + invalid.length + ' e.g. ' + invalid.slice(0, 3).map((r) => r.external_id + ':' + String(r.image).slice(0, 80)).join(' | ')); process.exit(1); }
-          if (storage.length > 0) {
-            const sample = storage.slice(0, Math.min(storage.length, 20));
-            for (const r of sample) {
-              const url = new URL(r.image);
-              const path = url.pathname.replace('/storage/v1/object/public/affiliate-images/', '');
-              const { data: exists } = await supabase.storage.from('affiliate-images').exists(path);
-              if (!exists) { console.error('::error::missing Storage image: ' + r.image); process.exit(1); }
-            }
+          const sample = rows.slice(0, Math.min(rows.length, 20));
+          for (const r of sample) {
+            const url = new URL(r.image);
+            const path = url.pathname.replace('/storage/v1/object/public/affiliate-images/', '');
+            const { data: exists } = await supabase.storage.from('affiliate-images').exists(path);
+            if (!exists) { console.error('::error::missing Storage image: ' + r.image); process.exit(1); }
           }
-          console.log('asset check ok: ' + rows.length + ' active rows, ' + storage.length + ' Storage images, ' + local.length + ' local /images/ (interim).');
+          console.log('asset check ok: ' + rows.length + ' active rows, all Storage images, sample exists verified.');
           "
 
-      - name: Verify DB sync (no file-vs-DB drift)
+      - name: Verify DB sync (self-consistency)
         # Assert the DB is self-consistent post-scrape: active>0, featured==6,
-        # no NULL/empty images. (Interim dual-write file must match — enforced
-        # by data.integrity.test.ts when it still reads the file.)
+        # no NULL/empty images.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

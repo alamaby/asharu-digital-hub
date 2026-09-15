@@ -321,9 +321,9 @@ hash + pesan + file kunci).
 - [x] M3.3 `products/page.tsx` + home ke DB + `revalidate = 3600`
 - [x] M3.4 Rewrite `data.integrity.test.ts` + `jsonld.test.ts` hermetik
 - [x] M3.5 Update `README.md` bagian scraper + arsitektur
-- [ ] M4.1 Scrape fresh penuh — **BLOCKED lokal** (`collshp.com` 503); butuh CI `workflow_dispatch`
-- [ ] M4.2 Hapus file/dir obsolete (`affiliate-products.ts`, `public/images/products/affiliate/`, `seed-affiliate-from-file.mjs`, `renderDataFile`) — menunggu M4.1 agar tidak broken image; step Commit workflow **sudah** dihapus
-- [ ] M4.3 GC orphan Storage + advisors verify + commit akhir — menunggu bucket terisi post-scrape
+- [x] M4.1 Scrape fresh penuh via CI `workflow_dispatch` run `34926314498` — **success**; MCP: 240/240 Storage, featured 6, broken 0, remote 0
+- [x] M4.2 Hapus file/dir obsolete (`affiliate-products.ts`, `public/images/products/affiliate/` 256 webp, `seed-affiliate-from-file.mjs`, `renderDataFile`); skema `image` Storage-only; asset-check workflow diketatkan (tolak non-Storage)
+- [x] M4.3 GC orphan Storage — audit: 240 objek vs 240 referensi, 0 orphan (tidak perlu hapus); advisors = pre-existing saja; build hijau pasca `.next` clean (ENOENT cache basi, bukan kode)
 
 ## Risks
 
@@ -403,6 +403,16 @@ hash + pesan + file kunci).
   objek dihapus):** exists-missing=false, upload ok, exists-present=true,
   public-url ok, remove ok, bucket kembali 0 objek. Gate: typecheck ✓
   lint ✓ test 583/583 ✓. Next: `workflow_dispatch` CI untuk repair penuh.
+- 2026-09-15 19:20:00 — **Repair run CI `34926314498` SUCCESS.** MCP verify:
+  total 240, active 240, storage_img 240, featured 6, broken 0, remote_other 0.
+  **M4.2 dieksekusi:** hapus `src/data/affiliate-products.ts`,
+  `public/images/products/affiliate/` (256 webp), `seed-affiliate-from-file.mjs`,
+  `renderDataFile` (+`sq`/`lsText`); dry-run scraper kini JSON; skema `image`
+  Storage-only; workflow asset-check tolak non-Storage + drift-check comment
+  dibersihkan. **M4.3:** audit orphan Storage 240/240/0 — tidak perlu GC.
+  Gate final: typecheck ✓ lint ✓ test 583/583 ✓ build ✓ (butuh `.next` clean
+  sekali karena ENOENT cache basi Windows, bukan error kode).
+  **MIGRASI SELESAI.** Dual-write mati; tidak ada lagi push runner ke main.
 
 ## Notes
 

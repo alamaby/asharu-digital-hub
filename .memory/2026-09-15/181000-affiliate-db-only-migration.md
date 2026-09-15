@@ -36,22 +36,34 @@ menghilangkan kelas kegagalan `rejected (fetch first)` 2026-09-14.
   policy SELECT anon/authenticated terpasang; `image` masih 239 lokal
   (`/images/…`) — belum ada URL Storage sampai scrape fresh berjalan.
 
-## Risiko / Blokir
+## Insiden Lanjutan: `exists()` Bad Request (run CI pertama pasca-M2)
 
-- **M4.1 scrape fresh BLOCKED di local:** `collshp.com` API 503 dari environment
-  ini (ikut `--insecure`, tetap 503; infrastruktur eksternal). Scrape full +
-  verifikasi SQL (`storage_img == active`, `featured == 6`, `broken == 0`)
-  **harus via `workflow_dispatch` di CI.**
-- **Transisi sedang berjalan:** kode M3 sudah tidak impor
-  `src/data/affiliate-products.ts`, tapi kolom DB `image` masih path lokal.
-  Hapus file/dir (`M4.2`) **tidak dilakukan** sampai setelah CI mengisi Storage,
-  atau halaman publik broken image. `AffiliateProductSchema.image` union
-  (lokal|Storage) menampung masa transisi ini.
-- `item_id` tracking GA berubah `affiliate-<id>` → `ASH-XXX` (cutover tercatat).
-- Git blob `.webp` lama (256 file / 11,7 MB) dibiarkan mengendap; rewrite
-  histori diluar cakupan (lihat plan §Scope).
-- `idx_affiliate_products_active_featured` muncul "unused" di advisors karena
-  baru — expected, akan terpakai setelah push ke prod + first ISR read.
+- **Gejala:** 240/240 `[warn] image upload failed: storage exists check failed:
+  Bad Request` → exit 1. Upsert tetap jalan dengan fallback URL remote.
+- **RCA (verified `storage-js@2.114.0/dist/index.mjs:1259`):** `exists()` pada
+  objek hilang me-RESOLVE `{ data:false, error: 400 }` (bukan reject) —
+  Supabase HEAD objek hilang = 400. Kode `if (existsErr) throw` menggagalkan
+  semua upload karena bucket masih kosong.
+- **Kerusakan:** kolom `image` 240 baris tertulis URL remote Shopee
+  (MCP: `remote_other: 240`) — situs render tanpa remotePattern (broken)
+  sampai run repair hijau.
+- **Fix (`aff752e`):** hanya `data===true` = hit; fetch existing di depan loop
+  untuk fallback gambar DB lama; produk BARU yang gagal dikecualikan dari
+  upsert + gagalkan run (DB tak pernah simpan URL remote); asset-check
+  workflow tolak non-Storage. Verifikasi infra prod one-off 6/6 PASS
+  (exists-missing=false, upload, exists-present=true, public-url, remove,
+  cleanup; bucket kembali 0 objek).
+- **Repair:** `workflow_dispatch` run `34926314498` SUCCESS → MCP 240/240
+  Storage, featured 6, broken 0, remote 0.
+
+## Status Akhir (MIGRASI SELESAI)
+
+- M4.2: file/dir obsolete dihapus; skema Storage-only; dry-run = JSON.
+- M4.3: audit orphan 240/240/0 — tidak perlu GC.
+- Gate final: typecheck ✓ lint ✓ test 583/583 ✓ build ✓ (`.next` clean sekali).
+- Sisa catatan: `item_id` GA `affiliate-<id>` → `ASH-XXX` (cutover tercatat);
+  blob `.webp` git lama mengendap (out-of-scope); index baru expected-unused
+  sampai first ISR read prod.
 
 ## Berkas Terkait
 

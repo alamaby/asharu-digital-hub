@@ -13,8 +13,8 @@ import { shopLinks, getVisibleShopLinks } from './shop-links';
 import { getPublishedProperties } from './properties';
 import { getSocialLinks } from './social-links';
 
-// M3: fixture hermetik menggantikan impor statis src/data/affiliate-products.ts
-// (file akan dihapus di M4.2). Cakup validasi skema + unique id + featured≤6.
+// M4 DB-only: fixture hermetik (tidak ada lagi file statis affiliate).
+// Cakup validasi skema + unique id + featured≤6.
 const fixtureProducts: AffiliateProduct[] = [
   {
     id: 'ASH-001',

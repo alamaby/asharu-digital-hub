@@ -49,7 +49,7 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 │   │   ├── schemas.ts        # skema Zod semua entitas
 │   │   ├── shop-links.ts     # toko online
 │   │   ├── social-links.ts   # media sosial (WhatsApp dari env)
-│   │   ├── affiliate-products.ts
+│   │   │                       # (katalog afiliasi kini DB-only: Supabase affiliate_products)
 │   │   ├── properties.ts
 │   │   └── math-app.ts       # promosi Asharu Math (subdomain)
 │   ├── config/
