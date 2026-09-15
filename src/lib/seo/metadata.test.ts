@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FACEBOOK_DOMAIN_VERIFICATION_TOKEN, buildMetadata } from './metadata';
+import {
+  FACEBOOK_DOMAIN_VERIFICATION_TOKEN,
+  buildMetadata,
+  truncateAtWord
+} from './metadata';
 
 describe('buildMetadata', () => {
   const base = {
@@ -55,5 +59,74 @@ describe('buildMetadata', () => {
     expect(metadata.other).toMatchObject({
       'facebook-domain-verification': 'wt9cbx9npb6njy0lcqrpe85dal7pmz'
     });
+  });
+
+  it('article option emits og:type article + times + image alt (og & twitter)', () => {
+    const metadata = buildMetadata({
+      locale: 'id',
+      path: '/artikel/[slug]',
+      params: { slug: 'contoh' },
+      ...base,
+      article: {
+        publishedTime: '2026-09-15T01:49:26.714Z',
+        modifiedTime: '2026-09-15T02:00:00.000Z',
+        ogImage: {
+          url: 'https://cdn.example.com/cover.png',
+          alt: 'Judul Artikel'
+        }
+      }
+    });
+    const og = metadata.openGraph as {
+      type: string;
+      publishedTime?: string;
+      modifiedTime?: string;
+      images?: Array<{ url: string; alt?: string }>;
+    };
+    expect(og.type).toBe('article');
+    expect(og.publishedTime).toBe('2026-09-15T01:49:26.714Z');
+    expect(og.modifiedTime).toBe('2026-09-15T02:00:00.000Z');
+    expect(og.images).toEqual([
+      { url: 'https://cdn.example.com/cover.png', alt: 'Judul Artikel' }
+    ]);
+    expect(metadata.alternates?.canonical).toBe(
+      'https://asharu.id/id/artikel/contoh'
+    );
+    const twitter = metadata.twitter as {
+      card?: string;
+      images?: Array<{ url: string; alt?: string }>;
+    };
+    expect(twitter.card).toBe('summary_large_image');
+    expect(twitter.images).toEqual([
+      { url: 'https://cdn.example.com/cover.png', alt: 'Judul Artikel' }
+    ]);
+  });
+
+  it('tanpa opsi article, og tetap website tanpa image', () => {
+    const metadata = buildMetadata({ locale: 'id', path: '/', ...base });
+    const og = metadata.openGraph as { type: string; images?: unknown };
+    expect(og.type).toBe('website');
+    expect(og.images).toBeUndefined();
+  });
+});
+
+describe('truncateAtWord', () => {
+  it('teks pendek dikembalikan apa adanya', () => {
+    expect(truncateAtWord('Halo dunia', 160)).toBe('Halo dunia');
+  });
+
+  it('potong di batas kata terakhir, bukan tengah kata', () => {
+    const text = 'abcde '.repeat(60);
+    const out = truncateAtWord(text, 100);
+    expect(out.length).toBeLessThanOrEqual(100);
+    expect(out.endsWith(' ')).toBe(false);
+    // Batas kata: karakter setelah potongan di teks asli harus spasi.
+    expect(text.charAt(out.length)).toBe(' ');
+    // Semua token hasil adalah kata utuh sumber.
+    expect(new Set(out.split(' '))).toEqual(new Set(['abcde']));
+  });
+
+  it('tanpa spasi di potongan, jatuh ke slice keras di batas max', () => {
+    const noSpace = 'a'.repeat(300);
+    expect(truncateAtWord(noSpace, 100)).toHaveLength(100);
   });
 });

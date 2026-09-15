@@ -4,12 +4,13 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 import { Link } from '@/i18n/navigation';
-import { buildMetadata } from '@/lib/seo/metadata';
+import { buildMetadata, truncateAtWord } from '@/lib/seo/metadata';
 import { articleFaqSchema, articleSchema, breadcrumbSchema } from '@/lib/seo/jsonld';
 import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
 import { getAllPublishedSlugs, getArticleProduct, getPublishedArticleBySlug } from '@/lib/articles/public';
 import { ArticlePublicView } from '@/components/articles/ArticlePublicView';
+import { ShareButtons } from '@/components/articles/ShareButtons';
 import { JsonLd } from '@/components/ui/JsonLd';
 
 interface ArticleDetailPageProps {
@@ -27,17 +28,21 @@ export async function generateMetadata({ params }: ArticleDetailPageProps): Prom
   const { locale, slug } = await params;
   const article = await getPublishedArticleBySlug(locale as Locale, slug);
   if (!article) return {};
-  const metadata = buildMetadata({
+  const ogImage = article.cover_image_url
+    ? { url: article.cover_image_url, alt: article.title }
+    : undefined;
+  return buildMetadata({
     locale: locale as Locale,
     path: '/artikel/[slug]',
     params: { slug },
     title: `${article.title} | Asharu`,
-    description: article.excerpt.slice(0, 160)
+    description: truncateAtWord(article.excerpt),
+    article: {
+      publishedTime: article.published_at ?? article.updated_at,
+      modifiedTime: article.updated_at,
+      ogImage
+    }
   });
-  if (metadata.openGraph && article.cover_image_url) {
-    metadata.openGraph.images = [{ url: article.cover_image_url }];
-  }
-  return metadata;
 }
 
 export default async function ArticleDetailPage({ params }: ArticleDetailPageProps) {
@@ -64,6 +69,7 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
       url: `${env.siteUrl}${localizedPathname('/artikel/[slug]', locale, { slug })}`
     }
   ]);
+  const canonical = `${env.siteUrl}${localizedPathname('/artikel/[slug]', locale, { slug })}`;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -99,10 +105,12 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
         disclosureHref={localizedPathname('/affiliate-disclosure', locale)}
       />
 
+      <ShareButtons canonicalUrl={canonical} title={article.title} />
+
       <JsonLd
         data={articleSchema({
           title: article.title,
-          description: article.excerpt.slice(0, 160),
+          description: truncateAtWord(article.excerpt),
           slug,
           locale,
           publishedAt: article.published_at,

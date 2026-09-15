@@ -151,7 +151,12 @@
     "affiliateBoxCta": "Lihat produk di platform penjual",
     "affiliateNote": "Tautan afiliasi: bila Anda membeli melalui tautan ini, Asharu dapat menerima komisi tanpa menambah harga yang Anda bayar.",
     "disclosureNote": "Sebagian tautan di situs ini adalah tautan afiliasi.",
-    "disclosureLink": "Baca disclosure afiliasi"
+    "disclosureLink": "Baca disclosure afiliasi",
+    "shareHeading": "Bagikan artikel ini",
+    "shareVia": "Bagikan via {channel}",
+    "shareCopy": "Salin tautan",
+    "shareCopied": "Tautan disalin!",
+    "shareNative": "Lainnya..."
   },
   "categories": {
     "automotive": "Otomotif",

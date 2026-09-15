@@ -151,7 +151,12 @@
     "affiliateBoxCta": "View product on the seller platform",
     "affiliateNote": "Affiliate link: if you buy through this link, Asharu may earn a commission at no extra cost to you.",
     "disclosureNote": "Some links on this site are affiliate links.",
-    "disclosureLink": "Read the affiliate disclosure"
+    "disclosureLink": "Read the affiliate disclosure",
+    "shareHeading": "Share this article",
+    "shareVia": "Share via {channel}",
+    "shareCopy": "Copy link",
+    "shareCopied": "Link copied!",
+    "shareNative": "More..."
   },
   "categories": {
     "automotive": "Automotive",
