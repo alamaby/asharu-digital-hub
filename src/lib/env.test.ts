@@ -109,6 +109,7 @@ describe('.env.example placeholder integrity', () => {
         'SUPABASE_SERVICE_ROLE_KEY',
         'CRON_SECRET',
         'TAVILY_API_KEY',
+        'RESEND_API_KEY',
         'THREADS_APP_ID',
         'THREADS_APP_SECRET',
         'THREADS_REDIRECT_URI'

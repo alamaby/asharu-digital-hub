@@ -126,6 +126,10 @@ export const routing = defineRouting({
       id: '/admin/sosial',
       en: '/admin/sosial'
     },
+    '/admin/automation': {
+      id: '/admin/automation',
+      en: '/admin/automation'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

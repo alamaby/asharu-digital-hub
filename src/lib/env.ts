@@ -88,6 +88,20 @@ const tavilyApiKeySchema = z.preprocess(
     .optional()
 );
 
+// Resend API key — preferred source is Supabase Vault (`resend_api_key`,
+// read via vault_decrypt_secret_by_name); this env var is the local-dev /
+// fallback path for the daily automation email. Optional.
+const resendApiKeySchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .min(10, 'Resend API key looks too short')
+    .refine((value) => value.startsWith('re_'), {
+      message: 'Resend API key must start with re_'
+    })
+    .optional()
+);
+
 // Threads (Meta) — static app credentials only (Fase 0). The rotating
 // long-lived user token lives in Supabase Vault, never in env.
 const threadsAppIdSchema = z.preprocess(
@@ -114,6 +128,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: supabaseSecretKeySchema,
   CRON_SECRET: cronSecretSchema,
   TAVILY_API_KEY: tavilyApiKeySchema,
+  RESEND_API_KEY: resendApiKeySchema,
   THREADS_APP_ID: threadsAppIdSchema,
   THREADS_APP_SECRET: threadsAppSecretSchema,
   THREADS_REDIRECT_URI: threadsRedirectUriSchema
@@ -134,6 +149,7 @@ export interface ParsedEnv {
   supabaseServiceRoleKey?: string;
   cronSecret?: string;
   tavilyApiKey?: string;
+  resendApiKey?: string;
   threadsAppId?: string;
   threadsAppSecret?: string;
   threadsRedirectUri?: string;
@@ -173,6 +189,7 @@ export function parseEnv(raw: Record<string, string | undefined>): ParsedEnv {
     supabaseServiceRoleKey: secretKey,
     cronSecret: result.data.CRON_SECRET,
     tavilyApiKey: result.data.TAVILY_API_KEY,
+    resendApiKey: result.data.RESEND_API_KEY,
     threadsAppId: result.data.THREADS_APP_ID,
     threadsAppSecret: result.data.THREADS_APP_SECRET,
     threadsRedirectUri: result.data.THREADS_REDIRECT_URI,

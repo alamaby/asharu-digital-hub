@@ -9,6 +9,7 @@ import {
   LogIn,
   Plus,
   Share2,
+  Workflow,
   type LucideIcon
 } from 'lucide-react';
 import type { NavItem } from '@/config/navigation';
@@ -41,6 +42,7 @@ export const adminNavGroups: readonly AdminNavGroup[] = [
       { key: 'adminLlm', pathname: '/admin/llm', icon: Cpu, adminOnly: true },
       { key: 'adminVisual', pathname: '/admin/visual', icon: Image, adminOnly: true },
       { key: 'adminSosial', pathname: '/admin/sosial', icon: Share2, adminOnly: true },
+      { key: 'adminAutomation', pathname: '/admin/automation', icon: Workflow, adminOnly: true },
       { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false },
     ]
   },

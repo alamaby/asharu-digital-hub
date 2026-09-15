@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARTICLE_EXCERPT_MAX,
   ARTICLE_MIN_WORDS,
   auditArticleEmoji,
   buildArticleExpandPrompt,
   buildArticlePrompt,
+  clampArticleExcerpt,
   countArticleWords,
   findAffiliateSectionIndex,
   parseArticleDraft,
@@ -129,6 +131,42 @@ describe('auditArticleEmoji', () => {
       en: null
     });
     expect(gaps).toEqual([]);
+  });
+});
+
+describe('clampArticleExcerpt', () => {
+  const longExcerpt = Array.from({ length: 300 }, (_, i) => `kata${i}`).join(' ');
+
+  it('excerpt pendek dibiarkan apa adanya (whitespace dinormalkan)', () => {
+    expect(clampArticleExcerpt('Pengantar   singkat\nuntuk artikel')).toBe('Pengantar singkat untuk artikel');
+  });
+
+  it('clip di batas kata dan tidak pernah melebihi batas DB', () => {
+    const clamped = clampArticleExcerpt(longExcerpt);
+    expect(clamped.length).toBeLessThanOrEqual(ARTICLE_EXCERPT_MAX);
+    expect(clamped.length).toBeGreaterThanOrEqual(50);
+    expect(longExcerpt.startsWith(clamped)).toBe(true);
+    expect(clamped).not.toMatch(/\s$/);
+  });
+
+  it('tidak memotong emoji di tengah (code point utuh)', () => {
+    const emojiHeavy = '😀'.repeat(400);
+    const clamped = clampArticleExcerpt(emojiHeavy);
+    // Array.from membagi per code point → tak ada surrogate yatim.
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(clamped)).toBe(false);
+    expect(Array.from(clamped).every((c) => c === '😀')).toBe(true);
+  });
+
+  it('parseArticleDraft mem-clamp excerpt panjang agar DB-valid', () => {
+    const parsed = parseArticleDraft(
+      JSON.stringify({ id: validLang({ excerpt: longExcerpt }), en: null })
+    );
+    expect(parsed?.id?.excerpt.length).toBeLessThanOrEqual(ARTICLE_EXCERPT_MAX);
+  });
+
+  it('excerpt < 50 char tetap ditolak parser', () => {
+    const parsed = parseArticleDraft(JSON.stringify({ id: validLang({ excerpt: 'terlalu pendek' }), en: null }));
+    expect(parsed).toBeNull();
   });
 });
 

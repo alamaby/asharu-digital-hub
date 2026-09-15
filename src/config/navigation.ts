@@ -18,6 +18,7 @@ export interface NavItem {
     | 'adminLlm'
     | 'adminVisual'
     | 'adminSosial'
+    | 'adminAutomation'
     | 'studio'
     | 'backToSite'
     | 'signIn';
@@ -36,6 +37,7 @@ export interface NavItem {
     | '/admin/llm/logs'
     | '/admin/visual'
     | '/admin/sosial'
+    | '/admin/automation'
     | '/konten/baru'
     | '/konten/review'
     | '/konten/review/[draftId]'
@@ -67,6 +69,7 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminLlm', pathname: '/admin/llm' },
   { key: 'adminVisual', pathname: '/admin/visual' },
   { key: 'adminSosial', pathname: '/admin/sosial' },
+  { key: 'adminAutomation', pathname: '/admin/automation' },
   { key: 'studio', pathname: '/studio' },
   { key: 'adminBaru', pathname: '/konten/baru' },
   { key: 'adminReview', pathname: '/konten/review' }

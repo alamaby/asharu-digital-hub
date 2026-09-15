@@ -334,12 +334,35 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
+/** Batas excerpt yang DB `articles.excerpt` izinkan (CHECK 50–500). */
+export const ARTICLE_EXCERPT_MAX = 500;
+export const ARTICLE_EXCERPT_MIN = 50;
+
+/**
+ * Pangkas excerpt ke batas DB-valid (≤500 char) di batas kata terakhir,
+ * mempertahankan code point utuh (tidak memotong emoji/surrogate pair).
+ * Parser tetap lenient terhadap output LLM yang panjang; normalisasi ini
+ * mencegah publish gagal 23514 (CHECK excerpt) — lihat RCA automation 15 Sep.
+ */
+export function clampArticleExcerpt(text: string, max: number = ARTICLE_EXCERPT_MAX): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const chars = Array.from(clean);
+  let cut = chars.slice(0, max).join('');
+  const lastSpace = cut.search(/\s\S*$/);
+  if (lastSpace > 0) cut = cut.slice(0, lastSpace);
+  cut = cut.replace(/[\s,;:.!?…-]+$/u, '').trim();
+  if (cut.length >= ARTICLE_EXCERPT_MIN) return cut;
+  // Fallback: hard slice pada batas code point (tetap ≥ min karena max ≫ min).
+  return chars.slice(0, max).join('').trim();
+}
+
 function parseArticleLang(raw: unknown): ArticleLangDraft | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (!isNonEmptyString(r.title) || r.title.trim().length > 200) return null;
   if (!isNonEmptyString(r.slug) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(r.slug.trim())) return null;
-  if (!isNonEmptyString(r.excerpt) || r.excerpt.trim().length < 50 || r.excerpt.trim().length > 2000) return null;
+  if (!isNonEmptyString(r.excerpt) || r.excerpt.trim().length < ARTICLE_EXCERPT_MIN) return null;
   if (!Array.isArray(r.sections) || r.sections.length < 3 || r.sections.length > 8) return null;
   const sections: ArticleSection[] = [];
   for (const s of r.sections) {
@@ -364,7 +387,7 @@ function parseArticleLang(raw: unknown): ArticleLangDraft | null {
   return {
     title: (r.title as string).trim(),
     slug: (r.slug as string).trim(),
-    excerpt: (r.excerpt as string).trim(),
+    excerpt: clampArticleExcerpt((r.excerpt as string).trim()),
     sections,
     faq,
     meta_title: (r.meta_title as string).trim(),
