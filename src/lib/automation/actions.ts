@@ -114,6 +114,16 @@ export async function retryAutomationRun(runId: string): Promise<void> {
   if (!row) throw new Error('run tidak ditemukan');
   if (row.status !== 'failed') throw new Error('run tidak berstatus failed');
   if (!row.session_id) throw new Error('run tanpa sesi — tidak bisa diulang');
+  // Sesi riset failed tidak bisa dipulihkan dari sini (perlu perbaikan di
+  // halaman riset) — tolak agar admin tidak mengulang tanpa guna.
+  const { data: session } = await supabase
+    .from('content_research_sessions')
+    .select('status')
+    .eq('id', row.session_id)
+    .maybeSingle();
+  if ((session as { status: string } | null)?.status === 'failed') {
+    throw new Error('sesi riset berstatus failed — perbaiki sesi di halaman Riset, lalu jalankan Run now');
+  }
   const nextStatus = row.article_draft_id ? 'awaiting_cover' : 'developing';
   const { error } = await supabase
     .from('automation_runs')
@@ -121,6 +131,7 @@ export async function retryAutomationRun(runId: string): Promise<void> {
       status: nextStatus,
       error_message: null,
       attempts: 0,
+      cover_started_at: null,
       updated_at: new Date().toISOString()
     })
     .eq('id', runId)

@@ -179,6 +179,56 @@ describe('runAutomationTick (guards)', () => {
     });
     expect(res).toMatchObject({ ok: true, skipped: 'already_done', status: 'failed' });
   });
+
+  it('tidak retry run failed bila sesi riset ikut failed (butuh intervensi manual)', async () => {
+    const tables = {
+      automation_configs: [baseConfig({ max_retry_attempts: 3 })],
+      automation_runs: [
+        {
+          id: 'run1',
+          run_date: '2026-09-16',
+          status: 'failed',
+          attempts: 0,
+          session_id: 's1',
+          cover_started_at: '2026-09-16T02:00:00Z'
+        }
+      ],
+      content_research_sessions: [{ id: 's1', status: 'failed' }]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true, skipped: 'already_done', status: 'failed' });
+    expect(tables.automation_runs[0]?.attempts).toBe(0);
+  });
+
+  it('run failed dengan sesi hidup di-retry: cover_started_at direset', async () => {
+    const tables = {
+      automation_configs: [baseConfig({ max_retry_attempts: 3 })],
+      automation_runs: [
+        {
+          id: 'run1',
+          run_date: '2026-09-16',
+          status: 'failed',
+          attempts: 1,
+          session_id: 's1',
+          article_draft_id: 'd1',
+          cover_started_at: '2026-09-16T02:00:00Z',
+          cover_attempts: 3
+        }
+      ],
+      content_research_sessions: [{ id: 's1', status: 'completed' }],
+      content_research_topics: [],
+      content_draft_images: []
+    };
+    const supabase = makeClient(tables);
+    await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(tables.automation_runs[0]?.attempts).toBe(2);
+    expect(tables.automation_runs[0]?.cover_started_at).not.toBe('2026-09-16T02:00:00Z');
+  });
 });
 
 describe('runAutomationTick (produk pool)', () => {

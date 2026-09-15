@@ -201,8 +201,31 @@ async function createRun(
     })
     .select('*')
     .single();
-  if (runError || !run) return { error: `insert run: ${runError?.message ?? 'no id'}` };
-
+  if (runError || !run) {
+    // Balapan dua tick (keduanya melihat "belum ada run") → yang kalah
+    // menerima unique violation. Buang sesi ekstra (cascade menghapus
+    // session_products) dan pakai run milik pemenang; bila bukan karena
+    // duplikat, tandai sesi failed agar tidak jadi orphan yang dipungut
+    // cron riset tanpa pengelola.
+    const { data: winner } = await supabase
+      .from('automation_runs')
+      .select('*')
+      .eq('run_date', runDate)
+      .maybeSingle();
+    if (winner) {
+      await supabase.from('content_research_sessions').delete().eq('id', sessionId);
+      return winner as AutomationRunRow;
+    }
+    await supabase
+      .from('content_research_sessions')
+      .update({
+        status: 'failed',
+        error_message: `automation: ${runError?.message ?? 'insert run returned no id'}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId);
+    return { error: `insert run: ${runError?.message ?? 'no id'}` };
+  }
   await log(supabase, sessionId, 'automation', 'info', `run ${runDate} dibuat untuk produk ${chosen.id}`);
   return run as AutomationRunRow;
 }
@@ -250,12 +273,28 @@ export async function runAutomationTick(
     if (run.attempts >= cfg.maxRetryAttempts) {
       return { ok: true, skipped: 'already_done', runDate, status: run.status };
     }
+    // Sesi riset failed tidak bisa pulih dari sisi automation (butuh
+    // perbaikan di halaman riset) — jangan retry berulang tanpa guna.
+    if (run.session_id) {
+      const sessionStatus = await loadSessionStatus(supabase, run.session_id);
+      if (sessionStatus === 'failed') {
+        return { ok: true, skipped: 'already_done', runDate, status: run.status };
+      }
+    }
+    // Reset cover_started_at: tanpa ini, batas tunggu cover dihitung dari
+    // timestamp run pertama sehingga retry langsung timeout lagi.
     await updateRun(supabase, run.id, {
       status: run.session_id ? 'developing' : 'session_created',
       attempts: run.attempts + 1,
-      error_message: null
+      error_message: null,
+      cover_started_at: null
     });
-    run = { ...run, status: run.session_id ? 'developing' : 'session_created', attempts: run.attempts + 1 };
+    run = {
+      ...run,
+      status: run.session_id ? 'developing' : 'session_created',
+      attempts: run.attempts + 1,
+      cover_started_at: null
+    };
   }
 
   const advanced = await advanceRun(supabase, cfg, run);
@@ -496,7 +535,17 @@ async function ensureCover(
   cfg: AutomationConfig,
   run: AutomationRunRow
 ): Promise<'ready' | 'waiting' | 'failed'> {
-  const startedAt = run.cover_started_at ?? new Date().toISOString();
+  if (!run.article_draft_id) {
+    return failCover(supabase, cfg, run, 'article_draft_id kosong saat menunggu cover');
+  }
+  // cover_started_at wajib tersimpan: bila hanya di-default ke `now` tanpa
+  // di-persist, batas tunggu ter-reset tiap tick dan tidak pernah tercapai
+  // (retry manual / run lama sebelum kolom ini terisi).
+  let startedAt = run.cover_started_at;
+  if (!startedAt) {
+    startedAt = new Date().toISOString();
+    await updateRun(supabase, run.id, { cover_started_at: startedAt });
+  }
   const waitMs = cfg.coverMaxWaitMinutes * 60 * 1000;
   const timedOut = Date.now() - new Date(startedAt).getTime() > waitMs;
 
