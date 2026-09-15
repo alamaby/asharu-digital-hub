@@ -7,8 +7,31 @@ import {
   realEstateListingSchema,
   websiteSchema
 } from './jsonld';
-import { affiliateProducts } from '@/data/affiliate-products';
+import { affiliateProductSchema, type AffiliateProduct } from '@/data/schemas';
 import { properties } from '@/data/properties';
+
+const fixtureProducts: AffiliateProduct[] = [
+  {
+    id: 'ASH-001',
+    name: { id: 'Mainan Tamagotchi', en: 'Tamagotchi Toy' },
+    category: 'sports-hobby',
+    description: { id: 'Mainan Tamagotchi', en: 'Tamagotchi Toy' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/1',
+    image: 'https://hljjmmejmirqikmbaryl.supabase.co/storage/v1/object/public/affiliate-images/41084744-a.webp',
+    featured: true
+  },
+  {
+    id: 'ASH-002',
+    name: { id: 'Wireless Mouse', en: 'Wireless Mouse' },
+    category: 'electronics',
+    description: { id: 'Wireless Mouse', en: 'Wireless Mouse' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/2',
+    image: 'https://hljjmmejmirqikmbaryl.supabase.co/storage/v1/object/public/affiliate-images/40631272-b.webp',
+    featured: false
+  }
+];
 
 describe('JSON-LD builders', () => {
   it('website schema points at the production domain', () => {
@@ -26,16 +49,17 @@ describe('JSON-LD builders', () => {
   });
 
   it('product ItemList uses external product URLs only (no fake offers)', () => {
-    const list = productListSchema(affiliateProducts.slice(0, 2), 'id');
+    const list = productListSchema(fixtureProducts.slice(0, 2), 'id');
     const items = list.itemListElement as Array<Record<string, unknown>>;
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({
       '@type': 'ListItem',
       position: 1,
-      name: affiliateProducts[0]!.name.id
+      name: fixtureProducts[0]!.name.id
     });
     expect(JSON.stringify(list)).not.toContain('"@type":"Product"');
     expect(JSON.stringify(list)).not.toContain('offers');
+    expect(fixtureProducts.every((p) => affiliateProductSchema.safeParse(p).success)).toBe(true);
   });
 
   it('property ItemList links to localized detail pages', () => {

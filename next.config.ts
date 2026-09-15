@@ -64,6 +64,18 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Allow <Image/> to optimize Supabase public Storage URLs (affiliate-images
+  // bucket). CSP img-src already permits the Supabase host — this only enables
+  // the Next.js optimizer for it. See M1.3 / M3 DB-only migration.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**'
+      }
+    ]
+  },
   async headers() {
     return [
       {

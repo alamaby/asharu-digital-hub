@@ -7,8 +7,10 @@ import { breadcrumbSchema, productListSchema } from '@/lib/seo/jsonld';
 import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
 import { pageHeading } from '@/lib/utils/title';
-import { affiliateProducts } from '@/data/affiliate-products';
+import { getActiveProducts } from '@/lib/affiliate/public';
 import { AffiliateDisclosure } from '@/components/home/AffiliateDisclosure';
+
+export const revalidate = 3600;
 import { ProductBrowser } from '@/components/cards/ProductBrowser';
 import { JsonLd } from '@/components/ui/JsonLd';
 
@@ -35,6 +37,9 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
   setRequestLocale(locale);
 
   const tMeta = await getTranslations({ locale, namespace: 'meta.products' });
+
+  // M3: read katalog dari DB (anonClient, ISR 3600) — ganti impor statis file.
+  const affiliateProducts = await getActiveProducts();
 
   const breadcrumb = breadcrumbSchema([
     { name: 'Asharu', url: `${env.siteUrl}${localizedPathname('/', locale)}` },

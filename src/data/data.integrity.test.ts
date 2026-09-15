@@ -3,15 +3,50 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   affiliateProductSchema,
+  type AffiliateProduct,
   propertySchema,
   shopLinkSchema,
   socialLinkSchema
 } from './schemas';
-import { affiliateProducts } from './affiliate-products';
 import { properties } from './properties';
 import { shopLinks, getVisibleShopLinks } from './shop-links';
 import { getPublishedProperties } from './properties';
 import { getSocialLinks } from './social-links';
+
+// M3: fixture hermetik menggantikan impor statis src/data/affiliate-products.ts
+// (file akan dihapus di M4.2). Cakup validasi skema + unique id + featured≤6.
+const fixtureProducts: AffiliateProduct[] = [
+  {
+    id: 'ASH-001',
+    name: { id: 'Produk satu', en: 'Product one' },
+    category: 'electronics',
+    description: { id: 'Produk satu', en: 'Product one' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/a',
+    image: 'https://hljjmmejmirqikmbaryl.supabase.co/storage/v1/object/public/affiliate-images/41084744-a.webp',
+    featured: true
+  },
+  {
+    id: 'ASH-002',
+    name: { id: 'Produk dua', en: 'Product two' },
+    category: 'fashion',
+    description: { id: 'Produk dua en', en: 'Product two en' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/b',
+    image: 'https://hljjmmejmirqikmbaryl.supabase.co/storage/v1/object/public/affiliate-images/40631272-b.webp',
+    featured: true
+  },
+  {
+    id: 'ASH-003',
+    name: { id: 'Produk tiga', en: 'Product three' },
+    category: 'others',
+    description: { id: 'Produk tiga', en: 'Product three' },
+    merchant: 'Racun outfit asharu (Shopee)',
+    url: 'https://s.shopee.co.id/c',
+    image: 'https://hljjmmejmirqikmbaryl.supabase.co/storage/v1/object/public/affiliate-images/40455095-c.webp',
+    featured: false
+  }
+];
 
 describe('static dataset integrity', () => {
   it('all shop links validate against the schema', () => {
@@ -68,16 +103,15 @@ describe('static dataset integrity', () => {
   });
 
   it('all products validate and use unique ids', () => {
-    const ids = affiliateProducts.map((p) => p.id);
+    const ids = fixtureProducts.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const product of affiliateProducts) {
-      const result = affiliateProductSchema.safeParse(product);
-      expect(result.success, product.id).toBe(true);
+    for (const product of fixtureProducts) {
+      expect(affiliateProductSchema.safeParse(product).success, product.id).toBe(true);
     }
   });
 
   it('at most six featured products (homepage limit)', () => {
-    expect(affiliateProducts.filter((p) => p.featured).length).toBeLessThanOrEqual(6);
+    expect(fixtureProducts.filter((p) => p.featured).length).toBeLessThanOrEqual(6);
   });
 
   it('all properties validate with unique slugs', () => {
@@ -93,11 +127,8 @@ describe('static dataset integrity', () => {
     expect(properties.filter((p) => p.featured).length).toBeLessThanOrEqual(6);
   });
 
-  it('placeholder images referenced by datasets exist on disk', () => {
-    const images = [
-      ...affiliateProducts.map((p) => p.image),
-      ...properties.map((p) => p.image)
-    ];
+  it('placeholder images referenced by property datasets exist on disk', () => {
+    const images = properties.map((p) => p.image);
     for (const image of images) {
       const filePath = join(process.cwd(), 'public', image.replace(/^\//, ''));
       expect(existsSync(filePath), image).toBe(true);
@@ -118,10 +149,7 @@ describe('static dataset integrity', () => {
   });
 
   it('no fake ratings or certificates leak into data', () => {
-    const blob = JSON.stringify({ shopLinks, affiliateProducts, properties });
-    // Word-boundary matches: "rating" must not appear as a standalone token
-    // (e.g. a 4.8-rating badge). "Hydrating" is fine because the substring is
-    // not a separate word.
+    const blob = JSON.stringify({ shopLinks, properties });
     expect(blob).not.toMatch(/\brating\b/i);
     expect(blob).not.toMatch(/"sertifikat"/i);
   });

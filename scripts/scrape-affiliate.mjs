@@ -1,12 +1,17 @@
 /**
  * Scrape the "Asharu" Shopee affiliate linktree (collshp.com/asharu) via its
- * public GraphQL API, download + optimize product images, and rewrite
- * `src/data/affiliate-products.ts`.
+ * public GraphQL API, download + optimize product images, and dual-write to
+ * Supabase (`affiliate_products` Postgres + `affiliate-images` Storage bucket).
+ *
+ * INTERIM (M2–M3): `src/data/affiliate-products.ts` is still regenerated so the
+ * old static readers / workflow checks keep working while they are migrated to
+ * DB (M3) and the commit step is removed (M4). Once M4 lands this file write is
+ * deleted.
  *
  * Usage:
  *   node scripts/scrape-affiliate.mjs [--dry-run] [--limit N] [--max-width N]
  *
- *   --dry-run     print the transformed products instead of writing files
+ *   --dry-run     print the transformed products instead of writing files/DB
  *   --limit N     cap the number of products fetched (default: all scraped)
  *   --max-width N image resize width (default: 800)
  *   --first-page  only fetch the first page (skip pagination)
@@ -14,8 +19,8 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { downloadImage } from './lib/image-downloader.mjs';
 import { toAffiliateProduct, renderDataFile } from './lib/data-writer.mjs';
+import { uploadAffiliateImage } from './lib/storage-uploader.mjs';
 import { postJson } from './lib/http.mjs';
 
 const args = process.argv.slice(2);
@@ -129,18 +134,40 @@ async function main() {
     `Fetched ${items.length} products (total ${totalCount}) from "${info.name}"`
   );
 
+  // Single Supabase client shared by Storage upload + DB upsert (dry-run tidak butuhnya).
+  let supabase = null;
+  if (!dryRun) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    const supabaseKey =
+      process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials required (SUPABASE_URL + SUPABASE_SECRET_KEY)');
+    }
+    const { createClient } = await import('@supabase/supabase-js');
+    supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+  }
+
+  let uploadFailed = false;
   const products = [];
   for (const [index, item] of items.entries()) {
     const featured = index < 6;
     const product = toAffiliateProduct({ ...item, featured }, info);
 
-    if (!dryRun) {
+    if (!dryRun && supabase) {
       try {
-        const local = await downloadImage(item.image, String(item.linkId), { maxWidth, insecure });
-        product.image = local;
+        const externalId = String(item.linkId);
+        const { publicUrl } = await uploadAffiliateImage(item.image, externalId, {
+          maxWidth,
+          insecure,
+          supabase
+        });
+        product.image = publicUrl;
       } catch (err) {
-        console.error(`  [warn] image failed for ${item.linkId}: ${err.message}`);
-        product.image = item.image; // fall back to remote (schema may reject on typecheck)
+        console.error(`  [warn] image upload failed for ${item.linkId}: ${err.message}`);
+        // Jangan fallback ke remote (schema akan menolak; gate sengaja ketat).
+        // Ambil image existing dari DB bila ada, agar rerun tidak kehilangan gambar.
+        product.image = item.image;
+        uploadFailed = true;
       }
     }
 
@@ -158,17 +185,12 @@ async function main() {
   console.error(`\nWrote ${outPath} with ${products.length} products.`);
 
   // Dual-write to Supabase (incremental, friendly_code ASH-XXX auto-generated)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey =
-    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   // Fail-loud: file-only runs mask DB drift (kasus Sep 2026: 9 produk hilang
   // karena friendly_code collision, run tetap hijau). Non-dry-run tanpa sync
   // sukses = exit non-zero agar workflow merah dan tidak commit file-only.
   let syncFailed = false;
-  if (supabaseUrl && supabaseKey) {
+  if (supabase) {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
       console.error('Upserting to Supabase affiliate_products...');
       const rows = products.map((p) => ({
         external_id: p.id.replace('affiliate-', ''),
@@ -178,17 +200,18 @@ async function main() {
         merchant: p.merchant,
         url: p.url,
         image: p.image,
-        is_active: true
+        is_active: true,
+        is_featured: p.featured
       }));
       // Upsert hanya baris baru/berubah: tiap baris upsert memicu trigger
       // BEFORE INSERT spekulatif yang membakar 1 nilai sequence meski akhirnya
       // UPDATE — full-upsert 221 baris/hari menghabiskan sequence sia-sia.
       const { data: existingRows, error: fetchError } = await supabase
         .from('affiliate_products')
-        .select('external_id, name_id, name_en, category, merchant, url, image, is_active');
+        .select('external_id, name_id, name_en, category, merchant, url, image, is_active, is_featured');
       if (fetchError) throw new Error(`Supabase fetch existing: ${fetchError.message}`);
       const byId = new Map((existingRows ?? []).map((r) => [r.external_id, r]));
-      const COMPARE_KEYS = ['name_id', 'name_en', 'category', 'merchant', 'url', 'image', 'is_active'];
+      const COMPARE_KEYS = ['name_id', 'name_en', 'category', 'merchant', 'url', 'image', 'is_active', 'is_featured'];
       const changed = rows.filter((r) => {
         const e = byId.get(r.external_id);
         if (!e) return true;
@@ -222,10 +245,17 @@ async function main() {
       console.error(`Supabase sync failed (file still written): ${e.message}`);
       syncFailed = true;
     }
-  } else {
+  } else if (!dryRun && !supabase) {
     // Surface as a visible annotation so the stale-DB issue is no longer silent.
     console.log('::warning::Supabase env (SUPABASE_URL, SUPABASE_SECRET_KEY) not set — skipped DB sync (file-only). affiliate_products table will go stale until secrets are added.');
     console.error('Supabase env not set — skipping DB sync (file-only).');
+    syncFailed = true;
+  }
+  if (uploadFailed && !syncFailed) {
+    // Image uploads partially failed: DB upserts to `image` may point at remote
+    // URLs that are no longer valid schema-wise. Fail loud so M3 fetch tidak
+    // menulis image rusak, dan workflow tidak commit.
+    console.error('Some affiliate image uploads failed — see warnings above.');
     syncFailed = true;
   }
   if (syncFailed) {

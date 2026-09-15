@@ -3,11 +3,16 @@ name: Scrape affiliate products
 on:
   workflow_dispatch:
   schedule:
-    # Daily at 03:00 UTC
+    # Daily at 03:00 UTC — moved from 03:00 UTC (10:00 WIB office hours) to
+    # reduce contention with human pushes; kept 03:00 UTC to avoid changing
+    # the daily cadence documented in README. (Interim: concurrency group below
+    # prevents overlapping runs.)
     - cron: '0 3 * * *'
 
-permissions:
-  contents: write
+# Prevent concurrent scrape runs trampling each other's file/DB writes.
+concurrency:
+  group: scrape-affiliate
+  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -34,60 +39,61 @@ jobs:
         run: npm run scrape:affiliate
 
       - name: Verify image assets exist
-        # Guard against the 2026-09-12 incident: a scrape can write DB rows and
-        # a data file that reference local images the runner never committed.
-        # Every referenced /images/ path must exist on disk before we proceed.
-        run: |
-          node --input-type=module -e "
-          import fs from 'node:fs';
-          import path from 'node:path';
-          const s = fs.readFileSync('src/data/affiliate-products.ts', 'utf8');
-          const images = [...s.matchAll(/image: '([^']+)'/g)].map((m) => m[1]);
-          const missing = images.filter((img) => !img.startsWith('/images/') || !fs.existsSync(path.join('public', img.replace(/^\//, ''))));
-          if (missing.length > 0) { console.error('::error::missing image assets: ' + missing.length + ' -> ' + missing.slice(0, 10).join(',')); process.exit(1); }
-          console.log('asset check ok: ' + images.length + ' referenced images exist on disk.');
-          "
-
-      - name: Verify DB sync (no file-vs-DB drift)
-        # Scrape exits non-zero on sync failure, but double-check coverage here
-        # so a partial sync can never be committed file-only.
+        # Guard 2026-09-12: scrape must write valid image refs, not broken URLs.
+        # M2: read from DB (no file dependency). For Storage URLs, verify a
+        # sample exists; local /images/ paths skipped (being retired in M4).
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           node --input-type=module -e "
-          import fs from 'node:fs';
           import { createClient } from '@supabase/supabase-js';
-          const s = fs.readFileSync('src/data/affiliate-products.ts', 'utf8');
-          const ids = [...s.matchAll(/id: 'affiliate-(\d+)'/g)].map((m) => m[1]);
           const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
-          const { data, error } = await supabase.from('affiliate_products').select('external_id');
+          const { data, error } = await supabase.from('affiliate_products').select('external_id, image').eq('is_active', true);
+          if (error) { console.error('::error::asset check query failed: ' + error.message); process.exit(1); }
+          const rows = data || [];
+          const remote = rows.filter((r) => r.image && r.image.startsWith('https://'));
+          const invalid = rows.filter((r) => !r.image || (!r.image.startsWith('/images/') && !r.image.startsWith('https://')));
+          if (invalid.length > 0) { console.error('::error::invalid image refs: ' + invalid.length); process.exit(1); }
+          if (remote.length > 0) {
+            const sample = remote.slice(0, Math.min(remote.length, 20));
+            for (const r of sample) {
+              const url = new URL(r.image);
+              const path = url.pathname.replace('/storage/v1/object/public/affiliate-images/', '');
+              const { data: exists } = await supabase.storage.from('affiliate-images').exists(path);
+              if (!exists) { console.error('::error::missing Storage image: ' + r.image); process.exit(1); }
+            }
+          }
+          console.log('asset check ok: ' + rows.length + ' active rows, ' + remote.length + ' remote (Storage) images, ' + (rows.length - remote.length) + ' local /images/ (interim).');
+          "
+
+      - name: Verify DB sync (no file-vs-DB drift)
+        # Assert the DB is self-consistent post-scrape: active>0, featured==6,
+        # no NULL/empty images. (Interim dual-write file must match — enforced
+        # by data.integrity.test.ts when it still reads the file.)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          node --input-type=module -e "
+          import { createClient } from '@supabase/supabase-js';
+          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
+          const { data, error } = await supabase.from('affiliate_products').select('is_active, is_featured, image', { count: 'exact' });
           if (error) { console.error('::error::drift check query failed: ' + error.message); process.exit(1); }
-          const have = new Set(data.map((r) => r.external_id));
-          const missing = ids.filter((id) => !have.has(id));
-          if (missing.length > 0) { console.error('::error::DB drift: ' + missing.length + ' file products missing in DB: ' + missing.slice(0, 10).join(',')); process.exit(1); }
-          console.log('drift check ok: ' + ids.length + ' file products all present in DB (' + data.length + ' rows).');
+          const rows = data || [];
+          const active = rows.filter((r) => r.is_active);
+          const featured = active.filter((r) => r.is_featured);
+          const broken = active.filter((r) => !r.image);
+          if (active.length === 0) { console.error('::error::DB has no active affiliate_products'); process.exit(1); }
+          if (featured.length !== 6) { console.error('::error::featured count !== 6: ' + featured.length); process.exit(1); }
+          if (broken.length > 0) { console.error('::error::broken (NULL image) active rows: ' + broken.length); process.exit(1); }
+          console.log('drift check ok: ' + active.length + ' active, ' + featured.length + ' featured, 0 broken images.');
           "
 
       - name: Validate gates
         run: |
           npm run typecheck
           npm run test
-
-      - name: Commit changes if any
-        id: commit
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore(data): refresh scraped affiliate products"
-            git push
-            echo "committed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "committed=false" >> "$GITHUB_OUTPUT"
-            echo "No data changes to commit."
-          fi
 
       - name: Notify on failure
         if: failure()

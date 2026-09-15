@@ -29,7 +29,7 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 | Framework | Next.js 15 (App Router), React 19, TypeScript strict |
 | Rendering | SSG untuk seluruh halaman (`generateStaticParams` + `setRequestLocale`); RSC default; client components terbatas (mobile nav, language switcher, property filter/gallery, product carousel, consent banner + settings button, GA loader) |
 | i18n | next-intl v4 — locale `id` (default) & `en`; localized pathnames (`/id/produk` ↔ `/en/products`); root `/` → `/id` via middleware **tanpa loop**; locale detection header dimatikan agar crawler selalu melihat `/id` deterministik |
-| Data | File type-safe di `src/data/`, divalidasi skema Zod (`src/data/schemas.ts`); tidak ada database/API saat render |
+| Data | File type-safe di `src/data/` + validasi Zod (`src/data/schemas.ts`); katalog afiliasi produk live dari `public.affiliate_products` (Supabase, anon RLS) + Storage `affiliate-images`; halaman publik pakai ISR 3600 |
 | Styling | Tailwind CSS 3.4 dengan palet color-blind-safe WCAG AA |
 | Font | Inter via `next/font` (self-hosted, zero layout shift) |
 | Analytics | GA4 consent-gated: script Google sama sekali tidak dimuat sebelum pengunjung menyetujui; 7 event type-safe tanpa PII (termasuk click_math_app) |
@@ -120,35 +120,37 @@ Semua file di `src/data/` dan gambar di `public/images/` adalah **placeholder be
    - Link share seperti `shp.ee/...` dapat kedaluwarsa bila diedit di dashboard — refresh nilainya berkala atau hapus field tersebut.
    - `handle` *(opsional)* menampilkan baris kecil `@namatoko` di kartu.
 2. **Sosial** — `social-links.ts`: ganti handle/URL; WhatsApp otomatis muncul begitu env diset.
-3. **Produk afiliasi** — `affiliate-products.ts`: ganti `url` dengan link afiliasi resmi, `image` dengan foto produk WebP/JPG (rasio 4:3, min. 800×600). Setiap kartu sudah otomatis memakai `rel="sponsored nofollow"`.
+3. **Produk afiliasi** — kini **DB-only** (`public.affiliate_products` di Supabase, baca anonClient). `image` berupa public URL Supabase Storage bucket `affiliate-images`. `id` publik/produk = `friendly_code` (`ASH-XXX`). Tiap kartu otomatis pakai `rel="sponsored nofollow"`.
 
 ### Scraper Produk Afiliasi (Shopee Linktree)
 
-Konten `affiliate-products.ts` dapat ditarik otomatis dari halaman afiliasi Shopee Linktree *"Racun outfit asharu"* (`collshp.com/asharu`) via **GraphQL API publik**-nya (tanpa auth, tanpa browser):
+Katalog afiliasi ditarik dari halaman Shopee Linktree *"Racun outfit asharu"* (`collshp.com/asharu`) via **GraphQL API publik** (tanpa auth, tanpa browser) dan ditulis langsung ke Supabase:
 
-- Endpoint: `POST https://collshp.com/api/v3/gql/graphql` — operation `getBaseInfoAndLinks` dengan `urlSuffix: "asharu"`.
-- Total tersedia kini **201 produk**; halaman support pagination (`pageSize`/`pageNum`) dan telah dibatasi ke **12 produk terbaru** di data saat ini.
-- Skema `AffiliateProduct` → `src/data/schemas.ts` dihasilkan `scripts/lib/data-writer.mjs`, divalidasi Zod sebelum ditulis.
+- **Endpoint:** `POST https://collshp.com/api/v3/gql/graphql` — operation `getBaseInfoAndLinks` dengan `urlSuffix: "asharu"`.
+- **Pagination:** `pageSize`/`pageNum`; total kini **201+ produk**.
+- **Skema:** baris DB dipetakan ke `AffiliateProduct` (`src/lib/affiliate/public.ts` → `src/data/schemas.ts`), validasi Zod.
 
-Jalankan scraper:
+Jalankan scraper (dev lokal; produksi via workflow):
 
 ```bash
-npm run scrape:affiliate:dry-run   # lihat hasil transform tanpa menulis file/unduh gambar
-npm run scrape:affiliate           # tarik SEMUA produk (~201), unduh+optimasi gambar, tulis data
-npm run scrape:affiliate -- --limit 12   # batasi jumlah produk
-npm run scrape:affiliate -- --first-page # hanya halaman pertama (tanpa pagination)
+npm run scrape:affiliate:dry-run   # lihat hasil transform + fetch tanpa menulis DB/Storage
+npm run scrape:affiliate           # scrape penuh: upsert DB + upload WebP ke Storage (idempoten, skip-if-exists)
+npm run scrape:affiliate -- --limit 12            # batasi jumlah produk
+npm run scrape:affiliate -- --first-page          # hanya halaman pertama (tanpa pagination)
+npm run scrape:affiliate -- --insecure            # lewati verifikasi TLS (jaringan korporat/MITM; CI tidak pakai)
+npm run scrape:affiliate -- --allow-mass-deactivation   # override guard nonaktifkan >20%
 ```
 
-Perintah tambahan: `--max-width <px>` (default 800), `--insecure` (lewati verifikasi TLS — hanya untuk jaringan korporat/MITM; CI tidak memakainya).
-
 Proses:
-1. Fetch GraphQL → baris `linkList { linkId, link, linkName, image, linkType, groupIds }`; dedupe by `linkId`, filter `linkType: "ITEM"` .
-2. **Kategori** dipetakan heuristik (kata kunci ID/EN) ke enum `electronics | home-living | fashion | sports-hobby` — sumber kebenaran: `src/lib/affiliate/category.ts` + `scripts/lib/category-keywords.json`. Default fallback `fashion`.
-3. **Gambar** diunduh (module `https`) → dioptimasi Sharp ke WebP (max 800px, kalitas 80) → `public/images/products/affiliate/<linkId>-<hash>.webp`, dedupe by sha256.
-4. `featured: true` hanya untuk 6 produk pertama (batas homepage); sisanya `false`.
-5. Ditulis ulang ke `src/data/affiliate-products.ts`, lalu validasi `typecheck` + `test`.
+1. Fetch GraphQL → `linkList { linkId, link, linkName, image, linkType, groupIds }`; dedupe by `linkId`, filter `linkType: "ITEM"`.
+2. **Kategori** dipetakan heuristik (kata kunci ID/EN) ke enum `electronics | home-living | fashion | sports-hobby` — sumber kebenaran: `scripts/lib/category-mapper.mjs` + `scripts/lib/category-keywords.json`. Fallback `fashion`.
+3. **Gambar** diunduh (`https`, sistem trust store) → dioptimasi Sharp ke WebP (max 800px, kalitas 80) → di-upload ke Supabase Storage bucket **`affiliate-images`** (nama content-addressed `<linkId>-<hash>.webp`; skip-if-exists agar reruns idempoten + hemat sequence). URL public disimpan di kolom `image`.
+4. `is_featured` true hanya untuk 6 produk pertama (limit homepage) → kolom boolean di DB; kolom+index ada di migrasi `20260915000001_affiliate_is_featured`.
+5. Upsert `affiliate_products` (onConflict `external_id`) hanya baris berubah (diff kolom termasuk `is_featured`); soft-delete missing (`is_active=false`) dengan guard nonaktifkan >20%.
 
-**Penjadwalan otomatis:** `.github/workflows/scrape-affiliate.yml` menjalankan `npm run scrape:affiliate` setiap hari 03:00 UTC (`0 3 * * *`, strict `npm ci`) atau via *workflow_dispatch*, memvalidasi gate, lalu commit-perubahan bila ada. Nama kategori tidak tersedia pada data GraphQL item harus dipetakan dari judul — verifikasi hasil klasifikasi ukuran dataset penuh sebelum dipublikasikan.
+**Penjadwalan otomatis:** `.github/workflows/scrape-affiliate.yml` menjalankan `npm run scrape:affiliate` setiap hari 03:00 UTC (`0 3 * * *`, strict `npm ci`) atau via *workflow_dispatch*, memvalidasi gate DB (active>0, featured==6, image NOT NULL, sampel Storage exists), dengan grup *concurrency* `scrape-affiliate`. **Tidak ada `git commit/push`** — scraper menulis ke Supabase langsung, sehingga race `rejected (fetch first)` tidak mungkin terjadi lagi.
+
+Nama kategori tidak tersedia pada data GraphQL item harus dipetakan dari judul — verifikasi hasil klasifikasi ukuran dataset penuh sebelum dipublikasikan.
 4. **Properti** — `properties.ts`: tiga listing riil (owner-verified) sudah aktif — Kamarasan Residence (dijual), Buah Batu Park (dijual), Sukaraja Jatiwangi (disewakan, *occupied*). Entri contoh lama ditandai `hidden: true`; hapus flag + isi data untuk mempublikasikan. Harga & alamat lengkap hanya diisi dari data pemilik.
    - Media: foto dioptimasi ke WebP via `node scripts/optimize-property-images.mjs --src <dir> --dest public/images/properties/<slug> [--copy]` — manifest dimensi yang dicetak dipakai mengisi `gallery`.
    - **EN copy pada listing migrated adalah hasil terjemahan asisten** — review owner sebelum launch.

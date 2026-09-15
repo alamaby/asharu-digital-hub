@@ -90,7 +90,15 @@ export const affiliateProductSchema = z.object({
   description: localizedTextSchema,
   merchant: z.string().min(1),
   url: httpsUrl,
-  image: z.string().startsWith('/images/'),
+  image: z.union([
+    z.string().startsWith('/images/'),
+    z
+      .string()
+      .url()
+      .refine((v) => v.includes('.supabase.co/storage/'), {
+        message: 'Storage image must point at *.supabase.co/storage/'
+      })
+  ]),
   featured: z.boolean()
 });
 export type AffiliateProduct = z.infer<typeof affiliateProductSchema>;

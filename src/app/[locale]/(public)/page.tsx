@@ -9,7 +9,7 @@ import { buildMetadata } from '@/lib/seo/metadata';
 import { productListSchema } from '@/lib/seo/jsonld';
 import { getVisibleShopLinks } from '@/data/shop-links';
 import { getSocialLinks } from '@/data/social-links';
-import { affiliateProducts, getFeaturedProducts } from '@/data/affiliate-products';
+import { getFeaturedProductsDB } from '@/lib/affiliate/public';
 import { getFeaturedProperties } from '@/data/properties';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { JsonLd } from '@/components/ui/JsonLd';
@@ -25,6 +25,8 @@ import { mathAppConfig } from '@/data/math-app';
 interface HomePageProps {
   params: Promise<{ locale: string }>;
 }
+
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: HomePageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -45,7 +47,7 @@ export default async function HomePage({ params }: HomePageProps) {
   const tHero = await getTranslations({ locale, namespace: 'hero' });
   const tHome = await getTranslations({ locale, namespace: 'home' });
 
-  const featuredProducts = getFeaturedProducts(6);
+  const featuredProducts = await getFeaturedProductsDB(6);
   const featuredProperties = getFeaturedProperties(6);
 
   return (
@@ -224,7 +226,7 @@ export default async function HomePage({ params }: HomePageProps) {
         <ContactCTA id="contact" linkPosition="home-contact" />
       </div>
 
-      <JsonLd data={productListSchema(affiliateProducts.filter((p) => p.featured), locale)} />
+      <JsonLd data={productListSchema(featuredProducts, locale)} />
     </>
   );
 }
