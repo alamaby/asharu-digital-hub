@@ -350,6 +350,57 @@ hash + pesan + file kunci).
   skema+RLS via MCP asharu, 256 webp/11,7 MB + orphan hash ganda, CSP ok,
   pola ISR Artikel). Keputusan user dikunci (is_featured, scrape-fresh,
   ISR 3600, ASH-XXX). Belum ada eksekusi.
+- 2026-09-15 17:35:00 — **M1 selesai + committed.** Migrasi submodule:
+  `20260915000001_affiliate_is_featured.sql` (kolom boolean default false,
+  index `idx_affiliate_products_active_featured WHERE is_active`, backfill 6
+  featured = ASH-232..237, verified via MCP). Bucket `affiliate-images` public
+  + policy SELECT anon/authenticated (`20260915000002_affiliate_storage_bucket.sql`,
+  both applied prod + submodule pushed 1eb2fea). `images.remotePatterns`
+  Storage ditambah di `next.config.ts` (CSP img-src sudah ok). Submodule dulu
+  + verified via MCP sebelum parent commit.
+- 2026-09-15 17:42:00 — **M2 selesai + committed.** Scraper
+  `scripts/scrape-affiliate.mjs` → `storage-uploader.mjs` (upload WebP ke
+  `affiliate-images`, skip-if-exists, fail-loud tanpa fallback remote);
+  payload upsert tambah `is_featured` + `COMPARE_KEYS`; `concurrency.group
+  scrape-affiliate`. Workflow step Commit **sudah dihapus** (membunuh race
+  `fetch first` — tidak ada push runner ke main lagi).
+- 2026-09-15 17:50:00 — **M3 selesai + committed.** Modul baru
+  `src/lib/affiliate/public.ts` (anonClient cookie-less, mapper `id=friendly_code`,
+  `getActiveProducts`/`getFeaturedProductsDB` order friendly_code). Skema
+  `image` union (lokal /images/ | https://…supabase.co/storage/). Halaman
+  home + products → `revalidate=3600` + DB. Test `data.integrity.test.ts` +
+  `jsonld.test.ts` hermetik (fixture, tidak impor file). README + arsitektur
+  diupdate. **Gate M3: typecheck ✓ lint ✓ build ✓; test 581/583 (1 flaky pre-existing
+  ContentRequestForm timeout DB, tidak terkait M3, lolos isolasi).**
+- 2026-09-15 18:05:00 — **M4.1 BLOCKED local-run:** `collshp.com` API
+  503 dari environment ini (bukan 200 juga dengan --insecure; infrastruktur
+  eksternal). Scrape fresh full + verifikasi SQL (`storage_img == active`,
+  `featured == 6`, `broken == 0`) **harus dilalui workflow CI** sebagai
+  `workflow_dispatch` manual. DB saat ini masih 239/239 `image` lokal
+  (`/images/…`) — berarti M4.2 (hapus file/dir) **belum boleh** dilakukan
+  atau halaman publik akan broken image sampai scrape mengisi Storage.
+- 2026-09-15 18:05:00 — **M4.3 (advisors):** semua finding WARN/INFO
+  adalah pre-existing (search_path mutable, SECURITY DEFINER functions,
+  unindexed FKs, RLS initplan, unused index, multiple permissive policies);
+  `idx_affiliate_products_active_featured` muncul "unused" karena baru dibuat
+  sebelum prod memakainya — expected. GC orphan Storage **deferred** sampai
+  bucket terisi dan M4.1 verified.
+
+## Notes
+
+- **STATUS:** M1–M3 committed + pushed (hash `0bd5768`, submodule `1eb2fea`).
+  M4.1 butuh CI scrape fresh (collshp 503 dari local). **JANGAN hapus file/dir
+  affiliate (`src/data/affiliate-products.ts`, `public/images/products/affiliate/`)
+  sampai setelah CI berhasil mengisi Storage dan verifikasi SQL lolos** —
+  halaman publik saat ini masih baca kolom `image` DB yang berisi path lokal;
+  kode reader sudah DB tapi nilai belum adalah URL Storage. Ini transisi
+  sedang berjalan, bukan final state.
+- **Langkah berikutnya (butuh CI):** jalankan `workflow_dispatch` scrape-affiliate
+  → tunggu M4.1 verify SQL → baru eksekusi M4.2 (hapus file/dir obsolete +
+  pastikan workflow tanpa Commit tetap lolos) → M4.3 GC + memori + commit akhir.
+- Asumsi (diverifikasi): trigger trg_friendly mengisi ASH-XXX otomatis; bucket
+  affiliate-images public read / service-only write sudah applied prod; secret
+  workflow sudah ada; tidak ada harga/rating di read publik.
 
 ## Notes
 

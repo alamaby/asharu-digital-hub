@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-14 16:25 (local time)
+Last updated: 2026-09-15 18:10 (local time)
 
 ## Current State
 
@@ -29,7 +29,7 @@ Last updated: 2026-09-14 16:25 (local time)
 10. Provider LLM DB-driven via `llm_providers.priority`; key pool round-robin + circuit breaker (`failure_count > 5` → nonaktif permanen, tanpa auto-recovery).
 11. Key LLM di Supabase Vault via RPC wrapper `public.vault_*` (SECURITY DEFINER, service_role only); seed via `scripts/seed-llm-keys.mjs`. Sama untuk Tavily: Vault `tavily_api_key` via RPC baru `vault_decrypt_secret_by_name` (by-name, bukan by-id); seed via `scripts/seed-tavily-key.mjs`.
 12. Cron processor berjalan di Supabase pg_cron tiap 5 menit (Vercel Hobby limit) → POST `https://asharu.id/api/content/process`; `vercel.json` crons kosong.
-13. Dual-write scraper (file `src/data/affiliate-products.ts` + DB `affiliate_products`); DB sumber ASH-XXX, file sumber build statis.
+13. Katalog afiliasi **sedang migrasi ke DB-only** (15 Sep): scraper menulis ke Postgres `affiliate_products` + Storage bucket `affiliate-images`; halaman publik baca DB via `anonClient` + ISR 3600. Kolom `is_featured` baru (6 featured). Workflow scrape **tidak lagi commit/push** (hapus race `fetch first`). M4.1 butuh `workflow_dispatch` CI untuk scrape fresh — `collshp.com` 503 dari environment dev. Sebelum migrasi selesai, DB `image` masih path lokal; file `src/data/affiliate-products.ts` tidak lagi diimpor tapi belum dihapus (pending CI) — lihat entry memori 2026-09-15.
 14. Admin membership = `profiles.is_admin` (single source of truth, 1 Sep 2026). `is_admin()` SQL baca profiles; `handle_new_user` default `is_admin=false`; middleware & review page lookup via profiles (tidak ada hardcoded email di kode). Admin baru di-elevate via `UPDATE profiles SET is_admin = true`. (P2 audit #12 ditutup.)
 
 ## Open Items / Blockers
@@ -43,6 +43,7 @@ Last updated: 2026-09-14 16:25 (local time)
 - [x] **3 baris `content_requests` status='processing' nyangkut** → di-set `failed` (user decision 31 Agu, via MCP execute_sql; ids cf8b8b5c5, 2972da62, e30761c7).
 - [ ] **Seed Tavily key ke Vault [USER ACTION]:** `node --env-file=.env.local scripts/seed-tavily-key.mjs` (atau `node scripts/seed-tavily-key.mjs` lalu paste key). Menyimpan sebagai Vault `tavily_api_key`; processor baca via RPC `vault_decrypt_secret_by_name` (service_role). Env `TAVILY_API_KEY` tetap fallback (dev). Tanpa key → Discovery throw → session `failed` (fail-safe). Rotasi: re-run script / tambah entri Vault nama sama (RPC ambil terbaru).
 - [ ] **Pipeline riset E2E di production** — P0 cron sudah aktif; tinggal seed Tavily (atas) lalu submit form `/konten/baru` → pantau `/admin/riset` (cron */10 advance Discovery→Verification→Scoring→awaiting_selection).
+- [ ] **Migrasi katalog afiliasi ke DB-only [USER ACTION]:** kode M1–M3 sudah committed (`0bd5768`); workflow tidak lagi commit/push. Tinggal jalankan `workflow_dispatch` scrape-affiliate → konfirmasi MCP (`storage_img == active`, `featured == 6`, `broken == 0`) → baru hapus `src/data/affiliate-products.ts` + `public/images/products/affiliate/` + `scripts/seed-affiliate-from-file.mjs` (M4.2) → GC orphan Storage (M4.3). `collshp.com` 503 dari environment dev jadi tidak bisa di-pre-flight lokal; butuh CI.
 - [ ] **Discovery iteratif** — `maximum_iterations`/`required_winners`/`minimum_score` tersimpan di session tapi discovery masih single-pass (belum loop). Future enhancement.
 - [ ] **P2/P3 audit lain belum:** ContentDraftCard error surfacing, duplikasi `getServiceClient`, `rate_limits` cleanup, realtime review (`supabase.channel`), middleware matcher persempit, INSERT anon limit, `target_category` validasi saat submit. (Soft-delete guard scraper selesai 13 Sep - guard 20% + override `--allow-mass-deactivation`; guard aset gambar pre-commit ditambahkan 14 Sep; admin consolidation P2 #12 sudah ditutup 1 Sep.)
 - [ ] **Magic-link `token_hash` flow [USER STEP RE-PASTE]:** kode + template local di-push (`0cab152` parent, `2a8215d` submodule). Template base URL diubah `{{ .SiteURL }}/id/auth/exchange?...` → `{{ .RedirectTo }}?...` (fix bug email production bawa URL localhost — `.SiteURL` resolve ke Dashboard Site URL default `http://localhost:3000`). User **re-paste** body `supabase/templates/magic_link.html` ke Supabase Dashboard → Auth → Email Templates → Magic Link (template lama di Dashboard masih `{{ .SiteURL }}`). Verifikasi: request magic link → link harus `https://asharu.id/id/auth/exchange?token_hash=...` (bukan localhost). [HYGIENE opsional] Set Dashboard Site URL = `https://asharu.id`.
@@ -55,6 +56,7 @@ Last updated: 2026-09-14 16:25 (local time)
 
 ## Recent Entries
 
+- [181000-affiliate-db-only-migration.md](2026-09-15/181000-affiliate-db-only-migration.md) — Migrasi katalog afiliasi file+git → DB+Storage (race `fetch first` workflow terbunuh). M1 `is_featured`+bucket+remotePatterns, M2 scraper upload Storage + `concurrency.group`, M3 ISR 3600 + halaman publik baca DB + test hermetik, M4.2 workflow tanpa commit. Committed `0bd5768` (submodule `1eb2fea`); gate typecheck ✓ lint ✓ build ✓, test 581/583 (1 flaky pre-existing). **Blokir:** M4.1 scrape fresh butuh CI (`collshp.com` 503 lokal); file/dir affiliate belum dihapus sampai Storage terisi agar tidak ada broken image.
 - [162500-image-worker-dua-jalur.md](2026-09-14/162500-image-worker-dua-jalur.md) — Worker image 2-jalur per tick (1 generate manual prioritas + 1 reasoning cover auto); kasus e5866cc7 tak lagi diblokir cover auto. Gate 583 tests + build hijau, tanpa migrasi. Perlu deploy agar tick berikut pakai jalur baru.
 - [160500-visual-timeline.md](2026-09-14/160500-visual-timeline.md) — Timeline per slide visualisasi (masuk antrean + status + percobaan, zona user). Berlaku cover + per-reply. Carousel 13/13, build hijau; 1 flaky timeout tak terkait (lolos run ulang).
 - [155500-artikel-rich-text.md](2026-09-14/155500-artikel-rich-text.md) — `*`/`**` kini dirender miring/tebal di body artikel (publik + pratinjau + draf) via `renderRichText`. Gate 577 tests + build hijau.
