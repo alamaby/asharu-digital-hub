@@ -94,7 +94,7 @@ Tidak termasuk:
   - `outputFileTracingExcludes` hanya ditambahkan bila teruji menurunkan ukuran (gain ekspektasi kecil karena file-tracing Next sudah selektif); bila ditambahkan, polanya wajib lolos `npm run build` + 1 preview deploy.
   - Ukur hasil dengan **satu** preview deploy, hitung ulang total output via skrip T0, lalu **hapus preview deploy tersebut** setelah diukur (agar tidak menambah storage).
   - Acceptance: total output per deployment turun di bawah baseline (~178 MB).
-- [ ] **T4 — Ignore Build Step docs-only (MANUAL oleh user di dashboard; tidak bisa via CLI/repo)**
+- [x] **T4 — Ignore Build Step docs-only (MANUAL oleh user di dashboard; tidak bisa via CLI/repo)**
   - Navigasi: Vercel Dashboard → proyek `asharu-digital-hub` → Settings → Git → kolom "Ignored Build Step", isi perintah:
     ```bash
     if git diff --name-only HEAD^ HEAD | grep -qvE '^(\.memory/|plans/|\.github/|.*\.md$)'; then exit 1; else exit 0; fi
@@ -131,7 +131,7 @@ Tidak termasuk:
 - 2026-09-15 — T3 selesai dengan koreksi: `sharp` ternyata SUDAH di `devDependencies` (premisi plan keliru) → tidak ada pemindahan. `experimental.optimizePackageImports: ['lucide-react', 'apexcharts']` ditambah ke `next.config.ts`; build lokal hijau. Pengukuran 1 preview deploy: 178.85 MB vs baseline 178.89 MB (≈ nol) — lambda didominasi runtime Next + next-intl + supabase, bukan barrel lucide. Preview ukur (`327iwvziu`) sudah dihapus. `outputFileTracingExcludes` TIDAK ditambahkan (gain ekspektasi kecil, risiko regresi).
 - 2026-09-15 — Sampingan: `vercel link` menyuntik `VERCEL_OIDC_TOKEN` ke `.env.local`; baris tersebut sudah dihapus kembali (file gitignored, tidak pernah di-commit).
 - 2026-09-15 — T5: gate hijau (`typecheck`, `lint`, 583 tests/68 files — naik karena test baru sesi paralel). Commit `71b8ab7` (`.vercelignore` + plan) di-push; seperti diprediksi memicu 1 production deploy baru (`brtvt5vtq`, ukur produksi: 95 outputs ≈ 178.89 MB — identik baseline, konfirmasi `optimizePackageImports` ≈ nol gain pada lambda). Setelah alias pindah ke `brtvt5vtq`, `qqmx593b6` dihapus → count kembali 2 (`brtvt5vtq` production + `n7tepozr7`).
-- 2026-09-15 — T4 BELUM dikerjakan (manual dashboard oleh user) — PENTING: setiap push ke `main` (termasuk commit plan ini) menambah ±178 MB. Minta user set Ignore Build Step SEGERA (perintah + uji dua arah ada di T4), lalu hapus deployment yang tergeser agar count tetap 2.
+- 2026-09-15 — T4 selesai di dashboard oleh user. Verifikasi uji (a): commit plan ini (docs-only) di-push → deployment harus `Canceled` dan count tetap 2. Uji (b) (`src/` → `Ready`) terverifikasi alami pada push kode berikutnya.
 
 ## Notes
 

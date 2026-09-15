@@ -67,23 +67,30 @@ describe('ContentRequestForm', () => {
     expect(screen.getByRole('radio', { name: /Problem–Solution/ })).not.toBeChecked();
   });
 
-  it('success panel links admin to admin/riset/[sessionId]', async () => {
+  // timeout 15s: submitForm mengetik ~150 karakter char-by-char (±1.5s
+  // isolasi); di bawah beban worker paralel dapat menembus testTimeout
+  // default 5000ms → abort test 1 mencemari test 2 (flake 2026-09-15).
+  it('success panel links admin to admin/riset/[sessionId]', { timeout: 15000 }, async () => {
     const sessId = '241dcd03-e1d1-4a00-9bbb-0e20cde00be8';
     vi.mocked(createResearchSession).mockResolvedValue({ success: true, sessionId: sessId });
     renderWithMessages(<ContentRequestForm platforms={platforms} categories={mockCategories} isAdmin={true} />);
     await submitForm();
-    expect(await screen.findByText('Riset berhasil dimulai')).toBeInTheDocument();
+    // Timeout eksplisit: panel sukses muncul setelah rangkaian user-event yang
+    // lambat di bawah beban worker paralel (flake 2026-09-15: default 1000ms
+    // tidak cukup saat full-suite). Tidak mengubah apa yang diassert.
+    expect(await screen.findByText('Riset berhasil dimulai', {}, { timeout: 5000 })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Lihat riset' });
     // Mock Link (vitest.setup.tsx) stringifies href.pathname without locale prefix.
     expect(link).toHaveAttribute('href', `/admin/riset/${sessId}`);
   });
 
-  it('success panel links non-admin to konten/riset/[sessionId]', async () => {
+  it('success panel links non-admin to konten/riset/[sessionId]', { timeout: 15000 }, async () => {
     const sessId = 'ab12cd34-ef56-7890-abcd-ef1234567890';
     vi.mocked(createResearchSession).mockResolvedValue({ success: true, sessionId: sessId });
     renderWithMessages(<ContentRequestForm platforms={platforms} categories={mockCategories} isAdmin={false} />);
     await submitForm();
-    expect(await screen.findByText('Riset berhasil dimulai')).toBeInTheDocument();
+    // Timeout eksplisit: lihat catatan anti-flake pada test admin di atas.
+    expect(await screen.findByText('Riset berhasil dimulai', {}, { timeout: 5000 })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Lihat riset' });
     expect(link).toHaveAttribute('href', `/konten/riset/${sessId}`);
   });
