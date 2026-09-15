@@ -87,6 +87,26 @@ artikel + kirim email notifikasi via Resend. Semua knob harus configurable by ta
 - `873e8f0` (submodule) — `feat(db): tabel automation_configs + automation_runs + cron harian`
 - `24e3bdb` (parent) — `feat(automation): riset harian otomatis ke artikel + notifikasi Resend`
 - `d220acb` (parent) — `fix(automation): cegah orphan sesi + reset batas tunggu cover saat retry`
+- `3ea8827` (parent) — `fix(automation): jamin email best-effort agar workflow tidak pernah terhenti`
+
+## Jaminan Email Best-Effort (commit `3ea8827`)
+
+Requirement user: workflow harus tetap jalan meski pengiriman email gagal. Audit menemukan
+4 jalur di luar try/catch `sendViaResend` yang masih bisa melempar dan menghentikan tick:
+`resolveResendKey` (RPC Vault), `resolveRecipients` (query `profiles`), `productLabel`
+(query produk), `loadArticleLinks` (query artikel).
+
+Fix berlapis:
+- Satu fungsi `deliver()` membungkus semua pengiriman → selalu mengembalikan `SendResult`.
+- `resolveResendKey`/`resolveRecipients`/`productLabel` dibuat anti-throw (fallback
+  `null`/`[]`/`'(produk)'`) — gangguan jaringan Supabase = email di-skip, bukan crash.
+- Blok notifikasi `draft_ready`, `published`, dan `notifyFailure` dibungkus try/catch;
+  kegagalan dicatat `warn` ke `content_research_logs` dan tidak mengubah status run.
+- Render payload (HTML) juga ter-guard.
+
+Efek: setelah publish, run **selalu** maju ke `completed`; `notify_on='none'` dan Vault tanpa
+`resend_api_key` tetap berjalan normal. +5 test (email 10 → 15; total suite 662).
+
 
 ## Hardening Pasca-Review (commit `d220acb`)
 

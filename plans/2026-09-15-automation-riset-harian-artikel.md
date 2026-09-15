@@ -88,7 +88,8 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
 - Auto-publish tanpa review berisiko halusinasi/afiliasi salah tayang → switch config + dry-run + email draft-ready.
 - Gate publish tetap menolak thin content (<600 kata) → run `failed` + email (tidak tayang).
 - Cover bergantung worker gambar global (1 generate + 1 reasoning per 5 mnt) → timeout configurable.
-- Resend butuh domain/from verified; kegagalan email tidak memblok publish.
+- Resend butuh domain/from verified; **kegagalan email (atau email tidak dikonfigurasi sama sekali)
+  tidak pernah menghentikan workflow** — semua jalur notifikasi best-effort dan run tetap `completed`.
 - `UNIQUE(run_date)` → tidak auto-retry hari yang sama; tombol Retry manual.
 - Konkurensi: automation hanya *mengamati* status; shortlist/advance idempoten.
 
@@ -98,6 +99,17 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
   melewati verify/scoring dan berhenti di `awaiting_selection`; `approveArticleAndPublish`
   admin-gated dan tidak mewajibkan cover; worker image auto-cover hanya sampai `prompt_ready`
   (belum render); tidak ada integrasi email sama sekali; pola config-by-table sudah mapan.
+- 2026-09-15 21:10:00 — Jaminan "workflow tetap jalan meski email gagal" (`3ea8827`).
+  Audit menemukan 4 jalur yang masih bisa melempar dan menghentikan tick: `resolveResendKey`
+  (RPC jaringan), `resolveRecipients` (query profiles), `productLabel` (query produk), dan
+  `loadArticleLinks` (query artikel) — semuanya di luar try/catch `sendViaResend`. Fix:
+  (1) satu fungsi `deliver()` yang membungkus semua pengiriman dan selalu mengembalikan
+  `SendResult`; (2) `resolveResendKey`/`resolveRecipients`/`productLabel` anti-throw (fallback
+  `null`/`[]`/`'(produk)'`); (3) blok notifikasi `draft_ready`, `published`, dan `notifyFailure`
+  dibungkus try/catch dan dicatat `warn` ke `content_research_logs`; (4) render payload juga
+  ter-guard. Efek: run selalu maju ke `completed` setelah publish, apa pun nasib emailnya;
+  `notify_on='none'` pun tetap berjalan. +5 test (10 → 15 email test). Gate: typecheck ✓ lint ✓
+  **662 tests** ✓ build ✓.
 - 2026-09-15 20:12:00 — Hardening pasca-review sendiri (commit `d220acb`): (1) insert
   `automation_runs` gagal tidak lagi meninggalkan sesi orphan — sesi dibuang bila kalah balapan
   `UNIQUE(run_date)`, atau ditandai `failed` bila error lain; (2) **bug retry**: `cover_started_at`
