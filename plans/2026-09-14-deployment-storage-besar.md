@@ -102,7 +102,7 @@ Tidak termasuk:
   - **SEMANTIK PENTING (terbalik dari CI biasa): exit 0 = SKIP build, non-zero = LANJUTKAN build.** Jadi ada file non-docs berubah → `exit 1` → build jalan; hanya docs (`*.md`, `plans/`, `.memory/`, `.github/`) berubah → `exit 0` → build di-skip.
   - Uji dua arah, keduanya wajib: (a) commit docs-only → deployment harus `Canceled`; (b) commit `src/` → harus `Ready`. Bila terbalik, perbaiki perintah, jangan lanjut sebelum benar.
   - Efek yang diharapkan: commit rutin `docs(memory)` / `docs(plan)` / `chore(data)` tidak lagi menambah deployment production.
-- [ ] **T5 — Verifikasi akhir, gate, commit + push (aturan repo `AGENTS.md`)**
+- [x] **T5 — Verifikasi akhir, gate, commit + push (aturan repo `AGENTS.md`)**
   - Verifikasi: `vercel ls` (count kecil), dashboard Deployment Storage < 1 GB, tidak ada preview deploy sisa dari pengukuran T3.
   - Gate (final — SETIAP edit setelah gate hijau, sekecil apa pun, MEMBATALKAN gate dan wajib re-run): `npm run typecheck`, `npm run lint`, `npm test` harus hijau.
   - Sebelum commit: `git status --short`, `git diff`, `git log --oneline -10`; stage hanya file yang dimaksud (`.vercelignore`, `next.config.ts`, `package.json` + lock bila T3 memindahkan `sharp`, file plan ini bila belum ter-commit).
@@ -130,6 +130,8 @@ Tidak termasuk:
 - 2026-09-15 — INSIDEN `.vercelignore`: pola tak-berjangkar `supabase/` ikut mengecualikan `src/lib/supabase/` (semantik gitignore cocok di semua level) → build preview gagal `module-not-found @/lib/supabase/server`. Diperbaiki dengan menjangkarkan semua pola direktori ke root (`/supabase/` dkk.); pola file (`*.test.*`, `vitest.*`, `*.tsbuildinfo`) sengaja tak-berjangkar. Preview gagal (`fvsrea1rm`) sudah dihapus. Pelajaran: pola ignore direktori wajib leading-slash bila maksudnya root-only.
 - 2026-09-15 — T3 selesai dengan koreksi: `sharp` ternyata SUDAH di `devDependencies` (premisi plan keliru) → tidak ada pemindahan. `experimental.optimizePackageImports: ['lucide-react', 'apexcharts']` ditambah ke `next.config.ts`; build lokal hijau. Pengukuran 1 preview deploy: 178.85 MB vs baseline 178.89 MB (≈ nol) — lambda didominasi runtime Next + next-intl + supabase, bukan barrel lucide. Preview ukur (`327iwvziu`) sudah dihapus. `outputFileTracingExcludes` TIDAK ditambahkan (gain ekspektasi kecil, risiko regresi).
 - 2026-09-15 — Sampingan: `vercel link` menyuntik `VERCEL_OIDC_TOKEN` ke `.env.local`; baris tersebut sudah dihapus kembali (file gitignored, tidak pernah di-commit).
+- 2026-09-15 — T5: gate hijau (`typecheck`, `lint`, 583 tests/68 files — naik karena test baru sesi paralel). Commit `71b8ab7` (`.vercelignore` + plan) di-push; seperti diprediksi memicu 1 production deploy baru (`brtvt5vtq`, ukur produksi: 95 outputs ≈ 178.89 MB — identik baseline, konfirmasi `optimizePackageImports` ≈ nol gain pada lambda). Setelah alias pindah ke `brtvt5vtq`, `qqmx593b6` dihapus → count kembali 2 (`brtvt5vtq` production + `n7tepozr7`).
+- 2026-09-15 — T4 BELUM dikerjakan (manual dashboard oleh user) — PENTING: setiap push ke `main` (termasuk commit plan ini) menambah ±178 MB. Minta user set Ignore Build Step SEGERA (perintah + uji dua arah ada di T4), lalu hapus deployment yang tergeser agar count tetap 2.
 
 ## Notes
 
