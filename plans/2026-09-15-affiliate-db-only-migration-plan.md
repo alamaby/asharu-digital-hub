@@ -310,20 +310,20 @@ hash + pesan + file kunci).
 
 ## Tasks
 
-- [ ] M1.1 Migrasi `is_featured` + index + backfill tepat 6 (submodule dulu)
-- [ ] M1.2 Bucket `affiliate-images` public + policy (read publik, tulis service-only)
-- [ ] M1.3 `images.remotePatterns` Storage di `next.config.ts` (CSP tetap)
-- [ ] M2.1 Scraper upload WebP ke Storage (skip-if-exists, tanpa fallback remote)
-- [ ] M2.2 Payload upsert + `is_featured` + `COMPARE_KEYS`; file interim deprecated
-- [ ] M2.3 Workflow checks ke DB + `concurrency.group` (step Commit tetap interim)
-- [ ] M3.1 Modul baru `src/lib/affiliate/public.ts` (`anonClient`, mapper ASH-XXX)
-- [ ] M3.2 Skema `image` union transisi di `src/data/schemas.ts`
-- [ ] M3.3 `products/page.tsx` + home ke DB + `revalidate = 3600`
-- [ ] M3.4 Rewrite `data.integrity.test.ts` + `jsonld.test.ts` hermetik
-- [ ] M3.5 Update `README.md` bagian scraper
-- [ ] M4.1 Scrape fresh penuh + verifikasi SQL (storage_img == active, featured == 6)
-- [ ] M4.2 Hapus file/dir obsolete + hapus step Commit workflow + union Storage-only
-- [ ] M4.3 GC orphan Storage + advisors + entri memori + commit/push per AGENTS.md
+- [x] M1.1 Migrasi `is_featured` + index + backfill tepat 6 (submodule dulu, applied prod)
+- [x] M1.2 Bucket `affiliate-images` public + policy (read publik, tulis service-only)
+- [x] M1.3 `images.remotePatterns` Storage di `next.config.ts` (CSP tidak berubah)
+- [x] M2.1 Scraper upload WebP ke Storage (skip-if-exists, tanpa fallback remote)
+- [x] M2.2 Payload upsert + `is_featured` + `COMPARE_KEYS`; `renderDataFile` `@deprecated` (interim tetap jalan)
+- [x] M2.3 Workflow checks ke DB + `concurrency.group` (step Commit **sudah dihapus**)
+- [x] M3.1 Modul baru `src/lib/affiliate/public.ts` (`anonClient`, mapper ASH-XXX)
+- [x] M3.2 Skema `image` union transisi di `src/data/schemas.ts`
+- [x] M3.3 `products/page.tsx` + home ke DB + `revalidate = 3600`
+- [x] M3.4 Rewrite `data.integrity.test.ts` + `jsonld.test.ts` hermetik
+- [x] M3.5 Update `README.md` bagian scraper + arsitektur
+- [ ] M4.1 Scrape fresh penuh — **BLOCKED lokal** (`collshp.com` 503); butuh CI `workflow_dispatch`
+- [ ] M4.2 Hapus file/dir obsolete (`affiliate-products.ts`, `public/images/products/affiliate/`, `seed-affiliate-from-file.mjs`, `renderDataFile`) — menunggu M4.1 agar tidak broken image; step Commit workflow **sudah** dihapus
+- [ ] M4.3 GC orphan Storage + advisors verify + commit akhir — menunggu bucket terisi post-scrape
 
 ## Risks
 
