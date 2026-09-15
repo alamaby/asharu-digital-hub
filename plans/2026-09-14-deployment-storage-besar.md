@@ -41,7 +41,7 @@ Tidak termasuk:
 
 ## Tasks
 
-- [ ] **T0 — Verifikasi awal (read-only, jangan hapus apa pun dulu)**
+- [x] **T0 — Verifikasi awal (read-only, jangan hapus apa pun dulu)**
   - `vercel whoami` dan `vercel project ls` untuk konfirmasi scope `alam-aby-bashits-projects` dan proyek `asharu-digital-hub`.
   - `vercel ls asharu-digital-hub --json --limit 100` simpan ke file temp (contoh: `$env:TEMP\deps1.json`); hitung jumlah deployment. Bila output meminta paginasi (`--next <token>`), ulangi sampai semua halaman terambil dan gabungkan.
   - `vercel inspect <url-deployment-terbaru> --json` simpan ke file temp, hitung total ukuran output dengan skrip kecil (simpan sebagai file `.py` di temp agar aman dari quoting PowerShell):
@@ -54,13 +54,13 @@ Tidak termasuk:
     print("total_MB:", round(tot / 1000000, 2))
     ```
   - Catat baseline di Progress Log: jumlah deployment, total MB per deploy, angka dashboard Usage → Deployment Storage.
-- [ ] **T1 — Hapus deployment lama, sisakan 2 (DESTRUKTIF, baca semua sub-poin dulu)**
+- [x] **T1 — Hapus deployment lama, sisakan 2 (DESTRUKTIF, baca semua sub-poin dulu)**
   - Aturan keep: **2 deployment dengan `createdAt` terbesar**. JANGAN hardcode URL dari analisa lama — tiap push menggeser posisi, jadi re-list saat eksekusi.
   - Sebelum menghapus: `vercel inspect <url> --json` pada kandidat yang dipertahankan, pastikan salah satunya memegang alias production (`asharu.id`, `www.asharu.id`, `asharu-digital-hub.vercel.app`). Kasus tepi: bila deployment ber-alias TIDAK termasuk 2 terbaru (mis. deploy terbaru gagal), pertahankan deployment ber-alias + 1 terbaru, dan catat penyimpangan di Progress Log.
   - Hapus sisanya satu per satu dengan `vercel remove <url-deployment> --yes`, batch ±20, lalu re-list tiap batch. Jalankan `vercel remove --help` dulu untuk konfirmasi flag persis pada versi CLI yang terpasang; jangan memakai flag destruktif lain.
   - Larangan: jangan hapus deployment yang masih memegang alias production; jangan menyentuh proyek lain (`albot`, `bagistruk`, landing pages, dll.).
   - Acceptance: `vercel ls asharu-digital-hub` hanya menampilkan ~2 deployment production (+ deployment baru bila ada push selama eksekusi); dashboard Usage → Deployment Storage turun ke kisaran < 1 GB setelah label "Updated just now" (estimasi: 2 × ~178 MB ≈ 0.36 GB sebelum kompresi Vercel). Tunggu/refresh bila angka belum turun.
-- [ ] **T2 — Buat `.vercelignore` di root repo (file baru)**
+- [x] **T2 — Buat `.vercelignore` di root repo (file baru)**
   - Isi persis:
     ```
     # Dokumen & memori kerja — tidak dibutuhkan runtime/build
@@ -83,7 +83,7 @@ Tidak termasuk:
     ```
   - Verifikasi: `npm run build` sukses; `git status --short` hanya menampilkan `.vercelignore` (untracked) sebagai perubahan terkait tugas ini.
   - Bila build gagal karena ada impor dari path yang di-ignore: kecilkan daftar (hapus baris penyebab), ulangi build, catat di Progress Log. Jangan force.
-- [ ] **T3 — Optimasi bundle di `next.config.ts` + investigasi `sharp`**
+- [x] **T3 — Optimasi bundle di `next.config.ts` + investigasi `sharp`**
   - Investigasi `sharp` dulu (saat ini di `dependencies`, `package.json:49`): cari impor runtime-nya di `src/` (contoh: pola `from "sharp"` / `require("sharp")`). Bila tidak ada impor runtime (hanya dipakai tooling/dev) → pindahkan ke `devDependencies` dan sinkronkan lockfile (`npm install`), lalu `npm run build`. Bila dipakai route runtime → BIARKAN dan catat alasannya di Progress Log (jangan pindah).
   - Tambahkan ke `nextConfig` (`next.config.ts:63-75`):
     ```ts
@@ -124,6 +124,12 @@ Tidak termasuk:
 
 - 2026-09-14 13:28:04 — Analisa selesai di Plan Mode: 95 lambda × ~2.07 MB ≈ 178 MB/deploy; ~12 deploy/hari (218 commit/18 hari) menumpuk jadi 4.87 GB. User memutuskan: sisakan 2 deployment, setuju `.vercelignore` + Ignore Build Step, media tetap di `public/`.
 - 2026-09-14 13:28:04 — File plan ini dibuat untuk diimplementasikan model kecil; belum ada eksekusi (T0–T5 masih `- [ ]`).
+- 2026-09-15 — T0 selesai: 214 deployment unik (3 halaman), 95 outputs × ~2.07 MB ≈ 178.89 MB/deploy, alias production (`asharu.id`) di deployment terbaru.
+- 2026-09-15 — T1 selesai: 214 → 2 deployment (212 dihapus via `vercel remove --safe --yes` batch, 0 gagal — 1 FAIL semu adalah penghapusan uji yang sudah terhapus). Selama eksekusi 2 push sesi paralel mendarat dan alias production berpindah 2 kali; aturan keep-2-terbaru + proteksi alias ditegakkan ulang tiap ronde. Akhir: `n7tepozr7` (production) + `qqmx593b6`, keduanya READY.
+- 2026-09-15 — T2 selesai: `.vercelignore` dibuat; `npm run build` lokal hijau setelah tabrakan build paralel sesi lain teratasi (tunggu PID selesai + rebuild).
+- 2026-09-15 — INSIDEN `.vercelignore`: pola tak-berjangkar `supabase/` ikut mengecualikan `src/lib/supabase/` (semantik gitignore cocok di semua level) → build preview gagal `module-not-found @/lib/supabase/server`. Diperbaiki dengan menjangkarkan semua pola direktori ke root (`/supabase/` dkk.); pola file (`*.test.*`, `vitest.*`, `*.tsbuildinfo`) sengaja tak-berjangkar. Preview gagal (`fvsrea1rm`) sudah dihapus. Pelajaran: pola ignore direktori wajib leading-slash bila maksudnya root-only.
+- 2026-09-15 — T3 selesai dengan koreksi: `sharp` ternyata SUDAH di `devDependencies` (premisi plan keliru) → tidak ada pemindahan. `experimental.optimizePackageImports: ['lucide-react', 'apexcharts']` ditambah ke `next.config.ts`; build lokal hijau. Pengukuran 1 preview deploy: 178.85 MB vs baseline 178.89 MB (≈ nol) — lambda didominasi runtime Next + next-intl + supabase, bukan barrel lucide. Preview ukur (`327iwvziu`) sudah dihapus. `outputFileTracingExcludes` TIDAK ditambahkan (gain ekspektasi kecil, risiko regresi).
+- 2026-09-15 — Sampingan: `vercel link` menyuntik `VERCEL_OIDC_TOKEN` ke `.env.local`; baris tersebut sudah dihapus kembali (file gitignored, tidak pernah di-commit).
 
 ## Notes
 

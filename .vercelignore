@@ -1,0 +1,22 @@
+# Pola direktori di-jangkar ke root (leading slash): tanpa ini, pola
+# seperti "supabase/" juga mengecualikan src/lib/supabase/ yang dipakai
+# runtime (insiden 2026-09-15: build preview gagal module-not-found
+# @/lib/supabase/server). Lihat Progress Log plan deployment-storage.
+# Dokumen & memori kerja — tidak dibutuhkan runtime/build
+/plans/
+/.memory/
+/.openchamber/
+/.zcode/
+# Submodule supabase di root (migrasi/seed DB) — tidak diimpor build Next.js.
+# Terverifikasi 2026-09-14: seluruh impor di src/ memakai @supabase/*
+# atau @/lib/supabase/* (src/lib/supabase/), bukan submodule ini.
+/supabase/
+# Utilitas & tooling lokal
+/scripts/
+/.github/
+# Artefak test & build lokal
+/coverage/
+# File test & config vitest di level mana pun (hanya dipakai saat test)
+*.test.*
+vitest.*
+*.tsbuildinfo
