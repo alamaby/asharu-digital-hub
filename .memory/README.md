@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-15 18:10 (local time)
+Last updated: 2026-09-15 16:36 (local time)
 
 ## Current State
 
@@ -56,6 +56,7 @@ Last updated: 2026-09-15 18:10 (local time)
 
 ## Recent Entries
 
+- [163500-riset-tambah-platform-rerun.md](2026-09-15/163500-riset-tambah-platform-rerun.md) — Admin bisa menambah platform yang belum dipilih pada sesi `completed`/`failed` (`/admin/riset/[sessionId]`) lalu rerun tahap `developing` saja: modul murni `platform-additions.ts` (effective ∪ active-minus + normalisasi `platform_slugs`) + action `addPlatformsAndRerun` (guard status/shortlisted, back-date agar cron memungut, tanpa LLM inline) + komponen `AddPlatformRerun` + 10 key i18n; idempotensi per-pasangan dari `runDevelopment` mencegah duplikat draf. Tanpa migrasi. Gate typecheck ✓ lint ✓ test 618/618 ✓ build ✓.
 - [134500-artikel-inline-fullwidth.md](2026-09-15/134500-artikel-inline-fullwidth.md) — Feedback screenshot: inline 48px → figure full-width + caption (`max-h-96 object-contain`). Runtime `next start` → HTTP 200, figure=1. Gate typecheck ✓ lint ✓ test 610/610 ✓ build ✓. [USER ACTION] Tunggu deploy → cek visual live.
 - [131700-artikel-rsc-digest-fix.md](2026-09-15/131700-artikel-rsc-digest-fix.md) — Fix live digest 1391377559 (`onError` di Server Component): island client `AffiliateImage` untuk panel + inline. Pelajaran: build hijau tak menjamin runtime ISR; verifikasi via `next start` → HTTP 200. Gate typecheck ✓ lint ✓ test 610/610 ✓ build ✓. [USER ACTION] Tunggu deploy → buka artikel live.
 - [130600-artikel-gambar-inline-panel.md](2026-09-15/130600-artikel-gambar-inline-panel.md) — Eksekusi plan gambar produk artikel (T0–T5): panel selalu render img + fallback placeholder sekali-guard; thumbnail `size-12` di paragraf ber-URL afiliasi. Diagnosis: `dfa8127` hanya docs plan, kode tak pernah ditulis; scrape hijau → 240/240 Storage (panel sembuh via data). Gate typecheck ✓ lint ✓ test 608/608 ✓ build ✓. [USER ACTION] Verifikasi live pasca-deploy.

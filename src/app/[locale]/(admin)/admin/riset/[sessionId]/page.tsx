@@ -15,11 +15,13 @@ import { ResearchLogItem } from '@/components/admin/ResearchLogItem';
 import { ResearchPerfCharts } from '@/components/admin/ResearchPerfCharts';
 import { ResearchParams } from '@/components/admin/ResearchParams';
 import { FixedProductCard } from '@/components/admin/FixedProductCard';
+import { AddPlatformRerun } from '@/components/admin/AddPlatformRerun';
 import { summarizeLlmLogs, summarizeSearchLogs } from '@/lib/research/perf-summary';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
 import { previewAffiliateMatches } from '@/lib/research/affiliate';
 import { sortDrafts, paginateDrafts, DRAFT_PAGE_SIZE } from '@/lib/research/draft-list';
+import { computeAddablePlatforms, resolveEffectivePlatforms } from '@/lib/research/platform-additions';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -168,6 +170,26 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
   const draftQueryBase = { logSort: sp.logSort, logLevel: sp.logLevel, logStage: sp.logStage, logPage: sp.logPage, draftSort: sp.draftSort };
 
   const list = (topics ?? []) as TopicRow[];
+
+  // Platform yang belum pernah dipilih sesi ini — untuk "Tambah platform &
+  // proses ulang" pada sesi completed/failed. Diambil dari platform aktif minus
+  // platform efektif (platform_slugs ∪ platform_slug ∪ platform draf nyata).
+  let addablePlatforms: { slug: string; display_name: string }[] = [];
+  if (s.status === 'completed' || s.status === 'failed') {
+    const { data: activePlatformRows } = await supabase
+      .from('platforms')
+      .select('slug, display_name')
+      .eq('is_active', true)
+      .order('slug');
+    const effective = resolveEffectivePlatforms(
+      s,
+      draftList.map((d) => d.platform_slug)
+    );
+    addablePlatforms = computeAddablePlatforms(
+      effective,
+      (activePlatformRows ?? []) as { slug: string; display_name: string }[]
+    );
+  }
 
   // Label platform sesi: platform_slugs (multi/checklist) > platform_slug
   // tunggal > 'all'. Sesi lama (keduanya null) = Semua Platform (agnostik).
@@ -368,6 +390,10 @@ export default async function ResearchSessionPage({ params, searchParams }: Page
         </div>
       ) : (s.status === 'completed' || s.status === 'awaiting_selection') ? (
         <RetrySessionButton sessionId={sessionId} />
+      ) : null}
+
+      {s.status === 'completed' || s.status === 'failed' ? (
+        <AddPlatformRerun sessionId={sessionId} platforms={addablePlatforms} />
       ) : null}
 
       {s.status === 'awaiting_selection' && draftList.length === 0 ? (

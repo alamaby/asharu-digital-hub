@@ -8,6 +8,11 @@ import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { extractUrls } from '@/lib/utils/urls';
 import { RESEARCH_TEMPLATE_SLUGS, getResearchTemplateHint } from '@/lib/research/templates';
+import {
+  isRealPlatformSlug,
+  mergeSessionPlatforms,
+  resolveEffectivePlatforms
+} from '@/lib/research/platform-additions';
 
 const requestSchema = z.object({
   topic: z.string().min(10).max(500),
@@ -988,9 +993,127 @@ export async function advanceToDevelopment(
   }
 }
 
+const addPlatformsSchema = z.object({
+  sessionId: z.string().uuid(),
+  platforms: z.array(z.string().min(1)).min(1).max(20)
+});
+
+/**
+ * Tambahkan platform yang sebelumnya tidak dipilih pada sesi riset yang sudah
+ * `completed` atau `failed`, lalu jalankan ulang tahap `developing`.
+ *
+ * Hanya tahap `developing` yang diulang (topik, verifikasi, dan skor dipertahankan).
+ * `runDevelopment` sudah idempoten per pasangan (topik × platform × produk), jadi
+ * draf platform lama tidak digandakan — hanya pasangan platform baru yang dibuat.
+ * Proses dijalankan oleh cron (`advancePendingSessions`, guard 5 menit) seperti
+ * `advanceToDevelopment`; tidak ada panggilan LLM inline di server action ini.
+ */
+export async function addPlatformsAndRerun(
+  sessionId: string,
+  platforms: string[]
+): Promise<ResearchAdminResult> {
+  try {
+    const supabase = await assertAdmin();
+
+    const selected = [...new Set(platforms.map((s) => s.trim()))].filter(isRealPlatformSlug);
+    const parsed = addPlatformsSchema.safeParse({ sessionId, platforms: selected });
+    if (!parsed.success) {
+      return { success: false, error: 'Pilih minimal 1 platform valid (bukan "all")' };
+    }
+
+    const { data: session, error: sessionError } = await supabase
+      .from('content_research_sessions')
+      .select('id, status, platform_slug, platform_slugs')
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (sessionError) return { success: false, error: sessionError.message };
+    const sess = session as {
+      id: string;
+      status: string;
+      platform_slug: string | null;
+      platform_slugs: string[] | null;
+    } | null;
+    if (!sess) return { success: false, error: 'Riset tidak ditemukan' };
+    if (sess.status !== 'completed' && sess.status !== 'failed') {
+      return {
+        success: false,
+        error: `Status ${sess.status} tidak bisa ditambah platform (hanya completed/failed)`
+      };
+    }
+
+    // Platform draf ikut dihitung agar sesi agnostik lama ('all') tidak
+    // mengekspansi ulang semua platform aktif saat rerun.
+    const { data: draftRows } = await supabase
+      .from('content_drafts')
+      .select('platform_slug')
+      .eq('request_id', sessionId);
+    const draftSlugs = ((draftRows ?? []) as { platform_slug: string | null }[]).map((d) => d.platform_slug);
+    const effective = resolveEffectivePlatforms(sess, draftSlugs);
+
+    const { data: activeRows } = await supabase
+      .from('platforms')
+      .select('slug')
+      .eq('is_active', true);
+    const activeSlugs = new Set(((activeRows ?? []) as { slug: string }[]).map((p) => p.slug));
+    const unknown = selected.filter((s) => !activeSlugs.has(s));
+    if (unknown.length > 0) {
+      return { success: false, error: `Platform tidak valid atau nonaktif: ${unknown.join(', ')}` };
+    }
+    const alreadyCovered = selected.filter((s) => effective.includes(s));
+    if (alreadyCovered.length === selected.length) {
+      return { success: false, error: `Platform sudah ada di sesi ini: ${alreadyCovered.join(', ')}` };
+    }
+
+    // Tanpa topik shortlisted, runDevelopment akan langsung menandai sesi failed —
+    // arahkan admin ke Resume/Retry alih-alih membuat status menyesatkan.
+    const { count: shortlistedCount, error: countError } = await supabase
+      .from('content_research_topics')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('status', 'shortlisted');
+    if (countError) return { success: false, error: countError.message };
+    if (!shortlistedCount) {
+      return {
+        success: false,
+        error: 'Tidak ada topik shortlisted — pakai Resume/Retry lebih dulu, lalu tambah platform'
+      };
+    }
+
+    const { platform_slug, platform_slugs } = mergeSessionPlatforms(effective, selected);
+    const { data: updated, error: updateError } = await supabase
+      .from('content_research_sessions')
+      .update({
+        platform_slug,
+        platform_slugs,
+        status: 'developing',
+        error_message: null,
+        current_stage_started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .in('status', ['completed', 'failed'])
+      .select('id')
+      .maybeSingle();
+    if (updateError) return { success: false, error: updateError.message };
+    if (!updated) return { success: false, error: 'Status sesi berubah — refresh halaman lalu coba lagi' };
+
+    await supabase.from('content_research_logs').insert({
+      session_id: sessionId,
+      stage: 'developing',
+      level: 'info',
+      message: `admin added platform(s) ${selected.join(', ')} — rerun developing untuk ${shortlistedCount} topik shortlisted (platform efektif: ${platform_slugs.join(', ')})`
+    });
+    revalidatePath(`/admin/riset/${sessionId}`);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Admin actions: affiliate swap / remove                             */
 /* ------------------------------------------------------------------ */
+
 
 export interface AffiliateAdminResult {
   success: boolean;
