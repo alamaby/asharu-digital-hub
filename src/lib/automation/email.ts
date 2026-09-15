@@ -24,24 +24,26 @@ export interface SendResult {
 }
 
 /**
- * Resolve Resend API key: Vault `resend_api_key` (preferred, rotasi Dashboard)
- * → env `RESEND_API_KEY` (dev). Service-role client wajib untuk RPC.
+ * Resolve Resend API key. Urutan: Vault `resend_api_key` (sumber utama —
+ * rotasi lewat Dashboard tanpa deploy) → env `RESEND_API_KEY` (fallback
+ * lokal/dev saja). Service-role client wajib untuk RPC.
+ *
  * Tidak pernah melempar — RPC bisa gagal jaringan; caller memperlakukannya
  * sebagai "email di-skip", bukan error fatal bagi alur automation.
  */
 export async function resolveResendKey(supabase: SupabaseClient): Promise<string | null> {
   try {
-    const fromEnv = env.resendApiKey?.trim();
-    if (fromEnv) return fromEnv;
     const { data, error } = await supabase.rpc('vault_decrypt_secret_by_name', {
       p_name: 'resend_api_key'
     });
-    if (error) return null;
-    const key = typeof data === 'string' ? data.trim() : '';
-    return key || null;
+    if (!error) {
+      const fromVault = typeof data === 'string' ? data.trim() : '';
+      if (fromVault) return fromVault;
+    }
   } catch {
-    return null;
+    /* jatuh ke env */
   }
+  return env.resendApiKey?.trim() || null;
 }
 
 /** Kirim 1 email via Resend REST (tanpa dependency baru). */
