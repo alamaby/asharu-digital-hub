@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-16 09:56 (local time)
+Last updated: 2026-09-16 10:55 (local time)
 
 ## Current State
 
@@ -61,6 +61,8 @@ Last updated: 2026-09-16 09:56 (local time)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [105037-studio-enhance-field-aware.md](2026-09-16/105037-studio-enhance-field-aware.md) — Enhance prompt Studio kini sadar-field: Preset style/Template subjek/Camera angle dikirim sebagai input (opsi aktif + konteks terpilih ke LLM), LLM memilihkan slug untuk field Auto (divalidasi ke himpunan aktif, anti-halusinasi → null), negative prompt WAJIB (gate `requireNegative` + retry), diff 3 picker di side-by-side, Terima menerapkan slug, `maxTokens` 1000. Bug laten Undo (tombol di dalam panel yang tertutup) ikut diperbaiki. Gate 681 tests hijau, pushed `e48564e`.
 
 - [095606-visual-field-char-limits.md](2026-09-16/095606-visual-field-char-limits.md) — Counter batas karakter di form template visual (`/admin/visual` subjek + camera angle, add & detail): komponen `CharCount` + konstanta `visual-limits.ts` (display_name 100 client-side, slug 60, subject/angle 500 min 10); `visual-actions.ts` pakai konstanta bersama. Gate 674 tests hijau.
 
