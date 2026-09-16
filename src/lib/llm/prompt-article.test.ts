@@ -9,6 +9,7 @@ import {
   countArticleWords,
   findAffiliateSectionIndex,
   parseArticleDraft,
+  repairArticleJson,
   slugifyTitle,
   type ArticleLangDraft
 } from './prompt';
@@ -85,6 +86,44 @@ describe('parseArticleDraft', () => {
   it('null bila slug tak valid dan section kurang', () => {
     const bad = validLang({ slug: 'Slug Buruk!!', sections: [{ h2: 'a', body: 'b' }] });
     expect(parseArticleDraft(JSON.stringify({ id: bad, en: null }))).toBeNull();
+  });
+
+  it('salvage section yang kehilangan kurung tutup (kasus 87b9fdc1)', () => {
+    // Bentuk cacat persis dari expand 16 Sep: `...body"},{"h2":...` tanpa `}{`.
+    const malformed =
+      '```json\n' +
+      JSON.stringify({ id: validLang(), en: null }).replace(/\},\{"h2":/g, ',"h2":') +
+      '\n```';
+    // Duplicate key = JSON "valid" tapi section kolaps jadi 1 (perilaku insiden).
+    const strict = JSON.parse(malformed.replace(/^```json\n|\n```$/g, '')) as {
+      id: { sections: unknown[] };
+    };
+    expect(strict.id.sections).toHaveLength(1);
+    const parsed = parseArticleDraft(malformed);
+    expect(parsed?.id?.sections).toHaveLength(4);
+    expect(parsed?.id?.sections.map((s) => s.h2)).toEqual(
+      validLang().sections.map((s) => s.h2)
+    );
+  });
+
+  it('salvage trailing comma sebelum penutup objek', () => {
+    const raw = JSON.stringify({ id: validLang(), en: null });
+    expect(parseArticleDraft(raw)?.id).not.toBeNull();
+    expect(repairArticleJson(raw.replace(/\}$/, ',}'))).not.toBeNull();
+  });
+});
+
+describe('repairArticleJson', () => {
+  it('valid JSON dikembalikan tanpa diubah', () => {
+    const raw = JSON.stringify({ id: validLang(), en: null });
+    const repaired = repairArticleJson(raw);
+    expect((repaired?.id as { slug: string })?.slug).toBe('tips-memilih-keyboard-mekanik-wfh');
+  });
+
+  it('null untuk input bukan objek / sampah', () => {
+    expect(repairArticleJson('bukan json')).toBeNull();
+    expect(repairArticleJson('[1,2,3]')).toBeNull();
+    expect(repairArticleJson('')).toBeNull();
   });
 });
 

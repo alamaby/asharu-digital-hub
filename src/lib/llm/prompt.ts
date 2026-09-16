@@ -291,6 +291,7 @@ export function buildArticlePrompt(
     'You write long-form articles that rank on Google: clear H1-title, scannable H2 sections, FAQ, natural affiliate mention.',
     'Rules:',
     '- Output JSON ONLY with shape: {"id": <article|null>, "en": <article|null>} where <article> = {"title":"...","slug":"...","excerpt":"...","sections":[{"h2":"...","body":"..."}],"faq":[{"q":"...","a":"..."}],"meta_title":"...","meta_desc":"..."}',
+    '- JSON HARUS VALID (akan di-parse mesin): tiap elemen `sections` adalah objek `{"h2":"...","body":"..."}` yang berdiri sendiri, dipisah `},{` (contoh: `..."},{"h2":"...`). Jangan menggabung beberapa section dalam satu objek; jangan ada trailing comma; jangan ada teks di luar JSON.',
     '- PANJANG (WAJIB, anti thin-content): total isi (excerpt + semua body section) 800-1500 kata per bahasa. Tiap section body 150-300 kata — hitung sendiri sebelum output (±1 kata ≈ 5-6 karakter; 150 kata ≈ 900+ karakter). 4-7 sections berarti total body ≥ 600 kata SELALU. Jangan berhenti dini: bila total masih < 800 kata, tambah contoh konkret, tips praktis, atau sub-poin sampai cukup. Jangan bertele-tele, tiap paragraf menambah informasi baru.',
     '- EMOJI (WAJIB, natural): excerpt memuat 1 emoji relevan + tiap section body memuat TEPAT 1 emoji relevan yang inline menyatu dengan kalimat (mis. di akhir kalimat pembuka). Emoji harus berkaitan dengan isi; jangan mengganti kata dengan emoji; jangan lebih dari 1 per section agar tetap pantas untuk SEO.',
     '- STRUKTUR: title = H1 yang memancing klik (10-70 karakter, masukkan keyword utama). excerpt 50-160 kata sebagai pengantar. sections = jawaban bertahap dari umum ke spesifik, H2 deskriptif (bukan "Pendahuluan"/"Kesimpulan" yang generik). faq 3-5 pasang Q&A yang benar-benar ditanyakan orang.',
@@ -395,23 +396,82 @@ function parseArticleLang(raw: unknown): ArticleLangDraft | null {
   };
 }
 
+function stripCodeFence(text: string): string {
+  return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+}
+
+/** JSON.parse yang hanya menerima objek (bukan array/primitif). */
+function tryParseObject(text: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Jumlah elemen array `sections` pada kedua bahasa (0 bila tak ada). */
+function countArticleSections(parsed: Record<string, unknown> | null): number {
+  if (!parsed) return 0;
+  let total = 0;
+  for (const lang of ['id', 'en'] as const) {
+    const a = parsed[lang] as { sections?: unknown } | null | undefined;
+    if (a && Array.isArray(a.sections)) total += a.sections.length;
+  }
+  return total;
+}
+
+/**
+ * Salvage output JSON artikel yang cacat namun "hampir valid". Kasus nyata
+ * 16 Sep 2026 (`87b9fdc1`): elemen `sections` kehilangan kurung tutup sehingga
+ * body diikuti `","h2":` alih-alih `"},{"h2":` — `sections` ter-parse jadi 1
+ * elemen lalu ditolak validasi (butuh >=3). Reparasi bersifat konservatif:
+ * versi repair hanya dimenangkan bila sections-nya lebih banyak, dan hasil
+ * akhir tetap divalidasi `parseArticleLang`.
+ */
+export function repairArticleJson(text: string): Record<string, unknown> | null {
+  const cleaned = stripCodeFence(text);
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  const candidate = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+
+  const direct = tryParseObject(candidate);
+
+  // Tanda section kolaps: body ditutup lalu key `h2` baru tanpa `}{`
+  // (`...body...","h2":...`). Duplicate key = JSON "valid" sehingga
+  // `JSON.parse` sukses tapi sections menyusut (kasus 87b9fdc1: 5→1) —
+  // repair WAJIB dicoba walau parse ketat tidak melempar.
+  let repaired: Record<string, unknown> | null = null;
+  if (/",\s*"h2"\s*:/.test(candidate)) {
+    repaired = tryParseObject(candidate.replace(/",(\s*)"h2"(\s*):/g, '"},$1{"h2"$2:'));
+  }
+  // Menangkan hasil dengan sections terbanyak; seri → versi sentuhan-minimal.
+  if (repaired && countArticleSections(repaired) > countArticleSections(direct)) {
+    return repaired;
+  }
+  if (direct) return direct;
+  if (repaired) return repaired;
+
+  // Fallback umum bila keduanya gagal.
+  const transforms: Array<(s: string) => string> = [
+    // Dua objek berdempet tanpa koma: `}{` → `},{`.
+    (s) => s.replace(/}\s*{/g, '},{'),
+    // Trailing comma sebelum penutup.
+    (s) => s.replace(/,\s*([}\]])/g, '$1')
+  ];
+  let current = candidate;
+  for (const transform of transforms) {
+    current = transform(current);
+    const parsed = tryParseObject(current);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 /** Parse output LLM menjadi draf artikel. Null bila struktur tidak valid. */
 export function parseArticleDraft(text: string): ParsedArticleDraft | null {
-  let parsed: Record<string, unknown> | null = null;
-  try {
-    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    parsed = JSON.parse(cleaned) as Record<string, unknown>;
-  } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (m) {
-      try {
-        parsed = JSON.parse(m[0]) as Record<string, unknown>;
-      } catch {
-        parsed = null;
-      }
-    }
-  }
-  if (!parsed || typeof parsed !== 'object') return null;
+  const parsed = repairArticleJson(text);
+  if (!parsed) return null;
   const id = parseArticleLang(parsed.id);
   const en = parseArticleLang(parsed.en);
   if (!id && !en) return null;
@@ -493,6 +553,7 @@ export function buildArticleExpandPrompt(
     'TASK: EXPAND artikel long-form di bawah yang THIN (di bawah minimum kata) hingga 800-1500 kata per bahasa.',
     'Rules:',
     '- Output JSON ONLY dengan shape yang SAMA PERSIS seperti input ({"id": <article|null>, "en": <article|null>} — field dan slug TIDAK BOLEH berubah).',
+    '- JSON HARUS VALID (akan di-parse mesin): tiap elemen `sections` adalah objek `{"h2":"...","body":"..."}` yang berdiri sendiri, dipisah `},{`. Jangan menggabung beberapa section dalam satu objek; jangan ada trailing comma; jangan ada teks di luar JSON.',
     '- KEMBANGKAN tiap section body hingga 150-300 kata: tambah contoh konkret, tips praktis, detail use-case, atau sub-poin yang relevan — tiap kalimat baru menambah informasi, bukan pengulangan.',
     '- PERTAHANKAN: title, slug, H2, faq, meta, fakta/key-facts, CTA, dan 1 sisipan {{PRODUCT_URL}} + NAMA PRODUK di section yang sama (jangan pindah/tambah/kurangi). Jangan mengarang data, angka, harga, atau klaim medis/finansial baru.',
     '- EMOJI: excerpt 1 emoji relevan + tiap section body TEPAT 1 emoji relevan inline (jangan ganti kata dengan emoji).',

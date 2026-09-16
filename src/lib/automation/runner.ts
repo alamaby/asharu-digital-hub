@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/env';
+import { ARTICLE_MIN_WORDS } from '@/lib/llm/prompt';
 import { publishArticleDraftCore } from '@/lib/articles/publish';
 import { loadAutomationConfig, resolveRecipients, resolveRunLocales, type AutomationConfig } from './config';
 import { isRunDue, localDateString, pickRandomProduct } from './scheduler';
@@ -111,11 +112,20 @@ async function productLabel(supabase: SupabaseClient, productId: string | null):
   }
 }
 
+interface SessionDraft {
+  id: string;
+  platform: string | null;
+  /** True bila `llm_meta.thin_content` (gate publish pasti menolak). */
+  thinContent: boolean;
+  /** Ringkasan `llm_meta.word_count` untuk pesan error, mis. `id:505`. */
+  words: string;
+}
+
 /** Draft per platform untuk sesi ini (terurut artikel → twitter → threads). */
 async function loadDrafts(
   supabase: SupabaseClient,
   sessionId: string
-): Promise<Array<{ id: string; platform: string | null }>> {
+): Promise<SessionDraft[]> {
   // Dua langkah (topik → draf), pola sama dengan research/development.ts —
   // menghindari filter embedded PostgREST yang rapuh.
   const { data: topics } = await supabase
@@ -126,12 +136,26 @@ async function loadDrafts(
   if (topicIds.length === 0) return [];
   const { data } = await supabase
     .from('content_drafts')
-    .select('id, platform_slug')
+    .select('id, platform_slug, llm_meta')
     .in('research_topic_id', topicIds);
-  const rows = ((data ?? []) as Array<{ id: string; platform_slug: string | null }>).map((r) => ({
-    id: r.id,
-    platform: r.platform_slug
-  }));
+  const rows = (
+    (data ?? []) as Array<{
+      id: string;
+      platform_slug: string | null;
+      llm_meta: { thin_content?: unknown; word_count?: unknown } | null;
+    }>
+  ).map((r) => {
+    const meta = r.llm_meta ?? {};
+    const wc = (meta.word_count ?? {}) as Record<string, unknown>;
+    return {
+      id: r.id,
+      platform: r.platform_slug,
+      thinContent: meta.thin_content === true,
+      words: Object.entries(wc)
+        .map(([l, w]) => `${l}:${w}`)
+        .join(', ')
+    };
+  });
   return rows.sort(
     (a, b) => PLATFORM_ORDER.indexOf(a.platform ?? '') - PLATFORM_ORDER.indexOf(b.platform ?? '')
   );
@@ -390,6 +414,23 @@ async function advanceRun(
         error_message: 'draf artikel tidak ditemukan setelah development'
       });
       await notifyFailure(supabase, cfg, run, 'developing', 'Draf artikel tidak ditemukan.');
+      return { status: 'failed', changed: true };
+    }
+    // Gate thin-content lebih awal (kasus 87b9fdc1): draf tipis deterministik
+    // ditolak gate publish — jangan bakar render cover + 3x publish yang sia-sia.
+    // `article_draft_id` tetap disimpan agar retry admin lanjut dari cover
+    // setelah draf dikembangkan manual di /konten/review.
+    if (articleDraft.thinContent) {
+      const msg =
+        `draf artikel thin content (${articleDraft.words || '?'} kata, minimum ${ARTICLE_MIN_WORDS}) — ` +
+        `kembangkan di /konten/review/${articleDraft.id} lalu publish manual atau retry run`;
+      await updateRun(supabase, run.id, {
+        status: 'failed',
+        error_message: msg,
+        article_draft_id: articleDraft.id
+      });
+      await log(supabase, sessionId, 'automation', 'error', msg);
+      await notifyFailure(supabase, cfg, run, 'developing', msg);
       return { status: 'failed', changed: true };
     }
     // Email "draft siap" (best-effort, sebelum publish). Kegagalan apa pun

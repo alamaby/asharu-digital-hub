@@ -259,3 +259,68 @@ describe('runAutomationTick (produk pool)', () => {
     expect(res.runDate).toBe('2026-09-16');
   });
 });
+
+describe('runAutomationTick (thin-content gate)', () => {
+  function thinTables(thinContent: boolean) {
+    return {
+      automation_configs: [baseConfig({ notify_on: 'none' })],
+      automation_runs: [
+        {
+          id: 'run1',
+          run_date: '2026-09-16',
+          status: 'developing',
+          attempts: 0,
+          session_id: 's1',
+          article_draft_id: null,
+          cover_attempts: 0,
+          cover_started_at: null,
+          draft_ready_notified_at: null,
+          published_at: null,
+          notified_at: null,
+          error_message: null
+        }
+      ],
+      content_research_sessions: [{ id: 's1', status: 'completed' }],
+      content_research_topics: [{ id: 't1', session_id: 's1' }],
+      content_drafts: [
+        {
+          id: 'd1',
+          research_topic_id: 't1',
+          platform_slug: 'artikel',
+          llm_meta: { thin_content: thinContent, word_count: { id: thinContent ? 505 : 910 } }
+        }
+      ],
+      content_draft_images: [],
+      content_research_logs: []
+    };
+  }
+
+  it('draf thin gagal cepat tanpa membakar cover/publish (kasus 87b9fdc1)', async () => {
+    const tables = thinTables(true);
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true, status: 'failed' });
+    const run = tables.automation_runs[0] as Record<string, unknown>;
+    expect(run.status).toBe('failed');
+    expect(run.article_draft_id).toBe('d1');
+    expect(String(run.error_message)).toMatch(/thin content/);
+    expect(String(run.error_message)).toMatch(/505/);
+    expect(String(run.error_message)).toMatch(/konten\/review\/d1/);
+    // Tanpa render cover: tidak ada baris image yang dienqueue.
+    expect(tables.content_draft_images).toHaveLength(0);
+  });
+
+  it('draf cukup kata lanjut ke awaiting_cover seperti biasa', async () => {
+    const tables = thinTables(false);
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true, status: 'awaiting_cover' });
+    const run = tables.automation_runs[0] as Record<string, unknown>;
+    expect(run.status).toBe('awaiting_cover');
+    expect(run.article_draft_id).toBe('d1');
+  });
+});

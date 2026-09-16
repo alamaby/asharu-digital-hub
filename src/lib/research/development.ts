@@ -961,8 +961,9 @@ async function generateArticleAndInsertDraft(
     return wc;
   };
 
-  // Repair thin-content 1x: kembangkan hingga ≥800 kata (pola repair emoji
-  // thread — kasus 419a2dc8: 488 kata lolos tanpa perlawanan).
+  // Repair thin-content hingga 2x: kembangkan hingga ≥800 kata (pola repair
+  // emoji thread — kasus 419a2dc8: 488 kata lolos tanpa perlawanan; kasus
+  // 87b9fdc1: expand 910 kata gagal diparse karena JSON cacat).
   let wordCount = countWords(workingArticle);
   let expanded = false;
   if (Object.values(wordCount).some((w) => w < ARTICLE_MIN_WORDS)) {
@@ -971,37 +972,55 @@ async function generateArticleAndInsertDraft(
       workingArticle,
       promptProduct
     );
-    const expandResult = await runLLMCompletion(supabase, {
-      requestId: null,
-      sessionId,
-      stage: 'developing',
-      providerId: devModel.providerId,
-      modelUuid: devModel.modelUuid,
-      messages: [
-        { role: 'system', content: expandPrompt.system },
-        { role: 'user', content: expandPrompt.user }
-      ],
-      temperature: 0.7,
-      maxTokens: 6000
-    }).catch(() => null);
-    const expandedParsed = expandResult ? parseArticleDraft(expandResult.output.text) : null;
-    if (expandedParsed && required.every((l) => expandedParsed[l])) {
-      workingArticle = expandedParsed;
-      activeLlm = expandResult;
-      expanded = true;
-      wordCount = countWords(workingArticle);
-      await supabase.from('content_research_logs').insert({
-        session_id: sessionId,
+    const runExpand = (attempt: number) =>
+      runLLMCompletion(supabase, {
+        requestId: null,
+        sessionId,
         stage: 'developing',
-        level: 'info',
-        message: `article topic ${topicId} expanded (thin repair): ${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata`
-      });
-    } else {
+        providerId: devModel.providerId,
+        modelUuid: devModel.modelUuid,
+        messages: [
+          { role: 'system', content: expandPrompt.system },
+          {
+            role: 'user',
+            content:
+              attempt === 0
+                ? expandPrompt.user
+                : `${expandPrompt.user}\n\nPENTING: output sebelumnya gagal diparse atau bahasa ${required.join('/')} tak lengkap. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan, SEMUA bahasa wajib terisi penuh.`
+          }
+        ],
+        temperature: attempt === 0 ? 0.7 : 0.3,
+        maxTokens: 6000
+      }).catch(() => null);
+    for (let attempt = 0; attempt < 2 && !expanded; attempt++) {
+      const expandResult = await runExpand(attempt);
+      const expandedParsed = expandResult ? parseArticleDraft(expandResult.output.text) : null;
+      if (expandedParsed && required.every((l) => expandedParsed[l])) {
+        workingArticle = expandedParsed;
+        activeLlm = expandResult;
+        expanded = true;
+        wordCount = countWords(workingArticle);
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'info',
+          message: `article topic ${topicId} expanded (thin repair${attempt > 0 ? ' retry' : ''}): ${Object.entries(wordCount).map(([l, w]) => `${l}:${w}`).join(', ')} kata`
+        });
+      } else if (attempt === 0) {
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'warn',
+          message: `article topic ${topicId} expand repair gagal diparse — coba sekali lagi`
+        });
+      }
+    }
+    if (!expanded) {
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'developing',
         level: 'warn',
-        message: `article topic ${topicId} expand repair gagal diparse — pakai draf awal`
+        message: `article topic ${topicId} expand repair gagal diparse 2x — pakai draf awal`
       });
     }
   }
