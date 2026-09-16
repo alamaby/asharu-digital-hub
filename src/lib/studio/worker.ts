@@ -17,7 +17,7 @@ import {
 } from '@/lib/image/types';
 import type { StudioConfig, StudioGenerationRow } from '@/lib/studio/types';
 import { DEFAULT_STUDIO_CONFIG } from '@/lib/studio/types';
-import { uploadUserImage, removeUserImage, fetchReferenceBytes } from '@/lib/studio/storage';
+import { uploadUserImageWithRetry, describeStorageError, removeUserImage, fetchReferenceBytes } from '@/lib/studio/storage';
 
 const MAX_ATTEMPTS = 3;
 
@@ -300,6 +300,18 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
     }
 
     let lastError: unknown = null;
+    // Fase 1 — generate + ambil bytes. Upload TIDAK di sini: kegagalan Storage
+    // bersifat infra, bukan kegagalan provider, jadi tidak boleh memicu
+    // fallback ke provider lain (biaya + hasil berbeda). Lihat RCA `c19c8d2f`.
+    let generated: {
+      provider: ImageProviderRow;
+      modelRow: ImageModelRow;
+      keySuffix: string | null;
+      bytes: Uint8Array;
+      mime: string;
+      width: number | null;
+      height: number | null;
+    } | null = null;
     for (const provider of providers) {
       let modelRow: ImageModelRow | null = null;
       if (provider.id === target.provider.id) {
@@ -345,23 +357,56 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
         } else {
           throw new Error(`${provider.slug} tidak mengembalikan bytes maupun url`);
         }
-        const { storagePath, publicUrl } = await uploadUserImage(row.user_id, imageId, bytes, mime);
-        await markImageModelUsage(modelRow.id);
-        await supabase
-          .from('user_image_generations')
-          .update({
-            status: 'ready',
-            provider_slug: provider.slug,
-            model_slug: modelRow.model_id,
-            storage_path: storagePath,
-            public_url: publicUrl,
-            width: result.width ?? null,
-            height: result.height ?? null,
-            last_error: null,
-            llm_meta: {
-            provider: provider.slug,
-            model: modelRow.model_id,
-            key_suffix: keyRow.key_suffix,
+        generated = {
+          provider,
+          modelRow,
+          keySuffix: keyRow.key_suffix,
+          bytes,
+          mime,
+          width: result.width ?? null,
+          height: result.height ?? null
+        };
+        break;
+      } catch (e) {
+        lastError = e;
+        if (e instanceof ImageHttpError && [401, 403, 429].includes(e.status)) {
+          await markImageModelFailure(modelRow.id);
+        }
+        continue;
+      }
+    }
+
+    if (!generated) {
+      const message = lastError instanceof Error ? lastError.message : String(lastError);
+      await failStudioImage(imageId, message);
+      return { imageId: null, error: message };
+    }
+
+    // Fase 2 — upload Storage (retry transient). Gagal di sini = failed jujur
+    // tanpa jatuh ke provider berikutnya.
+    try {
+      const { storagePath, publicUrl } = await uploadUserImageWithRetry(
+        row.user_id,
+        imageId,
+        generated.bytes,
+        generated.mime
+      );
+      await markImageModelUsage(generated.modelRow.id);
+      await supabase
+        .from('user_image_generations')
+        .update({
+          status: 'ready',
+          provider_slug: generated.provider.slug,
+          model_slug: generated.modelRow.model_id,
+          storage_path: storagePath,
+          public_url: publicUrl,
+          width: generated.width,
+          height: generated.height,
+          last_error: null,
+          llm_meta: {
+            provider: generated.provider.slug,
+            model: generated.modelRow.model_id,
+            key_suffix: generated.keySuffix,
             // Jejak audit: pin vs waterfall, agar hasil "bukan pilihan saya"
             // bisa dibedakan dari bug (kasus cloudflare→pixazo 11 Sep 2026).
             pinned: target.pinned,
@@ -371,21 +416,15 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
             reference: referenceB64 ? true : false,
             reference_strength: referenceB64 ? referenceStrength : null
           },
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', imageId);
-        return { imageId };
-      } catch (e) {
-        lastError = e;
-        if (e instanceof ImageHttpError && [401, 403, 429].includes(e.status)) {
-          await markImageModelFailure(modelRow.id);
-        }
-        continue;
-      }
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+      return { imageId };
+    } catch (e) {
+      const message = describeStorageError(e);
+      await failStudioImage(imageId, message);
+      return { imageId: null, error: message };
     }
-    const message = lastError instanceof Error ? lastError.message : String(lastError);
-    await failStudioImage(imageId, message);
-    return { imageId: null, error: message };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await failStudioImage(imageId, message);

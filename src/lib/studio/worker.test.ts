@@ -38,11 +38,16 @@ vi.mock('@/lib/image/storage', () => ({
   fetchRemoteImage: vi.fn(async () => ({ bytes: new Uint8Array([1]), mimeType: 'image/jpeg' }))
 }));
 
-vi.mock('@/lib/studio/storage', () => ({
-  uploadUserImage: vi.fn(async () => ({ storagePath: 'u/img.png', publicUrl: 'https://cdn.test/img.png' })),
-  removeUserImage: vi.fn(async () => {}),
-  fetchReferenceBytes: vi.fn(async () => ({ bytes: new Uint8Array([9, 9]), mimeType: 'image/jpeg' }))
-}));
+vi.mock('@/lib/studio/storage', async () => {
+  const actual = await vi.importActual<typeof import('./storage')>('./storage');
+  return {
+    StudioStorageError: actual.StudioStorageError,
+    describeStorageError: actual.describeStorageError,
+    uploadUserImageWithRetry: vi.fn(async () => ({ storagePath: 'u/img.png', publicUrl: 'https://cdn.test/img.png' })),
+    removeUserImage: vi.fn(async () => {}),
+    fetchReferenceBytes: vi.fn(async () => ({ bytes: new Uint8Array([9, 9]), mimeType: 'image/jpeg' }))
+  };
+});
 
 vi.mock('@/lib/image/config', () => ({
   markImageModelUsage: vi.fn(async () => {}),
@@ -239,5 +244,22 @@ describe('processOneStudioImage — strict-fail pin user', () => {
     expect(calls()).toEqual([]);
     const fin = finalStatus(updates)?.patch as Row;
     expect(fin.status).toBe('failed');
+  });
+
+  it('Auto: upload Storage gagal → failed jujur, provider kedua TIDAK dipanggil (kasus c19c8d2f)', async () => {
+    const { updates } = useSetup({});
+    const storage = await import('@/lib/studio/storage');
+    const { StudioStorageError } = storage;
+    vi.mocked(storage.uploadUserImageWithRetry).mockRejectedValueOnce(
+      new StudioStorageError('studio storage upload failed: upload gagal | HTTP 520', { status: 520 })
+    );
+    const res = await processOneStudioImage();
+    expect(res.imageId).toBeNull();
+    expect(res.error).toContain('HTTP 520');
+    // Hanya pixazo (generate sukses) — cloudflare tidak ikut dipanggil.
+    expect(calls()).toEqual(['pixazo']);
+    const fin = finalStatus(updates)?.patch as Row;
+    expect(fin.status).toBe('failed');
+    expect(String(fin.last_error)).toContain('HTTP 520');
   });
 });

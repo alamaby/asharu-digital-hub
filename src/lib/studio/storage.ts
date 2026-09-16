@@ -7,6 +7,67 @@ export const STUDIO_IMAGES_BUCKET = 'user-images';
 /** Prefix file referensi img2img (`ref/`) — bedakan dari hasil generate. */
 export const STUDIO_REFERENCE_PREFIX = 'ref';
 
+/**
+ * Error upload/generate Storage Studio yang membawa status HTTP + nama error
+ * asli service. Tanpa ini, `error.message` Storage bisa berisi `<none>`
+ * (kasus `c19c8d2f` 16 Sep 2026, HTTP 520) sehingga tak bisa didiagnosis.
+ */
+export class StudioStorageError extends Error {
+  readonly status?: number;
+  readonly statusCode?: string;
+  readonly storageError?: string;
+  readonly originalError?: unknown;
+
+  constructor(
+    message: string,
+    opts: { status?: number; statusCode?: string; storageError?: string; originalError?: unknown } = {}
+  ) {
+    super(message);
+    this.name = 'StudioStorageError';
+    this.status = opts.status;
+    this.statusCode = opts.statusCode;
+    this.storageError = opts.storageError;
+    this.originalError = opts.originalError;
+  }
+}
+
+/**
+ * Status HTTP yang layak dicoba ulang: 5xx (infra/gateway, mis. 520) dan
+ * 408/429 (timeout/throttle). 4xx lain (400/403/409) permanen — retry sia-sia.
+ */
+export function isTransientStorageError(error: unknown): boolean {
+  if (!(error instanceof StudioStorageError)) return false;
+  const status = error.status;
+  if (typeof status !== 'number') return true;
+  return status >= 500 || status === 408 || status === 429;
+}
+
+/** Deskripsi diagnostik: sertakan status + nama error Storage asli bila ada. */
+export function describeStorageError(error: unknown): string {
+  if (error instanceof StudioStorageError) {
+    const parts = [error.message];
+    if (typeof error.status === 'number') parts.push(`HTTP ${error.status}`);
+    if (error.statusCode) parts.push(`code=${error.statusCode}`);
+    if (error.storageError && error.storageError !== 'none') parts.push(`storage=${error.storageError}`);
+    return parts.join(' | ');
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Bungkus error Storage SDK → StudioStorageError (status + code + nama error). */
+function toStudioStorageError(error: unknown, prefix: string): StudioStorageError {
+  const e = error as { message?: string; status?: number; statusCode?: string; error?: string } | null;
+  const detail = e?.message && e.message !== 'none' ? e.message : '';
+  const storageError = typeof e?.error === 'string' ? e.error : undefined;
+  const label = storageError && storageError !== 'none' ? storageError : detail || 'upload gagal';
+  return new StudioStorageError(`${prefix}: ${label}`, {
+    status: typeof e?.status === 'number' ? e.status : undefined,
+    statusCode: typeof e?.statusCode === 'string' ? e.statusCode : undefined,
+    storageError,
+    originalError: error
+  });
+}
+
 /** Nama file referensi: UUID + ekstensi aman (tanpa path traversal). */
 const FRESH_REFERENCE_FILE_RE = /^[0-9a-fA-F-]{1,64}\.(jpg|jpeg|png|webp)$/;
 
@@ -68,10 +129,40 @@ export async function uploadUserImage(
   const { error } = await supabase.storage
     .from(STUDIO_IMAGES_BUCKET)
     .upload(storagePath, bytes, { contentType: mimeType, upsert: true });
-  if (error) throw new Error(`studio storage upload failed: ${error.message}`);
+  if (error) throw toStudioStorageError(error, 'studio storage upload failed');
   const { data } = supabase.storage.from(STUDIO_IMAGES_BUCKET).getPublicUrl(storagePath);
   if (!data?.publicUrl) throw new Error('studio storage getPublicUrl returned empty');
   return { storagePath, publicUrl: data.publicUrl };
+}
+
+/** Jeda backoff retry upload (ms) — 2 percobaan ulang setelah percobaan awal. */
+const UPLOAD_RETRY_DELAYS_MS = [400, 1200] as const;
+
+/**
+ * Upload hasil generate dengan retry berjenjang pada error TRANSIENT
+ * (5xx/408/429). Kasus `c19c8d2f` (16 Sep 2026): Storage membalas 520 sesaat
+ * setelah Pixazo berhasil generate — satu blip mematikan seluruh generate.
+ * Error permanen (400/403/409) tidak diulang: langsung dilempar.
+ */
+export async function uploadUserImageWithRetry(
+  userId: string,
+  imageId: string,
+  bytes: Uint8Array,
+  mimeType: string,
+  delaysMs: readonly number[] = UPLOAD_RETRY_DELAYS_MS
+): Promise<{ storagePath: string; publicUrl: string }> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
+    try {
+      return await uploadUserImage(userId, imageId, bytes, mimeType);
+    } catch (e) {
+      lastError = e;
+      const canRetry = attempt < delaysMs.length && isTransientStorageError(e);
+      if (!canRetry) throw e;
+      await new Promise((resolve) => setTimeout(resolve, delaysMs[attempt]));
+    }
+  }
+  throw lastError ?? new Error('studio storage upload failed: unknown');
 }
 
 /**
