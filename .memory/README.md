@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-16 09:00 (local time)
+Last updated: 2026-09-16 09:56 (local time)
 
 ## Current State
 
@@ -61,6 +61,8 @@ Last updated: 2026-09-16 09:00 (local time)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [095606-visual-field-char-limits.md](2026-09-16/095606-visual-field-char-limits.md) — Counter batas karakter di form template visual (`/admin/visual` subjek + camera angle, add & detail): komponen `CharCount` + konstanta `visual-limits.ts` (display_name 100 client-side, slug 60, subject/angle 500 min 10); `visual-actions.ts` pakai konstanta bersama. Gate 674 tests hijau.
 
 - [085500-produk-featured-order-isr.md](2026-09-16/085500-produk-featured-order-isr.md) — RCA `/id/produk` "masih produk lama": akar = `getActiveProducts()` urut `friendly_code ASC` tanpa limit, `ProductBrowser` hanya render 8 pertama → ASH-255 (featured terbaru) terkubur di posisi ~240. Fix: urut `is_featured DESC, created_at DESC` + endpoint `POST /api/revalidate/products` (Bearer `CRON_SECRET`) + step purge best-effort di workflow scrape (scraper menulis DB langsung, tanpa Server Action). Gate 670 tests + build hijau. [USER ACTION] Tambah `CRON_SECRET` ke GitHub Actions secrets.
 

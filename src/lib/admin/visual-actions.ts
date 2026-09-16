@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
+import { SLUG_MAX, SUBJECT_EN_MAX, SUBJECT_EN_MIN } from './visual-limits';
 import type { LlmActionResult } from './llm-actions';
 
 function fail(message: string): LlmActionResult {
@@ -23,7 +24,7 @@ function slugify(raw: string): string {
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
+    .slice(0, SLUG_MAX);
 }
 
 export interface SubjectRow {
@@ -40,7 +41,7 @@ export async function addSubject(formData: FormData): Promise<LlmActionResult> {
   const subjectEn = String(formData.get('subject_en') ?? '').trim();
   const slugRaw = String(formData.get('slug') ?? '').trim();
   if (!displayName) return fail('display_name required');
-  if (subjectEn.length < 10 || subjectEn.length > 500) return fail('subject_en 10–500 karakter');
+  if (subjectEn.length < SUBJECT_EN_MIN || subjectEn.length > SUBJECT_EN_MAX) return fail(`subject_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const slug = slugRaw ? slugify(slugRaw) : slugify(displayName);
   if (!slug) return fail('slug tidak valid');
   const { data: maxRow } = await supabase.from('image_subject_templates').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
@@ -60,7 +61,7 @@ export async function updateSubject(slug: string, formData: FormData): Promise<L
   const subjectEn = String(formData.get('subject_en') ?? '').trim();
   const sortOrder = Number(String(formData.get('sort_order') ?? '').trim());
   if (!displayName) return fail('display_name required');
-  if (subjectEn.length < 10 || subjectEn.length > 500) return fail('subject_en 10–500 karakter');
+  if (subjectEn.length < SUBJECT_EN_MIN || subjectEn.length > SUBJECT_EN_MAX) return fail(`subject_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const patch: Record<string, unknown> = { display_name: displayName, subject_en: subjectEn };
   if (Number.isFinite(sortOrder)) patch.sort_order = Math.floor(sortOrder);
   const { error } = await supabase.from('image_subject_templates').update(patch).eq('slug', slug);
@@ -121,7 +122,7 @@ export async function addCameraAngle(formData: FormData): Promise<LlmActionResul
   const angleEn = String(formData.get('angle_en') ?? '').trim();
   const slugRaw = String(formData.get('slug') ?? '').trim();
   if (!displayName) return failAngle('display_name required');
-  if (angleEn.length < 10 || angleEn.length > 500) return failAngle('angle_en 10–500 karakter');
+  if (angleEn.length < SUBJECT_EN_MIN || angleEn.length > SUBJECT_EN_MAX) return failAngle(`angle_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const slug = slugRaw ? slugify(slugRaw) : slugify(displayName);
   if (!slug) return failAngle('slug tidak valid');
   const { data: maxRow } = await supabase.from('image_camera_angles').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
@@ -140,7 +141,7 @@ export async function updateCameraAngle(slug: string, formData: FormData): Promi
   const angleEn = String(formData.get('angle_en') ?? '').trim();
   const sortOrder = Number(String(formData.get('sort_order') ?? '').trim());
   if (!displayName) return failAngle('display_name required');
-  if (angleEn.length < 10 || angleEn.length > 500) return failAngle('angle_en 10–500 karakter');
+  if (angleEn.length < SUBJECT_EN_MIN || angleEn.length > SUBJECT_EN_MAX) return failAngle(`angle_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const patch: Record<string, unknown> = { display_name: displayName, angle_en: angleEn };
   if (Number.isFinite(sortOrder)) patch.sort_order = Math.floor(sortOrder);
   const { error } = await supabase.from('image_camera_angles').update(patch).eq('slug', slug);
