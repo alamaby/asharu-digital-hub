@@ -111,7 +111,7 @@ function baseConfig(over: Row = {}): Row {
     max_retry_attempts: 3,
     notify_on: 'none',
     notify_emails: [],
-    email_from: 'Asharu <notifikasi@asharu.id>',
+    email_from: 'Asharu <updates@alamaby.com>',
     email_reply_to: null,
     ...over
   };

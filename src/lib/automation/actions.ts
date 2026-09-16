@@ -80,7 +80,7 @@ export async function updateAutomationConfig(formData: FormData): Promise<void> 
       max_retry_attempts: num(formData, 'max_retry_attempts', 3),
       notify_on: str(formData, 'notify_on') ?? 'both',
       notify_emails: csv(formData, 'notify_emails'),
-      email_from: str(formData, 'email_from') ?? 'Asharu <notifikasi@asharu.id>',
+      email_from: str(formData, 'email_from') ?? 'Asharu <updates@alamaby.com>',
       email_reply_to: str(formData, 'email_reply_to'),
       updated_at: new Date().toISOString()
     })

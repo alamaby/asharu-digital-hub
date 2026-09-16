@@ -12,7 +12,7 @@ const input: AutomationEmailInput = {
   to: ['admin@asharu.id'],
   subject: 'Test',
   html: '<p>Halo</p>',
-  from: 'Asharu <notifikasi@asharu.id>',
+  from: 'Asharu <updates@alamaby.com>',
   replyTo: 'balas@asharu.id'
 };
 
@@ -43,7 +43,7 @@ function cfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
     maxRetryAttempts: 3,
     notifyOn: 'both',
     notifyEmails: ['admin@asharu.id'],
-    emailFrom: 'Asharu <notifikasi@asharu.id>',
+    emailFrom: 'Asharu <updates@alamaby.com>',
     emailReplyTo: null,
     ...over
   };
