@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-16 10:55 (local time)
+Last updated: 2026-09-16 13:02 (local time)
 
 ## Current State
 
@@ -61,6 +61,8 @@ Last updated: 2026-09-16 10:55 (local time)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [130236-studio-upload-resilience.md](2026-09-16/130236-studio-upload-resilience.md) — RCA Studio `c19c8d2f` (failed "studio storage upload failed: <none>"): pixazo sukses generate, upload ke Storage kena **HTTP 520** transient (edge_logs; `storage.objects` kosong; `net._http_response` cron). Patch: `StudioStorageError` + `isTransientStorageError` + `describeStorageError` + `uploadUserImageWithRetry` (2 retry/backoff, 5xx-408-429 saja) di `storage.ts`, dan **pisah fase generate vs fase upload** di worker (upload gagal = failed jujur, tidak fallback ke provider lain). Gate 692 tests hijau, pushed `7788f57`. [USER ACTION] Klik Ulangi baris `c19c8d2f`.
 
 - [105037-studio-enhance-field-aware.md](2026-09-16/105037-studio-enhance-field-aware.md) — Enhance prompt Studio kini sadar-field: Preset style/Template subjek/Camera angle dikirim sebagai input (opsi aktif + konteks terpilih ke LLM), LLM memilihkan slug untuk field Auto (divalidasi ke himpunan aktif, anti-halusinasi → null), negative prompt WAJIB (gate `requireNegative` + retry), diff 3 picker di side-by-side, Terima menerapkan slug, `maxTokens` 1000. Bug laten Undo (tombol di dalam panel yang tertutup) ikut diperbaiki. Gate 681 tests hijau, pushed `e48564e`.
 
