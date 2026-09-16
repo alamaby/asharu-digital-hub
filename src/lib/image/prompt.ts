@@ -29,6 +29,10 @@ export interface ImagePromptOutput {
   image_prompt: string;
   negative_prompt?: string;
   reasoning: ImageReasoning;
+  /** Pilihan picker hasil enhance (hanya stage enhance Studio) — null = biarkan Auto. */
+  style_slug?: string | null;
+  subject_slug?: string | null;
+  camera_slug?: string | null;
 }
 
 export function buildImagePromptMessages(input: ImagePromptInput): {
@@ -68,6 +72,11 @@ export function buildImagePromptMessages(input: ImagePromptInput): {
   return { system, user };
 }
 
+/** Slug picker dari output LLM: hanya string non-kosong, selain itu null. */
+function parseOptionalSlug(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : null;
+}
+
 /** Parse output JSON stage image_prompt (toleran code fence). */
 export function parseImagePrompt(text: string): ImagePromptOutput {
   const cleaned = text
@@ -84,6 +93,9 @@ export function parseImagePrompt(text: string): ImagePromptOutput {
     hook_keywords?: unknown;
     contradiction_check?: unknown;
     justification?: unknown;
+    style_slug?: unknown;
+    subject_slug?: unknown;
+    camera_slug?: unknown;
   };
   if (typeof parsed.image_prompt !== 'string' || !parsed.image_prompt.trim()) {
     throw new Error('image_prompt: missing image_prompt string');
@@ -108,7 +120,11 @@ export function parseImagePrompt(text: string): ImagePromptOutput {
       contradiction_check:
         typeof parsed.contradiction_check === 'string' ? parsed.contradiction_check.slice(0, 500) : '',
       justification: typeof parsed.justification === 'string' ? parsed.justification.slice(0, 500) : ''
-    }
+    },
+    // Hanya stage enhance Studio yang mengisi ini; stage lain mengabaikannya.
+    style_slug: parseOptionalSlug(parsed.style_slug),
+    subject_slug: parseOptionalSlug(parsed.subject_slug),
+    camera_slug: parseOptionalSlug(parsed.camera_slug)
   };
 }
 
@@ -122,11 +138,15 @@ export interface ImagePromptGateResult {
  * Strategi 'before' dihapus (user bisa edit prompt manual) — gate hanya
  * memastikan prompt/negative terisi wajar dan strategi valid
  * (after/bridge/custom). Legacy 'before' dari data lama tetap lolos.
+ *
+ * `requireNegative` dipakai stage enhance Studio: negative prompt wajib
+ * terisi (bukan sekadar valid bila ada). Default false agar worker konten
+ * tidak berubah perilaku.
  */
 export function validateImagePromptContradiction(
   output: ImagePromptOutput,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _sourceText: string
+  _sourceText: string,
+  opts?: { requireNegative?: boolean }
 ): ImagePromptGateResult {
   const reasons: string[] = [];
   const prompt = output.image_prompt?.trim() ?? '';
@@ -137,6 +157,9 @@ export function validateImagePromptContradiction(
   }
   if (prompt.length > 500) {
     reasons.push('image_prompt maksimal 500 karakter');
+  }
+  if (opts?.requireNegative && negative.length < 10) {
+    reasons.push('negative_prompt wajib terisi (minimal 10 karakter)');
   }
   if (negative.length > 300) {
     reasons.push('negative_prompt maksimal 300 karakter');
@@ -202,10 +225,31 @@ export function mergeImageNegativePrompts(userNegative: string | null | undefine
   return parts.length ? parts.join(', ') : undefined;
 }
 
+export interface StudioOption {
+  slug: string;
+  display_name: string;
+}
+
 export interface StudioEnhanceInput {
   promptDraft: string;
   negativeDraft?: string | null;
   styleSuffix?: string;
+  /** Konteks pilihan picker user (nama + teks EN) — jadikan input polish. */
+  styleName?: string | null;
+  subjectName?: string | null;
+  subjectEn?: string | null;
+  cameraName?: string | null;
+  cameraEn?: string | null;
+  /** Daftar opsi aktif: LLM HANYA boleh memilih slug dari daftar ini. */
+  styleOptions?: StudioOption[];
+  subjectOptions?: StudioOption[];
+  cameraOptions?: StudioOption[];
+}
+
+/** Baris daftar opsi: "slug — display name" (hemat token, slug tetap persis). */
+function optionLines(options: StudioOption[] | undefined): string {
+  if (!options?.length) return '';
+  return options.map((o) => `${o.slug} — ${o.display_name}`).join('; ');
 }
 
 /**
@@ -214,6 +258,12 @@ export interface StudioEnhanceInput {
  * MISSED-DETAIL vs source post — LLM polish + perkaya detail visual dari
  * draf itu sendiri (pencahayaan, komposisi, mood, tekstur) tanpa membuang
  * detail eksplisit user.
+ *
+ * Sejak 16 Sep 2026 builder ini juga FIELD-AWARE: LLM memilih preset style,
+ * template subjek, dan camera angle dari daftar opsi aktif (dikirim slug +
+ * display_name), selalu mengisi negative prompt, dan tidak menyisipkan
+ * wording style/angle ke image_prompt karena worker yang menempelkannya
+ * (lihat `src/lib/studio/worker.ts`).
  */
 export function buildStudioEnhanceMessages(input: StudioEnhanceInput): {
   system: string;
@@ -224,19 +274,35 @@ export function buildStudioEnhanceMessages(input: StudioEnhanceInput): {
     'The user drafted an image_prompt (and maybe negative_prompt) for a standalone illustration. There is NO source post — polish and ENRICH the draft itself.',
     'Preserve intent, correct English, make it single scene, concrete objects/action/setting, ≤60 words.',
     'Rules:',
-    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
+    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "...", "style_slug": "...|null", "subject_slug": "...|null", "camera_slug": "...|null"}.',
     '- image_prompt: polished English, ≤60 words (hard limit), concrete, no text/watermark/logo.',
-    '- Negative: polish too (no text, no watermark, no logo), ≤300 chars.',
+    '- Negative: REQUIRED, never empty — always cover at least "no text, no watermark, no logo, blurry, low quality, distorted anatomy", plus anything the draft must avoid. Max 300 chars.',
     '- visual_strategy: AFTER = direct/aspirational illustration; BRIDGE = curiosity-gap object.',
     '- ENRICHMENT: add concrete visual detail the draft lacks (lighting, composition, mood, texture, atmosphere) so the image generator has enough to work with. NEVER drop explicit details already in the draft — only add.',
     '- CRITICAL PRESERVATION: User draft may be in Indonesian — translate to English FAITHFULLY and keep EVERY explicit detail (clothing, camera angle/shot, pose/expression, setting/location, accessories, atmosphere). When in doubt, keep the detail verbatim (translated).',
+    '- Do NOT write the style preset wording or the camera angle wording into image_prompt — the pipeline appends them automatically. Just make the scene fit them.',
     '- No people faces close-up unless the draft demands it; prefer medium shot that shows subject + setting.',
-    '- No violent, sexual, or political content.'
+    '- No violent, sexual, or political content.',
+    'FIELD SELECTION (style_slug / subject_slug / camera_slug):',
+    '- Choose ONLY from the OPTION LISTS below and return the exact slug string. NEVER invent a slug.',
+    '- If the user already selected a field, treat it as an INPUT: keep the scene consistent with it. You MAY recommend a different slug when clearly better.',
+    '- subject_slug MUST be null when the draft clearly has no person/subject; do not force a human subject.',
+    '- camera_slug: pick the angle that best fits the draft scene and shot; null only if no angle in the list fits.'
   ].join('\n');
+  const selected: string[] = [];
+  if (input.styleName) selected.push(`- Style preset selected: ${input.styleName}`);
+  if (input.subjectName) selected.push(`- Subject template selected: ${input.subjectName}`);
+  if (input.subjectEn) selected.push(`  (subject template EN, will be prepended by the pipeline): ${input.subjectEn}`);
+  if (input.cameraName) selected.push(`- Camera angle selected: ${input.cameraName}`);
+  if (input.cameraEn) selected.push(`  (camera angle EN, will be appended by the pipeline): ${input.cameraEn}`);
   const user = [
     `User draft prompt (PRESERVE all details, ID→EN translate, then ENRICH): ${input.promptDraft}`,
     input.negativeDraft ? `User draft negative: ${input.negativeDraft}` : '',
-    input.styleSuffix ? `Style hint (will be appended by worker): ${input.styleSuffix}` : ''
+    input.styleSuffix ? `Style hint (will be appended by worker): ${input.styleSuffix}` : '',
+    selected.length ? `Currently selected fields:\n${selected.join('\n')}` : 'Currently selected fields: none (all Auto) — pick the best option for each list.',
+    input.styleOptions?.length ? `OPTION LIST style_slug: ${optionLines(input.styleOptions)}` : '',
+    input.subjectOptions?.length ? `OPTION LIST subject_slug: ${optionLines(input.subjectOptions)}` : '',
+    input.cameraOptions?.length ? `OPTION LIST camera_slug: ${optionLines(input.cameraOptions)}` : ''
   ]
     .filter(Boolean)
     .join('\n');

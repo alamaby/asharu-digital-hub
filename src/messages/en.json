@@ -840,7 +840,8 @@
       "llmSuggestion": "LLM suggestion",
       "accept": "Accept",
       "cancel": "Cancel",
-      "undo": "Undo"
+      "undo": "Undo",
+      "autoPicked": "Auto"
     },
     "notice": {
       "enqueue": "Queued. The worker processes in ≤5 minutes — results turn ready automatically.",

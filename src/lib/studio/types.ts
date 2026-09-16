@@ -114,13 +114,18 @@ export interface StudioListOptions {
 /** Hasil enhance prompt studio (bentuk sama dengan EnhancePromptResult review). */
 export interface StudioEnhanceResult {
   image_prompt: string;
-  negative_prompt?: string;
+  /** Selalu terisi — gate enhance Studio menolak negative kosong. */
+  negative_prompt: string;
   reasoning: {
     visual_strategy: string;
     hook_keywords?: string[];
     contradiction_check?: string;
     justification?: string;
   };
+  /** Rekomendasi picker dari LLM; null = biarkan Auto. Sudah divalidasi ke slug aktif. */
+  style_slug: string | null;
+  subject_slug: string | null;
+  camera_slug: string | null;
 }
 
 export interface StudioQuota {

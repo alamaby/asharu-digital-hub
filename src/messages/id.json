@@ -840,7 +840,8 @@
       "llmSuggestion": "Usulan LLM",
       "accept": "Terima",
       "cancel": "Batal",
-      "undo": "Urungkan"
+      "undo": "Urungkan",
+      "autoPicked": "Auto"
     },
     "notice": {
       "enqueue": "Masuk antrean. Worker memproses ≤5 menit — histori akan berubah ke ready otomatis.",

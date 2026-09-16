@@ -12,7 +12,17 @@ import { DEFAULT_STUDIO_CONFIG } from '@/lib/studio/types';
 vi.mock('@/lib/studio/actions', () => ({
   uploadStudioReference: vi.fn(async () => ({ ok: true, data: { storagePath: 'ref/u1/x.png', publicUrl: 'https://cdn.test/ref.png' } })),
   enqueueStudioImage: vi.fn(async () => ({ ok: true, data: { imageId: 'new-id', expiresAt: '2026-10-11T00:00:00Z' } })),
-  enhanceStudioPrompt: vi.fn(async () => ({ ok: true, data: { image_prompt: 'polished prompt', negative_prompt: 'blurry', reasoning: { visual_strategy: 'after' } } })),
+  enhanceStudioPrompt: vi.fn(async () => ({
+    ok: true,
+    data: {
+      image_prompt: 'polished prompt',
+      negative_prompt: 'blurry, no text',
+      reasoning: { visual_strategy: 'after' },
+      style_slug: 'photorealistic',
+      subject_slug: 'wanita-muda-modis',
+      camera_slug: 'eye-level-three-quarter'
+    }
+  })),
   retryFailedStudioImage: vi.fn(async () => ({ ok: true, data: { imageId: 'x' } })),
   deleteStudioImage: vi.fn(async () => ({ ok: true, data: null })),
   listUserImages: vi.fn(async () => [])
@@ -138,6 +148,57 @@ describe('StudioForm', () => {
     expect(await screen.findByText('Side-by-side — usulan LLM')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Terima' }));
     expect(screen.getByLabelText('Image prompt (EN, deskriptif)')).toHaveValue('polished prompt');
+  });
+
+  it('Terima mengisi picker style/subjek/camera + negative dari usulan LLM', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    await user.click(screen.getByRole('button', { name: 'Sempurnakan' }));
+    await screen.findByText('Side-by-side — usulan LLM');
+    await user.click(screen.getByRole('button', { name: 'Terima' }));
+    expect(screen.getByLabelText('Preset style')).toHaveValue('photorealistic');
+    expect(screen.getByLabelText('Template subjek')).toHaveValue('wanita-muda-modis');
+    expect(screen.getByLabelText('Camera angle')).toHaveValue('eye-level-three-quarter');
+    expect(screen.getByLabelText('Negative prompt (opsional)')).toHaveValue('blurry, no text');
+  });
+
+  it('Terima mengirim slug terpilih sebagai input enhance', async () => {
+    const user = userEvent.setup();
+    const { enhanceStudioPrompt } = await import('@/lib/studio/actions');
+    vi.mocked(enhanceStudioPrompt).mockClear();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    await user.selectOptions(screen.getByLabelText('Preset style'), 'photorealistic');
+    await user.selectOptions(screen.getByLabelText('Camera angle'), 'eye-level-three-quarter');
+    await user.click(screen.getByRole('button', { name: 'Sempurnakan' }));
+    await screen.findByText('Side-by-side — usulan LLM');
+    expect(enhanceStudioPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        styleSlug: 'photorealistic',
+        cameraSlug: 'eye-level-three-quarter'
+      })
+    );
+  });
+
+  it('Urungkan mengembalikan prompt, negative, dan 3 picker ke draf sebelumnya', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    expect(screen.getByLabelText('Preset style')).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Sempurnakan' }));
+    await screen.findByText('Side-by-side — usulan LLM');
+    await user.click(screen.getByRole('button', { name: 'Terima' }));
+    await user.click(screen.getByRole('button', { name: 'Urungkan' }));
+    expect(screen.getByLabelText('Image prompt (EN, deskriptif)')).toHaveValue('a tidy bedroom with soft morning light');
+    expect(screen.getByLabelText('Preset style')).toHaveValue('');
+    expect(screen.getByLabelText('Camera angle')).toHaveValue('');
   });
 
   it('panel referensi: upload + slider strength + badge ref di opsi model', async () => {

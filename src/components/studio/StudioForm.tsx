@@ -32,8 +32,20 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
   const [llmProviderId, setLlmProviderId] = useState('');
   const [llmModelId, setLlmModelId] = useState('');
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [proposed, setProposed] = useState<{ prompt: string; negative?: string } | null>(null);
-  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
+  const [proposed, setProposed] = useState<{
+    prompt: string;
+    negative?: string;
+    styleSlug: string | null;
+    subjectSlug: string | null;
+    cameraSlug: string | null;
+  } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{
+    prompt: string;
+    negative: string;
+    styleSlug: string;
+    subjectSlug: string;
+    cameraSlug: string;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [lastReuseId, setLastReuseId] = useState<string | null>(null);
@@ -194,13 +206,21 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
         prompt: p,
         negativePrompt: negativeTrimmed || null,
         styleSlug: styleSlug || null,
+        subjectSlug: subjectSlug || null,
+        cameraSlug: cameraSlug || null,
         llmModelId: llmModelId || null
       });
       if (!res.ok) {
         setNotice(`Gagal enhance: ${res.error}`);
         return;
       }
-      setProposed({ prompt: res.data.image_prompt, negative: res.data.negative_prompt });
+      setProposed({
+        prompt: res.data.image_prompt,
+        negative: res.data.negative_prompt,
+        styleSlug: res.data.style_slug,
+        subjectSlug: res.data.subject_slug,
+        cameraSlug: res.data.camera_slug
+      });
       setNotice(tEnhance('ready'));
     } catch (e) {
       setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : tEnhance('failed'));
@@ -211,11 +231,33 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
 
   function acceptProposed() {
     if (!proposed) return;
-    setPrevPrompt({ prompt, negative });
+    setPrevPrompt({ prompt, negative, styleSlug, subjectSlug, cameraSlug });
     setPrompt(proposed.prompt);
     setNegative(proposed.negative ?? '');
+    // Field Auto diisi rekomendasi LLM; field yang sudah dipilih boleh
+    // tergantikan (terlihat dulu di diff side-by-side).
+    if (proposed.styleSlug) setStyleSlug(proposed.styleSlug);
+    if (proposed.subjectSlug) setSubjectSlug(proposed.subjectSlug);
+    if (proposed.cameraSlug) setCameraSlug(proposed.cameraSlug);
     setProposed(null);
     setNotice(tEnhance('accepted'));
+  }
+
+  function undoProposed() {
+    if (!prevPrompt) return;
+    setPrompt(prevPrompt.prompt);
+    setNegative(prevPrompt.negative);
+    setStyleSlug(prevPrompt.styleSlug);
+    setSubjectSlug(prevPrompt.subjectSlug);
+    setCameraSlug(prevPrompt.cameraSlug);
+    setPrevPrompt(null);
+    setNotice(tEnhance('reverted'));
+  }
+
+  /** Label diff picker: `Preset style: Cinematic → Anime` (Auto bila kosong). */
+  function optionLabel(list: { slug: string; display_name: string }[] | undefined, slug: string | null): string {
+    if (!slug) return tEnhance('autoPicked');
+    return list?.find((o) => o.slug === slug)?.display_name ?? slug;
   }
 
   return (
@@ -523,11 +565,21 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
                 <p className="text-[11px] font-semibold text-ink-muted">{tEnhance('yourDraft')}</p>
                 <p className="mt-1 text-ink">{prompt || '—'}</p>
                 <p className="mt-2 text-ink-muted">Negative: {negative || '—'}</p>
+                <ul className="mt-2 grid gap-0.5 text-ink-muted">
+                  <li>{tForm('styleLabel')}: {optionLabel(options?.styles, styleSlug || null)}</li>
+                  <li>{tForm('subjectLabel')}: {optionLabel(options?.subjects, subjectSlug || null)}</li>
+                  <li>{tForm('cameraLabel')}: {optionLabel(options?.cameras, cameraSlug || null)}</li>
+                </ul>
               </div>
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-2">
                 <p className="text-[11px] font-semibold text-primary">{tEnhance('llmSuggestion')}</p>
                 <p className="mt-1 text-ink">{proposed.prompt}</p>
                 <p className="mt-2 text-ink-muted">Negative: {proposed.negative || '—'}</p>
+                <ul className="mt-2 grid gap-0.5 text-ink-muted">
+                  <li>{tForm('styleLabel')}: {optionLabel(options?.styles, proposed.styleSlug)}</li>
+                  <li>{tForm('subjectLabel')}: {optionLabel(options?.subjects, proposed.subjectSlug)}</li>
+                  <li>{tForm('cameraLabel')}: {optionLabel(options?.cameras, proposed.cameraSlug)}</li>
+                </ul>
               </div>
             </div>
             <div className="mt-2 flex gap-2">
@@ -537,17 +589,19 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
               <button type="button" onClick={() => setProposed(null)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs">
                 {tEnhance('cancel')}
               </button>
-              {prevPrompt ? (
-                <button
-                  type="button"
-                  onClick={() => { setPrompt(prevPrompt.prompt); setNegative(prevPrompt.negative); setPrevPrompt(null); setNotice(tEnhance('reverted')); }}
-                  className="text-xs text-ink-muted hover:text-primary"
-                >
-                  {tEnhance('undo')}
-                </button>
-              ) : null}
             </div>
           </div>
+        ) : null}
+
+        {/* Urungkan tetap tersedia setelah Terima (panel usulan sudah tertutup). */}
+        {prevPrompt ? (
+          <button
+            type="button"
+            onClick={undoProposed}
+            className="mt-2 text-xs text-ink-muted hover:text-primary"
+          >
+            {tEnhance('undo')}
+          </button>
         ) : null}
       </div>
 

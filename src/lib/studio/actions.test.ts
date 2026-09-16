@@ -22,7 +22,7 @@ vi.mock('next/cache', () => ({
 
 import { enqueueStudioImage, listUserImages } from './actions';
 import { resolveFreshReferenceStoragePath } from './storage';
-import { buildStudioEnhanceMessages } from '@/lib/image/prompt';
+import { buildStudioEnhanceMessages, validateImagePromptContradiction } from '@/lib/image/prompt';
 
 /** Client mock yang mencatat rantai query (eq/order/limit) per tabel. */
 function makeClient(tables: Record<string, Row[]>) {
@@ -308,5 +308,63 @@ describe('buildStudioEnhanceMessages — studio tanpa konteks post', () => {
     const { user } = buildStudioEnhanceMessages({ promptDraft: 'a cat on a chair, soft light' });
     expect(user).toContain('a cat on a chair');
     expect(user).not.toContain('User draft negative');
+  });
+
+  it('field-aware: daftar opsi dikirim sebagai slug + display_name', () => {
+    const { system, user } = buildStudioEnhanceMessages({
+      promptDraft: 'kamar tidur rapi, soft light',
+      styleOptions: [{ slug: 'cinematic', display_name: 'Cinematic' }],
+      subjectOptions: [{ slug: 'wanita-muda-modis', display_name: 'Wanita Muda Modis' }],
+      cameraOptions: [{ slug: 'eye-level-three-quarter', display_name: 'Eye-Level Three-Quarter' }]
+    });
+    expect(system).toContain('FIELD SELECTION');
+    expect(system).toContain('negative_prompt');
+    expect(user).toContain('OPTION LIST style_slug: cinematic — Cinematic');
+    expect(user).toContain('OPTION LIST subject_slug: wanita-muda-modis — Wanita Muda Modis');
+    expect(user).toContain('OPTION LIST camera_slug: eye-level-three-quarter — Eye-Level Three-Quarter');
+    expect(user).toContain('Currently selected fields: none');
+  });
+
+  it('field-aware: pilihan user terpilih dikirim sebagai konteks input', () => {
+    const { user } = buildStudioEnhanceMessages({
+      promptDraft: 'a woman in a kitchen',
+      styleName: 'Cinematic',
+      subjectName: 'Wanita Muda Modis',
+      subjectEn: 'A fashionable young adult woman',
+      cameraName: 'Eye-Level Three-Quarter',
+      cameraEn: 'eye-level three-quarter shot',
+      styleOptions: [{ slug: 'cinematic', display_name: 'Cinematic' }]
+    });
+    expect(user).toContain('Style preset selected: Cinematic');
+    expect(user).toContain('Subject template selected: Wanita Muda Modis');
+    expect(user).toContain('Camera angle selected: Eye-Level Three-Quarter');
+    expect(user).toContain('will be prepended by the pipeline');
+    expect(user).toContain('will be appended by the pipeline');
+  });
+});
+
+describe('validateImagePromptContradiction — requireNegative', () => {
+  const reasoning = { visual_strategy: 'after' as const, hook_keywords: [], contradiction_check: 'x', justification: 'y' };
+  it('gate default tidak mewajibkan negative (worker konten tak berubah)', () => {
+    const gate = validateImagePromptContradiction(
+      { image_prompt: 'a tidy bedroom with soft morning light', reasoning },
+      'draft'
+    );
+    expect(gate.ok).toBe(true);
+  });
+
+  it('requireNegative menolak negative kosong / <10 karakter', () => {
+    const base = { image_prompt: 'a tidy bedroom with soft morning light', reasoning };
+    expect(validateImagePromptContradiction(base, 'draft', { requireNegative: true }).ok).toBe(false);
+    expect(
+      validateImagePromptContradiction({ ...base, negative_prompt: 'blurry' }, 'draft', { requireNegative: true }).ok
+    ).toBe(false);
+    expect(
+      validateImagePromptContradiction(
+        { ...base, negative_prompt: 'no text, no watermark, no logo' },
+        'draft',
+        { requireNegative: true }
+      ).ok
+    ).toBe(true);
   });
 });

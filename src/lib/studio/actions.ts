@@ -335,6 +335,8 @@ export interface EnhanceStudioInput {
   prompt: string;
   negativePrompt?: string | null;
   styleSlug?: string | null;
+  subjectSlug?: string | null;
+  cameraSlug?: string | null;
   /** Pin model LLM (UUID llm_models.id). Null = Auto = stage default enhance. */
   llmModelId?: string | null;
 }
@@ -345,6 +347,10 @@ export interface EnhanceStudioInput {
  * gate self-consistency (panjang + strategi valid).
  * Stage: enhance_image_prompt; rate limit 30/jam TERPISAH dari kuota
  * generate harian agar eksplorasi prompt tidak memotong kuota.
+ *
+ * Field-aware (16 Sep 2026): pilihan Preset style / Template subjek /
+ * Camera angle dikirim sebagai konteks; LLM memilihkan slug untuk field yang
+ * masih Auto. Slug hasil LLM divalidasi ke himpunan aktif (anti-halusinasi).
  */
 export async function enhanceStudioPrompt(
   input: EnhanceStudioInput
@@ -365,10 +371,11 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
   if (!draftPrompt || draftPrompt.length < 10) throw new Error('Prompt minimal 10 karakter (isi dulu di textarea).');
   if (draftPrompt.length > maxPrompt) throw new Error(`Prompt maksimal ${maxPrompt} karakter.`);
   const negDraft = input.negativePrompt?.trim().slice(0, 300) ?? null;
+  const supabase = svc();
 
   // Validasi pin LLM aktif (sekali jalan, tanpa secret).
   if (input.llmModelId) {
-    const { data: lm } = await svc()
+    const { data: lm } = await supabase
       .from('llm_models')
       .select('id')
       .eq('id', input.llmModelId)
@@ -377,17 +384,34 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
     if (!lm) throw new Error('Model LLM tidak aktif — refresh pilihan.');
   }
 
-  // Style hint (suffix) mengikuti pilihan picker studio, bukan default global.
-  let styleSuffix: string | null = null;
-  if (input.styleSlug) {
-    const { data: st } = await svc()
+  // Opsi picker aktif (slug + display_name) + teks EN/style suffix baris
+  // terpilih — satu Promise.all, tanpa secret.
+  const [{ data: styleRows }, { data: subjectRows }, { data: cameraRows }] = await Promise.all([
+    supabase
       .from('image_style_presets')
-      .select('prompt_suffix')
-      .eq('slug', input.styleSlug)
+      .select('slug, display_name, prompt_suffix')
       .eq('is_active', true)
-      .maybeSingle();
-    styleSuffix = ((st as { prompt_suffix?: string } | null)?.prompt_suffix ?? null) || null;
-  }
+      .order('slug'),
+    supabase
+      .from('image_subject_templates')
+      .select('slug, display_name, subject_en')
+      .eq('is_active', true)
+      .order('sort_order')
+      .order('slug'),
+    supabase
+      .from('image_camera_angles')
+      .select('slug, display_name, angle_en')
+      .eq('is_active', true)
+      .order('sort_order')
+      .order('slug')
+  ]);
+  const styles = (styleRows ?? []) as { slug: string; display_name: string; prompt_suffix: string | null }[];
+  const subjects = (subjectRows ?? []) as { slug: string; display_name: string; subject_en: string | null }[];
+  const cameras = (cameraRows ?? []) as { slug: string; display_name: string; angle_en: string | null }[];
+
+  const pickedStyle = input.styleSlug ? styles.find((s) => s.slug === input.styleSlug) ?? null : null;
+  const pickedSubject = input.subjectSlug ? subjects.find((s) => s.slug === input.subjectSlug) ?? null : null;
+  const pickedCamera = input.cameraSlug ? cameras.find((c) => c.slug === input.cameraSlug) ?? null : null;
 
   // Rate limit 30/jam (bucket sendiri: enhance_studio_prompt).
   const hdrs = await headers();
@@ -398,7 +422,15 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
   const { system, user } = buildStudioEnhanceMessages({
     promptDraft: draftPrompt.slice(0, maxPrompt),
     negativeDraft: negDraft,
-    styleSuffix: styleSuffix ?? undefined
+    styleSuffix: pickedStyle?.prompt_suffix?.trim() || undefined,
+    styleName: pickedStyle?.display_name ?? null,
+    subjectName: pickedSubject?.display_name ?? null,
+    subjectEn: pickedSubject?.subject_en?.trim() ?? null,
+    cameraName: pickedCamera?.display_name ?? null,
+    cameraEn: pickedCamera?.angle_en?.trim() ?? null,
+    styleOptions: styles.map(({ slug, display_name }) => ({ slug, display_name })),
+    subjectOptions: subjects.map(({ slug, display_name }) => ({ slug, display_name })),
+    cameraOptions: cameras.map(({ slug, display_name }) => ({ slug, display_name }))
   });
 
   const { providerId, modelUuid } = await resolveStageModel('enhance_image_prompt', input.llmModelId ?? null);
@@ -407,7 +439,7 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
   async function attempt(temperature: number, gateNote?: string) {
     const msgs = [
       { role: 'system' as const, content: system },
-      { role: 'user' as const, content: gateNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${gateNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
+      { role: 'user' as const, content: gateNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${gateNote}). Perbaiki visual_strategy + image_prompt + negative_prompt (negative WAJIB terisi).` : user }
     ];
     const out = await runLLMCompletion(llm, {
       stage: 'enhance_image_prompt',
@@ -415,33 +447,43 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
       modelUuid,
       messages: msgs,
       temperature,
-      maxTokens: 500
+      maxTokens: 1000
     });
     return { parsed: parseImagePrompt(out.output.text) };
   }
 
-  // Gate konsisten dengan worker konten: self-check panjang + strategi valid.
+  // Gate konsisten dengan worker konten + negative WAJIB untuk enhance Studio.
+  const gateWith = (parsed: ReturnType<typeof parseImagePrompt>) =>
+    validateImagePromptContradiction(
+      { image_prompt: parsed.image_prompt, negative_prompt: parsed.negative_prompt, reasoning: parsed.reasoning },
+      draftPrompt,
+      { requireNegative: true }
+    );
+
   let chosen = await attempt(0.5);
-  const gate = validateImagePromptContradiction(
-    { image_prompt: chosen.parsed.image_prompt, negative_prompt: chosen.parsed.negative_prompt, reasoning: chosen.parsed.reasoning },
-    draftPrompt
-  );
+  const gate = gateWith(chosen.parsed);
   if (!gate.ok) {
     const retry = await attempt(0.3, gate.reasons.join('; '));
-    const gate2 = validateImagePromptContradiction(
-      { image_prompt: retry.parsed.image_prompt, negative_prompt: retry.parsed.negative_prompt, reasoning: retry.parsed.reasoning },
-      draftPrompt
-    );
+    const gate2 = gateWith(retry.parsed);
     if (!gate2.ok) throw new Error(`enhance gate: ${[...gate.reasons, ...gate2.reasons].join(' | ').slice(0, 500)}`);
     chosen = retry;
   }
 
+  // Anti-halusinasi: slug di luar himpunan aktif → null (biarkan Auto),
+  // bukan menggagalkan seluruh enhance.
+  const activeSlugs = (rows: { slug: string }[], slug: string | null | undefined) =>
+    slug && rows.some((r) => r.slug === slug) ? slug : null;
+  const parsed = chosen.parsed;
+
   await incrementRateLimit(ip, 'enhance_studio_prompt').catch(() => {});
 
   return {
-    image_prompt: chosen.parsed.image_prompt,
-    negative_prompt: chosen.parsed.negative_prompt,
-    reasoning: chosen.parsed.reasoning
+    image_prompt: parsed.image_prompt,
+    negative_prompt: parsed.negative_prompt ?? '',
+    reasoning: parsed.reasoning,
+    style_slug: activeSlugs(styles, parsed.style_slug),
+    subject_slug: activeSlugs(subjects, parsed.subject_slug),
+    camera_slug: activeSlugs(cameras, parsed.camera_slug)
   };
 }
 
