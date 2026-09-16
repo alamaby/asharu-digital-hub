@@ -84,6 +84,25 @@ jobs:
           console.log('drift check ok: ' + active.length + ' active, ' + featured.length + ' featured, 0 broken images.');
           "
 
+      - name: Revalidate public catalog cache
+        # Baris affiliate_products ditulis via service key (bukan Server Action),
+        # sehingga tidak ada revalidatePath yang terpanggil dan ISR `/id/produk`
+        # + beranda bisa basi hingga 1 jam. Best-effort: kegagalan di sini tidak
+        # menggagalkan scrape (data DB sudah benar, hanya cache publik tertunda).
+        continue-on-error: true
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://asharu.id' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::CRON_SECRET not set — skipping on-demand revalidation (ISR 1h still applies)."
+            exit 0
+          fi
+          curl -sS -X POST "$SITE_URL/api/revalidate/products" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H 'Content-Type: application/json' \
+            -w '\nHTTP %{http_code}\n'
+
       - name: Validate gates
         run: |
           npm run typecheck
