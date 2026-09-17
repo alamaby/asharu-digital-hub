@@ -36,8 +36,11 @@ semua `reasoning_effort=max` default.
 - [x] Migrasi di submodule `supabase/` (`20260917000001_llm_models_ciora.sql`),
   non-destruktif mengikuti pola `20260910000001_llm_models_gemini_bynara.sql`.
 - [x] Commit submodule `supabase/` DULU, baru parent.
-- [ ] [USER ACTION] Apply migrasi ke prod DULU (Dashboard/CLI) — seed script butuh
+- [x] [USER ACTION] Apply migrasi ke prod DULU (Dashboard/CLI) — seed script butuh
   baris `llm_providers` slug `ciora`, kalau belum ada ia exit(2) "not found".
+  ✅ APPLIED 2026-09-17 ~11:00 via MCP `apply_migration` (`{"success":true}`).
+  Terverifikasi: provider `ciora` aktif priority 5 di depan + 10/10 model aktif
+  reasoning max. Advisors: hanya pre-existing, tak ada temuan baru.
 - [ ] [USER ACTION] Seed 1 key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
   → slug `ciora`, priority `0`.
 - [x] Gate: `npm run typecheck`, `npm run lint`, `npm test` (+ `npm run build` bila
@@ -67,6 +70,8 @@ semua `reasoning_effort=max` default.
   Sisa user action (urutan penting!): apply migrasi prod DULU → seed key → smoke test.
 - 2026-09-17 10:57 — koreksi urutan atas feedback user: seed script exit(2) bila
   provider belum ada (`seed-llm-keys.mjs:49-53`), jadi migrasi prod WAJIB sebelum seed.
+- 2026-09-17 ~11:00 — migrasi APPLIED prod via MCP (success:true), terverifikasi
+  10/10 model + advisors bersih. Sisa: seed key → smoke test.
 
 ## Notes
 

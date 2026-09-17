@@ -37,7 +37,11 @@ format OpenAI `/chat/completions`, auth `Bearer`) dengan 10 model, semua
 
 ## Blocker / belum selesai (URUTAN PENTING — koreksi 10:57 atas feedback user)
 
-1. [USER ACTION] Apply migrasi ke prod DULU (Supabase Dashboard / CLI).
+1. [x] Apply migrasi ke prod — SELESAI 2026-09-17 ~11:00 via MCP
+   `apply_migration` (`{"success":true}`). Terverifikasi: 5 provider
+   (ciora priority 5 di depan) + 10/10 model ciora aktif reasoning max.
+   Advisors security: hanya pre-existing (search_path, SECURITY DEFINER RPC,
+   leaked-pw) — tak ada temuan baru.
 2. [USER ACTION] Seed key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
    → slug `ciora`, priority `0`.
 3. [USER ACTION] Smoke test 1 call per model + cek `llm_call_logs`.
