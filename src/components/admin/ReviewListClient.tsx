@@ -33,7 +33,7 @@ interface Props {
 }
 
 const STATUS_OPTIONS = ['needs_review', 'approved', 'rejected'];
-const PROVIDER_OPTIONS = ['naraya', 'openrouter', 'gemini', 'cloudflare'];
+const PROVIDER_OPTIONS = ['ciora', 'naraya', 'openrouter', 'gemini', 'cloudflare'];
 
 function MultiSelect({
   label,

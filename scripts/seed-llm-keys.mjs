@@ -26,7 +26,7 @@ function ask(q) {
   return new Promise((res) => rl.question(q, (a) => res(a)));
 }
 
-const slug = (await ask('Provider slug (naraya/openrouter/gemini/cloudflare): ')).trim();
+const slug = (await ask('Provider slug (ciora/naraya/openrouter/gemini/cloudflare): ')).trim();
 const rawKey = (await ask('API key: ')).trim();
 const priority = Number((await ask('Priority (0 = highest, default 0): ')).trim() || '0');
 // Cloudflare Workers AI needs the account id (URL identifier, not a secret).

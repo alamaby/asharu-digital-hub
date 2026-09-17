@@ -1,7 +1,7 @@
 /** Helper murni daftar review konten: filter multi-select + paginasi. */
 
 export const REVIEW_STATUSES = ['needs_review', 'approved', 'rejected'] as const;
-export const REVIEW_PROVIDERS = ['naraya', 'openrouter', 'gemini', 'cloudflare'] as const;
+export const REVIEW_PROVIDERS = ['ciora', 'naraya', 'openrouter', 'gemini', 'cloudflare'] as const;
 
 /**
  * Parse `?status=a,b&provider=c&platform=d,e` menjadi nilai valid

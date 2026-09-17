@@ -1,4 +1,4 @@
-export type ProviderSlug = 'naraya' | 'openrouter' | 'gemini' | 'cloudflare';
+export type ProviderSlug = 'naraya' | 'openrouter' | 'gemini' | 'cloudflare' | 'ciora';
 
 /** 8 LLM stages that support per-stage provider→model pinning */
 export type LLMStage = 'idea_generation' | 'discovering' | 'verifying' | 'scoring' | 'developing' | 'regen_affiliate' | 'image_prompt' | 'enhance_image_prompt';
