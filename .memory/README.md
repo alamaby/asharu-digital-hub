@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-17 10:49 (local time)
+Last updated: 2026-09-17 11:48 (local time)
 
 ## Current State
 
@@ -36,6 +36,8 @@ Last updated: 2026-09-17 10:49 (local time)
 
 ## Open Items / Blockers
 
+- [ ] **Verifikasi live Chat Lab [USER ACTION]:** login → `/id/lab` submit 1–2 target → cek hasil side-by-side + history + stats; anon harus redirect `/masuk`. Opsional: cek cron `asharu-lab-cleanup` di Supabase Dashboard → Cron Jobs.
+
 - [ ] **Purge cache katalog otomatis [USER ACTION]:** tambahkan `CRON_SECRET` ke GitHub Actions secrets (environment `Production`) agar step revalidate di `.github/workflows/scrape-affiliate.yml` aktif; opsional set repo variable `SITE_URL` (default `https://asharu.id`). Tanpa itu purge dilewati (warning) dan ISR 1 jam tetap berlaku.
 
 - [ ] **Automation harian — seed Resend + dry-run [USER ACTION]:** `node --env-file=.env.local scripts/seed-resend-key.mjs` (Vault `resend_api_key`) + verifikasi domain Resend. Lalu di `/id/admin/automation` aktifkan kill-switch + `Run now` dengan `auto_publish_article=false` untuk uji 1 hari → baru nyalakan auto-publish. Deploy Vercel wajib agar endpoint + cron live.
@@ -62,6 +64,7 @@ Last updated: 2026-09-17 10:49 (local time)
 
 ## Recent Entries
 
+- [114800-chat-lab-menu.md](2026-09-17/114800-chat-lab-menu.md) — Menu **Chat Lab** `/lab` (login-only, sidebar sejajar Studio): 1 prompt → fan-out paralel 1–3 target strict-pin (tanpa fallback, adil) + side-by-side + metrik token/latency/tok/s + history per-user 30 hari + log detail + chart CSS-only + kuota 50/hari + rate 30/jam. Migrasi `20260918000001` applied prod, gate typecheck+lint+742 tests+build hijau, pushed `7541c8d`/`a6dfa2b`. [USER ACTION] Verifikasi live (atas).
 - [104940-ciora-llm-provider.md](2026-09-17/104940-ciora-llm-provider.md) — Provider LLM `ciora` (`https://ciora.id/v1`, OpenAI-only) priority 5 (paling depan) + 10 model reasoning max. Kode (slug union, filter review, factory+3 tests, seed prompt) + migrasi `20260917000001`. Gate typecheck+lint+710 tests hijau, pushed   `ec017d6`/`70b78e4`. Migrasi APPLIED prod 17 Sep ~11:00 via MCP (10/10 model aktif,
   advisors bersih). [USER ACTION] (1) seed key ciora ke Vault → (2) smoke test 10 model.
 - [171911-artikel-thin-content-json-salvage.md](2026-09-16/171911-artikel-thin-content-json-salvage.md) — RCA draf otomasi `87b9fdc1` (505 kata, cover `selected`, run failed di publishing): expand 910 kata gagal parse karena `sections` kehilangan `}{` (duplicate-key → 1 section). Fix: `repairArticleJson` (menang-banyak-section) + retry thin-repair 1x + aturan JSON eksplisit di prompt + runner fail-fast `thin_content` (hemat cover+publish). Gate 698 tests + build hijau. User expand manual 827 kata → published 09:33 UTC, artikel live + cover. [USER ACTION] Deploy Vercel.
@@ -88,9 +91,6 @@ Last updated: 2026-09-17 10:49 (local time)
 - [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
 - [144500-review-artikel-419a2dc8-fix.md](2026-09-14/144500-review-artikel-419a2dc8-fix.md) — Fix 5 temuan review artikel `419a2dc8` (488 kata/thin): prompt hardening + thin-repair 1x + emoji 1/section; cover tampil di review + wiring `cover_image_url` saat publish; upload cover manual; box produk + highlight section afiliasi (reuse `affiliate_products.image`); `expandArticleDraft` untuk repair manual; swap patch body artikel. Gate hijau 569 tests + build, tanpa migrasi.
 - [120000-riset-9a24c768-gambar-produk-404.md](2026-09-14/120000-riset-9a24c768-gambar-produk-404.md) — RCA gambar produk 404 di `/admin/riset/9a24c768`: scrape 12 Sep sukses upsert DB + download 12 gambar tapi gagal gate `npm test` (fixture carousel `slice(0,3)` vs nama ber-spasi ganda) → step commit tak jalan → 12 `.webp` tak pernah masuk repo. Fix: fixture lokal test + normalisasi whitespace writer + fallback `onError` FixedProductCard + guard aset CI; workflow dispatch memulihkan 12 gambar (`e9cd7d0`), verifikasi produksi 200. Gate 556 tests hijau, `db0de1b`.
-- [214500-artikel-platform-seo.md](2026-09-13/214500-artikel-platform-seo.md) — Route Artikel sebagai platform riset baru (SEO): migrasi platform+tabel `articles` + prompt long-form + cabang development + publish per bahasa + halaman publik `/artikel`/`/articles` (SSG/ISR, JSON-LD, sitemap); gate hijau 555 tests + build, pushed `739ea40`/`4b91d56`. **Migrasi APPLIED prod 14 Sep** (terverifikasi: seed, 17 kolom, RLS 2 policy; advisors tanpa temuan baru). [USER ACTION] Uji sesi Artikel pertama.
-- [143000-riset-9a24c768-developing-gate-fix.md](2026-09-13/143000-riset-9a24c768-developing-gate-fix.md) — RCA riset `9a24c768` (mekanisme dua) failed "produk tetap tidak aktif/hilang": gate lama menyatukan 3 kasus tanpa log; akar transient = Supabase 504 intermiten di tick cron. Fix: `classifyFixedProducts` 3-kasus + defer cap 5/24j (bukan failed) + pending eksak + `updated_at` di semua UPDATE failed + validasi produk di `advanceToDevelopment` + guard soft-delete scraper 20%; sesi di-resume → 8/8 draf, `completed`; gate 536 tests hijau, pushed `3fafebe`.
-- [020000-studio-surface-real-errors.md](2026-09-13/020000-studio-surface-real-errors.md) — Studio: action client-facing (upload ref/enqueue/enhance/retry/delete) kini kembalikan `{ok,data}|{ok,error}` (pola `ActionResult` konten) agar pesan error asli tampil, bukan digest generik Next.js; gate 527 tests hijau, pushed `b222157`.
 - _(entri lebih lama diarsipkan sebagai file di .memory/ - tidak dihapus, hanya tidak ditautkan di indeks 20-terbaru)_
 ## Legacy Archive
 
