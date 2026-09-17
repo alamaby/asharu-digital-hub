@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchThroughput, summarizeLabRuns, tokensPerSec } from './stats';
+import { batchThroughput, findWinners, summarizeLabRuns, tokensPerSec } from './stats';
 import type { LabRunRow } from './types';
 
 function run(over: Partial<LabRunRow>): LabRunRow {
@@ -61,6 +61,48 @@ describe('batchThroughput', () => {
         { total_tokens: null, latency_ms: null }
       ])
     ).toBeNull();
+  });
+});
+
+describe('findWinners', () => {
+  const w = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    ok: true,
+    latencyMs: 1000,
+    tps: 10,
+    total: 100,
+    ...over
+  });
+
+  it('terendah/tertinggi menang per metrik', () => {
+    const out = findWinners([
+      w('a', { latencyMs: 500, tps: 20, total: 80 }),
+      w('b', { latencyMs: 2000, tps: 5, total: 200 })
+    ]);
+    expect(out).toEqual({ latency: ['a'], speed: ['a'], tokens: ['a'] });
+  });
+
+  it('seri menang semua', () => {
+    const out = findWinners([w('a', { latencyMs: 500 }), w('b', { latencyMs: 500 })]);
+    expect(out.latency).toEqual(['a', 'b']);
+  });
+
+  it('run error dan NULL didiskualifikasi', () => {
+    const out = findWinners([
+      w('a', { ok: false, latencyMs: 100 }),
+      w('b', { latencyMs: null, tps: null, total: null }),
+      w('c', { latencyMs: 900 })
+    ]);
+    expect(out).toEqual({ latency: ['c'], speed: ['c'], tokens: ['c'] });
+  });
+
+  it('kosong/semua-NULL = tak ada pemenang', () => {
+    expect(findWinners([])).toEqual({ latency: [], speed: [], tokens: [] });
+    expect(findWinners([w('a', { latencyMs: null, tps: null, total: null })])).toEqual({
+      latency: [],
+      speed: [],
+      tokens: []
+    });
   });
 });
 

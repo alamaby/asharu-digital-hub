@@ -44,6 +44,7 @@ export interface NavItem {
     | '/konten/review/[draftId]'
     | '/studio'
     | '/lab'
+    | '/lab/[batchId]'
     | '/masuk';
   /** In-page anchor (homepage sections). */
   hash?: string;

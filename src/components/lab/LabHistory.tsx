@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { Check, Copy, RotateCcw, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { formatDateTime } from '@/lib/utils/format';
 import type { LabBatchRow, LabBatchWithRuns, LabRunRow } from '@/lib/lab/types';
@@ -212,6 +213,12 @@ export function LabHistory({ batches: initial, locale, timeZone, refreshKey = 0,
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  <Link
+                    href={{ pathname: '/lab/[batchId]', params: { batchId: batch.id } }}
+                    className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-muted hover:text-primary"
+                  >
+                    {t('openDetail')}
+                  </Link>
                   <button
                     type="button"
                     onClick={() => onReuse?.({ batch, runs })}

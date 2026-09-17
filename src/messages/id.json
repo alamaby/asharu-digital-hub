@@ -954,7 +954,11 @@
       "latency": "Latensi",
       "speed": "Kecepatan",
       "ttftPending": "TTFT: streaming menyusul (fase 2)",
-      "errorTitle": "Gagal (strict, tanpa fallback)"
+      "errorTitle": "Gagal (strict, tanpa fallback)",
+      "bestLatency": "Latensi terendah",
+      "bestSpeed": "Kecepatan tertinggi",
+      "bestTokens": "Token tersedikit",
+      "legend": "Kotak hijau = terbaik per metrik"
     },
     "history": {
       "heading": "Riwayat Uji",
@@ -971,6 +975,7 @@
       "sortNewest": "Terbaru dulu",
       "sortOldest": "Terlama dulu",
       "reuse": "Pakai ulang",
+      "openDetail": "Buka detail",
       "delete": "Hapus",
       "deleteConfirm": "Yakin hapus batch ini?",
       "cancelDelete": "Batal",
@@ -1002,12 +1007,24 @@
       "statusTitle": "Status runs",
       "ms": "ms",
       "tps": "tok/s",
-      "unknown": "tak diketahui"
+      "unknown": "tak diketahui",
+      "legend": "Bar penuh = terbaik; bar redup = bukan pemenang"
     },
     "notice": {
       "running": "Menjalankan ke {count} target...",
       "done": "Selesai — {ok} sukses, {err} gagal.",
       "empty": "Belum ada hasil. Isi form di atas lalu Jalankan."
+    },
+    "detail": {
+      "back": "Kembali ke Chat Lab",
+      "heading": "Detail Komparasi",
+      "promptLabel": "Prompt",
+      "systemLabel": "System",
+      "notFound": "Batch tidak ditemukan (mungkin sudah kedaluwarsa).",
+      "downloadCard": "Unduh kartu (1080×1080)",
+      "downloadingCard": "Menyiapkan gambar...",
+      "shareCard": "Bagikan",
+      "cardReady": "Kartu siap — unduh lalu unggah ke sosmed favorit Anda."
     }
   }
 }

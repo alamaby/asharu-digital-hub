@@ -61,7 +61,7 @@ vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers())
 }));
 
-import { deleteLabBatch, getLabQuota, listLabBatches, runChatLabBatch } from './actions';
+import { deleteLabBatch, getLabBatch, getLabQuota, listLabBatches, runChatLabBatch } from './actions';
 import { buildLabExpiry } from './validation';
 
 const PROVIDERS = [
@@ -269,6 +269,23 @@ describe('listLabBatches — filter status', () => {
     resetDb({ batches: [B1, B2], runs: [okRun, errRun] });
     const out = await listLabBatches({ status: 'error' });
     expect(out.map((b) => b.batch.id)).toEqual(['b2']);
+  });
+});
+
+describe('getLabBatch', () => {
+  it('milik sendiri kembali batch + runs', async () => {
+    resetDb({
+      batches: [{ id: 'b1', user_id: 'u1', user_prompt: 'halo dunia tes' }],
+      runs: [{ id: 'r1', batch_id: 'b1', user_id: 'u1', provider_slug: 'naraya' }]
+    });
+    const out = await getLabBatch('b1');
+    expect(out.batch.id).toBe('b1');
+    expect(out.runs).toHaveLength(1);
+  });
+
+  it('batch hilang throw jujur', async () => {
+    resetDb({ batches: [], runs: [] });
+    await expect(getLabBatch('missing')).rejects.toThrow(/tidak ditemukan/);
   });
 });
 

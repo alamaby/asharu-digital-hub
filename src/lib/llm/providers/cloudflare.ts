@@ -38,17 +38,46 @@ export class CloudflareProvider implements LLMProvider {
       throw new LLMHttpError(res.status, `LLM cloudflare ${res.status}: ${text.slice(0, 500)}`);
     }
     const json = (await res.json()) as {
-      result?: { response?: string; choices?: { message?: { content?: string } }[] };
+      result?: {
+        response?: string;
+        choices?: { message?: { content?: string } }[];
+        usage?: Record<string, unknown>;
+      };
+      usage?: Record<string, unknown>;
       response?: string;
     };
     // Workers AI returns OpenAI-style choices for chat models, plus a legacy
-    // `result.response` string for text models.
+    // `result.response` string for text models. Newer models also report
+    // `result.usage` (prompt/completion/total tokens) — previously ignored,
+    // which left Chat Lab metrics blank for Cloudflare.
     const content =
       json.result?.choices?.[0]?.message?.content ?? json.result?.response ?? json.response ?? '';
     return {
       text: typeof content === 'string' ? content : JSON.stringify(content),
+      usage: normalizeUsage(json.result?.usage ?? json.usage),
       model: input.model,
       latencyMs: Date.now() - started
     };
   }
+}
+
+/** Accept snake_case, camelCase, and short aliases (toleran antar model). */
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+function normalizeUsage(u: Record<string, unknown> | undefined):
+  | { promptTokens: number; completionTokens: number; totalTokens?: number }
+  | undefined {
+  if (!u) return undefined;
+  const prompt = num(u.prompt_tokens) ?? num(u.promptTokens) ?? num(u.input_tokens);
+  const completion =
+    num(u.completion_tokens) ?? num(u.completionTokens) ?? num(u.output_tokens);
+  const total = num(u.total_tokens) ?? num(u.totalTokens);
+  if (prompt === undefined && completion === undefined && total === undefined) return undefined;
+  return {
+    promptTokens: prompt ?? 0,
+    completionTokens: completion ?? 0,
+    totalTokens: total
+  };
 }

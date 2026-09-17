@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { formatCompact, type LabSummary } from '@/lib/lab/stats';
+import { findWinners, formatCompact, type LabSummary } from '@/lib/lab/stats';
 
 interface Props {
   summary: LabSummary | null;
@@ -62,10 +62,15 @@ export function LabStats({ summary, locale }: Props) {
   const maxTokens = Math.max(1, ...summary.byRun.map((c) => c.prompt + c.completion));
   const maxLatency = Math.max(1, ...summary.byRun.map((c) => c.latencyMs ?? 0));
   const maxTps = Math.max(0.01, ...summary.byRun.map((c) => c.tps ?? 0));
+  const winners = findWinners(
+    summary.byRun.map((c) => ({ id: c.runId, ok: c.ok, latencyMs: c.latencyMs, tps: c.tps, total: c.total }))
+  );
+  const hasWinners = winners.latency.length + winners.speed.length + winners.tokens.length > 0;
 
   return (
     <section aria-label={t('heading')} className="mt-10 space-y-3">
       <h2 className="text-lg font-semibold text-ink">{t('heading')}</h2>
+      {hasWinners ? <p className="text-xs text-ink-muted">{t('legend')}</p> : null}
 
       <div className="rounded-xl border border-line bg-surface p-3">
         <div className="grid grid-cols-3 gap-1.5">
@@ -88,13 +93,14 @@ export function LabStats({ summary, locale }: Props) {
             {summary.byRun.map((c, i) => {
               const inPct = ((c.prompt / maxTokens) * 100).toFixed(1);
               const outPct = ((c.completion / maxTokens) * 100).toFixed(1);
+              const win = winners.tokens.includes(c.runId);
               return (
                 <li key={i} className="text-[11px]">
-                  <p className="truncate text-ink-muted" title={c.label}>
-                    {c.label}{!c.ok ? ' · ERR' : ''}{c.fallback ? ' · fb' : ''}
+                  <p className={`truncate ${win ? 'font-semibold text-emerald-600' : 'text-ink-muted'}`} title={c.label}>
+                    {win ? '★ ' : ''}{c.label}{!c.ok ? ' · ERR' : ''}{c.fallback ? ' · fb' : ''}
                   </p>
                   <div
-                    className="mt-0.5 flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+                    className={`mt-0.5 flex h-2.5 w-full overflow-hidden rounded-full bg-muted ${win ? '' : 'opacity-40'}`}
                     role="img"
                     aria-label={`${c.label}: in ${c.prompt}, out ${c.completion}`}
                   >
@@ -136,9 +142,11 @@ export function LabStats({ summary, locale }: Props) {
         <ul className="mt-2 space-y-1.5">
           {summary.byRun.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[11px]">
-              <span className="w-40 shrink-0 truncate text-ink-muted" title={c.label}>{c.label}</span>
+              <span className={`w-40 shrink-0 truncate ${winners.latency.includes(c.runId) ? 'font-semibold text-emerald-600' : 'text-ink-muted'}`} title={c.label}>
+                {winners.latency.includes(c.runId) ? '★ ' : ''}{c.label}
+              </span>
               <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${c.label}: ${c.latencyMs ?? 0}ms`}>
-                <div className="h-full rounded-full bg-sky-500" style={{ width: `${(((c.latencyMs ?? 0) / maxLatency) * 100).toFixed(1)}%` }} />
+                <div className={`h-full rounded-full ${winners.latency.includes(c.runId) ? 'bg-emerald-500' : 'bg-sky-500 opacity-40'}`} style={{ width: `${(((c.latencyMs ?? 0) / maxLatency) * 100).toFixed(1)}%` }} />
               </div>
               <span className="w-14 shrink-0 text-right font-mono text-[10px] text-ink-muted">
                 {c.latencyMs === null ? '-' : fmtMs(c.latencyMs)}
@@ -153,9 +161,11 @@ export function LabStats({ summary, locale }: Props) {
         <ul className="mt-2 space-y-1.5">
           {summary.byRun.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[11px]">
-              <span className="w-40 shrink-0 truncate text-ink-muted" title={c.label}>{c.label}</span>
+              <span className={`w-40 shrink-0 truncate ${winners.speed.includes(c.runId) ? 'font-semibold text-emerald-600' : 'text-ink-muted'}`} title={c.label}>
+                {winners.speed.includes(c.runId) ? '★ ' : ''}{c.label}
+              </span>
               <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${c.label}: ${c.tps ?? 0} tok/s`}>
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(((c.tps ?? 0) / maxTps) * 100).toFixed(1)}%` }} />
+                <div className={`h-full rounded-full bg-emerald-500 ${winners.speed.includes(c.runId) ? '' : 'opacity-40'}`} style={{ width: `${(((c.tps ?? 0) / maxTps) * 100).toFixed(1)}%` }} />
               </div>
               <span className="w-14 shrink-0 text-right font-mono text-[10px] text-ink-muted">
                 {c.tps === null ? t('unknown') : c.tps}

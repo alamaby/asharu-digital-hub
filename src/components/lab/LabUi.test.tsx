@@ -9,6 +9,7 @@ import { LabForm } from './LabForm';
 import { LabCompareGrid } from './LabCompareGrid';
 import { LabHistory } from './LabHistory';
 import { LabStats } from './LabStats';
+import { LabCardActions } from './LabCardActions';
 
 vi.mock('@/lib/lab/actions', () => ({
   runChatLabBatch: vi.fn(async () => ({ ok: true, data: { batchId: 'batch-1' } })),
@@ -94,8 +95,8 @@ function summary(): LabSummary {
     avgTokensPerSec: 15,
     successPct: 66.7,
     byRun: [
-      { label: 'naraya / model-a', provider: 'naraya', model: 'naraya/model-a', prompt: 10, completion: 20, latencyMs: 1000, tps: 20, ok: true, fallback: false, createdAt: '2026-09-17T10:00:00Z' },
-      { label: 'openrouter / model-b', provider: 'openrouter', model: 'openrouter/model-b', prompt: 15, completion: 25, latencyMs: 2000, tps: 12.5, ok: true, fallback: true, createdAt: '2026-09-17T11:00:00Z' }
+      { runId: 'r1', label: 'naraya / model-a', provider: 'naraya', model: 'naraya/model-a', prompt: 10, completion: 20, total: 30, latencyMs: 1000, tps: 20, ok: true, fallback: false, createdAt: '2026-09-17T10:00:00Z' },
+      { runId: 'r2', label: 'openrouter / model-b', provider: 'openrouter', model: 'openrouter/model-b', prompt: 15, completion: 25, total: 40, latencyMs: 2000, tps: 12.5, ok: true, fallback: true, createdAt: '2026-09-17T11:00:00Z' }
     ]
   };
 }
@@ -113,6 +114,7 @@ describe('LabStats', () => {
     expect(screen.getByText('Latensi per run (ms)')).toBeDefined();
     expect(screen.getByText('Kecepatan per run (tok/s)')).toBeDefined();
     expect(screen.getAllByText('Token per run (masuk + keluar)').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bar penuh = terbaik; bar redup = bukan pemenang')).toBeDefined();
   });
 });
 
@@ -128,6 +130,14 @@ describe('LabCompareGrid', () => {
     expect(screen.getByText('naraya / model-a')).toBeDefined();
     expect(screen.getByText('openrouter / model-b')).toBeDefined();
     expect(screen.getAllByText('Halo juga!')).toHaveLength(2);
+  });
+
+  it('kotak metrik terbaik di-highlight', () => {
+    renderWithMessages(<LabCompareGrid result={batch()} />);
+    // r1: latensi 1000 < 2000, tok/s 20 > 10 → menang keduanya (batch() default)
+    expect(screen.getByTitle('Latensi terendah')).toBeDefined();
+    expect(screen.getByTitle('Kecepatan tertinggi')).toBeDefined();
+    expect(screen.getByText('Kotak hijau = terbaik per metrik')).toBeDefined();
   });
 
   it('run error tampil jujur', () => {
@@ -163,5 +173,21 @@ describe('LabHistory', () => {
     expect(screen.getByText('Jelaskan fotosintesis.')).toBeDefined();
     expect(screen.getByText('Pakai ulang')).toBeDefined();
     expect(screen.getByText('Hapus')).toBeDefined();
+  });
+
+  it('ada link buka detail per batch', () => {
+    renderWithMessages(
+      <LabHistory batches={[batch()]} locale="id" timeZone="Asia/Jakarta" />
+    );
+    const link = screen.getByText('Buka detail').closest('a');
+    expect(link?.getAttribute('href')).toContain('/lab/b1');
+  });
+});
+
+describe('LabCardActions', () => {
+  it('render tombol unduh + bagikan', () => {
+    renderWithMessages(<LabCardActions batchId="b1" />);
+    expect(screen.getByText('Unduh kartu (1080×1080)')).toBeDefined();
+    expect(screen.getByText('Bagikan')).toBeDefined();
   });
 });

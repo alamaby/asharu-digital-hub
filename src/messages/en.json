@@ -954,7 +954,11 @@
       "latency": "Latency",
       "speed": "Speed",
       "ttftPending": "TTFT: streaming coming in phase 2",
-      "errorTitle": "Failed (strict, no fallback)"
+      "errorTitle": "Failed (strict, no fallback)",
+      "bestLatency": "Lowest latency",
+      "bestSpeed": "Highest speed",
+      "bestTokens": "Fewest tokens",
+      "legend": "Green box = best per metric"
     },
     "history": {
       "heading": "Test History",
@@ -971,6 +975,7 @@
       "sortNewest": "Newest first",
       "sortOldest": "Oldest first",
       "reuse": "Reuse",
+      "openDetail": "Open detail",
       "delete": "Delete",
       "deleteConfirm": "Delete this batch?",
       "cancelDelete": "Cancel",
@@ -1002,12 +1007,24 @@
       "statusTitle": "Run status",
       "ms": "ms",
       "tps": "tok/s",
-      "unknown": "unknown"
+      "unknown": "unknown",
+      "legend": "Full bar = winner; dimmed bar = not a winner"
     },
     "notice": {
       "running": "Running on {count} targets...",
       "done": "Done — {ok} succeeded, {err} failed.",
       "empty": "No results yet. Fill the form above then Run."
+    },
+    "detail": {
+      "back": "Back to Chat Lab",
+      "heading": "Comparison Detail",
+      "promptLabel": "Prompt",
+      "systemLabel": "System",
+      "notFound": "Batch not found (it may have expired).",
+      "downloadCard": "Download card (1080×1080)",
+      "downloadingCard": "Preparing image...",
+      "shareCard": "Share",
+      "cardReady": "Card ready — download then upload to your favorite social app."
     }
   }
 }
