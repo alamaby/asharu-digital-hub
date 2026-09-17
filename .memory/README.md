@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-17 11:48 (local time)
+Last updated: 2026-09-17 12:59 (local time)
 
 ## Current State
 
@@ -37,6 +37,8 @@ Last updated: 2026-09-17 11:48 (local time)
 ## Open Items / Blockers
 
 - [ ] **Verifikasi live Chat Lab [USER ACTION]:** login → `/id/lab` submit 1–2 target → cek hasil side-by-side + history + stats; anon harus redirect `/masuk`. Opsional: cek cron `asharu-lab-cleanup` di Supabase Dashboard → Cron Jobs.
+- [ ] **Live verify token Cloudflare [USER ACTION]:** submit 1 target Cloudflare di `/id/lab` → kolom Masuk/Keluar/Total harus terisi (fix parse `usage`, `ac095c9`). Bila tetap `-`, laporkan agar diputuskan tahap B (pindah endpoint OpenAI-compatible).
+- [ ] **Verifikasi live highlight/detail/kartu [USER ACTION]:** kotak ★ + bar penuh di hasil & stats; buka `/id/lab/[id]` dari history (metrik + chart + log); tombol Unduh kartu 1080 + Bagikan.
 
 - [ ] **Purge cache katalog otomatis [USER ACTION]:** tambahkan `CRON_SECRET` ke GitHub Actions secrets (environment `Production`) agar step revalidate di `.github/workflows/scrape-affiliate.yml` aktif; opsional set repo variable `SITE_URL` (default `https://asharu.id`). Tanpa itu purge dilewati (warning) dan ISR 1 jam tetap berlaku.
 
@@ -64,11 +66,12 @@ Last updated: 2026-09-17 11:48 (local time)
 
 ## Recent Entries
 
+- [125908-chat-lab-improvements.md](2026-09-17/125908-chat-lab-improvements.md) — 4 peningkatan Chat Lab: highlight ★ pemenang (latensi/speed/token) di grid + chart, parse `usage` Cloudflare (tahap B ditunda menunggu live verify), halaman detail `/lab/[batchId]` (metrik+chart+log), kartu share PNG 1080 via next/og + Unduh/Bagikan. Gate 754 tests + build hijau, pushed `ac095c9`. [USER ACTION] Live verify token CF + highlight/detail/kartu.
 - [114800-chat-lab-menu.md](2026-09-17/114800-chat-lab-menu.md) — Menu **Chat Lab** `/lab` (login-only, sidebar sejajar Studio): 1 prompt → fan-out paralel 1–3 target strict-pin (tanpa fallback, adil) + side-by-side + metrik token/latency/tok/s + history per-user 30 hari + log detail + chart CSS-only + kuota 50/hari + rate 30/jam. Migrasi `20260918000001` applied prod, gate typecheck+lint+742 tests+build hijau, pushed `7541c8d`/`a6dfa2b`. [USER ACTION] Verifikasi live (atas).
 - [104940-ciora-llm-provider.md](2026-09-17/104940-ciora-llm-provider.md) — Provider LLM `ciora` (`https://ciora.id/v1`, OpenAI-only) priority 5 (paling depan) + 10 model reasoning max. Kode (slug union, filter review, factory+3 tests, seed prompt) + migrasi `20260917000001`. Gate typecheck+lint+710 tests hijau, pushed   `ec017d6`/`70b78e4`. Migrasi APPLIED prod 17 Sep ~11:00 via MCP (10/10 model aktif,
   advisors bersih). [USER ACTION] (1) seed key ciora ke Vault → (2) smoke test 10 model.
 - [171911-artikel-thin-content-json-salvage.md](2026-09-16/171911-artikel-thin-content-json-salvage.md) — RCA draf otomasi `87b9fdc1` (505 kata, cover `selected`, run failed di publishing): expand 910 kata gagal parse karena `sections` kehilangan `}{` (duplicate-key → 1 section). Fix: `repairArticleJson` (menang-banyak-section) + retry thin-repair 1x + aturan JSON eksplisit di prompt + runner fail-fast `thin_content` (hemat cover+publish). Gate 698 tests + build hijau. User expand manual 827 kata → published 09:33 UTC, artikel live + cover. [USER ACTION] Deploy Vercel.
-- [130236-studio-upload-resilience.md](2026-09-16/130236-studio-upload-resilience.md) — RCA Studio `c19c8d2f` (failed "studio storage upload failed: <none>"): pixazo sukses generate, upload ke Storage kena **HTTP 520** transient (edge_logs; `storage.objects` kosong; `net._http_response` cron). Patch: `StudioStorageError` + `isTransientStorageError` + `describeStorageError` + `uploadUserImageWithRetry` (2 retry/backoff, 5xx-408-429 saja) di `storage.ts`, dan **pisah fase generate vs fase upload** di worker (upload gagal = failed jujur, tidak fallback ke provider lain). Gate 692 tests hijau, pushed `7788f57`. [USER ACTION] Klik Ulangi baris `c19c8d2f`.
+- [130236-studio-upload-resilience.md](2026-09-16/130236-studio-upload-resilience.md) — RCA Studio `c19c8d2f` (failed "studio storage upload failed: <none>"): pixazo sukses generate, upload ke Storage kena **HTTP 520** transient. Patch: retry/backoff + pisah fase generate vs upload di worker. Gate 692 tests hijau, pushed `7788f57`. [USER ACTION] Klik Ulangi baris `c19c8d2f`.
 
 - [105037-studio-enhance-field-aware.md](2026-09-16/105037-studio-enhance-field-aware.md) — Enhance prompt Studio kini sadar-field: Preset style/Template subjek/Camera angle dikirim sebagai input (opsi aktif + konteks terpilih ke LLM), LLM memilihkan slug untuk field Auto (divalidasi ke himpunan aktif, anti-halusinasi → null), negative prompt WAJIB (gate `requireNegative` + retry), diff 3 picker di side-by-side, Terima menerapkan slug, `maxTokens` 1000. Bug laten Undo (tombol di dalam panel yang tertutup) ikut diperbaiki. Gate 681 tests hijau, pushed `e48564e`.
 
@@ -90,7 +93,6 @@ Last updated: 2026-09-17 11:48 (local time)
 - [155000-artikel-linkify-afiliasi.md](2026-09-14/155000-artikel-linkify-afiliasi.md) — URL inline di body artikel kini anchor bisa diklik (publik + pratinjau + draf review) via `linkifyText`; tanda baca akhir tak ikut href. Gate 574 tests + build hijau.
 - [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
 - [144500-review-artikel-419a2dc8-fix.md](2026-09-14/144500-review-artikel-419a2dc8-fix.md) — Fix 5 temuan review artikel `419a2dc8` (488 kata/thin): prompt hardening + thin-repair 1x + emoji 1/section; cover tampil di review + wiring `cover_image_url` saat publish; upload cover manual; box produk + highlight section afiliasi (reuse `affiliate_products.image`); `expandArticleDraft` untuk repair manual; swap patch body artikel. Gate hijau 569 tests + build, tanpa migrasi.
-- [120000-riset-9a24c768-gambar-produk-404.md](2026-09-14/120000-riset-9a24c768-gambar-produk-404.md) — RCA gambar produk 404 di `/admin/riset/9a24c768`: scrape 12 Sep sukses upsert DB + download 12 gambar tapi gagal gate `npm test` (fixture carousel `slice(0,3)` vs nama ber-spasi ganda) → step commit tak jalan → 12 `.webp` tak pernah masuk repo. Fix: fixture lokal test + normalisasi whitespace writer + fallback `onError` FixedProductCard + guard aset CI; workflow dispatch memulihkan 12 gambar (`e9cd7d0`), verifikasi produksi 200. Gate 556 tests hijau, `db0de1b`.
 - _(entri lebih lama diarsipkan sebagai file di .memory/ - tidak dihapus, hanya tidak ditautkan di indeks 20-terbaru)_
 ## Legacy Archive
 
