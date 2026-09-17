@@ -35,13 +35,13 @@ semua `reasoning_effort=max` default.
   `(naraya/openrouter/gemini/cloudflare/ciora)`; `.env.example` — tambah Ciora.
 - [x] Migrasi di submodule `supabase/` (`20260917000001_llm_models_ciora.sql`),
   non-destruktif mengikuti pola `20260910000001_llm_models_gemini_bynara.sql`.
-- [ ] Commit submodule `supabase/` DULU, baru parent.
+- [x] Commit submodule `supabase/` DULU, baru parent.
 - [ ] [USER ACTION] Seed 1 key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
   → slug `ciora`, priority `0`.
 - [x] Gate: `npm run typecheck`, `npm run lint`, `npm test` (+ `npm run build` bila
   sentuh pola build-only). Setiap edit setelah hijau = re-run gate.
 - [ ] Smoke test per model via curl + cek `llm_call_logs`.
-- [ ] Memory: 1 entri `.memory/` + update `.memory/README.md`.
+- [x] Memory: 1 entri `.memory/` + update `.memory/README.md`.
 
 ## Risks
 
@@ -60,6 +60,9 @@ semua `reasoning_effort=max` default.
 
 - 2026-09-17 22:56:00 — rencana disusun dari jawaban user (max semua, depan, 1 key,
   OpenAI-only); eksekusi dimulai (build mode).
+- 2026-09-17 10:49 — kode + migrasi selesai, gate hijau (typecheck/lint/710 tests),
+  commit submodule `70b78e4` + parent `ec017d6`, pushed. Memory `0239a84`.
+  Sisa user action: seed key, apply migrasi prod, smoke test 10 model.
 
 ## Notes
 
