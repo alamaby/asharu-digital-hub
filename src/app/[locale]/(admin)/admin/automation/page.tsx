@@ -8,10 +8,9 @@ import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { Link } from '@/i18n/navigation';
 import {
-  retryAutomationRun,
-  runAutomationNow,
-  updateAutomationConfig
-} from '@/lib/automation/actions';
+  AutomationConfigForm,
+  RetryRunForm
+} from '@/components/admin/automation/AutomationForms';
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata({
@@ -67,22 +66,40 @@ interface RunRow {
   published_at: string | null;
   updated_at: string;
 }
+// Nilai null/undefined dari Supabase dinormalkan agar props serializable
+// dan cocok dengan tipe form client.
+import type { ConfigFormData } from '@/components/admin/automation/AutomationForms';
 
-const TONES = ['casual', 'formal', 'witty', 'professional', 'friendly', 'edukatif'];
-const LANGUAGES = [
-  { value: 'both', label: 'Indonesia + Inggris' },
-  { value: 'id', label: 'Indonesia' },
-  { value: 'en', label: 'Inggris' }
-];
-const NOTIFY_OPTIONS = [
-  { value: 'both', label: 'Draft siap + Published' },
-  { value: 'draft_ready', label: 'Hanya draft siap' },
-  { value: 'published', label: 'Hanya published' },
-  { value: 'none', label: 'Tidak ada email' }
-];
-
-const inputCls = 'mt-1 w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink';
-const labelCls = 'block text-sm text-ink';
+function toConfigFormData(cfg: ConfigRow): ConfigFormData {
+  return {
+    is_enabled: cfg.is_enabled,
+    schedule_hour: cfg.schedule_hour,
+    schedule_minute: cfg.schedule_minute,
+    timezone: cfg.timezone,
+    schedule_window_minutes: cfg.schedule_window_minutes,
+    platform_slugs: cfg.platform_slugs ?? [],
+    template_slug: cfg.template_slug,
+    max_topics: cfg.max_topics,
+    language: cfg.language,
+    tone: cfg.tone,
+    audience: cfg.audience,
+    purpose: cfg.purpose,
+    cta_style: cfg.cta_style,
+    target_reply_count: cfg.target_reply_count,
+    product_pool_size: cfg.product_pool_size,
+    product_category: cfg.product_category,
+    require_cover: cfg.require_cover,
+    cover_max_wait_minutes: cfg.cover_max_wait_minutes,
+    cover_max_attempts: cfg.cover_max_attempts,
+    auto_publish_article: cfg.auto_publish_article,
+    max_retry_attempts: cfg.max_retry_attempts,
+    notify_on: cfg.notify_on,
+    notify_emails: cfg.notify_emails ?? [],
+    email_from: cfg.email_from,
+    email_reply_to: cfg.email_reply_to,
+    last_run_at: cfg.last_run_at
+  };
+}
 
 export default async function AutomationAdminPage({
   params
@@ -132,178 +149,13 @@ export default async function AutomationAdminPage({
           Baris config (id=1) belum ada — jalankan migrasi `20260915000003_automation_config.sql`.
         </p>
       ) : (
-        <form action={updateAutomationConfig} className="mt-6 rounded-xl border border-line bg-surface p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-ink">Konfigurasi</p>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input type="checkbox" name="is_enabled" defaultChecked={cfg.is_enabled} />
-              Aktif (kill-switch)
-            </label>
-          </div>
-
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">Jadwal</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <label className={labelCls}>
-              Jam (0–23)
-              <input type="number" min={0} max={23} name="schedule_hour" defaultValue={cfg.schedule_hour} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Menit (0–59)
-              <input type="number" min={0} max={59} name="schedule_minute" defaultValue={cfg.schedule_minute} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Timezone
-              <input name="timezone" defaultValue={cfg.timezone} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Jendela (menit)
-              <input type="number" min={5} max={1440} name="schedule_window_minutes" defaultValue={cfg.schedule_window_minutes} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Retry maks/hari
-              <input type="number" min={0} max={10} name="max_retry_attempts" defaultValue={cfg.max_retry_attempts} className={inputCls} />
-            </label>
-            <p className="self-end text-xs text-ink-muted">
-              Terakhir run: {cfg.last_run_at ? new Date(cfg.last_run_at).toLocaleString() : '—'}
-            </p>
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Platform & topik</p>
-          <fieldset className="mt-2 flex flex-wrap gap-3">
-            {platformRows.map((p) => (
-              <label key={p.slug} className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  name="platform_slugs"
-                  value={p.slug}
-                  defaultChecked={cfg.platform_slugs.includes(p.slug)}
-                />
-                {p.display_name} <span className="font-mono text-xs text-ink-muted">({p.slug})</span>
-              </label>
-            ))}
-          </fieldset>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className={labelCls}>
-              Maks topik
-              <input type="number" min={1} max={10} name="max_topics" defaultValue={cfg.max_topics} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Template riset
-              <select name="template_slug" defaultValue={cfg.template_slug ?? ''} className={inputCls}>
-                <option value="">Bebas</option>
-                {templateRows.map((t) => (
-                  <option key={t.slug} value={t.slug}>{t.display_name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Pemilihan produk</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <label className={labelCls}>
-              Pool produk terbaru (N)
-              <input type="number" min={1} max={500} name="product_pool_size" defaultValue={cfg.product_pool_size} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Filter kategori (opsional)
-              <input name="product_category" defaultValue={cfg.product_category ?? ''} placeholder="electronics" className={inputCls} />
-            </label>
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Gaya konten</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <label className={labelCls}>
-              Bahasa
-              <select name="language" defaultValue={cfg.language} className={inputCls}>
-                {LANGUAGES.map((l) => (<option key={l.value} value={l.value}>{l.label}</option>))}
-              </select>
-            </label>
-            <label className={labelCls}>
-              Tone
-              <select name="tone" defaultValue={cfg.tone} className={inputCls}>
-                {TONES.map((t) => (<option key={t} value={t}>{t}</option>))}
-              </select>
-            </label>
-            <label className={labelCls}>
-              CTA style
-              <input name="cta_style" defaultValue={cfg.cta_style} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Audience
-              <input name="audience" defaultValue={cfg.audience} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Purpose
-              <input name="purpose" defaultValue={cfg.purpose} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Reply count (opsional)
-              <input type="number" min={1} max={10} name="target_reply_count" defaultValue={cfg.target_reply_count ?? ''} className={inputCls} />
-            </label>
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Cover & publish</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <label className="flex items-center gap-2 text-sm text-ink sm:col-span-3">
-              <input type="checkbox" name="require_cover" defaultChecked={cfg.require_cover} />
-              Wajib cover ter-render sebelum publish
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink sm:col-span-3">
-              <input type="checkbox" name="auto_publish_article" defaultChecked={cfg.auto_publish_article} />
-              Auto-publish artikel (tanpa review admin)
-            </label>
-            <label className={labelCls}>
-              Batas tunggu cover (menit)
-              <input type="number" min={5} max={720} name="cover_max_wait_minutes" defaultValue={cfg.cover_max_wait_minutes} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Maks percobaan cover
-              <input type="number" min={1} max={10} name="cover_max_attempts" defaultValue={cfg.cover_max_attempts} className={inputCls} />
-            </label>
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Email (Resend)</p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <label className={labelCls}>
-              Kirim email
-              <select name="notify_on" defaultValue={cfg.notify_on} className={inputCls}>
-                {NOTIFY_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-              </select>
-            </label>
-            <label className={labelCls}>
-              From
-              <input name="email_from" defaultValue={cfg.email_from} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Reply-to (opsional)
-              <input name="email_reply_to" defaultValue={cfg.email_reply_to ?? ''} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              Penerima (pisah koma; kosong = semua admin)
-              <input name="notify_emails" defaultValue={cfg.notify_emails.join(', ')} className={inputCls} />
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
-              Simpan
-            </button>
-          </div>
-        </form>
+        <AutomationConfigForm
+          cfg={toConfigFormData(cfg)}
+          platformRows={platformRows}
+          templateRows={templateRows}
+        />
       )}
-
-      {cfg ? (
-        <form action={runAutomationNow} className="mt-4">
-          <button
-            type="submit"
-            className="rounded-lg border border-line px-4 py-2 text-sm text-ink hover:bg-background"
-            title="Jalankan satu tick sekarang (mengabaikan jendela jadwal)"
-          >
-            Run now
-          </button>
-        </form>
-      ) : null}
-
+      
       <h2 className="mt-8 text-lg font-semibold text-ink">Riwayat run (20 terbaru)</h2>
       <div className="mt-3 space-y-3">
         {runRows.map((r) => (
@@ -337,11 +189,7 @@ export default async function AutomationAdminPage({
                   </Link>
                 ) : null}
                 {r.status === 'failed' && r.session_id ? (
-                  <form action={retryAutomationRun.bind(null, r.id)}>
-                    <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90">
-                      Coba lagi
-                    </button>
-                  </form>
+                  <RetryRunForm runId={r.id} />
                 ) : null}
               </div>
             </div>
