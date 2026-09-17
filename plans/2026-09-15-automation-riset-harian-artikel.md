@@ -99,6 +99,14 @@ Semua parameter perilaku disimpan di tabel config (`automation_configs`).
   melewati verify/scoring dan berhenti di `awaiting_selection`; `approveArticleAndPublish`
   admin-gated dan tidak mewajibkan cover; worker image auto-cover hanya sampai `prompt_ready`
   (belum render); tidak ada integrasi email sama sekali; pola config-by-table sudah mapan.
+- 2026-09-16 ~10:45 — **Fix UI + bug platform** (`880ea83`):
+  (1) Root cause: `csv()` memakai `form.get()` yang hanya mengambil nilai PERTAMA — checkbox
+  `platform_slugs` hanya menyimpan `artikel` meski 3 dicentang. Fix pakai `getAll`.
+  (2) Action kembalikan `AutomationActionResult` (bukan lempar).
+  (3) Form + tombol Run now + Coba lagi dipindah ke komponen client
+  `AutomationForms.tsx` dengan `ActionNoticeView` + `PendingButton` (pola `LlmForms`).
+  Audit field lain: semua tersimpan benar, hanya platform. Gate: typecheck ✓ lint ✓
+  **707 tests** ✓ build ✓.
 - 2026-09-15 21:10:00 — Jaminan "workflow tetap jalan meski email gagal" (`3ea8827`).
   Audit menemukan 4 jalur yang masih bisa melempar dan menghentikan tick: `resolveResendKey`
   (RPC jaringan), `resolveRecipients` (query profiles), `productLabel` (query produk), dan

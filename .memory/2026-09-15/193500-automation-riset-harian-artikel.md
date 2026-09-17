@@ -88,6 +88,31 @@ artikel + kirim email notifikasi via Resend. Semua knob harus configurable by ta
 - `24e3bdb` (parent) — `feat(automation): riset harian otomatis ke artikel + notifikasi Resend`
 - `d220acb` (parent) — `fix(automation): cegah orphan sesi + reset batas tunggu cover saat retry`
 - `3ea8827` (parent) — `fix(automation): jamin email best-effort agar workflow tidak pernah terhenti`
+- `880ea83` (parent) — `fix(automation): simpan semua platform + feedback jelas di admin UI`
+
+## Fix UI + Bug Platform (commit `880ea83`, 16 Sep)
+
+Keluhan user: platform tidak tersimpan (centang 3 → hanya `artikel` yang tersisa) dan tidak
+ada feedback saat klik Simpan / Run now.
+
+1. **Root cause platform:** `csv()` memakai `form.get()` yang hanya mengambil nilai PERTAMA
+   dari checkbox group. Urutan DOM alfabetis → `artikel` selalu yang tersimpan. Fix:
+   `listValues` memakai `form.getAll()`; wrapper `checkboxValues` (dedupe urutan stabil) untuk
+   `platform_slugs`, `csv` (teks koma) tetap untuk `notify_emails`.
+2. **Audit semua field:** `bool`/`num`/`str` + select/number/checkbox tunggal semuanya sudah
+   cocok nama ↔ action; hanya `platform_slugs` yang multi-nilai dan salah. `notify_emails`
+   aman (satu input teks).
+3. **Feedback UI:** action (`updateAutomationConfig`, `runAutomationNow`, `retryAutomationRun`)
+   kini return `AutomationActionResult` (pola `LlmActionResult`) bukan melempar; form config
+   + Run now + Coba lagi dipindah ke client `AutomationForms.tsx` memakai `ActionNoticeView`
+   + `PendingButton` dari `../llm/ActionFeedback` (pola yang sama dipakai LLM/visual).
+   Pelajaran build: di file `'use server'` **tidak boleh** ada `export` non-async (Next menandai
+   semuanya sebagai Server Action) — `checkboxValues` dibiarkan internal dan regresi diuji
+   lewat `updateAutomationConfig`.
+4. Pelajaran React Router v5/Next 15 App Router: inline `<form action={() => ...}>` ditolak
+   build ("Server Actions must be async functions") bila closure diinterpretasi sebagai aksi —
+   polanya diganti handler async bernama + `type="button" onClick`.
+5. Verifikasi: typecheck ✓ lint ✓ 707 tests ✓ build ✓.
 
 ## Jaminan Email Best-Effort (commit `3ea8827`)
 
