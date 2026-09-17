@@ -66,6 +66,8 @@ export interface ConfigFormData {
   target_reply_count: number | null;
   product_pool_size: number;
   product_category: string | null;
+  idea_generation_enabled: boolean;
+  idea_product_search: boolean;
   require_cover: boolean;
   cover_max_wait_minutes: number;
   cover_max_attempts: number;
@@ -211,6 +213,22 @@ export function AutomationConfigForm({
             Filter kategori (opsional)
             <input name="product_category" defaultValue={cfg.product_category ?? ''} placeholder="electronics" className={inputCls} />
           </label>
+        </div>
+
+        <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Generate ide (ideation)</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2">
+            <input type="checkbox" name="idea_generation_enabled" defaultChecked={cfg.idea_generation_enabled} />
+            Generate ide dari mekanisme produk sebelum riset (disarankan)
+          </label>
+          <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2">
+            <input type="checkbox" name="idea_product_search" defaultChecked={cfg.idea_product_search} />
+            Riset mekanisme via Tavily (mati = LLM-only dari nama produk, hemat kuota)
+          </label>
+          <p className="text-xs text-ink-muted sm:col-span-2">
+            Alur: riset mekanisme produk → LLM susun ide (topik, keywords, kategori, audience) → discovery memakai
+            parameter yang diperkaya. Gagal di tahap ini tidak menggagalkan run (lanjut parameter config mentah).
+          </p>
         </div>
 
         <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Gaya konten</p>

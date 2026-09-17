@@ -40,6 +40,8 @@ interface ConfigRow {
   target_reply_count: number | null;
   product_pool_size: number;
   product_category: string | null;
+  idea_generation_enabled: boolean;
+  idea_product_search: boolean;
   require_cover: boolean;
   cover_max_wait_minutes: number;
   cover_max_attempts: number;
@@ -88,6 +90,8 @@ function toConfigFormData(cfg: ConfigRow): ConfigFormData {
     target_reply_count: cfg.target_reply_count,
     product_pool_size: cfg.product_pool_size,
     product_category: cfg.product_category,
+    idea_generation_enabled: cfg.idea_generation_enabled ?? false,
+    idea_product_search: cfg.idea_product_search ?? true,
     require_cover: cfg.require_cover,
     cover_max_wait_minutes: cfg.cover_max_wait_minutes,
     cover_max_attempts: cfg.cover_max_attempts,
@@ -139,7 +143,7 @@ export default async function AutomationAdminPage({
       </div>
       <h1 className="text-2xl font-bold text-ink">Automation Riset Harian</h1>
       <p className="mt-1 text-sm text-ink-muted">
-        Cron tiap 5 menit, gated ke jam lokal di bawah, maksimal 1 run/hari. Alur: pilih acak 1 produk →
+        Cron tiap 5 menit, gated ke jam lokal di bawah, maksimal 1 run/hari.         Alur: pilih acak 1 produk → generate ide dari mekanisme produk (bila aktif) →
         riset (1 topik) → draf artikel/twitter/threads → cover wajib ter-render → publish artikel → email Resend.
         Semua knob di tabel — perubahan langsung dipakai tanpa deploy.
       </p>

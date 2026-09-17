@@ -4,6 +4,8 @@ import { env } from '@/lib/env';
 import { ARTICLE_MIN_WORDS } from '@/lib/llm/prompt';
 import { publishArticleDraftCore } from '@/lib/articles/publish';
 import { loadAutomationConfig, resolveRecipients, resolveRunLocales, type AutomationConfig } from './config';
+import { defaultIdeaDeps, generateSessionIdea, type GeneratedIdea, type IdeaProduct } from '@/lib/research/idea';
+import { getResearchTemplateHint } from '@/lib/research/templates';
 import { isRunDue, localDateString, pickRandomProduct } from './scheduler';
 import {
   sendDraftReadyEmail,
@@ -95,9 +97,48 @@ async function loadSessionStatus(
     .maybeSingle();
   return (data as { status: string } | null)?.status ?? null;
 }
+/** Detail produk untuk ideation + label email. Tidak pernah melempar. */
+async function loadProductDetail(
+  supabase: SupabaseClient,
+  productId: string | null
+): Promise<{ label: string; detail: IdeaProduct | null }> {
+  if (!productId) return { label: '(produk)', detail: null };
+  try {
+    const { data } = await supabase
+      .from('affiliate_products')
+      .select('id, friendly_code, name_id, name_en, category, merchant, url')
+      .eq('id', productId)
+      .maybeSingle();
+    const row = data as {
+      id: string;
+      friendly_code: string | null;
+      name_id: string | null;
+      name_en: string | null;
+      category: string | null;
+      merchant: string | null;
+      url: string | null;
+    } | null;
+    if (!row?.name_id) return { label: '(produk)', detail: null };
+    return {
+      label: row.name_id ?? row.friendly_code ?? '(produk)',
+      detail: {
+        id: row.id,
+        friendly_code: row.friendly_code,
+        name_id: row.name_id,
+        name_en: row.name_en,
+        category: row.category,
+        merchant: row.merchant,
+        url: row.url
+      }
+    };
+  } catch {
+    return { label: '(produk)', detail: null };
+  }
+}
 
 /** Produk name untuk email (fallback friendly_code). Tidak pernah melempar. */
 async function productLabel(supabase: SupabaseClient, productId: string | null): Promise<string> {
+
   if (!productId) return '(produk)';
   try {
     const { data } = await supabase
@@ -161,6 +202,56 @@ async function loadDrafts(
   );
 }
 
+/** Tahap ideation di createRun: riset mekanisme produk → generate ide.
+ * Fail-soft total: kembalikan null bila knob mati / tahap mana pun gagal —
+ * pemanggil memakai nilai config mentah (perilaku lama). Log best-effort
+ * agar operator bisa menelusuri provenance ide di halaman riset.
+ */
+async function enrichSessionIdea(
+  supabase: SupabaseClient,
+  cfg: AutomationConfig,
+  sessionId: string,
+  productId: string
+): Promise<GeneratedIdea | null> {
+  if (!cfg.ideaGenerationEnabled) return null;
+  try {
+    const { detail } = await loadProductDetail(supabase, productId);
+    if (!detail) return null;
+    const deps = await defaultIdeaDeps(supabase);
+    if (!deps) return null;
+    if (!cfg.ideaProductSearch) deps.searchProvider = null;
+    let templateHint: string | null = null;
+    try {
+      const tpl = await getResearchTemplateHint(supabase, cfg.templateSlug);
+      if (tpl) templateHint = `${tpl.display_name} — ${tpl.description}`;
+    } catch {
+      templateHint = null;
+    }
+    const idea = await generateSessionIdea(
+      supabase,
+      detail,
+      {
+        language: cfg.language,
+        tone: cfg.tone,
+        audience: cfg.audience,
+        purpose: cfg.purpose,
+        ctaStyle: cfg.ctaStyle,
+        templateSlug: cfg.templateSlug,
+        targetReplyCount: cfg.targetReplyCount
+      },
+      templateHint,
+      deps
+    );
+    if (idea) {
+      await log(supabase, sessionId, 'automation', 'info', `ideation: ide "${idea.topic.slice(0, 120)}" dari mekanisme produk`);
+    } else {
+      await log(supabase, sessionId, 'automation', 'warn', 'ideation gagal/invalid — lanjut parameter config mentah');
+    }
+    return idea;
+  } catch {
+    return null;
+  }
+}
 /** Buat sesi riset `dua` + produk tetap, lalu `automation_runs` untuk hari ini. */
 async function createRun(
   supabase: SupabaseClient,
@@ -206,6 +297,29 @@ async function createRun(
     return { error: `insert sesi: ${sessionError?.message ?? 'no id'}` };
   }
   const sessionId = (session as { id: string }).id;
+
+  // Tahap ideation (fail-soft): hasil valid ditulis ke sesi agar discovery
+  // menerima parameter lebih lengkap; gagal → perilaku lama (config mentah).
+  const idea = await enrichSessionIdea(supabase, cfg, sessionId, chosen.id);
+  if (idea) {
+    await supabase
+      .from('content_research_sessions')
+      .update({
+        topic: idea.topic,
+        keywords: idea.keywords,
+        target_category: idea.targetCategory,
+        audience: idea.audience ?? cfg.audience,
+        audience_age: idea.audience ?? cfg.audience,
+        audience_interests: idea.audienceInterests ?? [],
+        target_location: idea.targetLocation,
+        account_goal: idea.accountGoal ?? cfg.purpose,
+        purpose: idea.purpose ?? cfg.purpose,
+        tone: idea.tone ?? cfg.tone,
+        cta_style: idea.ctaStyle ?? cfg.ctaStyle,
+        updated_at: new Date().toISOString()
+      } as unknown as Record<string, unknown>)
+      .eq('id', sessionId);
+  }
 
   const { error: productError } = await supabase
     .from('content_research_session_products')

@@ -36,6 +36,8 @@ function cfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
     targetReplyCount: null,
     productPoolSize: 50,
     productCategory: null,
+    ideaGenerationEnabled: false,
+    ideaProductSearch: true,
     requireCover: true,
     coverMaxWaitMinutes: 60,
     coverMaxAttempts: 3,

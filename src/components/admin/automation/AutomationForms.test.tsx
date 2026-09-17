@@ -20,6 +20,8 @@ const cfg = {
   target_reply_count: null,
   product_pool_size: 50,
   product_category: null,
+  idea_generation_enabled: false,
+  idea_product_search: true,
   require_cover: true,
   cover_max_wait_minutes: 60,
   cover_max_attempts: 3,

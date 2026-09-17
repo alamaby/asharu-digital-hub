@@ -104,4 +104,17 @@ describe('updateAutomationConfig', () => {
     expect(res).toEqual({ ok: false, error: 'jam/menit jadwal tidak valid' });
     expect(supabase.patched).toHaveLength(0);
   });
+
+  it('menyimpan knob ideation (checkbox on → true, absen → false)', async () => {
+    const supabase = makeClient();
+    clientRef.current = supabase as never;
+    const fd = new FormData();
+    fd.append('platform_slugs', 'artikel');
+    fd.append('idea_generation_enabled', 'on');
+    // idea_product_search tidak dicentang → false
+    const res = await updateAutomationConfig(fd);
+    expect(res.ok).toBe(true);
+    expect(supabase.patched[0]?.idea_generation_enabled).toBe(true);
+    expect(supabase.patched[0]?.idea_product_search).toBe(false);
+  });
 });

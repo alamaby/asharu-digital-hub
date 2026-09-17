@@ -197,6 +197,88 @@ Pilih topik terbaik yang RELEVAN dengan TARGET AUDIENS dari hasil di atas. Tolak
   return { system, user };
 }
 
+/**
+ * Input tahap ideation automation: riset mekanisme produk dulu, lalu
+ * generate ide agar parameter riset discovery lebih lengkap.
+ * Config operator = hint; output LLM = mempertajam, bukan menulis bebas.
+ */
+export interface IdeaInput {
+  productName: string;
+  productCategory?: string | null;
+  productMerchant?: string | null;
+  productUrl?: string | null;
+  /** Ringkasan mekanisme produk dari Tavily (search+extract), bisa kosong. */
+  mechanismContext: string | null;
+  language: string;
+  tone: string;
+  audience: string;
+  purpose: string;
+  ctaStyle: string;
+  templateHint?: string | null;
+  /** Topik produk ini N hari terakhir — negative examples anti-ulang. */
+  recentTopics: string[];
+  /** Seed variasi agar tiap run menghasilkan sudut berbeda. */
+  varietySeed: string;
+}
+
+/**
+ * Prompt ideation: 1 ide konten afiliasi berbasis mekanisme produk nyata.
+ * Output di-validasi ketat di `idea.ts` (mirror researchSchema actions.ts);
+ * prompt hanya satu lapis pertahanan — validasi kode yang final.
+ */
+export function buildIdeaPrompt(input: IdeaInput): { system: string; user: string } {
+  const lang = input.language === 'en' ? 'en' : input.language === 'both' ? 'id' : 'id';
+  const productLine = [
+    input.productName,
+    input.productCategory ? `(kategori: ${input.productCategory})` : null,
+    input.productMerchant ? `— ${input.productMerchant}` : null
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const system = `Anda adalah Content Idea Generator untuk Asharu (asharu.id). Tugas: buat 1 ide konten afiliasi yang segar, spesifik, dan siap jadi parameter riset discovery.
+
+KONTEKS MEKANISME PRODUK (fakta terverifikasi dari riset web — jadikan fondasi ide):
+${input.mechanismContext ?? '(konteks mekanisme tidak tersedia — bangun ide dari nama produk saja, jangan mengarang klaim spesifik)'}
+
+ATURAN KERAS
+- Topik/angle/audience/keywords WAJIB dibangun di sekitar PRODUK: ${productLine}. Sisipan produk di konten akhir harus natural (use-case, tips, cerita yang nyambung).
+- JANGAN mengarang fitur, harga, atau manfaat produk di luar konteks mekanisme di atas dan nama produk yang diberikan.
+- JANGAN mengulang topik yang sudah dipakai baru-baru ini (daftar di bawah) — variasikan sudut, audiens, atau use-case.
+- Hormati hint operator di bawah (jangan ubah maknanya, pertajam agar spesifik dan siap riset).
+- Bahasa output: ${lang}.
+
+FORMAT KELUARAN (WAJIB ikuti schema ini persis)
+Kembalikan JSON valid tanpa teks tambahan:
+{
+  "topic": "judul topik 10-500 karakter, hook kuat, spesifik (hindari pola generik)",
+  "targetCategory": "salah satu dari: automotive|electronics|home-living|fashion|sports-hobby|others",
+  "keywords": "kata kunci pisah koma, relevan dengan topic",
+  "audience": "deskripsi audiens 3-200 karakter",
+  "audienceInterests": "minat audiens pisah koma",
+  "audienceAge": "rentang usia audiens",
+  "targetLocation": "lokasi utama audiens",
+  "accountGoal": "tujuan akun",
+  "purpose": "tujuan konten 3-200 karakter",
+  "tone": "salah satu dari: casual|formal|witty|professional|friendly|edukatif",
+  "ctaStyle": "gaya CTA singkat"
+}`.trim();
+
+  const hintLines = [
+    `Produk tetap: ${productLine}`,
+    `Hint audience operator: ${input.audience}`,
+    `Hint purpose operator: ${input.purpose}`,
+    `Hint tone operator: ${input.tone}`,
+    `Hint CTA operator: ${input.ctaStyle}`,
+    input.templateHint ? `Template riset: ${input.templateHint}` : null,
+    input.recentTopics.length > 0
+      ? `Topik BARU-BARU INI untuk produk ini (JANGAN ulangi, buat sudut BERBEDA):\n${input.recentTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+      : null
+  ].filter((l): l is string => Boolean(l));
+  const user = `Hint operator:\n${hintLines.map((l) => `- ${l}`).join('\n')}\nVariasi #${input.varietySeed} — berikan 1 ide yang segar dan BERBEDA dari pola umum maupun daftar di atas.`.trim();
+
+  return { system, user };
+}
+
 export function buildVerificationPrompt(input: VerificationInput): { system: string; user: string } {
   const lang = input.language ?? 'id';
   const system = `Anda adalah Fact-Checker untuk konten media sosial Indonesia. Tugas Anda: periksa kandidat topik dan nilai kelayakan verifikasinya.

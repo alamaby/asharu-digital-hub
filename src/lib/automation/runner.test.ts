@@ -258,6 +258,32 @@ describe('runAutomationTick (produk pool)', () => {
     expect(res.ok).toBe(true);
     expect(res.runDate).toBe('2026-09-16');
   });
+
+  it('knob ideation mati default → sesi topic null (perilaku lama, tanpa LLM)', async () => {
+    const tables = {
+      automation_configs: [baseConfig()],
+      automation_runs: [] as Row[],
+      affiliate_products: [
+        {
+          id: 'p1',
+          is_active: true,
+          created_at: '2026-09-15T00:00:00Z',
+          name_id: 'Produk X',
+          friendly_code: 'ASH-1'
+        }
+      ],
+      content_research_sessions: [] as Row[],
+      content_research_session_products: [] as Row[]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:00:00Z')
+    });
+    expect(res.ok).toBe(true);
+    // enrichSessionIdea tak menulis apa-apa → topic tetap null dari insert.
+    const session = tables.content_research_sessions[0] as Row;
+    expect(session.topic).toBeNull();
+  });
 });
 
 describe('runAutomationTick (thin-content gate)', () => {

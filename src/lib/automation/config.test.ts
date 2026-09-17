@@ -56,6 +56,21 @@ describe('mapConfigRow', () => {
   it('single language tetap dipertahankan', () => {
     expect(mapConfigRow({ ...base, language: 'id' }).language).toBe('id');
   });
+
+  it('kolom ideation: default konservatif bila baris pre-migrasi', () => {
+    const legacy = { ...base };
+    delete (legacy as Record<string, unknown>).idea_generation_enabled;
+    delete (legacy as Record<string, unknown>).idea_product_search;
+    const cfg = mapConfigRow(legacy);
+    expect(cfg.ideaGenerationEnabled).toBe(false);
+    expect(cfg.ideaProductSearch).toBe(true);
+  });
+
+  it('kolom ideation: nilai DB dipakai apa adanya', () => {
+    const cfg = mapConfigRow({ ...base, idea_generation_enabled: true, idea_product_search: false });
+    expect(cfg.ideaGenerationEnabled).toBe(true);
+    expect(cfg.ideaProductSearch).toBe(false);
+  });
 });
 
 describe('resolveRunLocales', () => {

@@ -22,6 +22,8 @@ export interface AutomationConfig {
   targetReplyCount: number | null;
   productPoolSize: number;
   productCategory: string | null;
+  ideaGenerationEnabled: boolean;
+  ideaProductSearch: boolean;
   requireCover: boolean;
   coverMaxWaitMinutes: number;
   coverMaxAttempts: number;
@@ -52,6 +54,10 @@ interface AutomationConfigRow {
   target_reply_count: number | null;
   product_pool_size: number;
   product_category: string | null;
+  // Kolom ideation (migrasi 20260918_*; opsional agar baris pre-migrasi
+  // tetap termuat — mapping default konservatif di bawah).
+  idea_generation_enabled?: boolean | null;
+  idea_product_search?: boolean | null;
   require_cover: boolean;
   cover_max_wait_minutes: number;
   cover_max_attempts: number;
@@ -88,6 +94,10 @@ export function mapConfigRow(row: AutomationConfigRow): AutomationConfig {
     targetReplyCount: row.target_reply_count,
     productPoolSize: row.product_pool_size,
     productCategory: row.product_category,
+    // Kolom ideation (migrasi 20260918): baris lama tanpa kolom → default
+    // konservatif (mati) agar perilaku existing tak berubah diam-diam.
+    ideaGenerationEnabled: row.idea_generation_enabled ?? false,
+    ideaProductSearch: row.idea_product_search ?? true,
     requireCover: row.require_cover,
     coverMaxWaitMinutes: row.cover_max_wait_minutes,
     coverMaxAttempts: row.cover_max_attempts,
