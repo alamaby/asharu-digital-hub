@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-17 16:38 (local time)
+Last updated: 2026-09-17 17:25 (local time)
 
 ## Current State
 
@@ -66,6 +66,7 @@ Last updated: 2026-09-17 16:38 (local time)
 
 ## Recent Entries
 
+- [172500-automation-idea-generation.md](2026-09-17/172500-automation-idea-generation.md) — Tahap ideation workflow otomatis: riset mekanisme produk (Tavily 2 query + extract, cap 2000 char) → LLM stage `idea_generation` → parameter sesi diperkaya (topic/keywords/kategori/audience/dst); fail-soft berlapis, knob `idea_generation_enabled=false` default + `idea_product_search=true`, UI admin 2 checkbox. Migrasi `20260918000004`. Gate typecheck+lint+796 tests+build hijau, pushed `6592c5c`/`ef755e4`. [USER ACTION] Apply migrasi prod → Run now dry-run → pantau 1 hari.
 - [163800-studio-history-param-final-prompt.md](2026-09-17/163800-studio-history-param-final-prompt.md) — Riwayat Generate Studio kini tampilkan 4 parameter enqueue (style/subjek/camera/aspek, display_name) + full prompt final terkirim ke model di `<details>` hide-by-default + 2 tombol salin. Snapshot `final_prompt/final_negative` di worker (ready + semua jalur failed); migrasi `20260918000004` (submodule `c9b6de2`). Gate typecheck+lint+772 tests+build hijau, pushed `20b939a`. [USER ACTION] Apply migrasi prod + deploy + verifikasi live.
 - [153300-bynara-10-models-additive.md](2026-09-17/153300-bynara-10-models-additive.md) — Tambah 10 model Bynara (naraya) reasoning max ADDITIVE (tanpa disable lama, sesuai konfirmasi user): atria-dawn, ling fin/sante/vl, nemotron super/ultra-free/lightning, union-alpha, glm-5.3-flash, gpt-5.6-luna, priority 200–290. Migrasi `20260918000003` applied prod via MCP, 10/10 aktif, gate 767 tests hijau, pushed `3526672`/parent. `nemotron-3-ultra-free` = model berbeda dari baris lama `nemotron-3-ultra` (dibiarkan nonaktif). [USER ACTION opsional] Smoke test per model via Chat Lab + cek `llm_call_logs`.
 - [140152-chat-lab-pagination-ranking.md](2026-09-17/140152-chat-lab-pagination-ranking.md) — Chat Lab pagination DB-driven (`has_error` + backfill, count akurat, filter DB) + statistik 1 tab rentang (Hari ini/7/14/30/Semua) + papan peringkat Best (sukses% → tok/s) provider & model. Migrasi `20260918000002` applied prod, gate 767 tests + build hijau, pushed `7467351`/`e1cfcfa`. [USER ACTION] Live verify pagination + tab + ★ juara.

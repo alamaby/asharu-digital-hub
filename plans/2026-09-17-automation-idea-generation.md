@@ -45,6 +45,7 @@ Keputusan user (17 Sep): (1) LLM + riset mekanisme Tavily, (2) field penuh — c
 
 - 2026-09-17 17:01:41 — Plan dibuat; eksekusi dimulai (mode build).
 - 2026-09-17 17:20 — Implementasi selesai; gate hijau (typecheck ✓, lint ✓, 796 tests ✓, build ✓). Siap commit.
+- 2026-09-17 17:25 — Pushed: submodule `ef755e4` + parent `6592c5c`. [USER ACTION] apply migrasi prod → Run now dry-run.
 
 ## Notes
 
