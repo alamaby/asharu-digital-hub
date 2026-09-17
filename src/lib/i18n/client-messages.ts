@@ -20,7 +20,8 @@ export const CLIENT_MESSAGE_NAMESPACES = [
   'product',
   'property',
   'propertyFilters',
-  'studio'
+  'studio',
+  'lab'
 ] as const;
 
 function pickNamespace(

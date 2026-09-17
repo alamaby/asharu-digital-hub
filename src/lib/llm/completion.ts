@@ -38,6 +38,12 @@ export interface LLMCompletionInput {
   sessionId?: string | null;
   /** Stage tag for llm_call_logs (e.g. 'discovering'). */
   stage?: string;
+  /**
+   * Strict pinned mode (Chat Lab komparasi): bila model pilihan gagal,
+   * lempar error langsung TANPA fallback ke waterfall global agar
+   * perbandingan antar target adil. Default false (jalur lama tak berubah).
+   */
+  strictPinned?: boolean;
 }
 
 /**
@@ -62,6 +68,11 @@ export async function runLLMCompletion(
   if (input.modelUuid) {
     const pinned = await tryPinnedModel(supabase, input);
     if (pinned) return pinned;
+    // Strict mode (Chat Lab): gagal pin = error jujur, tanpa fallback global.
+    // Detail error sudah dicatat di llm_call_logs oleh tryPinnedModel.
+    if (input.strictPinned) {
+      throw new Error('Model pilihan gagal (strict, tanpa fallback ke waterfall global) — lihat log untuk detail.');
+    }
     // Pinned failed → log warn only if sessionId present (P0-01: content_research_logs.session_id is FK NOT NULL)
     if (input.sessionId) {
       await supabase
@@ -81,6 +92,9 @@ export async function runLLMCompletion(
   if (input.modelHint && !input.modelUuid) {
     const pinnedHint = await tryPinnedModelHint(supabase, input);
     if (pinnedHint) return pinnedHint;
+    if (input.strictPinned) {
+      throw new Error(`Model hint "${input.modelHint}" gagal (strict, tanpa fallback ke waterfall global).`);
+    }
     if (input.sessionId) {
       await supabase
         .from('content_research_logs')

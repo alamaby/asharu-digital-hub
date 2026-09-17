@@ -50,6 +50,10 @@
       "title": "Studio Gambar | Asharu",
       "description": "Generate gambar dengan pilih provider, model, style, dan aspek rasio. Histori tersimpan 30 hari."
     },
+    "lab": {
+      "title": "Chat Lab | Asharu",
+      "description": "Uji provider dan model chat LLM: bandingkan respons, token, latensi, dan kecepatan. Histori tersimpan 30 hari."
+    },
     "notFound": {
       "title": "Halaman Tidak Ditemukan | Asharu",
       "description": "Halaman yang Anda cari tidak tersedia. Silakan kembali ke beranda Asharu."
@@ -84,6 +88,7 @@
     "adminSosial": "Sosial",
     "adminAutomation": "Automation",
     "studio": "Studio",
+    "chatLab": "Chat Lab",
     "backToSite": "Kembali ke situs",
     "signIn": "Masuk",
     "groupManage": "Kelola",
@@ -906,6 +911,103 @@
       "dimensions": "Dimensi",
       "lastError": "Error terakhir",
       "llmMeta": "Meta provider (llm_meta)"
+    }
+  },
+  "lab": {
+    "title": "Chat Lab",
+    "intro": "Uji provider dan model chat: 1 prompt dikirim paralel ke 1–3 target, respons tampil side-by-side beserta metrik. Histori tersimpan 30 hari.",
+    "quota": {
+      "used": "Kuota hari ini: {used}/{limit}",
+      "unlimited": "Kuota: unlimited",
+      "remaining": "{remaining} sisa",
+      "exhausted": "Kuota harian habis ({limit}/hari) — coba lagi besok."
+    },
+    "form": {
+      "systemLabel": "System prompt (opsional)",
+      "systemPlaceholder": "Contoh: Jawab singkat dalam Bahasa Indonesia.",
+      "systemChar": "{current}/2000 karakter",
+      "promptLabel": "Prompt",
+      "promptPlaceholder": "Contoh: Jelaskan fotosintesis dalam 2 kalimat.",
+      "promptChar": "{current}/4000 karakter",
+      "promptMin": "Prompt minimal 10 karakter.",
+      "tempLabel": "Temperature (kosongkan = default {value})",
+      "maxTokensLabel": "Max tokens (kosongkan = default {value})",
+      "targetHeading": "Target model (1–3)",
+      "targetLabel": "Target {n}",
+      "providerLabel": "Provider",
+      "modelLabel": "Model",
+      "addTarget": "Tambah target",
+      "removeTarget": "Hapus target {n}",
+      "submit": "Jalankan",
+      "submitting": "Menjalankan...",
+      "reused": "Prompt dimuat dari riwayat — cek lalu Jalankan."
+    },
+    "result": {
+      "heading": "Hasil komparasi",
+      "fallbackBadge": "fallback",
+      "truncatedBadge": "terpotong",
+      "copy": "Salin respons",
+      "copied": "Disalin",
+      "tokensIn": "Masuk",
+      "tokensOut": "Keluar",
+      "tokensTotal": "Total",
+      "latency": "Latensi",
+      "speed": "Kecepatan",
+      "ttftPending": "TTFT: streaming menyusul (fase 2)",
+      "errorTitle": "Gagal (strict, tanpa fallback)"
+    },
+    "history": {
+      "heading": "Riwayat Uji",
+      "empty": "Belum ada riwayat. Submit pertama Anda akan muncul di sini.",
+      "noResults": "Tidak ada hasil untuk filter ini — ubah filter atau tekan Atur ulang.",
+      "all": "Semua",
+      "ok": "Sukses",
+      "error": "Error",
+      "filterStatus": "Status",
+      "filterProvider": "Provider",
+      "filterModel": "Model",
+      "clearFilters": "Atur ulang filter",
+      "sortLabel": "Urutkan",
+      "sortNewest": "Terbaru dulu",
+      "sortOldest": "Terlama dulu",
+      "reuse": "Pakai ulang",
+      "delete": "Hapus",
+      "deleteConfirm": "Yakin hapus batch ini?",
+      "cancelDelete": "Batal",
+      "deleting": "Menghapus...",
+      "promptLabel": "Prompt",
+      "systemLabel": "System",
+      "responseLabel": "Respons",
+      "errorLabel": "Error",
+      "detailLog": "Detail log",
+      "requestLabel": "Request",
+      "metaQueued": "{provider} · {model}"
+    },
+    "stats": {
+      "heading": "Statistik 30 hari",
+      "empty": "Belum ada data — jalankan uji pertama untuk melihat statistik.",
+      "batches": "Batch",
+      "runs": "Runs",
+      "successRate": "Sukses",
+      "avgLatency": "Rerata latensi",
+      "avgSpeed": "Rerata kecepatan",
+      "tokensIn": "Token masuk",
+      "tokensOut": "Token keluar",
+      "tokensTotal": "Total token",
+      "errors": "Error",
+      "fallbacks": "Fallback",
+      "latencyPerRun": "Latensi per run (ms)",
+      "tokensPerRun": "Token per run (masuk + keluar)",
+      "speedPerRun": "Kecepatan per run (tok/s)",
+      "statusTitle": "Status runs",
+      "ms": "ms",
+      "tps": "tok/s",
+      "unknown": "tak diketahui"
+    },
+    "notice": {
+      "running": "Menjalankan ke {count} target...",
+      "done": "Selesai — {ok} sukses, {err} gagal.",
+      "empty": "Belum ada hasil. Isi form di atas lalu Jalankan."
     }
   }
 }

@@ -50,6 +50,10 @@
       "title": "Image Studio | Asharu",
       "description": "Generate images by picking provider, model, style, and aspect ratio. History retained for 30 days."
     },
+    "lab": {
+      "title": "Chat Lab | Asharu",
+      "description": "Test chat LLM providers and models: compare responses, tokens, latency, and speed. History retained for 30 days."
+    },
     "notFound": {
       "title": "Page Not Found | Asharu",
       "description": "The page you are looking for is not available. Please return to the Asharu homepage."
@@ -84,6 +88,7 @@
     "adminSosial": "Social",
     "adminAutomation": "Automation",
     "studio": "Studio",
+    "chatLab": "Chat Lab",
     "backToSite": "Back to site",
     "signIn": "Sign in",
     "groupManage": "Manage",
@@ -906,6 +911,103 @@
       "dimensions": "Dimensions",
       "lastError": "Last error",
       "llmMeta": "Provider meta (llm_meta)"
+    }
+  },
+  "lab": {
+    "title": "Chat Lab",
+    "intro": "Test chat providers and models: 1 prompt is fanned out in parallel to 1–3 targets, responses shown side-by-side with metrics. History retained for 30 days.",
+    "quota": {
+      "used": "Today's quota: {used}/{limit}",
+      "unlimited": "Quota: unlimited",
+      "remaining": "{remaining} left",
+      "exhausted": "Daily quota exhausted ({limit}/day) — try again tomorrow."
+    },
+    "form": {
+      "systemLabel": "System prompt (optional)",
+      "systemPlaceholder": "E.g. Answer briefly in Indonesian.",
+      "systemChar": "{current}/2000 characters",
+      "promptLabel": "Prompt",
+      "promptPlaceholder": "E.g. Explain photosynthesis in 2 sentences.",
+      "promptChar": "{current}/4000 characters",
+      "promptMin": "Prompt must be at least 10 characters.",
+      "tempLabel": "Temperature (empty = default {value})",
+      "maxTokensLabel": "Max tokens (empty = default {value})",
+      "targetHeading": "Target models (1–3)",
+      "targetLabel": "Target {n}",
+      "providerLabel": "Provider",
+      "modelLabel": "Model",
+      "addTarget": "Add target",
+      "removeTarget": "Remove target {n}",
+      "submit": "Run",
+      "submitting": "Running...",
+      "reused": "Prompt loaded from history — review then Run."
+    },
+    "result": {
+      "heading": "Comparison results",
+      "fallbackBadge": "fallback",
+      "truncatedBadge": "truncated",
+      "copy": "Copy response",
+      "copied": "Copied",
+      "tokensIn": "In",
+      "tokensOut": "Out",
+      "tokensTotal": "Total",
+      "latency": "Latency",
+      "speed": "Speed",
+      "ttftPending": "TTFT: streaming coming in phase 2",
+      "errorTitle": "Failed (strict, no fallback)"
+    },
+    "history": {
+      "heading": "Test History",
+      "empty": "No history yet. Your first submission will appear here.",
+      "noResults": "No results for this filter — change the filter or Reset.",
+      "all": "All",
+      "ok": "Success",
+      "error": "Error",
+      "filterStatus": "Status",
+      "filterProvider": "Provider",
+      "filterModel": "Model",
+      "clearFilters": "Reset filters",
+      "sortLabel": "Sort",
+      "sortNewest": "Newest first",
+      "sortOldest": "Oldest first",
+      "reuse": "Reuse",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this batch?",
+      "cancelDelete": "Cancel",
+      "deleting": "Deleting...",
+      "promptLabel": "Prompt",
+      "systemLabel": "System",
+      "responseLabel": "Response",
+      "errorLabel": "Error",
+      "detailLog": "Log detail",
+      "requestLabel": "Request",
+      "metaQueued": "{provider} · {model}"
+    },
+    "stats": {
+      "heading": "30-day statistics",
+      "empty": "No data yet — run your first test to see statistics.",
+      "batches": "Batches",
+      "runs": "Runs",
+      "successRate": "Success",
+      "avgLatency": "Avg latency",
+      "avgSpeed": "Avg speed",
+      "tokensIn": "Input tokens",
+      "tokensOut": "Output tokens",
+      "tokensTotal": "Total tokens",
+      "errors": "Errors",
+      "fallbacks": "Fallbacks",
+      "latencyPerRun": "Latency per run (ms)",
+      "tokensPerRun": "Tokens per run (in + out)",
+      "speedPerRun": "Speed per run (tok/s)",
+      "statusTitle": "Run status",
+      "ms": "ms",
+      "tps": "tok/s",
+      "unknown": "unknown"
+    },
+    "notice": {
+      "running": "Running on {count} targets...",
+      "done": "Done — {ok} succeeded, {err} failed.",
+      "empty": "No results yet. Fill the form above then Run."
     }
   }
 }

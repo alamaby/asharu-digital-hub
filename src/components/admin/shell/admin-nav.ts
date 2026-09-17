@@ -7,6 +7,7 @@ import {
   Image,
   LayoutDashboard,
   LogIn,
+  MessagesSquare,
   Plus,
   Share2,
   Workflow,
@@ -44,6 +45,7 @@ export const adminNavGroups: readonly AdminNavGroup[] = [
       { key: 'adminSosial', pathname: '/admin/sosial', icon: Share2, adminOnly: true },
       { key: 'adminAutomation', pathname: '/admin/automation', icon: Workflow, adminOnly: true },
       { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false },
+      { key: 'chatLab', pathname: '/lab', icon: MessagesSquare, adminOnly: false },
     ]
   },
   {

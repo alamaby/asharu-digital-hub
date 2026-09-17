@@ -20,6 +20,7 @@ export interface NavItem {
     | 'adminSosial'
     | 'adminAutomation'
     | 'studio'
+    | 'chatLab'
     | 'backToSite'
     | 'signIn';
   pathname:
@@ -42,6 +43,7 @@ export interface NavItem {
     | '/konten/review'
     | '/konten/review/[draftId]'
     | '/studio'
+    | '/lab'
     | '/masuk';
   /** In-page anchor (homepage sections). */
   hash?: string;
@@ -71,6 +73,7 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminSosial', pathname: '/admin/sosial' },
   { key: 'adminAutomation', pathname: '/admin/automation' },
   { key: 'studio', pathname: '/studio' },
+  { key: 'chatLab', pathname: '/lab' },
   { key: 'adminBaru', pathname: '/konten/baru' },
   { key: 'adminReview', pathname: '/konten/review' }
 ];
