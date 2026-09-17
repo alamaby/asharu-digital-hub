@@ -69,6 +69,12 @@ export interface StudioGenerationRow {
   reference_storage_path: string | null;
   reference_public_url: string | null;
   reference_strength: number | string | null;
+  /** Kolom advanced (migrasi 20260919000001) — NULL = Auto/default model. */
+  guidance: number | string | null;
+  steps: number | null;
+  seed: number | string | null;
+  req_width: number | null;
+  req_height: number | null;
   /** Snapshot prompt final terkirim ke model (migrasi 20260918000004) — NULL = pending / data lama. */
   final_prompt: string | null;
   final_negative: string | null;
@@ -82,6 +88,8 @@ export interface StudioModelOption {
   provider_slug: string;
   /** True bila model mendukung image reference (config.supports_reference). */
   supports_reference: boolean;
+  /** True bila model merender teks visual akurat (Phoenix/Lucid). */
+  text_capable: boolean;
 }
 
 export interface StudioOptions {

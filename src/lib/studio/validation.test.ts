@@ -68,6 +68,27 @@ describe('studio reference validation', () => {
     expect(validateReferenceModelLink('https://cdn.test/ref.jpg', 'm-flux', models)).toMatch(/tidak mendukung image reference/);
   });
 
+  it('advanced opsional: null lolos; di luar rentang ditolak', () => {
+    const base = { prompt: 'a tidy bedroom with soft light', aspectSlug: '1:1' };
+    expect(studioInputSchema(500).safeParse(base).success).toBe(true);
+    const ok = studioInputSchema(500).safeParse({
+      ...base,
+      guidance: 4.5,
+      steps: 20,
+      seed: 42,
+      reqWidth: 1120,
+      reqHeight: 1120
+    });
+    expect(ok.success).toBe(true);
+    expect(studioInputSchema(500).safeParse({ ...base, guidance: 11 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, steps: 0 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, steps: 51 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, steps: 2.5 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, seed: -1 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, reqWidth: 255 }).success).toBe(false);
+    expect(studioInputSchema(500).safeParse({ ...base, reqHeight: 2501 }).success).toBe(false);
+  });
+
   it('pin model support + referensi lolos; tanpa referensi selalu lolos', () => {
     expect(validateReferenceModelLink('https://cdn.test/ref.jpg', 'm-img2img', models)).toBeNull();
     expect(validateReferenceModelLink(null, 'm-flux', models)).toBeNull();

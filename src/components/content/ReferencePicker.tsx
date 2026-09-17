@@ -10,6 +10,8 @@ export interface ReferenceModelOption {
   provider_slug: string;
   /** True bila model mendukung image reference (flag server, bukan hardcode). */
   supports_reference?: boolean;
+  /** True bila model merender teks visual akurat (Phoenix/Lucid, manual-only). */
+  text_capable?: boolean;
 }
 
 interface ReferencePickerProps {
@@ -153,7 +155,7 @@ export function ReferencePicker({
         </p>
       ) : null}
       {referenceUrl && !modelUuid ? (
-        <p className="mt-1 text-[10px] text-ink-muted">Auto + referensi: hanya model img2img yang dipakai.</p>
+        <p className="mt-1 text-[10px] text-ink-muted">Auto + referensi: hanya model reference (SD img2img / FLUX.2) yang dipakai.</p>
       ) : null}
       {notice ? (
         <p role="status" className="mt-1 text-[11px] text-ink-muted">

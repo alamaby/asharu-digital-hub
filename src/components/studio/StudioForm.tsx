@@ -55,6 +55,13 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
   const [referenceStrength, setReferenceStrength] = useState(0.6);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Advanced (opsional): kosong = Auto/default model. Auto di-clamp hemat
+  // (≤1024px / ≤25 steps, hint di bawah); pin model manual boleh sampai HD.
+  const [advGuidance, setAdvGuidance] = useState('');
+  const [advSteps, setAdvSteps] = useState('');
+  const [advSeed, setAdvSeed] = useState('');
+  const [advWidth, setAdvWidth] = useState('');
+  const [advHeight, setAdvHeight] = useState('');
 
   // "Pakai ulang" dari riwayat: isi form dari baris (sekali per klik).
   useEffect(() => {
@@ -74,6 +81,17 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
     }
     const s = Number(reuseRow.reference_strength);
     if (Number.isFinite(s) && s >= 0 && s <= 1) setReferenceStrength(s);
+    // Advanced ikut terisi ulang (kosong = Auto).
+    const optNum = (v: string | number | null | undefined): string => {
+      if (v === null || v === undefined || v === '') return '';
+      const n = Number(v);
+      return Number.isFinite(n) ? String(n) : '';
+    };
+    setAdvGuidance(optNum(reuseRow.guidance));
+    setAdvSteps(optNum(reuseRow.steps));
+    setAdvSeed(optNum(reuseRow.seed));
+    setAdvWidth(optNum(reuseRow.req_width));
+    setAdvHeight(optNum(reuseRow.req_height));
     setProposed(null);
     setNotice(tForm('reused'));
   }, [reuseRow, lastReuseId, tForm]);
@@ -147,6 +165,39 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
       setNotice(tForm('errorInput'));
       return;
     }
+    // Advanced: string kosong = Auto (null); angka di luar rentang ditolak cepat.
+    const parseAdv = (raw: string): number | null => {
+      const t = raw.trim();
+      if (!t) return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    };
+    const adv = {
+      guidance: parseAdv(advGuidance),
+      steps: parseAdv(advSteps),
+      seed: parseAdv(advSeed),
+      reqWidth: parseAdv(advWidth),
+      reqHeight: parseAdv(advHeight)
+    };
+    if (adv.guidance !== null && (adv.guidance < 0 || adv.guidance > 10)) {
+      setNotice(tForm('advancedGuidanceRange'));
+      return;
+    }
+    if (adv.steps !== null && (!Number.isInteger(adv.steps) || adv.steps < 1 || adv.steps > 50)) {
+      setNotice(tForm('advancedStepsRange'));
+      return;
+    }
+    if (adv.seed !== null && (!Number.isInteger(adv.seed) || adv.seed < 0)) {
+      setNotice(tForm('advancedSeedRange'));
+      return;
+    }
+    if (
+      (adv.reqWidth !== null && (!Number.isInteger(adv.reqWidth) || adv.reqWidth < 256 || adv.reqWidth > 2500)) ||
+      (adv.reqHeight !== null && (!Number.isInteger(adv.reqHeight) || adv.reqHeight < 256 || adv.reqHeight > 2500))
+    ) {
+      setNotice(tForm('advancedDimsRange'));
+      return;
+    }
     const limited = quota?.remaining;
     if (typeof limited === 'number' && limited <= 0) {
       setNotice(t('quota.exhausted', { limit: quota?.limit ?? 0 }));
@@ -165,7 +216,12 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
           cameraSlug: cameraSlug || null,
           aspectSlug: aspectSlug,
           referencePublicUrl: referenceUrl,
-          referenceStrength: referenceUrl ? referenceStrength : null
+          referenceStrength: referenceUrl ? referenceStrength : null,
+          guidance: adv.guidance,
+          steps: adv.steps,
+          seed: adv.seed,
+          reqWidth: adv.reqWidth,
+          reqHeight: adv.reqHeight
         };
         const res = await enqueueStudioImage(input);
         if (!res.ok) {
@@ -176,6 +232,11 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
         setPrompt('');
         setNegative('');
         clearReference();
+        setAdvGuidance('');
+        setAdvSteps('');
+        setAdvSeed('');
+        setAdvWidth('');
+        setAdvHeight('');
         onEnqueued?.();
       } catch (err) {
         setNotice(err instanceof Error ? err.message : tForm('errorInput'));
@@ -343,6 +404,7 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
               <option key={m.id} value={m.id}>
                 {m.provider_slug} · {m.display_name}
                 {m.supports_reference ? ' · ref' : ''}
+                {m.text_capable ? ' · teks' : ''}
               </option>
             ))}
           </select>
@@ -493,6 +555,90 @@ export function StudioForm({ options, quota, reuseRow, onEnqueued }: Props) {
           </div>
         ) : null}
       </div>
+
+      {/* Parameter advanced (opsional): kosong = Auto/default model. */}
+      <details className="rounded-md border border-line bg-background p-3">
+        <summary className="cursor-pointer text-sm font-medium text-ink">{tForm('advancedTitle')}</summary>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{tForm('advancedHint')}</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs" htmlFor="studio-adv-guidance">
+            <span className="text-ink-muted">{tForm('advancedGuidanceLabel')}</span>
+            <input
+              id="studio-adv-guidance"
+              type="number"
+              min={0}
+              max={10}
+              step={0.5}
+              value={advGuidance}
+              onChange={(e) => setAdvGuidance(e.target.value)}
+              disabled={fieldsDisabled}
+              placeholder={tForm('advancedAuto')}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          <label className="grid gap-1 text-xs" htmlFor="studio-adv-steps">
+            <span className="text-ink-muted">{tForm('advancedStepsLabel')}</span>
+            <input
+              id="studio-adv-steps"
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              value={advSteps}
+              onChange={(e) => setAdvSteps(e.target.value)}
+              disabled={fieldsDisabled}
+              placeholder={tForm('advancedAuto')}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          <label className="grid gap-1 text-xs" htmlFor="studio-adv-seed">
+            <span className="text-ink-muted">{tForm('advancedSeedLabel')}</span>
+            <input
+              id="studio-adv-seed"
+              type="number"
+              min={0}
+              step={1}
+              value={advSeed}
+              onChange={(e) => setAdvSeed(e.target.value)}
+              disabled={fieldsDisabled}
+              placeholder={tForm('advancedAuto')}
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-1 text-xs" htmlFor="studio-adv-width">
+              <span className="text-ink-muted">{tForm('advancedWidthLabel')}</span>
+              <input
+                id="studio-adv-width"
+                type="number"
+                min={256}
+                max={2500}
+                step={64}
+                value={advWidth}
+                onChange={(e) => setAdvWidth(e.target.value)}
+                disabled={fieldsDisabled}
+                placeholder={tForm('advancedAuto')}
+                className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </label>
+            <label className="grid gap-1 text-xs" htmlFor="studio-adv-height">
+              <span className="text-ink-muted">{tForm('advancedHeightLabel')}</span>
+              <input
+                id="studio-adv-height"
+                type="number"
+                min={256}
+                max={2500}
+                step={64}
+                value={advHeight}
+                onChange={(e) => setAdvHeight(e.target.value)}
+                disabled={fieldsDisabled}
+                placeholder={tForm('advancedAuto')}
+                className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </label>
+          </div>
+        </div>
+      </details>
 
       <button
         type="submit"

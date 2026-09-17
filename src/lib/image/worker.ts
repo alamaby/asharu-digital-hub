@@ -12,7 +12,7 @@ import {
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
 import type { ImageReasoning } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
-import { ImageHttpError, bytesToBase64, clampImg2ImgStrength, modelSupportsReference } from './types';
+import { ImageHttpError, bytesToBase64, clampImg2ImgStrength, modelRendersText, modelSupportsReference, resolveEffectiveAdvanced, stripNoTextClause } from './types';
 import type {
   DraftImageRow,
   ImageAspect,
@@ -389,7 +389,12 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
         .eq('id', imageId);
       return { imageId };
     }
-    const styleSuffix = target.style?.prompt_suffix?.trim() || '';
+    const styleSuffixRaw = target.style?.prompt_suffix?.trim() || '';
+    // Model text-capable (Phoenix/Lucid): kecualikan klausa "no text" agar
+    // keunggulan render teks model tidak dibatalkan komposisi prompt.
+    const styleSuffix = modelRendersText({ model_id: target.model.model_id, config: target.model.config })
+      ? stripNoTextClause(styleSuffixRaw)
+      : styleSuffixRaw;
     // Camera angle: auto-append natural sebelum style suffix (opsional).
     // Guard anti-duplikat: prompt textarea bisa sudah berisi angle (suggest).
     let withAngle = imagePrompt;
@@ -410,6 +415,13 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
     }
     const finalPrompt = styleSuffix ? `${withAngle}, ${styleSuffix}` : withAngle;
     const aspect: ImageAspect = target.aspect;
+    // Advanced (picker review <details>): NULL = Auto/default model. Jalur
+    // Auto di-clamp hemat (≤1024px / ≤25 steps); pin manual sampai maks model.
+    const adv = resolveEffectiveAdvanced(
+      { model_id: target.model.model_id, config: target.model.config },
+      { guidance: row.guidance, steps: row.steps, seed: row.seed, req_width: row.req_width, req_height: row.req_height },
+      target.pinned
+    );
 
     // Waterfall provider: resolved dulu, lalu sisanya sesuai prioritas.
     // Pin manual admin (override review): hanya provider terpilih — gagal
@@ -447,11 +459,24 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
       try {
         const pool = new ImageKeyPool(provider);
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
-          const adapter = createImageAdapter(provider, modelRow.model_id, apiKey);
+          const adapter = createImageAdapter(provider, modelRow.model_id, apiKey, modelRow.config);
+          const advForModel = provider.id === target.provider.id
+            ? adv
+            : resolveEffectiveAdvanced(
+                { model_id: modelRow.model_id, config: modelRow.config },
+                { guidance: row.guidance, steps: row.steps, seed: row.seed, req_width: row.req_width, req_height: row.req_height },
+                // Waterfall lintas-provider = tidak di-pin untuk model pengganti.
+                false
+              );
           return adapter.generateImage({
             prompt: finalPrompt,
             negativePrompt: finalNegative,
             aspectRatio: aspect,
+            ...(advForModel.guidance !== undefined ? { guidance: advForModel.guidance } : {}),
+            ...(advForModel.numSteps !== undefined ? { numSteps: advForModel.numSteps } : {}),
+            ...(advForModel.seed !== undefined ? { seed: advForModel.seed } : {}),
+            ...(advForModel.width !== undefined ? { width: advForModel.width } : {}),
+            ...(advForModel.height !== undefined ? { height: advForModel.height } : {}),
             ...(referenceB64 ? { referenceImageB64: referenceB64, strength: referenceStrength } : {})
           });
         });
@@ -502,7 +527,10 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
               pinned: target.pinned,
               // Jejak audit img2img: referensi dipakai atau tidak + strength.
               reference: referenceB64 ? true : false,
-              reference_strength: referenceB64 ? referenceStrength : null
+              reference_strength: referenceB64 ? referenceStrength : null,
+              // Jejak audit advanced: nilai efektif terkirim + flag clamp Auto.
+              advanced: adv.audit,
+              advanced_clamped: adv.clamped
             },
             updated_at: new Date().toISOString()
           })

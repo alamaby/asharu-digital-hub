@@ -65,6 +65,11 @@ function row(over: Partial<DraftImageRow> & { id: string }): DraftImageRow {
     reference_storage_path: null,
     reference_public_url: null,
     reference_strength: null,
+    guidance: null,
+    steps: null,
+    seed: null,
+    req_width: null,
+    req_height: null,
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',
     ...over
@@ -134,6 +139,21 @@ describe('ImageHistoryCarousel', () => {
     expect(screen.getByRole('button', { name: 'Slide sebelumnya' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Slide berikutnya' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Slide 2 dari 3' })).toBeInTheDocument();
+  });
+
+  it('menampilkan baris Advanced bila terisi; sembunyi bila Auto', () => {
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({ id: 'adv', status: 'ready', guidance: 4.5, steps: 20, seed: 7, req_width: 1120, req_height: 1120, image_prompt: 'x' }),
+          row({ id: 'auto', status: 'ready', image_prompt: 'y' })
+        ]}
+        selectedId={null}
+      />
+    );
+    const text = container.textContent ?? '';
+    expect(text).toContain('Advanced: guidance 4.5 · steps 20 · seed 7 · 1120×1120');
+    expect(text.match(/Advanced:/g)).toHaveLength(1);
   });
 
   it('renders no navigation controls for a single slide', () => {

@@ -638,6 +638,17 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                     <dt className="font-medium text-ink-muted">{tHist('aspectParamLabel')}</dt>
                     <dd className="text-ink">{paramLabels(img).aspect}</dd>
                   </div>
+                  <div className="sm:col-span-2">
+                    <dt className="font-medium text-ink-muted">Advanced</dt>
+                    <dd className="text-ink">
+                      {[
+                        img.guidance !== null && img.guidance !== undefined && img.guidance !== '' ? `guidance ${String(img.guidance)}` : null,
+                        img.steps !== null && img.steps !== undefined ? `steps ${img.steps}` : null,
+                        img.seed !== null && img.seed !== undefined && img.seed !== '' ? `seed ${String(img.seed)}` : null,
+                        img.req_width && img.req_height ? `${img.req_width}×${img.req_height}` : null
+                      ].filter(Boolean).join(' · ') || 'Auto'}
+                    </dd>
+                  </div>
                 </dl>
                 <div className="mt-1.5">
                   <p className="font-medium text-ink-muted">{tHist('finalPromptLabel')}</p>

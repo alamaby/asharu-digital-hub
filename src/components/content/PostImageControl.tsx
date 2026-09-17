@@ -46,6 +46,12 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
   const [referenceStrength, setReferenceStrength] = useState(0.6);
   const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
+  // Advanced (opsional): kosong = Auto (hemat, clamp ≤1024px/≤25 steps).
+  const [advGuidance, setAdvGuidance] = useState('');
+  const [advSteps, setAdvSteps] = useState('');
+  const [advSeed, setAdvSeed] = useState('');
+  const [advWidth, setAdvWidth] = useState('');
+  const [advHeight, setAdvHeight] = useState('');
   const [isPending, startTransition] = useTransition();
 
   const selected = history.find((r) => r.status === 'selected') ?? null;
@@ -65,6 +71,36 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
       setNotice(`Model ${pinned.display_name} tidak mendukung image reference — pilih model bertanda ref atau Auto.`);
       return;
     }
+    const parseAdv = (raw: string): number | null => {
+      const t = raw.trim();
+      if (!t) return null;
+      const num = Number(t);
+      return Number.isFinite(num) ? num : null;
+    };
+    const guidance = parseAdv(advGuidance);
+    const steps = parseAdv(advSteps);
+    const seed = parseAdv(advSeed);
+    const reqWidth = parseAdv(advWidth);
+    const reqHeight = parseAdv(advHeight);
+    if (guidance !== null && (guidance < 0 || guidance > 10)) {
+      setNotice('Guidance harus 0–10 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (steps !== null && (!Number.isInteger(steps) || steps < 1 || steps > 50)) {
+      setNotice('Steps harus bilangan bulat 1–50 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (seed !== null && (!Number.isInteger(seed) || seed < 0)) {
+      setNotice('Seed harus bilangan bulat ≥0 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (
+      (reqWidth !== null && (!Number.isInteger(reqWidth) || reqWidth < 256 || reqWidth > 2500)) ||
+      (reqHeight !== null && (!Number.isInteger(reqHeight) || reqHeight < 256 || reqHeight > 2500))
+    ) {
+      setNotice('Dimensi harus bilangan bulat 256–2500 (atau kosongkan untuk Auto).');
+      return;
+    }
     setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
@@ -76,7 +112,12 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
           imagePrompt: p || null,
           negativePrompt: n || null,
           referencePublicUrl: referenceUrl,
-          referenceStrength: referenceUrl ? referenceStrength : null
+          referenceStrength: referenceUrl ? referenceStrength : null,
+          guidance,
+          steps,
+          seed,
+          reqWidth,
+          reqHeight
         });
         setNotice(p
           ? 'Masuk antrean. Worker memproses ≤5 menit — refresh halaman untuk melihat hasil. Prompt edit custom.'
@@ -279,6 +320,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
                 <option key={m.id} value={m.id}>
                   {m.provider_slug} · {m.display_name}
                   {m.supports_reference ? ' · ref' : ''}
+                  {m.text_capable ? ' · teks' : ''}
                 </option>
               ))}
             </select>
@@ -365,6 +407,34 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             onStrength={setReferenceStrength}
             notice={referenceNotice}
           />
+          <details className="rounded-md border border-line bg-surface p-1.5 text-[11px]">
+            <summary className="cursor-pointer font-medium text-ink">Parameter advanced (opsional)</summary>
+            <p className="mt-0.5 text-[10px] text-ink-muted">Kosongkan = Auto (hemat, maks 1024px / 25 steps).</p>
+            <div className="mt-1 grid gap-1 sm:grid-cols-2">
+              <label className="grid gap-0.5">
+                <span className="text-ink-muted">Guidance (0–10)</span>
+                <input type="number" min={0} max={10} step={0.5} value={advGuidance} onChange={(e) => setAdvGuidance(e.target.value)} placeholder="Auto" className="w-full rounded-md border border-line bg-background px-1.5 py-1" />
+              </label>
+              <label className="grid gap-0.5">
+                <span className="text-ink-muted">Steps (1–50)</span>
+                <input type="number" min={1} max={50} step={1} value={advSteps} onChange={(e) => setAdvSteps(e.target.value)} placeholder="Auto" className="w-full rounded-md border border-line bg-background px-1.5 py-1" />
+              </label>
+              <label className="grid gap-0.5">
+                <span className="text-ink-muted">Seed</span>
+                <input type="number" min={0} step={1} value={advSeed} onChange={(e) => setAdvSeed(e.target.value)} placeholder="Auto" className="w-full rounded-md border border-line bg-background px-1.5 py-1" />
+              </label>
+              <div className="grid grid-cols-2 gap-1">
+                <label className="grid gap-0.5">
+                  <span className="text-ink-muted">Lebar</span>
+                  <input type="number" min={256} max={2500} step={64} value={advWidth} onChange={(e) => setAdvWidth(e.target.value)} placeholder="Auto" className="w-full rounded-md border border-line bg-background px-1.5 py-1" />
+                </label>
+                <label className="grid gap-0.5">
+                  <span className="text-ink-muted">Tinggi</span>
+                  <input type="number" min={256} max={2500} step={64} value={advHeight} onChange={(e) => setAdvHeight(e.target.value)} placeholder="Auto" className="w-full rounded-md border border-line bg-background px-1.5 py-1" />
+                </label>
+              </div>
+            </div>
+          </details>
         </div>
       ) : null}
       {postIndex > 0 && perReplyEnabled ? (

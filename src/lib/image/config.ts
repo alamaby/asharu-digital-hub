@@ -128,7 +128,7 @@ export async function resolveImageTarget(options: {
       throw new Error('Model pilihan tidak aktif — pilih ulang model lalu coba lagi.');
     }
     if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
-      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
     }
     return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: true };
   }
@@ -138,7 +138,7 @@ export async function resolveImageTarget(options: {
     const found = await findModel(session.image_model_id);
     if (found) {
       if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
-        throw new Error(`Model sesi ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+        throw new Error(`Model sesi ${found.model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
       }
       return { provider: found.provider, model: found.model, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
     }
@@ -149,7 +149,7 @@ export async function resolveImageTarget(options: {
     const found = await findModel(defaults.model_id);
     if (found) {
       if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
-        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
       }
       return { provider: found.provider, model: found.model, style, aspect: defaults.aspect, pinned: false };
     }
@@ -170,7 +170,7 @@ export async function resolveImageTarget(options: {
     return { provider, model: pick, style, aspect: defaults?.aspect ?? '1:1', pinned: false };
   }
   throw new Error(needsReference
-    ? 'Tidak ada model image reference aktif — pilih model SD img2img.'
+    ? 'Tidak ada model image reference aktif — pilih model reference (SD img2img / FLUX.2).'
     : 'No active image provider/model available');
 }
 

@@ -10,7 +10,9 @@ import type { ImageGenerationProvider } from './base';
 export function createImageAdapter(
   provider: ImageProviderRow,
   modelId: string,
-  apiKey: string
+  apiKey: string,
+  /** Config per-model dari baris image_models (transport, negative_mode, defaults). */
+  modelConfig?: Record<string, unknown> | null
 ): ImageGenerationProvider {
   const baseUrl = provider.base_url;
   const config = provider.config ?? {};
@@ -19,7 +21,7 @@ export function createImageAdapter(
       return new PixazoImageAdapter({ baseUrl, model: modelId }, apiKey);
     case 'cloudflare':
       return new CloudflareImageAdapter(
-        { baseUrl, model: modelId, accountId: config['account_id'] ?? '' },
+        { baseUrl, model: modelId, accountId: config['account_id'] ?? '', modelConfig: modelConfig ?? null },
         apiKey
       );
     case 'pollinations':

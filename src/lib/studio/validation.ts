@@ -20,6 +20,40 @@ export function studioInputSchema(maxPromptLength: number) {
     subjectSlug: z.string().trim().max(120).nullable().default(null),
     cameraSlug: z.string().trim().max(120).nullable().default(null),
     aspectSlug: z.string().trim().min(1, 'Pilih aspek rasio.'),
+    /** Advanced opsional (diekspos di form): guidance 0–10, steps 1–50, seed ≥0, dimensi 256–2500. */
+    guidance: z
+      .number({ invalid_type_error: 'Guidance harus angka 0–10.' })
+      .min(0, 'Guidance minimal 0.')
+      .max(10, 'Guidance maksimal 10.')
+      .nullable()
+      .default(null),
+    steps: z
+      .number({ invalid_type_error: 'Steps harus angka 1–50.' })
+      .int('Steps harus bilangan bulat.')
+      .min(1, 'Steps minimal 1.')
+      .max(50, 'Steps maksimal 50.')
+      .nullable()
+      .default(null),
+    seed: z
+      .number({ invalid_type_error: 'Seed harus angka ≥0.' })
+      .int('Seed harus bilangan bulat.')
+      .min(0, 'Seed minimal 0.')
+      .nullable()
+      .default(null),
+    reqWidth: z
+      .number({ invalid_type_error: 'Lebar harus angka 256–2500.' })
+      .int('Lebar harus bilangan bulat.')
+      .min(256, 'Lebar minimal 256.')
+      .max(2500, 'Lebar maksimal 2500.')
+      .nullable()
+      .default(null),
+    reqHeight: z
+      .number({ invalid_type_error: 'Tinggi harus angka 256–2500.' })
+      .int('Tinggi harus bilangan bulat.')
+      .min(256, 'Tinggi minimal 256.')
+      .max(2500, 'Tinggi maksimal 2500.')
+      .nullable()
+      .default(null),
     /** Strength img2img 0–1 opsional; hanya bermakna bila referensi diisi. */
     referenceStrength: z
       .number({ invalid_type_error: 'Strength harus angka 0–1.' })
@@ -46,7 +80,7 @@ export function validateReferenceModelLink(
   const model = models.find((m) => m.id === modelId);
   if (!model) return 'Model tidak dikenal — refresh pilihan lalu coba lagi.';
   if (!model.supports_reference) {
-    return `Model ${model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`;
+    return `Model ${model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`;
   }
   return null;
 }

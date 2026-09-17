@@ -282,6 +282,19 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                 {img.negative_prompt ? (
                   <p className={`mt-1 text-ink-muted ${isCover ? 'text-xs' : 'text-[11px]'}`}>Negative: {img.negative_prompt}</p>
                 ) : null}
+                {img.guidance !== null && img.guidance !== undefined
+                || img.steps !== null && img.steps !== undefined
+                || img.seed !== null && img.seed !== undefined
+                || (img.req_width && img.req_height) ? (
+                  <p className={`mt-1 tabular-nums text-ink-muted ${isCover ? 'text-xs' : 'text-[11px]'}`}>
+                    Advanced: {[
+                      img.guidance !== null && img.guidance !== undefined ? `guidance ${String(img.guidance)}` : null,
+                      img.steps !== null && img.steps !== undefined ? `steps ${img.steps}` : null,
+                      img.seed !== null && img.seed !== undefined ? `seed ${String(img.seed)}` : null,
+                      img.req_width && img.req_height ? `${img.req_width}×${img.req_height}` : null
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                ) : null}
                 {img.reasoning?.visual_strategy ? (
                   <p className={`mt-1 text-ink-muted ${isCover ? 'text-xs' : 'text-[11px]'}`}>
                     Strategi: {img.reasoning.visual_strategy}

@@ -7,12 +7,25 @@ import { BynaraImageAdapter } from './providers/bynara';
 import { ImageHttpError } from './types';
 import {
   DEFAULT_IMG2IMG_STRENGTH,
+  clampAutoParams,
+  clampGuidance,
   clampImg2ImgDimension,
   clampImg2ImgSteps,
   clampImg2ImgStrength,
+  clampRequestDimension,
+  clampTextSteps,
+  isFlux2Model,
   isImg2ImgModel,
+  isLeonardoModel,
+  isLucidModel,
+  isPhoenixModel,
+  modelDefaultParams,
+  modelNegativeMode,
+  modelRendersText,
   modelSupportsReference,
-  stripDataUrlPrefix
+  resolveEffectiveAdvanced,
+  stripDataUrlPrefix,
+  stripNoTextClause
 } from './types';
 import { isHttpsUrl, base64ToBytes } from './providers/base';
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
@@ -185,7 +198,7 @@ describe('CloudflareImageAdapter img2img', () => {
     expect(result.mimeType).toBe('image/png');
   });
 
-  it('menolak reference untuk model Flux sebelum request (hemat key/kuota)', async () => {
+  it('menolak reference untuk model Flux-1/Leonardo sebelum request (hemat key/kuota)', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
     vi.stubGlobal('fetch', fetchMock);
     const adapter = new CloudflareImageAdapter(
@@ -193,6 +206,13 @@ describe('CloudflareImageAdapter img2img', () => {
       'tok'
     );
     await expect(adapter.generateImage({ prompt: 'cat', referenceImageB64: B64 })).rejects.toThrow(
+      /tidak mendukung image reference/
+    );
+    const leo = new CloudflareImageAdapter(
+      { baseUrl: 'https://x.test/ai', model: '@cf/leonardo/phoenix-1.0', accountId: 'acc1' },
+      'tok'
+    );
+    await expect(leo.generateImage({ prompt: 'cat', referenceImageB64: B64 })).rejects.toThrow(
       /tidak mendukung image reference/
     );
     expect(fetchMock).not.toHaveBeenCalled();
@@ -219,12 +239,190 @@ describe('CloudflareImageAdapter img2img', () => {
   });
 });
 
+describe('CloudflareImageAdapter Leonardo', () => {
+  const base = 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai';
+
+  it('Phoenix: negative native + guidance + num_steps + dimensi + seed', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/leonardo/phoenix-1.0', accountId: 'acc1' },
+      'tok'
+    );
+    await adapter.generateImage({
+      prompt: 'infographic poster',
+      negativePrompt: 'blurry',
+      guidance: 5,
+      numSteps: 30,
+      seed: 7,
+      width: 1536,
+      height: 1024
+    });
+    const init = (fetchMock.mock.calls as unknown[][])[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body['prompt']).toBe('infographic poster');
+    expect(body['negative_prompt']).toBe('blurry');
+    expect(body['guidance']).toBe(5);
+    expect(body['num_steps']).toBe(30);
+    expect(body).not.toHaveProperty('steps');
+    expect(body['width']).toBe(1536);
+    expect(body['height']).toBe(1024);
+    expect(body['seed']).toBe(7);
+  });
+
+  it('Lucid: tanpa negative_prompt (lipat Avoid:) + kirim num_steps dan steps', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ image: B64 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/leonardo/lucid-origin', accountId: 'acc1' },
+      'tok'
+    );
+    const result = await adapter.generateImage({ prompt: 'product mockup', negativePrompt: 'blurry', numSteps: 22 });
+    expect(Buffer.from(result.imageBytes!).toString()).toBe('fake-bytes');
+    const init = (fetchMock.mock.calls as unknown[][])[0]?.[1] as { body: string };
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('negative_prompt');
+    expect(String(body['prompt'])).toContain('Avoid: blurry');
+    expect(body['num_steps']).toBe(22);
+    expect(body['steps']).toBe(22);
+  });
+
+  it('Phoenix menerima respons biner image/jpeg', async () => {
+    const bytes = Buffer.from('phoenix-jpeg');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          ({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'image/jpeg' }),
+            json: async () => {
+              throw new Error('not json');
+            },
+            text: async () => '',
+            arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+          }) as unknown as Response
+      )
+    );
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/leonardo/phoenix-1.0', accountId: 'acc1' },
+      'tok'
+    );
+    const result = await adapter.generateImage({ prompt: 'poster' });
+    expect(Buffer.from(result.imageBytes!).toString()).toBe('phoenix-jpeg');
+    expect(result.mimeType).toBe('image/jpeg');
+  });
+});
+
+describe('CloudflareImageAdapter FLUX.2', () => {
+  const base = 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai';
+
+  it('text-to-image: FormData primary (tanpa Content-Type manual)', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/black-forest-labs/flux-2-klein-4b', accountId: 'acc1' },
+      'tok'
+    );
+    await adapter.generateImage({ prompt: 'cat', negativePrompt: 'blurry', numSteps: 6, seed: 3 });
+    const calls = fetchMock.mock.calls as unknown[][];
+    expect(calls).toHaveLength(1);
+    const init = calls[0]?.[1] as { headers: Record<string, string>; body: FormData };
+    expect(init.headers).not.toHaveProperty('Content-Type');
+    const form = init.body;
+    expect(form.get('prompt')).toBe('cat Avoid: blurry');
+    expect(form.get('steps')).toBe('6');
+    expect(form.get('seed')).toBe('3');
+  });
+
+  it('fallback JSON minimal 1x khusus HTTP 400 (401 tidak di-fallback)', async () => {
+    const badThenOk = vi
+      .fn(async () => ({ ok: false, status: 400, text: async () => 'bad' }) as Response)
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => 'bad' } as Response)
+      .mockResolvedValueOnce(jsonResponse({ result: { image: B64 } }) as Response);
+    vi.stubGlobal('fetch', badThenOk);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/black-forest-labs/flux-2-dev', accountId: 'acc1' },
+      'tok'
+    );
+    const result = await adapter.generateImage({ prompt: 'cat' });
+    expect(Buffer.from(result.imageBytes!).toString()).toBe('fake-bytes');
+    expect(badThenOk).toHaveBeenCalledTimes(2);
+    const second = (badThenOk.mock.calls as unknown[][])[1]?.[1] as { headers: Record<string, string>; body: string };
+    expect(second.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(second.body)).toMatchObject({ prompt: 'cat' });
+    expect(result.metadata).toMatchObject({ transport: 'json-fallback' });
+
+    const unauthorized = vi.fn(async () => ({ ok: false, status: 401, text: async () => 'no' }) as Response);
+    vi.stubGlobal('fetch', unauthorized);
+    await expect(adapter.generateImage({ prompt: 'cat' })).rejects.toMatchObject({ status: 401 });
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('transport=json: langsung JSON tanpa FormData; transport=multipart: tanpa fallback', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const jsonAdapter = new CloudflareImageAdapter(
+      {
+        baseUrl: base,
+        model: '@cf/black-forest-labs/flux-2-klein-9b',
+        accountId: 'acc1',
+        modelConfig: { transport: 'json' }
+      },
+      'tok'
+    );
+    await jsonAdapter.generateImage({ prompt: 'cat', parameters: { transport: 'json' } });
+    const init = (fetchMock.mock.calls as unknown[][])[0]?.[1] as { headers: Record<string, string> };
+    expect(init.headers['Content-Type']).toBe('application/json');
+
+    const bad = vi.fn(async () => ({ ok: false, status: 400, text: async () => 'bad' }) as Response);
+    vi.stubGlobal('fetch', bad);
+    const strict = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/black-forest-labs/flux-2-klein-9b', accountId: 'acc1' },
+      'tok'
+    );
+    await expect(strict.generateImage({ prompt: 'cat', parameters: { transport: 'multipart' } })).rejects.toMatchObject({ status: 400 });
+    expect(bad).toHaveBeenCalledTimes(1);
+  });
+
+  it('single-reference: part image + metadata reference=true', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ result: { image: B64 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new CloudflareImageAdapter(
+      { baseUrl: base, model: '@cf/black-forest-labs/flux-2-klein-4b', accountId: 'acc1' },
+      'tok'
+    );
+    const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64').toString('base64');
+    const result = await adapter.generateImage({ prompt: 'edit this', referenceImageB64: tinyPng, seed: 1 });
+    const init = (fetchMock.mock.calls as unknown[][])[0]?.[1] as { body: FormData };
+    const part = init.body.get('image');
+    expect(part).toBeInstanceOf(Blob);
+    expect(result.metadata).toMatchObject({ reference: true });
+  });
+});
+
 describe('img2img helpers', () => {
-  it('isImg2ImgModel hanya untuk 2 model fase 1', () => {
+  it('isImg2ImgModel hanya untuk 2 model SD fase 1 (Flux-2/Leonardo terpisah)', () => {
     expect(isImg2ImgModel('@cf/runwayml/stable-diffusion-v1-5-img2img')).toBe(true);
     expect(isImg2ImgModel('@cf/bytedance/stable-diffusion-xl-lightning')).toBe(true);
     expect(isImg2ImgModel('@cf/lykon/dreamshaper-8-lcm')).toBe(false);
     expect(isImg2ImgModel('@cf/black-forest-labs/flux-1-schnell')).toBe(false);
+    expect(isImg2ImgModel('@cf/black-forest-labs/flux-2-klein-4b')).toBe(false);
+    expect(isImg2ImgModel('@cf/leonardo/phoenix-1.0')).toBe(false);
+  });
+  it('detektor famili baru: Flux-2 / Leonardo / Phoenix / Lucid', () => {
+    expect(isFlux2Model('@cf/black-forest-labs/flux-2-klein-4b')).toBe(true);
+    expect(isFlux2Model('@cf/black-forest-labs/flux-2-klein-9b')).toBe(true);
+    expect(isFlux2Model('@cf/black-forest-labs/flux-2-dev')).toBe(true);
+    expect(isFlux2Model('@cf/black-forest-labs/flux-1-schnell')).toBe(false);
+    expect(isLeonardoModel('@cf/leonardo/phoenix-1.0')).toBe(true);
+    expect(isLeonardoModel('@cf/leonardo/lucid-origin')).toBe(true);
+    expect(isLeonardoModel('@cf/black-forest-labs/flux-2-dev')).toBe(false);
+    expect(isPhoenixModel('@cf/leonardo/phoenix-1.0')).toBe(true);
+    expect(isPhoenixModel('@cf/leonardo/lucid-origin')).toBe(false);
+    expect(isLucidModel('@cf/leonardo/lucid-origin')).toBe(true);
+    expect(isLucidModel('@cf/leonardo/phoenix-1.0')).toBe(false);
   });
   it('modelSupportsReference: flag config menang atas daftar', () => {
     expect(modelSupportsReference({ model_id: 'flux-1-schnell', config: { supports_reference: true } })).toBe(true);
@@ -232,7 +430,62 @@ describe('img2img helpers', () => {
       modelSupportsReference({ model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', config: { supports_reference: false } })
     ).toBe(false);
     expect(modelSupportsReference({ model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', config: null })).toBe(true);
+    expect(modelSupportsReference({ model_id: '@cf/black-forest-labs/flux-2-klein-4b', config: { supports_reference: true } })).toBe(true);
+    expect(modelSupportsReference({ model_id: '@cf/black-forest-labs/flux-2-klein-4b', config: null })).toBe(false);
     expect(modelSupportsReference({ model_id: 'flux', config: null })).toBe(false);
+  });
+  it('modelRendersText: flag text_capable atau famili Leonardo', () => {
+    expect(modelRendersText({ model_id: '@cf/leonardo/phoenix-1.0', config: null })).toBe(true);
+    expect(modelRendersText({ model_id: '@cf/leonardo/lucid-origin', config: null })).toBe(true);
+    expect(modelRendersText({ model_id: 'x', config: { text_capable: true } })).toBe(true);
+    expect(modelRendersText({ model_id: '@cf/black-forest-labs/flux-2-dev', config: null })).toBe(false);
+  });
+  it('stripNoTextClause: hanya buang klausa no/without text', () => {
+    expect(stripNoTextClause('photorealistic, no text, no watermark')).toBe('photorealistic, no watermark');
+    expect(stripNoTextClause('cinematic still, without text, dramatic lighting')).toBe('cinematic still, dramatic lighting');
+    expect(stripNoTextClause('flat vector, no texture loss')).toBe('flat vector, no texture loss');
+    expect(stripNoTextClause('')).toBe('');
+  });
+  it('clamp helper advanced: guidance/steps/dimensi', () => {
+    expect(clampGuidance(99, 7.5)).toBe(10);
+    expect(clampGuidance(-1, 7.5)).toBe(0);
+    expect(clampGuidance('x', 4.5)).toBe(4.5);
+    expect(clampTextSteps(99, 20, 1, 40)).toBe(40);
+    expect(clampTextSteps(0, 20, 1, 40)).toBe(1);
+    expect(clampTextSteps(2.6, 20, 1, 40)).toBe(3);
+    expect(clampTextSteps('x', 20, 1, 40)).toBe(20);
+    expect(clampRequestDimension(9999, 1024, 2500)).toBe(2500);
+    expect(clampRequestDimension(100, 1024, 2048)).toBe(256);
+    expect(clampRequestDimension('x', 1120, 2500)).toBe(1120);
+  });
+  it('clampAutoParams: Auto hemat ≤1024px / ≤25 steps', () => {
+    expect(clampAutoParams({ width: 2048, height: 2048, steps: 40 })).toEqual({ width: 1024, height: 1024, steps: 25, clamped: true });
+    expect(clampAutoParams({ width: 768, height: 768, steps: 10 })).toEqual({ width: 768, height: 768, steps: 10, clamped: false });
+    expect(clampAutoParams({ width: null, height: null, steps: null })).toEqual({ width: null, height: null, steps: null, clamped: false });
+  });
+  it('modelDefaultParams: default per famili + override config', () => {
+    expect(modelDefaultParams('@cf/leonardo/phoenix-1.0', null)).toMatchObject({ guidance: 2, maxSteps: 50, maxDim: 2048 });
+    expect(modelDefaultParams('@cf/leonardo/lucid-origin', null)).toMatchObject({ guidance: 4.5, maxSteps: 40, maxDim: 2500 });
+    expect(modelDefaultParams('@cf/black-forest-labs/flux-2-klein-4b', null)).toMatchObject({ steps: 4, maxSteps: 8 });
+    expect(modelDefaultParams('@cf/leonardo/phoenix-1.0', { steps_default: 10, max_steps: 30 })).toMatchObject({ steps: 10, maxSteps: 30 });
+  });
+  it('modelNegativeMode: Phoenix/SD native, Lucid/Flux fold, config menang', () => {
+    expect(modelNegativeMode('@cf/leonardo/phoenix-1.0', null)).toBe('native');
+    expect(modelNegativeMode('@cf/leonardo/lucid-origin', null)).toBe('fold');
+    expect(modelNegativeMode('@cf/black-forest-labs/flux-2-dev', null)).toBe('fold');
+    expect(modelNegativeMode('@cf/runwayml/stable-diffusion-v1-5-img2img', null)).toBe('native');
+    expect(modelNegativeMode('@cf/leonardo/lucid-origin', { negative_mode: 'native' })).toBe('native');
+  });
+  it('resolveEffectiveAdvanced: Auto clamp hemat, pin sampai maks model', () => {
+    const row = { guidance: 9, steps: 40, seed: 7, req_width: 2048, req_height: 2048 };
+    const auto = resolveEffectiveAdvanced({ model_id: '@cf/leonardo/lucid-origin', config: null }, row, false);
+    expect(auto).toMatchObject({ guidance: 9, numSteps: 25, seed: 7, width: 1024, height: 1024, clamped: true });
+    const pinned = resolveEffectiveAdvanced({ model_id: '@cf/leonardo/lucid-origin', config: null }, row, true);
+    expect(pinned).toMatchObject({ guidance: 9, numSteps: 40, seed: 7, width: 2048, height: 2048, clamped: false });
+    const empty = resolveEffectiveAdvanced({ model_id: '@cf/leonardo/phoenix-1.0', config: null }, {}, false);
+    expect(empty.audit).toMatchObject({ guidance: 2, steps: 20, seed: null });
+    expect(empty.guidance).toBeUndefined();
+    expect(empty.clamped).toBe(false);
   });
   it('clamp + strip prefix data URL', () => {
     expect(clampImg2ImgStrength(2)).toBe(1);

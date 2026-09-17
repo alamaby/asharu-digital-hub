@@ -35,8 +35,8 @@ function options(): StudioOptions {
       { id: 'prov-cf', slug: 'cloudflare', display_name: 'Cloudflare Workers AI' }
     ],
     models: [
-      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo', supports_reference: false },
-      { id: 'model-cf', provider_id: 'prov-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare', supports_reference: false }
+      { id: 'model-1', provider_id: 'prov-1', model_id: 'flux-schnell', display_name: 'Flux Schnell', provider_slug: 'pixazo', supports_reference: false, text_capable: false },
+      { id: 'model-cf', provider_id: 'prov-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare', supports_reference: false, text_capable: false }
     ],
     styles: [{ slug: 'photorealistic', display_name: 'Photorealistic' }],
     subjects: [{ slug: 'wanita-muda-modis', display_name: 'Wanita Muda Modis' }],
@@ -72,6 +72,11 @@ function genRow(over: Partial<StudioGenerationRow> & { id: string }): StudioGene
     reference_storage_path: null,
     reference_public_url: null,
     reference_strength: null,
+    guidance: null,
+    steps: null,
+    seed: null,
+    req_width: null,
+    req_height: null,
     final_prompt: null,
     final_negative: null,
     expires_at: '2026-10-11T00:00:00Z',
@@ -208,7 +213,7 @@ describe('StudioForm', () => {
     const opts = options();
     opts.models = [
       ...opts.models,
-      { id: 'model-sd', provider_id: 'prov-cf', model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', display_name: 'SD 1.5 Img2Img', provider_slug: 'cloudflare', supports_reference: true }
+      { id: 'model-sd', provider_id: 'prov-cf', model_id: '@cf/runwayml/stable-diffusion-v1-5-img2img', display_name: 'SD 1.5 Img2Img', provider_slug: 'cloudflare', supports_reference: true, text_capable: false }
     ];
     renderWithMessages(
       <StudioForm options={opts} quota={{ used: 0, remaining: 20, limit: 20 }} />
@@ -221,6 +226,41 @@ describe('StudioForm', () => {
     expect(fileInput.accept).toContain('image/webp');
     await user.selectOptions(screen.getByLabelText('Model'), 'model-sd');
     expect(screen.getByLabelText('Model')).toHaveValue('model-sd');
+  });
+
+  it('advanced: details ter-render + nilai terkirim ke enqueue + rentang divalidasi', async () => {
+    const user = userEvent.setup();
+    const { enqueueStudioImage } = await import('@/lib/studio/actions');
+    vi.mocked(enqueueStudioImage).mockClear();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    await user.click(screen.getByText('Parameter advanced (opsional)'));
+    await user.type(screen.getByLabelText('Guidance (0–10)'), '4.5');
+    await user.type(screen.getByLabelText('Steps (1–50)'), '20');
+    await user.type(screen.getByLabelText('Seed (reproduksibilitas)'), '42');
+    await user.type(screen.getByLabelText('Lebar (256–2500)'), '1120');
+    await user.type(screen.getByLabelText('Tinggi (256–2500)'), '1120');
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(enqueueStudioImage).toHaveBeenCalledWith(
+      expect.objectContaining({ guidance: 4.5, steps: 20, seed: 42, reqWidth: 1120, reqHeight: 1120 })
+    );
+  });
+
+  it('advanced: guidance di luar 0–10 ditolak tanpa enqueue', async () => {
+    const user = userEvent.setup();
+    const { enqueueStudioImage } = await import('@/lib/studio/actions');
+    vi.mocked(enqueueStudioImage).mockClear();
+    renderWithMessages(
+      <StudioForm options={options()} quota={{ used: 0, remaining: 20, limit: 20 }} />
+    );
+    await user.type(screen.getByLabelText('Image prompt (EN, deskriptif)'), 'a tidy bedroom with soft morning light');
+    await user.click(screen.getByText('Parameter advanced (opsional)'));
+    await user.type(screen.getByLabelText('Guidance (0–10)'), '99');
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Guidance harus 0–10');
+    expect(enqueueStudioImage).not.toHaveBeenCalled();
   });
 });
 
@@ -282,6 +322,23 @@ describe('StudioHistory', () => {
     expect(screen.getByText('cloudflare image 400: boom detail')).toBeInTheDocument();
     expect(screen.getByText('Percobaan')).toBeInTheDocument();
     expect(document.body.textContent).toContain('"provider": "cloudflare"');
+  });
+
+  it('detail parameter menampilkan advanced terisi; Auto bila kosong', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([
+          genRow({ id: 'a1', status: 'ready', guidance: 4.5, steps: 20, seed: 7, req_width: 1120, req_height: 1120 }),
+          genRow({ id: 'a2', status: 'ready' })
+        ])}
+      />
+    );
+    const summaries = screen.getAllByText('Parameter & prompt terkirim');
+    await user.click(summaries[0] as HTMLElement);
+    expect(screen.getByText('guidance 4.5 · steps 20 · seed 7 · 1120×1120')).toBeInTheDocument();
+    await user.click(summaries[1] as HTMLElement);
+    expect(screen.getAllByText('Auto').length).toBeGreaterThan(0);
   });
 
   it('menampilkan placeholder memproses untuk antrean pending', () => {

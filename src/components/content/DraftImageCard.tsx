@@ -60,6 +60,17 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     const s = Number(latestOf(initialImages)?.reference_strength);
     return Number.isFinite(s) && s >= 0 && s <= 1 ? s : 0.6;
   });
+  // Advanced (opsional): kosong = Auto (hemat, clamp ≤1024px/≤25 steps); pin model = HD.
+  const advOf = (v: string | number | null | undefined): string => {
+    if (v === null || v === undefined || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? String(n) : '';
+  };
+  const [advGuidance, setAdvGuidance] = useState(() => advOf(latestOf(initialImages)?.guidance));
+  const [advSteps, setAdvSteps] = useState(() => advOf(latestOf(initialImages)?.steps));
+  const [advSeed, setAdvSeed] = useState(() => advOf(latestOf(initialImages)?.seed));
+  const [advWidth, setAdvWidth] = useState(() => advOf(latestOf(initialImages)?.req_width));
+  const [advHeight, setAdvHeight] = useState(() => advOf(latestOf(initialImages)?.req_height));
   const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -111,6 +122,37 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
       setNotice(`Model ${pinned.display_name} tidak mendukung image reference — pilih model bertanda ref atau Auto.`);
       return;
     }
+    // Advanced: kosong = Auto; angka di luar rentang ditolak cepat (worker clamp final).
+    const parseAdv = (raw: string): number | null => {
+      const t = raw.trim();
+      if (!t) return null;
+      const num = Number(t);
+      return Number.isFinite(num) ? num : null;
+    };
+    const guidance = parseAdv(advGuidance);
+    const steps = parseAdv(advSteps);
+    const seed = parseAdv(advSeed);
+    const reqWidth = parseAdv(advWidth);
+    const reqHeight = parseAdv(advHeight);
+    if (guidance !== null && (guidance < 0 || guidance > 10)) {
+      setNotice('Guidance harus 0–10 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (steps !== null && (!Number.isInteger(steps) || steps < 1 || steps > 50)) {
+      setNotice('Steps harus bilangan bulat 1–50 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (seed !== null && (!Number.isInteger(seed) || seed < 0)) {
+      setNotice('Seed harus bilangan bulat ≥0 (atau kosongkan untuk Auto).');
+      return;
+    }
+    if (
+      (reqWidth !== null && (!Number.isInteger(reqWidth) || reqWidth < 256 || reqWidth > 2500)) ||
+      (reqHeight !== null && (!Number.isInteger(reqHeight) || reqHeight < 256 || reqHeight > 2500))
+    ) {
+      setNotice('Dimensi harus bilangan bulat 256–2500 (atau kosongkan untuk Auto).');
+      return;
+    }
     setNotice(p ? 'Menyiapkan generate...' : 'Meminta reasoning otomatis...');
     setProposed(null);
     startTransition(async () => {
@@ -122,7 +164,12 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           imagePrompt: p || null,
           negativePrompt: n || null,
           referencePublicUrl: referenceUrl,
-          referenceStrength: referenceUrl ? referenceStrength : null
+          referenceStrength: referenceUrl ? referenceStrength : null,
+          guidance,
+          steps,
+          seed,
+          reqWidth,
+          reqHeight
         });
         setNotice(p
           ? 'Masuk antrean generate. Worker cron memproses ≤5 menit — tekan Muat ulang untuk melihat hasil. Prompt edit tersimpan sebagai visual_strategy=custom.'
@@ -313,6 +360,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
               <option key={m.id} value={m.id}>
                 {m.provider_slug} · {m.display_name}
                 {m.supports_reference ? ' · ref' : ''}
+                {m.text_capable ? ' · teks' : ''}
               </option>
             ))}
           </select>
@@ -376,6 +424,34 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         onStrength={setReferenceStrength}
         notice={referenceNotice}
       />
+      <details className="mt-2 rounded-lg border border-line bg-background p-2 text-xs">
+        <summary className="cursor-pointer font-medium text-ink">Parameter advanced (opsional)</summary>
+        <p className="mt-0.5 text-[11px] text-ink-muted">Kosongkan = Auto (hemat, maks 1024px / 25 steps). Phoenix/Lucid bertanda teks hanya manual.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-0.5">
+            <span className="text-ink-muted">Guidance (0–10)</span>
+            <input type="number" min={0} max={10} step={0.5} value={advGuidance} onChange={(e) => setAdvGuidance(e.target.value)} placeholder="Auto" className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+          </label>
+          <label className="grid gap-0.5">
+            <span className="text-ink-muted">Steps (1–50)</span>
+            <input type="number" min={1} max={50} step={1} value={advSteps} onChange={(e) => setAdvSteps(e.target.value)} placeholder="Auto" className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+          </label>
+          <label className="grid gap-0.5">
+            <span className="text-ink-muted">Seed</span>
+            <input type="number" min={0} step={1} value={advSeed} onChange={(e) => setAdvSeed(e.target.value)} placeholder="Auto" className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-0.5">
+              <span className="text-ink-muted">Lebar (256–2500)</span>
+              <input type="number" min={256} max={2500} step={64} value={advWidth} onChange={(e) => setAdvWidth(e.target.value)} placeholder="Auto" className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+            </label>
+            <label className="grid gap-0.5">
+              <span className="text-ink-muted">Tinggi (256–2500)</span>
+              <input type="number" min={256} max={2500} step={64} value={advHeight} onChange={(e) => setAdvHeight(e.target.value)} placeholder="Auto" className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm" />
+            </label>
+          </div>
+        </div>
+      </details>
       <div className="mt-3 grid gap-2">
         <label className="text-xs">
           <span className="mb-1 block text-ink-muted">Image prompt (EN, ≤500 char / ≤60 kata — edit lalu Regenerate; style suffix ditambah otomatis)</span>

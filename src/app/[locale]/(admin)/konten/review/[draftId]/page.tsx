@@ -157,7 +157,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   let regenModels: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[] = [];
   // For image picker: active image providers/models/styles + draft image history
   let imageProviders: { id: string; slug: string; display_name: string }[] = [];
-  let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string; supports_reference: boolean }[] = [];
+  let imageModels: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string; supports_reference: boolean; text_capable: boolean }[] = [];
   let imageStyles: { slug: string; display_name: string }[] = [];
   let imageSubjects: { slug: string; display_name: string }[] = [];
   let imageCameras: { slug: string; display_name: string }[] = [];
@@ -170,6 +170,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     style_slug: string | null; camera_slug: string | null; provider_slug: string; model_id: string; key_suffix: string | null;
     storage_path: string | null; public_url: string | null; width: number | null; height: number | null;
     reference_storage_path: string | null; reference_public_url: string | null; reference_strength: number | null;
+    guidance: number | null; steps: number | null; seed: number | null; req_width: number | null; req_height: number | null;
     status: 'pending' | 'prompt_ready' | 'ready' | 'failed' | 'selected'; last_error: string | null; attempts: number;
     llm_meta: Record<string, unknown> | null; created_at: string; updated_at: string;
   }[] = [];
@@ -212,7 +213,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         ({ image_providers: p, ...m }) => ({
           ...m,
           provider_slug: p.slug,
-          supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config })
+          supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config }),
+          text_capable: m.config?.['text_capable'] === true
         })
       );
     }

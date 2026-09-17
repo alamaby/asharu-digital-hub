@@ -42,6 +42,12 @@ export interface ImageEnqueueOverride {
   referencePublicUrl?: string | null;
   /** Path storage referensi bila sudah di-upload (hemat re-upload). */
   referenceStoragePath?: string | null;
+  /** Advanced opsional (picker review <details>): NULL = Auto/default model. */
+  guidance?: number | null;
+  steps?: number | null;
+  seed?: number | null;
+  reqWidth?: number | null;
+  reqHeight?: number | null;
 }
 
 /**
@@ -216,6 +222,25 @@ export async function generatePostImage(
     }
   }
   const referenceStrength = referenceUrl ? clampImg2ImgStrength(override?.referenceStrength) : null;
+  // Advanced: validasi rentang ringan (worker yang clamp final per model + pin).
+  const numOrNull = (v: unknown): number | null => {
+    if (v === null || v === undefined) return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const clampOpt = (v: number | null, min: number, max: number): number | null => {
+    if (v === null) return null;
+    if (v < min || v > max) throw new Error('Parameter advanced di luar rentang (guidance 0–10, steps 1–50, dimensi 256–2500).');
+    return v;
+  };
+  const guidance = clampOpt(numOrNull(override?.guidance), 0, 10);
+  const stepsRaw = clampOpt(numOrNull(override?.steps), 1, 50);
+  const steps = stepsRaw === null ? null : Math.round(stepsRaw);
+  const seed = clampOpt(numOrNull(override?.seed), 0, Number.MAX_SAFE_INTEGER);
+  const reqWidthRaw = clampOpt(numOrNull(override?.reqWidth), 256, 2500);
+  const reqHeightRaw = clampOpt(numOrNull(override?.reqHeight), 256, 2500);
+  const reqWidth = reqWidthRaw === null ? null : Math.round(reqWidthRaw);
+  const reqHeight = reqHeightRaw === null ? null : Math.round(reqHeightRaw);
   const { data: created, error } = await supabase
     .from('content_draft_images')
     .insert({
@@ -229,6 +254,11 @@ export async function generatePostImage(
       reference_public_url: referenceUrl,
       reference_storage_path: referenceStoragePath,
       reference_strength: referenceStrength,
+      guidance,
+      steps,
+      seed,
+      req_width: reqWidth,
+      req_height: reqHeight,
       reasoning: hasCustom ? { visual_strategy: 'custom', justification: 'user_edited' } : null,
       llm_meta: override ? { override } : {}
     })

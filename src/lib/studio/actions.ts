@@ -100,7 +100,8 @@ export async function listStudioOptions(): Promise<StudioOptions> {
   }>).map(({ image_providers, ...m }) => ({
     ...m,
     provider_slug: image_providers.slug,
-    supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config })
+    supports_reference: modelSupportsReference({ model_id: m.model_id, config: m.config }),
+    text_capable: m.config?.['text_capable'] === true
   }));
   return {
     providers: (providers ?? []) as StudioOptions['providers'],
@@ -130,6 +131,12 @@ export interface EnqueueStudioInput {
   referencePublicUrl?: string | null;
   /** Path storage referensi bila sudah di-upload (hemat re-upload). */
   referenceStoragePath?: string | null;
+  /** Advanced opsional (form <details>): NULL = Auto/default model. */
+  guidance?: number | null;
+  steps?: number | null;
+  seed?: number | null;
+  reqWidth?: number | null;
+  reqHeight?: number | null;
 }
 
 /** Batas upload referensi img2img dipakai form dari `@/lib/image/types`. */
@@ -190,7 +197,12 @@ async function enqueueStudioImageImpl(input: EnqueueStudioInput): Promise<{ imag
     cameraSlug: input.cameraSlug ?? null,
     aspectSlug: input.aspectSlug,
     referenceStrength: input.referenceStrength ?? null,
-    referencePublicUrl: input.referencePublicUrl ?? null
+    referencePublicUrl: input.referencePublicUrl ?? null,
+    guidance: input.guidance ?? null,
+    steps: input.steps ?? null,
+    seed: input.seed ?? null,
+    reqWidth: input.reqWidth ?? null,
+    reqHeight: input.reqHeight ?? null
   });
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Input tidak valid.');
@@ -293,6 +305,11 @@ async function enqueueStudioImageImpl(input: EnqueueStudioInput): Promise<{ imag
       reference_public_url: v.referencePublicUrl,
       reference_storage_path: referenceStoragePath,
       reference_strength: strength,
+      guidance: v.guidance,
+      steps: v.steps,
+      seed: v.seed,
+      req_width: v.reqWidth,
+      req_height: v.reqHeight,
       expires_at: expiresAt
     })
     .select('id, expires_at')

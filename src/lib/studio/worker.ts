@@ -9,7 +9,10 @@ import {
   ImageHttpError,
   bytesToBase64,
   clampImg2ImgStrength,
+  modelRendersText,
   modelSupportsReference,
+  resolveEffectiveAdvanced,
+  stripNoTextClause,
   type ImageAspect,
   type ImageModelRow,
   type ImageProviderRow,
@@ -84,7 +87,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
       throw new Error('Model bukan milik provider terpilih.');
     }
     if (!modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
-      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      throw new Error(`Model ${found.model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
     }
     return { provider: found.provider, model: found.model, style, aspect, pinned: true };
   }
@@ -135,7 +138,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
         : 'Provider pilihan tidak punya model aktif — pilih provider lain lalu coba lagi.');
     }
     if (needsReference && !modelSupportsReference({ model_id: pick.model_id, config: pick.config })) {
-      throw new Error(`Model ${pick.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+      throw new Error(`Model ${pick.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
     }
     return { provider, model: pick, style, aspect, pinned: true };
   }
@@ -146,7 +149,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
     const found = await findStudioModel(config.default_model_id);
     if (found) {
       if (needsReference && !modelSupportsReference({ model_id: found.model.model_id, config: found.model.config })) {
-        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model SD img2img atau Auto.`);
+        throw new Error(`Model default ${found.model.display_name} tidak mendukung image reference — pilih model reference (SD img2img / FLUX.2) atau Auto.`);
       }
       return { provider: found.provider, model: found.model, style, aspect, pinned: true };
     }
@@ -177,7 +180,7 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
     if (pick) return { provider, model: pick, style, aspect, pinned: false };
   }
   throw new Error(needsReference
-    ? 'Tidak ada model image reference aktif — pilih model SD img2img.'
+    ? 'Tidak ada model image reference aktif — pilih model reference (SD img2img / FLUX.2).'
     : 'Tidak ada provider/model image aktif.');
 }
 
@@ -245,7 +248,12 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       await failStudioImage(imageId, 'Prompt kosong — isi prompt dulu (minimal 10 karakter).');
       return { imageId: null, error: 'empty prompt' };
     }
-    const styleSuffix = target.style?.prompt_suffix?.trim() || '';
+    const styleSuffixRaw = target.style?.prompt_suffix?.trim() || '';
+    // Model text-capable (Phoenix/Lucid): kecualikan klausa "no text" dari
+    // style suffix agar keunggulan render teks model tidak dibatalkan.
+    const styleSuffix = modelRendersText({ model_id: target.model.model_id, config: target.model.config })
+      ? stripNoTextClause(styleSuffixRaw)
+      : styleSuffixRaw;
     // Urutan natural: [subject, prompt, angle, style]. Angle disisip sebelum
     // style suffix (instruksi render) agar framing terbaca sebagai scene.
     let composed = prompt;
@@ -283,6 +291,14 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
     const finalNegative = mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
     composedSnapshot = composed.slice(0, 4000);
     finalNegativeSnapshot = finalNegative ? finalNegative.slice(0, 1000) : null;
+
+    // Advanced (form <details>): NULL = Auto/default model. Auto (non-pin)
+    // di-clamp hemat (≤1024px / ≤25 steps); pin manual boleh sampai maks model.
+    const adv = resolveEffectiveAdvanced(
+      { model_id: target.model.model_id, config: target.model.config },
+      { guidance: row.guidance, steps: row.steps, seed: row.seed, req_width: row.req_width, req_height: row.req_height },
+      target.pinned
+    );
 
     const supabase = getServiceClient();
     const { data: provs } = await supabase
@@ -356,11 +372,24 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       try {
         const pool = new ImageKeyPool(provider);
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
-          const adapter = createImageAdapter(provider, modelRow!.model_id, apiKey);
+          const adapter = createImageAdapter(provider, modelRow!.model_id, apiKey, modelRow!.config);
+          const advForModel = provider.id === target.provider.id
+            ? adv
+            : resolveEffectiveAdvanced(
+                { model_id: modelRow!.model_id, config: modelRow!.config },
+                { guidance: row.guidance, steps: row.steps, seed: row.seed, req_width: row.req_width, req_height: row.req_height },
+                // Waterfall lintas-provider = tidak di-pin untuk model pengganti.
+                false
+              );
           return adapter.generateImage({
             prompt: composed,
             negativePrompt: finalNegative,
             aspectRatio: target.aspect,
+            ...(advForModel.guidance !== undefined ? { guidance: advForModel.guidance } : {}),
+            ...(advForModel.numSteps !== undefined ? { numSteps: advForModel.numSteps } : {}),
+            ...(advForModel.seed !== undefined ? { seed: advForModel.seed } : {}),
+            ...(advForModel.width !== undefined ? { width: advForModel.width } : {}),
+            ...(advForModel.height !== undefined ? { height: advForModel.height } : {}),
             ...(referenceB64 ? { referenceImageB64: referenceB64, strength: referenceStrength } : {})
           });
         });
@@ -435,7 +464,10 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
             requested_model_id: row.model_id,
             // Jejak audit img2img: referensi dipakai atau tidak + strength.
             reference: referenceB64 ? true : false,
-            reference_strength: referenceB64 ? referenceStrength : null
+            reference_strength: referenceB64 ? referenceStrength : null,
+            // Jejak audit advanced: nilai efektif terkirim + flag clamp Auto.
+            advanced: adv.audit,
+            advanced_clamped: adv.clamped
           },
           updated_at: new Date().toISOString()
         })
