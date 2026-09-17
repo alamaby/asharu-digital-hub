@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-17 12:59 (local time)
+Last updated: 2026-09-17 14:01 (local time)
 
 ## Current State
 
@@ -66,6 +66,7 @@ Last updated: 2026-09-17 12:59 (local time)
 
 ## Recent Entries
 
+- [140152-chat-lab-pagination-ranking.md](2026-09-17/140152-chat-lab-pagination-ranking.md) — Chat Lab pagination DB-driven (`has_error` + backfill, count akurat, filter DB) + statistik 1 tab rentang (Hari ini/7/14/30/Semua) + papan peringkat Best (sukses% → tok/s) provider & model. Migrasi `20260918000002` applied prod, gate 767 tests + build hijau, pushed `7467351`/`e1cfcfa`. [USER ACTION] Live verify pagination + tab + ★ juara.
 - [125908-chat-lab-improvements.md](2026-09-17/125908-chat-lab-improvements.md) — 4 peningkatan Chat Lab: highlight ★ pemenang (latensi/speed/token) di grid + chart, parse `usage` Cloudflare (tahap B ditunda menunggu live verify), halaman detail `/lab/[batchId]` (metrik+chart+log), kartu share PNG 1080 via next/og + Unduh/Bagikan. Gate 754 tests + build hijau, pushed `ac095c9`. [USER ACTION] Live verify token CF + highlight/detail/kartu.
 - [114800-chat-lab-menu.md](2026-09-17/114800-chat-lab-menu.md) — Menu **Chat Lab** `/lab` (login-only, sidebar sejajar Studio): 1 prompt → fan-out paralel 1–3 target strict-pin (tanpa fallback, adil) + side-by-side + metrik token/latency/tok/s + history per-user 30 hari + log detail + chart CSS-only + kuota 50/hari + rate 30/jam. Migrasi `20260918000001` applied prod, gate typecheck+lint+742 tests+build hijau, pushed `7541c8d`/`a6dfa2b`. [USER ACTION] Verifikasi live (atas).
 - [104940-ciora-llm-provider.md](2026-09-17/104940-ciora-llm-provider.md) — Provider LLM `ciora` (`https://ciora.id/v1`, OpenAI-only) priority 5 (paling depan) + 10 model reasoning max. Kode (slug union, filter review, factory+3 tests, seed prompt) + migrasi `20260917000001`. Gate typecheck+lint+710 tests hijau, pushed   `ec017d6`/`70b78e4`. Migrasi APPLIED prod 17 Sep ~11:00 via MCP (10/10 model aktif,
@@ -92,7 +93,6 @@ Last updated: 2026-09-17 12:59 (local time)
 - [155500-artikel-rich-text.md](2026-09-14/155500-artikel-rich-text.md) — `*`/`**` kini dirender miring/tebal di body artikel (publik + pratinjau + draf) via `renderRichText`. Gate 577 tests + build hijau.
 - [155000-artikel-linkify-afiliasi.md](2026-09-14/155000-artikel-linkify-afiliasi.md) — URL inline di body artikel kini anchor bisa diklik (publik + pratinjau + draf review) via `linkifyText`; tanda baca akhir tak ikut href. Gate 574 tests + build hijau.
 - [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
-- [144500-review-artikel-419a2dc8-fix.md](2026-09-14/144500-review-artikel-419a2dc8-fix.md) — Fix 5 temuan review artikel `419a2dc8` (488 kata/thin): prompt hardening + thin-repair 1x + emoji 1/section; cover tampil di review + wiring `cover_image_url` saat publish; upload cover manual; box produk + highlight section afiliasi (reuse `affiliate_products.image`); `expandArticleDraft` untuk repair manual; swap patch body artikel. Gate hijau 569 tests + build, tanpa migrasi.
 - _(entri lebih lama diarsipkan sebagai file di .memory/ - tidak dihapus, hanya tidak ditautkan di indeks 20-terbaru)_
 ## Legacy Archive
 
