@@ -35,12 +35,16 @@ format OpenAI `/chat/completions`, auth `Bearer`) dengan 10 model, semua
 - `model_id` exact dari user diasumsikan benar — perlu smoke test 10/10 (belum).
 - Key diasumsikan sudah ada (1 key semua model) — seed ke Vault belum dilakukan.
 
-## Blocker / belum selesai
+## Blocker / belum selesai (URUTAN PENTING — koreksi 10:57 atas feedback user)
 
-- [USER ACTION] Seed key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
-  → slug `ciora`, priority `0`.
-- [USER ACTION] Apply migrasi ke prod (Supabase Dashboard / CLI) lalu smoke test
-  1 call per model + cek `llm_call_logs`.
+1. [USER ACTION] Apply migrasi ke prod DULU (Supabase Dashboard / CLI).
+2. [USER ACTION] Seed key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
+   → slug `ciora`, priority `0`.
+3. [USER ACTION] Smoke test 1 call per model + cek `llm_call_logs`.
+
+Alasan urutan: `seed-llm-keys.mjs:49-53` query `llm_providers` by slug dan exit(2)
+"Provider ciora not found" bila migrasi belum di-apply. Plan file sudah dibetulkan.
+
 - Pantau `llm_call_logs` pasca-deploy; bila burn-in buruk turunkan priority ciora.
 
 ## Verifikasi

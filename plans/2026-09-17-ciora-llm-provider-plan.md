@@ -36,6 +36,8 @@ semua `reasoning_effort=max` default.
 - [x] Migrasi di submodule `supabase/` (`20260917000001_llm_models_ciora.sql`),
   non-destruktif mengikuti pola `20260910000001_llm_models_gemini_bynara.sql`.
 - [x] Commit submodule `supabase/` DULU, baru parent.
+- [ ] [USER ACTION] Apply migrasi ke prod DULU (Dashboard/CLI) — seed script butuh
+  baris `llm_providers` slug `ciora`, kalau belum ada ia exit(2) "not found".
 - [ ] [USER ACTION] Seed 1 key: `node --env-file=.env.local scripts/seed-llm-keys.mjs`
   → slug `ciora`, priority `0`.
 - [x] Gate: `npm run typecheck`, `npm run lint`, `npm test` (+ `npm run build` bila
@@ -62,7 +64,9 @@ semua `reasoning_effort=max` default.
   OpenAI-only); eksekusi dimulai (build mode).
 - 2026-09-17 10:49 — kode + migrasi selesai, gate hijau (typecheck/lint/710 tests),
   commit submodule `70b78e4` + parent `ec017d6`, pushed. Memory `0239a84`.
-  Sisa user action: seed key, apply migrasi prod, smoke test 10 model.
+  Sisa user action (urutan penting!): apply migrasi prod DULU → seed key → smoke test.
+- 2026-09-17 10:57 — koreksi urutan atas feedback user: seed script exit(2) bila
+  provider belum ada (`seed-llm-keys.mjs:49-53`), jadi migrasi prod WAJIB sebelum seed.
 
 ## Notes
 
