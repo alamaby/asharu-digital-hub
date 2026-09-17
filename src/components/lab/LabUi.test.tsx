@@ -13,11 +13,21 @@ import { LabCardActions } from './LabCardActions';
 
 vi.mock('@/lib/lab/actions', () => ({
   runChatLabBatch: vi.fn(async () => ({ ok: true, data: { batchId: 'batch-1' } })),
-  listLabBatches: vi.fn(async () => []),
+  listLabBatches: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 })),
   deleteLabBatch: vi.fn(async () => ({ ok: true, data: null })),
   getLabBatch: vi.fn(async () => null),
   getLabStats: vi.fn(async () => null)
 }));
+
+function pageOf(items: ReturnType<typeof batch>[], total = items.length) {
+  return {
+    items,
+    total,
+    page: 1,
+    pageSize: 10,
+    totalPages: Math.max(1, Math.ceil(total / 10))
+  };
+}
 
 function options(): LabOptions {
   return {
@@ -70,6 +80,7 @@ function batch(): LabBatchWithRuns {
       user_prompt: 'Jelaskan fotosintesis.',
       temperature: null,
       max_tokens: null,
+      has_error: false,
       expires_at: '2026-10-17T00:00:00Z',
       created_at: '2026-09-17T10:00:00Z'
     },
@@ -94,6 +105,7 @@ function summary(): LabSummary {
     avgLatencyMs: 1500,
     avgTokensPerSec: 15,
     successPct: 66.7,
+    ranks: { providers: [], models: [] },
     byRun: [
       { runId: 'r1', label: 'naraya / model-a', provider: 'naraya', model: 'naraya/model-a', prompt: 10, completion: 20, total: 30, latencyMs: 1000, tps: 20, ok: true, fallback: false, createdAt: '2026-09-17T10:00:00Z' },
       { runId: 'r2', label: 'openrouter / model-b', provider: 'openrouter', model: 'openrouter/model-b', prompt: 15, completion: 25, total: 40, latencyMs: 2000, tps: 12.5, ok: true, fallback: true, createdAt: '2026-09-17T11:00:00Z' }
@@ -103,18 +115,42 @@ function summary(): LabSummary {
 
 describe('LabStats', () => {
   it('empty state tanpa data', () => {
-    renderWithMessages(<LabStats summary={null} locale="id" />);
+    renderWithMessages(<LabStats initial={null} locale="id" />);
     expect(screen.getByText(/Belum ada data/)).toBeDefined();
   });
 
+  it('tab rentang selalu tampil', () => {
+    renderWithMessages(<LabStats initial={null} locale="id" />);
+    for (const label of ['Hari ini', '7 hari', '14 hari', '30 hari', 'Semua']) {
+      expect(screen.getByText(label)).toBeDefined();
+    }
+  });
+
   it('render KPI + chart per-run', () => {
-    renderWithMessages(<LabStats summary={summary()} locale="id" />);
+    renderWithMessages(<LabStats initial={summary()} locale="id" />);
     expect(screen.getByText('Statistik 30 hari')).toBeDefined();
     expect(screen.getByText('66.7%')).toBeDefined();
     expect(screen.getByText('Latensi per run (ms)')).toBeDefined();
     expect(screen.getByText('Kecepatan per run (tok/s)')).toBeDefined();
     expect(screen.getAllByText('Token per run (masuk + keluar)').length).toBeGreaterThan(0);
     expect(screen.getByText('Bar penuh = terbaik; bar redup = bukan pemenang')).toBeDefined();
+  });
+
+  it('tabel peringkat best-first + mahkota juara', () => {
+    const s = summary();
+    s.ranks = {
+      providers: [
+        { key: 'naraya', label: 'naraya', runs: 2, successPct: 100, avgLatencyMs: 1000, avgTps: 20, totalTokens: 70 },
+        { key: 'openrouter', label: 'openrouter', runs: 2, successPct: 50, avgLatencyMs: 2000, avgTps: 12.5, totalTokens: 90 }
+      ],
+      models: [
+        { key: 'naraya/model-a', label: 'naraya / model-a', runs: 2, successPct: 100, avgLatencyMs: 1000, avgTps: 20, totalTokens: 70 }
+      ]
+    };
+    renderWithMessages(<LabStats initial={s} locale="id" />);
+    expect(screen.getByText('Provider terbaik')).toBeDefined();
+    expect(screen.getByText('Model terbaik')).toBeDefined();
+    expect(screen.getAllByText('★ 1')).toHaveLength(2);
   });
 });
 
@@ -167,7 +203,7 @@ describe('LabForm', () => {
 describe('LabHistory', () => {
   it('render batch + filter + aksi', () => {
     renderWithMessages(
-      <LabHistory batches={[batch()]} locale="id" timeZone="Asia/Jakarta" />
+      <LabHistory initialPage={pageOf([batch()])} locale="id" timeZone="Asia/Jakarta" />
     );
     expect(screen.getByText('Riwayat Uji')).toBeDefined();
     expect(screen.getByText('Jelaskan fotosintesis.')).toBeDefined();
@@ -177,10 +213,30 @@ describe('LabHistory', () => {
 
   it('ada link buka detail per batch', () => {
     renderWithMessages(
-      <LabHistory batches={[batch()]} locale="id" timeZone="Asia/Jakarta" />
+      <LabHistory initialPage={pageOf([batch()])} locale="id" timeZone="Asia/Jakarta" />
     );
     const link = screen.getByText('Buka detail').closest('a');
     expect(link?.getAttribute('href')).toContain('/lab/b1');
+  });
+
+  it('pagination: info halaman + tombol next', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <LabHistory initialPage={pageOf([batch()], 25)} locale="id" timeZone="Asia/Jakarta" />
+    );
+    expect(screen.getByText('Halaman 1 dari 3 · 25')).toBeDefined();
+    const next = screen.getByText('Lanjut ›');
+    expect((next as HTMLButtonElement).disabled).toBe(false);
+    await user.click(next);
+    expect(screen.getByText('Halaman 1 dari 1 · 0')).toBeDefined();
+  });
+
+  it('tombol prev/next disable di satu halaman', () => {
+    renderWithMessages(
+      <LabHistory initialPage={pageOf([batch()])} locale="id" timeZone="Asia/Jakarta" />
+    );
+    expect((screen.getByText('‹ Sblm') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText('Lanjut ›') as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

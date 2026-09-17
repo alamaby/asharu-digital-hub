@@ -1,4 +1,19 @@
-import type { LabRunRow } from './types';
+import type { LabRange, LabRunRow } from './types';
+
+/**
+ * Awal rentang statistik (ISO) relatif ke `now`; null = semua waktu.
+ * `today` = sejak 00:00 UTC, sama definisi kuota harian. Murni, unit-testable.
+ */
+export function rangeStart(range: LabRange, now: Date = new Date()): string | null {
+  if (range === 'all') return null;
+  if (range === 'today') {
+    const d = new Date(now);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  const days = range === '7d' ? 7 : range === '14d' ? 14 : 30;
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+}
 
 /**
  * Agregasi murni statistik Chat Lab (unit-testable, tanpa I/O).
@@ -44,6 +59,8 @@ export interface LabSummary {
   avgLatencyMs: number | null;
   avgTokensPerSec: number | null;
   successPct: number | null;
+  /** Papan peringkat best-first (sukses% → tok/s → runs). */
+  ranks: { providers: RankEntry[]; models: RankEntry[] };
   /** Per-run untuk chart (diurutkan pemanggil). */
   byRun: {
     runId: string;
@@ -83,6 +100,7 @@ export function summarizeLabRuns(batches: number, runs: LabRunRow[]): LabSummary
     avgLatencyMs: avg(runs.map((r) => r.latency_ms)),
     avgTokensPerSec: avg(runs.map((r) => r.tokens_per_sec)),
     successPct: runs.length === 0 ? null : Math.round((ok / runs.length) * 1000) / 10,
+    ranks: { providers: rankProviders(runs), models: rankModels(runs) },
     byRun: runs.map((r) => ({
       runId: r.id,
       label: `${r.provider_slug || '?'} / ${(r.model_slug || '').split('/').pop() || '?'}`,
@@ -137,6 +155,86 @@ export function findWinners(runs: WinnerInput[]): LabWinners {
     speed: bestIds(runs, (r) => r.tps, 'max'),
     tokens: bestIds(runs, (r) => r.total, 'min')
   };
+}
+
+/**
+ * Papan peringkat provider/model (murni, unit-testable).
+ * Best = sukses% tertinggi, tie-break tok/s tertinggi (NULL diabaikan, bukan 0
+ * — adil untuk provider tanpa data token seperti Cloudflare bila nihil).
+ */
+export interface RankEntry {
+  key: string;
+  label: string;
+  runs: number;
+  successPct: number;
+  avgLatencyMs: number | null;
+  avgTps: number | null;
+  totalTokens: number;
+}
+
+interface RankInput {
+  key: string;
+  label: string;
+  ok: boolean;
+  latencyMs: number | null;
+  tps: number | null;
+  total: number | null;
+}
+
+export function rankGroups(rows: RankInput[]): RankEntry[] {
+  const acc = new Map<string, { label: string; runs: number; ok: number; lat: (number | null)[]; tps: (number | null)[]; tok: number }>();
+  for (const r of rows) {
+    const e = acc.get(r.key) ?? { label: r.label, runs: 0, ok: 0, lat: [], tps: [], tok: 0 };
+    e.runs += 1;
+    if (r.ok) e.ok += 1;
+    e.lat.push(r.latencyMs);
+    e.tps.push(r.tps);
+    e.tok += r.total ?? 0;
+    acc.set(r.key, e);
+  }
+  const out: RankEntry[] = [...acc.entries()].map(([key, e]) => ({
+    key,
+    label: e.label,
+    runs: e.runs,
+    successPct: Math.round((e.ok / e.runs) * 1000) / 10,
+    avgLatencyMs: avg(e.lat),
+    avgTps: avg(e.tps),
+    totalTokens: e.tok
+  }));
+  // Best-first: sukses% → tok/s (NULL terakhir) → jumlah runs.
+  out.sort(
+    (a, b) =>
+      b.successPct - a.successPct ||
+      (b.avgTps ?? -1) - (a.avgTps ?? -1) ||
+      b.runs - a.runs
+  );
+  return out;
+}
+
+export function rankProviders(runs: LabRunRow[]): RankEntry[] {
+  return rankGroups(
+    runs.map((r) => ({
+      key: r.provider_slug || '(?)',
+      label: r.provider_slug || '?',
+      ok: !r.error,
+      latencyMs: r.latency_ms,
+      tps: r.tokens_per_sec,
+      total: r.total_tokens
+    }))
+  );
+}
+
+export function rankModels(runs: LabRunRow[]): RankEntry[] {
+  return rankGroups(
+    runs.map((r) => ({
+      key: r.model_slug || '(?)',
+      label: `${r.provider_slug || '?'} / ${(r.model_slug || '').split('/').pop() || '?'}`,
+      ok: !r.error,
+      latencyMs: r.latency_ms,
+      tps: r.tokens_per_sec,
+      total: r.total_tokens
+    }))
+  );
 }
 
 /** Format ringkas 1200 -> "1,2 rb" (id) / "1.2K" (en). */

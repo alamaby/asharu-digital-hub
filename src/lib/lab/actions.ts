@@ -11,17 +11,19 @@ import { isLengthCutoff } from '@/lib/llm/model-config';
 import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
 import {
   DEFAULT_LAB_CONFIG,
+  type LabBatchPage,
   type LabBatchRow,
   type LabBatchWithRuns,
   type LabConfig,
   type LabListOptions,
   type LabOptions,
   type LabQuota,
+  type LabRange,
   type LabRunRow,
   type LabTarget
 } from './types';
 import { buildLabExpiry, labInputSchema, validateLabTargetLink } from './validation';
-import { summarizeLabRuns, tokensPerSec, type LabSummary } from './stats';
+import { rangeStart, summarizeLabRuns, tokensPerSec, type LabSummary } from './stats';
 
 function svc() {
   const supabase = createSupabaseService();
@@ -178,6 +180,7 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
   );
 
   const expiresAt = buildLabExpiry(new Date(), config.retention_days);
+  const hasError = settled.some((s) => s.status === 'rejected');
   const { data: batch, error: batchError } = await supabase
     .from('chat_lab_batches')
     .insert({
@@ -186,6 +189,7 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
       user_prompt: v.userPrompt,
       temperature: v.temperature,
       max_tokens: v.maxTokens,
+      has_error: hasError,
       expires_at: expiresAt
     })
     .select('id')
@@ -260,24 +264,57 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
 }
 
 /**
- * Histori batch milik user (terbaru dulu) beserta runs-nya.
- * Filter provider/model/status diterapkan di memori (limit kecil, 50 batch).
+ * Histori batch milik user (terbaru dulu) beserta runs-nya — pagination
+ * DB-driven dengan count akurat. Semua filter di DB: status via kolom
+ * denormalisasi `has_error`; provider/model via pra-query runs (dua-query agar
+ * count menghitung batch, bukan baris join).
  */
-export async function listLabBatches(options?: LabListOptions): Promise<LabBatchWithRuns[]> {
+export async function listLabBatches(options?: LabListOptions): Promise<LabBatchPage> {
   const { id: userId } = await requireUser();
   const supabase = svc();
-  const limit = Math.min(50, Math.max(1, options?.limit ?? 20));
+  const page = Math.max(1, options?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, options?.pageSize ?? 10));
   const ascending = options?.dir === 'asc';
-  const { data: batches, error } = await supabase
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const providerSlug = options?.providerSlug || null;
+  const modelSlug = options?.modelSlug || null;
+  const status = options?.status ?? 'all';
+  const now = new Date().toISOString();
+
+  // Pra-query runs bila filter provider/model aktif → daftar batch id.
+  let batchIds: string[] | null = null;
+  if (providerSlug || modelSlug) {
+    let rq = supabase
+      .from('chat_lab_runs')
+      .select('batch_id')
+      .eq('user_id', userId)
+      .gte('expires_at', now);
+    if (providerSlug) rq = rq.eq('provider_slug', providerSlug);
+    if (modelSlug) rq = rq.eq('model_slug', modelSlug);
+    const { data: matched, error: matchError } = await rq;
+    if (matchError) throw new Error(matchError.message);
+    batchIds = Array.from(
+      new Set(((matched ?? []) as unknown as { batch_id: string }[]).map((r) => r.batch_id))
+    );
+    if (batchIds.length === 0) return { items: [], total: 0, page, pageSize, totalPages: 1 };
+  }
+
+  let q = supabase
     .from('chat_lab_batches')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', userId)
-    .gte('expires_at', new Date().toISOString())
-    .order('created_at', { ascending })
-    .limit(limit);
+    .gte('expires_at', now);
+  if (batchIds) q = q.in('id', batchIds);
+  if (status === 'ok') q = q.eq('has_error', false);
+  if (status === 'error') q = q.eq('has_error', true);
+  q = q.order('created_at', { ascending }).range(from, to);
+  const { data: batches, error, count } = await q;
   if (error) throw new Error(error.message);
   const rows = (batches ?? []) as unknown as LabBatchRow[];
-  if (rows.length === 0) return [];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (rows.length === 0) return { items: [], total, page, pageSize, totalPages };
   const { data: runs } = await supabase
     .from('chat_lab_runs')
     .select('*')
@@ -290,18 +327,13 @@ export async function listLabBatches(options?: LabListOptions): Promise<LabBatch
     list.push(r);
     byBatch.set(r.batch_id, list);
   }
-  const providerSlug = options?.providerSlug || null;
-  const modelSlug = options?.modelSlug || null;
-  const status = options?.status ?? 'all';
-  return rows
-    .map((batch) => ({ batch, runs: byBatch.get(batch.id) ?? [] }))
-    .filter(({ runs: rs }) => {
-      if (providerSlug && !rs.some((r) => r.provider_slug === providerSlug)) return false;
-      if (modelSlug && !rs.some((r) => r.model_slug === modelSlug)) return false;
-      if (status === 'ok' && rs.some((r) => r.error)) return false;
-      if (status === 'error' && !rs.some((r) => r.error)) return false;
-      return true;
-    });
+  return {
+    items: rows.map((batch) => ({ batch, runs: byBatch.get(batch.id) ?? [] })),
+    total,
+    page,
+    pageSize,
+    totalPages
+  };
 }
 
 /** Detail 1 batch milik user (owner atau admin). */
@@ -356,21 +388,28 @@ export async function getLabQuota(): Promise<LabQuota> {
   return { used, limit: config.daily_limit, remaining: Math.max(0, (config.daily_limit ?? 0) - used) };
 }
 
-/** Ringkasan statistik 30 hari terakhir milik user (untuk chart). */
-export async function getLabStats(): Promise<LabSummary> {
+/**
+ * Ringkasan statistik milik user untuk 1 rentang (KPI + chart + peringkat).
+ * Cap 1000 runs untuk `all` — bila tembus, agregat menjadi sampel (fase lanjut:
+ * view SQL). Default `30d` = perilaku lama.
+ */
+export async function getLabStats(range: LabRange = '30d'): Promise<LabSummary> {
   const { id: userId } = await requireUser();
   const supabase = svc();
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [{ count: batchCount }, { data: runs }] = await Promise.all([
-    supabase.from('chat_lab_batches').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', since),
-    supabase
-      .from('chat_lab_runs')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('created_at', since)
-      .order('created_at', { ascending: true })
-      .limit(200)
-  ]);
+  const since = rangeStart(range);
+  let batchQuery = supabase
+    .from('chat_lab_batches')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  if (since) batchQuery = batchQuery.gte('created_at', since);
+  let runsQuery = supabase
+    .from('chat_lab_runs')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1000);
+  if (since) runsQuery = runsQuery.gte('created_at', since);
+  const [{ count: batchCount }, { data: runs }] = await Promise.all([batchQuery, runsQuery]);
   return summarizeLabRuns(batchCount ?? 0, (runs ?? []) as unknown as LabRunRow[]);
 }
 

@@ -6,11 +6,13 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { formatDateTime } from '@/lib/utils/format';
-import type { LabBatchRow, LabBatchWithRuns, LabRunRow } from '@/lib/lab/types';
+import type { LabBatchPage, LabBatchRow, LabBatchWithRuns, LabOptions, LabRunRow } from '@/lib/lab/types';
 import { deleteLabBatch, listLabBatches } from '@/lib/lab/actions';
 
 interface Props {
-  batches: LabBatchWithRuns[];
+  initialPage: LabBatchPage;
+  /** Katalog aktif untuk dropdown filter (lengkap, bukan hanya halaman ini). */
+  options?: LabOptions | null;
   locale: Locale;
   timeZone: string;
   refreshKey?: number;
@@ -49,54 +51,52 @@ function pretty(v: unknown): string {
   }
 }
 
-export function LabHistory({ batches: initial, locale, timeZone, refreshKey = 0, onReuse }: Props) {
+const PAGE_SIZE = 10;
+
+export function LabHistory({ initialPage, options, locale, timeZone, refreshKey = 0, onReuse }: Props) {
   const t = useTranslations('lab.history');
-  const [batches, setBatches] = useState<LabBatchWithRuns[]>(initial);
+  const [pageData, setPageData] = useState<LabBatchPage>(initialPage);
   const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_FILTERS);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  // Sinkron dari parent (submit baru) + re-fetch saat refreshKey berubah.
-  useEffect(() => {
-    setBatches(initial);
-  }, [initial]);
+  async function fetchPage(page: number, f: HistoryFilters) {
+    try {
+      const res = await listLabBatches({
+        page,
+        pageSize: PAGE_SIZE,
+        dir: f.sortDir,
+        providerSlug: f.providerSlug || null,
+        modelSlug: f.modelSlug || null,
+        status: f.status
+      });
+      setPageData(res);
+    } catch {
+      // Biarkan data lama tampil; error fetch bukan fatal.
+    }
+  }
+
+  function fetchTransition(page: number, f: HistoryFilters) {
+    startTransition(async () => fetchPage(page, f));
+  }
+
+  // Submit baru → kembali ke halaman 1 agar batch terbaru terlihat.
   useEffect(() => {
     if (refreshKey === 0) return;
-    startTransition(async () => {
-      try {
-        const rows = await listLabBatches({
-          limit: 20,
-          dir: filters.sortDir,
-          providerSlug: filters.providerSlug || null,
-          modelSlug: filters.modelSlug || null,
-          status: filters.status
-        });
-        setBatches(rows);
-      } catch {
-        // Biarkan data lama tampil; error fetch bukan fatal.
-      }
-    });
+    fetchTransition(1, filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  async function applyFilters(next: HistoryFilters) {
+  function applyFilters(next: HistoryFilters) {
     setFilters(next);
-    startTransition(async () => {
-      try {
-        const rows = await listLabBatches({
-          limit: 20,
-          dir: next.sortDir,
-          providerSlug: next.providerSlug || null,
-          modelSlug: next.modelSlug || null,
-          status: next.status
-        });
-        setBatches(rows);
-      } catch {
-        // Biarkan data lama tampil.
-      }
-    });
+    fetchTransition(1, next);
+  }
+
+  function goTo(page: number) {
+    const clamped = Math.min(Math.max(1, page), pageData.totalPages);
+    fetchTransition(clamped, filters);
   }
 
   async function copy(runId: string, text: string) {
@@ -123,11 +123,29 @@ export function LabHistory({ batches: initial, locale, timeZone, refreshKey = 0,
     const res = await deleteLabBatch(batchId);
     setBusyId(null);
     setConfirmId(null);
-    if (res.ok) setBatches((prev) => prev.filter((b) => b.batch.id !== batchId));
+    if (res.ok) {
+      // Re-fetch halaman aktif; mundur 1 halaman bila halaman jadi kosong.
+      const next = await listLabBatches({
+        page: pageData.page,
+        pageSize: PAGE_SIZE,
+        dir: filters.sortDir,
+        providerSlug: filters.providerSlug || null,
+        modelSlug: filters.modelSlug || null,
+        status: filters.status
+      }).catch(() => null);
+      if (next && next.items.length === 0 && next.page > 1) {
+        fetchTransition(next.page - 1, filters);
+      } else if (next) {
+        setPageData(next);
+      }
+    }
   }
 
-  const providerOpts = Array.from(new Set(batches.flatMap((b) => b.runs.map((r) => r.provider_slug)).filter(Boolean))).sort();
-  const modelOpts = Array.from(new Set(batches.flatMap((b) => b.runs.map((r) => r.model_slug)).filter(Boolean))).sort();
+  const providerOpts = (options?.providers ?? []).map((p) => p.slug).sort();
+  const modelOpts = (options?.models ?? [])
+    .filter((m) => !filters.providerSlug || m.provider_id === (options?.providers ?? []).find((p) => p.slug === filters.providerSlug)?.id)
+    .map((m) => m.model_id)
+    .sort();
 
   function runBadge(run: LabRunRow) {
     if (run.error) return <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">{t('error')}</span>;
@@ -197,11 +215,11 @@ export function LabHistory({ batches: initial, locale, timeZone, refreshKey = 0,
         {t('clearFilters')}
       </button>
 
-      {batches.length === 0 ? (
+      {pageData.items.length === 0 ? (
         <p className="mt-4 text-sm text-ink-muted">{t('noResults')}</p>
       ) : (
         <ol className="mt-4 space-y-4">
-          {batches.map(({ batch, runs }: { batch: LabBatchRow; runs: LabRunRow[] }) => (
+          {pageData.items.map(({ batch, runs }: { batch: LabBatchRow; runs: LabRunRow[] }) => (
             <li key={batch.id} className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -299,6 +317,30 @@ export function LabHistory({ batches: initial, locale, timeZone, refreshKey = 0,
           ))}
         </ol>
       )}
+
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <span className="text-ink-muted">
+          {t('pageOf', { page: pageData.page, total: pageData.totalPages })} · {pageData.total}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => goTo(pageData.page - 1)}
+            disabled={pageData.page <= 1}
+            className="rounded border border-line px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t('prev')}
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo(pageData.page + 1)}
+            disabled={pageData.page >= pageData.totalPages}
+            className="rounded border border-line px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t('next')}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { batchThroughput, findWinners, summarizeLabRuns, tokensPerSec } from './stats';
+import {
+  batchThroughput,
+  findWinners,
+  rangeStart,
+  rankGroups,
+  summarizeLabRuns,
+  tokensPerSec
+} from './stats';
 import type { LabRunRow } from './types';
 
 function run(over: Partial<LabRunRow>): LabRunRow {
@@ -103,6 +110,53 @@ describe('findWinners', () => {
       speed: [],
       tokens: []
     });
+  });
+});
+
+describe('rangeStart', () => {
+  const now = new Date('2026-09-17T10:00:00Z');
+  it('today = 00:00 UTC, all = null', () => {
+    expect(rangeStart('today', now)).toBe('2026-09-17T00:00:00.000Z');
+    expect(rangeStart('all', now)).toBeNull();
+  });
+  it('7d/14d/30d mundur N hari', () => {
+    expect(rangeStart('7d', now)).toBe('2026-09-10T10:00:00.000Z');
+    expect(rangeStart('14d', now)).toBe('2026-09-03T10:00:00.000Z');
+    expect(rangeStart('30d', now)).toBe('2026-08-18T10:00:00.000Z');
+  });
+});
+
+describe('rankGroups', () => {
+  const row = (key: string, over: Record<string, unknown> = {}) => ({
+    key,
+    label: key,
+    ok: true,
+    latencyMs: 1000,
+    tps: 10,
+    total: 100,
+    ...over
+  });
+  it('best-first: sukses% lalu tok/s', () => {
+    const out = rankGroups([
+      row('a', { ok: false, tps: 99 }),
+      row('a', { tps: 99 }),
+      row('b', { tps: 5 }),
+      row('b', { tps: 6 })
+    ]);
+    expect(out.map((e) => e.key)).toEqual(['b', 'a']);
+    expect(out[0]).toMatchObject({ runs: 2, successPct: 100 });
+    expect(out[1]).toMatchObject({ runs: 2, successPct: 50 });
+  });
+  it('tie sukses% → tok/s tertinggi menang; NULL tidak jadi 0', () => {
+    const out = rankGroups([
+      row('cf', { tps: null, total: null }),
+      row('nr', { tps: 20 })
+    ]);
+    expect(out.map((e) => e.key)).toEqual(['nr', 'cf']);
+    expect(out[1]?.avgTps).toBeNull();
+  });
+  it('kosong = list kosong', () => {
+    expect(rankGroups([])).toEqual([]);
   });
 });
 

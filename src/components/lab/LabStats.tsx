@@ -1,12 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { findWinners, formatCompact, type LabSummary } from '@/lib/lab/stats';
+import type { LabRange } from '@/lib/lab/types';
+import { getLabStats } from '@/lib/lab/actions';
+import { LabRankTables } from './LabRankTables';
 
 interface Props {
-  summary: LabSummary | null;
+  initial: LabSummary | null;
   locale: 'id' | 'en';
+  refreshKey?: number;
 }
+
+const RANGES: { value: LabRange; key: 'rangeToday' | 'range7d' | 'range14d' | 'range30d' | 'rangeAll' }[] = [
+  { value: 'today', key: 'rangeToday' },
+  { value: '7d', key: 'range7d' },
+  { value: '14d', key: 'range14d' },
+  { value: '30d', key: 'range30d' },
+  { value: 'all', key: 'rangeAll' }
+];
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -47,14 +60,70 @@ function fmtMs(v: number | null): string {
   return v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`;
 }
 
-export function LabStats({ summary, locale }: Props) {
+function RangeTabs({
+  range,
+  pick,
+  t
+}: {
+  range: LabRange;
+  pick: (r: LabRange) => void;
+  t: (key: 'rangeToday' | 'range7d' | 'range14d' | 'range30d' | 'rangeAll' | 'loading') => string;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" role="tablist" aria-label="range">
+      {RANGES.map((r) => (
+        <button
+          key={r.value}
+          type="button"
+          role="tab"
+          aria-selected={range === r.value}
+          onClick={() => pick(r.value)}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            range === r.value ? 'bg-primary text-white' : 'border border-line text-ink-muted hover:text-primary'
+          }`}
+        >
+          {t(r.key)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function LabStats({ initial, locale, refreshKey = 0 }: Props) {
   const t = useTranslations('lab.stats');
+  const [summary, setSummary] = useState<LabSummary | null>(initial);
+  const [range, setRange] = useState<LabRange>('30d');
+  const [loading, setLoading] = useState(false);
+
+  async function load(r: LabRange) {
+    setLoading(true);
+    try {
+      setSummary(await getLabStats(r));
+    } catch {
+      // Ringkasan lama tetap tampil.
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Submit baru → refresh rentang aktif.
+  useEffect(() => {
+    if (refreshKey === 0) return;
+    load(range);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
+
+  function pick(r: LabRange) {
+    setRange(r);
+    load(r);
+  }
 
   if (!summary || summary.runs === 0) {
     return (
       <section aria-label={t('heading')} className="mt-10">
         <h2 className="text-lg font-semibold text-ink">{t('heading')}</h2>
-        <p className="mt-2 text-sm text-ink-muted">{t('empty')}</p>
+        <RangeTabs range={range} pick={pick} t={t} />
+        <p className="mt-2 text-sm text-ink-muted">{loading ? t('loading') : t('empty')}</p>
       </section>
     );
   }
@@ -70,6 +139,9 @@ export function LabStats({ summary, locale }: Props) {
   return (
     <section aria-label={t('heading')} className="mt-10 space-y-3">
       <h2 className="text-lg font-semibold text-ink">{t('heading')}</h2>
+      <RangeTabs range={range} pick={pick} t={t} />
+      {loading ? <p className="text-xs text-ink-muted">{t('loading')}</p> : null}
+      <LabRankTables providers={summary.ranks.providers} models={summary.ranks.models} locale={locale} />
       {hasWinners ? <p className="text-xs text-ink-muted">{t('legend')}</p> : null}
 
       <div className="rounded-xl border border-line bg-surface p-3">

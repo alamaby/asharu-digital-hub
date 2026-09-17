@@ -8,7 +8,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 import { getLabQuota, getLabStats, listLabBatches, listLabOptions } from '@/lib/lab/actions';
 import { LabPageClient } from '@/components/lab/LabPageClient';
-import type { LabBatchWithRuns, LabOptions, LabQuota } from '@/lib/lab/types';
+import type { LabBatchPage, LabOptions, LabQuota } from '@/lib/lab/types';
 import type { LabSummary } from '@/lib/lab/stats';
 
 interface PageProps {
@@ -49,17 +49,17 @@ export default async function LabPage({ params }: PageProps) {
 
   let options: LabOptions | null = null;
   let quota: LabQuota | null = null;
-  let batches: LabBatchWithRuns[] = [];
+  let initialPage: LabBatchPage = { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
   let stats: LabSummary | null = null;
   let err: string | null = null;
   // Zona waktu display user untuk timestamp riwayat (pola admin/llm/logs).
   const timeZone = await getDisplayTimezone();
   try {
-    [options, quota, batches, stats] = await Promise.all([
+    [options, quota, initialPage, stats] = await Promise.all([
       listLabOptions(),
       getLabQuota(),
-      listLabBatches({ limit: 20 }),
-      getLabStats()
+      listLabBatches({ page: 1, pageSize: 10 }),
+      getLabStats('30d')
     ]);
   } catch (e) {
     err = e instanceof Error ? e.message : String(e);
@@ -71,7 +71,7 @@ export default async function LabPage({ params }: PageProps) {
       timeZone={timeZone}
       options={options}
       quota={quota}
-      batches={batches}
+      initialPage={initialPage}
       stats={stats}
       error={err}
     />

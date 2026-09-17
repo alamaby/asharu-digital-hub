@@ -109,7 +109,7 @@ export default async function LabDetailPage({ params }: PageProps) {
       </div>
 
       <LabCompareGrid result={data} />
-      <LabStats summary={stats} locale={locale} />
+      <LabStats initial={stats} locale={locale} />
     </div>
   );
 }

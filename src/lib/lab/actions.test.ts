@@ -61,7 +61,7 @@ vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers())
 }));
 
-import { deleteLabBatch, getLabBatch, getLabQuota, listLabBatches, runChatLabBatch } from './actions';
+import { deleteLabBatch, getLabBatch, getLabQuota, getLabStats, listLabBatches, runChatLabBatch } from './actions';
 import { buildLabExpiry } from './validation';
 
 const PROVIDERS = [
@@ -82,10 +82,11 @@ const CONFIG = {
 };
 
 /** Mock client minimal untuk chat_lab_* + llm_* (rantai supabase-js). */
-function makeClient(db: { batches?: Row[]; runs?: Row[]; batchCount?: number }) {
+function makeClient(db: { batches?: Row[]; runs?: Row[]; batchCount?: number; totalCount?: number }) {
   return {
     from(table: string) {
       let head = false;
+      let wantCount = false;
       let rows: Row[] = [];
       if (table === 'llm_providers') rows = [...PROVIDERS];
       else if (table === 'llm_models') rows = [...MODELS];
@@ -95,6 +96,11 @@ function makeClient(db: { batches?: Row[]; runs?: Row[]; batchCount?: number }) 
       const builder = {
         select: (_c?: string, opts?: { count?: string; head?: boolean }) => {
           if (opts?.head) head = true;
+          if (opts?.count === 'exact') wantCount = true;
+          return builder;
+        },
+        range: (from: number, to: number) => {
+          rows = rows.slice(from, to + 1);
           return builder;
         },
         eq: (col: string, val: unknown) => {
@@ -121,6 +127,7 @@ function makeClient(db: { batches?: Row[]; runs?: Row[]; batchCount?: number }) 
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
         then: (onfulfilled: (v: { data: Row[]; error: null; count?: number }) => unknown) => {
           if (head) return onfulfilled({ data: [], error: null, count: db.batchCount ?? 0 });
+          if (wantCount) return onfulfilled({ data: rows, error: null, count: db.totalCount ?? rows.length });
           return onfulfilled({ data: rows, error: null });
         }
       };
@@ -129,7 +136,7 @@ function makeClient(db: { batches?: Row[]; runs?: Row[]; batchCount?: number }) 
   };
 }
 
-function resetDb(db: { batches?: Row[]; runs?: Row[]; batchCount?: number } = {}) {
+function resetDb(db: { batches?: Row[]; runs?: Row[]; batchCount?: number; totalCount?: number } = {}) {
   inserted.current = [];
   clientRef.current = makeClient(db);
   llmImpl.current = async () => ({
@@ -253,22 +260,42 @@ describe('runChatLabBatch', () => {
   });
 });
 
-describe('listLabBatches — filter status', () => {
-  const B1 = { id: 'b1', user_id: 'u1', user_prompt: 'p1', created_at: '2026-09-17T10:00:00Z', expires_at: '2026-10-17T00:00:00Z' };
-  const B2 = { id: 'b2', user_id: 'u1', user_prompt: 'p2', created_at: '2026-09-17T11:00:00Z', expires_at: '2026-10-17T00:00:00Z' };
+describe('listLabBatches — pagination + filter DB', () => {
+  const B1 = { id: 'b1', user_id: 'u1', user_prompt: 'p1', has_error: false, created_at: '2026-09-17T10:00:00Z', expires_at: '2026-10-17T00:00:00Z' };
+  const B2 = { id: 'b2', user_id: 'u1', user_prompt: 'p2', has_error: true, created_at: '2026-09-17T11:00:00Z', expires_at: '2026-10-17T00:00:00Z' };
   const okRun = { id: 'r1', batch_id: 'b1', user_id: 'u1', provider_slug: 'naraya', model_slug: 'naraya/model-a', error: null, response_text: 'ok', created_at: '2026-09-17T10:00:01Z' };
   const errRun = { id: 'r2', batch_id: 'b2', user_id: 'u1', provider_slug: '', model_slug: '', error: 'boom', response_text: null, created_at: '2026-09-17T11:00:01Z' };
 
-  it('status=ok hanya batch tanpa error', async () => {
+  it('status=ok hanya batch tanpa error + info halaman', async () => {
     resetDb({ batches: [B1, B2], runs: [okRun, errRun] });
     const out = await listLabBatches({ status: 'ok' });
-    expect(out.map((b) => b.batch.id)).toEqual(['b1']);
+    expect(out.items.map((b) => b.batch.id)).toEqual(['b1']);
+    expect(out).toMatchObject({ total: 1, page: 1, totalPages: 1 });
   });
 
   it('status=error hanya batch dengan error', async () => {
     resetDb({ batches: [B1, B2], runs: [okRun, errRun] });
     const out = await listLabBatches({ status: 'error' });
-    expect(out.map((b) => b.batch.id)).toEqual(['b2']);
+    expect(out.items.map((b) => b.batch.id)).toEqual(['b2']);
+  });
+
+  it('total + totalPages dari count DB', async () => {
+    resetDb({ batches: [B1, B2], runs: [okRun, errRun], totalCount: 25 });
+    const out = await listLabBatches({ page: 2, pageSize: 10 });
+    expect(out).toMatchObject({ total: 25, page: 2, pageSize: 10, totalPages: 3 });
+  });
+
+  it('filter provider via pra-query runs', async () => {
+    resetDb({ batches: [B1, B2], runs: [okRun, errRun] });
+    const out = await listLabBatches({ providerSlug: 'naraya' });
+    expect(out.items.map((b) => b.batch.id)).toEqual(['b1']);
+    expect(out.total).toBe(1);
+  });
+
+  it('filter provider tanpa hasil = halaman kosong', async () => {
+    resetDb({ batches: [B1, B2], runs: [okRun, errRun] });
+    const out = await listLabBatches({ providerSlug: 'tak-ada' });
+    expect(out).toMatchObject({ items: [], total: 0, totalPages: 1 });
   });
 });
 
@@ -286,6 +313,22 @@ describe('getLabBatch', () => {
   it('batch hilang throw jujur', async () => {
     resetDb({ batches: [], runs: [] });
     await expect(getLabBatch('missing')).rejects.toThrow(/tidak ditemukan/);
+  });
+});
+
+describe('getLabStats(range)', () => {
+  it('rentang diteruskan + ringkasan berisi ranks', async () => {
+    resetDb({
+      batches: [{ id: 'b1', user_id: 'u1' }],
+      runs: [
+        { id: 'r1', batch_id: 'b1', user_id: 'u1', provider_slug: 'naraya', model_slug: 'naraya/m-a', prompt_tokens: 10, completion_tokens: 20, total_tokens: 30, latency_ms: 1000, tokens_per_sec: 20, error: null, response_text: 'ok', created_at: new Date().toISOString() }
+      ],
+      batchCount: 1
+    });
+    const s = await getLabStats('7d');
+    expect(s.runs).toBe(1);
+    expect(s.ranks.providers.map((e) => e.key)).toEqual(['naraya']);
+    expect(s.ranks.models.map((e) => e.key)).toEqual(['naraya/m-a']);
   });
 });
 

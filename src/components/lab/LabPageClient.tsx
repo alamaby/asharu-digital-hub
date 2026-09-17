@@ -4,9 +4,9 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
-import type { LabBatchWithRuns, LabOptions, LabQuota } from '@/lib/lab/types';
+import type { LabBatchPage, LabBatchWithRuns, LabOptions, LabQuota } from '@/lib/lab/types';
 import type { LabSummary } from '@/lib/lab/stats';
-import { getLabBatch, getLabStats } from '@/lib/lab/actions';
+import { getLabBatch } from '@/lib/lab/actions';
 import { LabForm } from './LabForm';
 import { LabCompareGrid } from './LabCompareGrid';
 import { LabHistory } from './LabHistory';
@@ -17,12 +17,12 @@ interface Props {
   timeZone: string;
   options: LabOptions | null;
   quota: LabQuota | null;
-  batches: LabBatchWithRuns[];
+  initialPage: LabBatchPage;
   stats: LabSummary | null;
   error: string | null;
 }
 
-export function LabPageClient({ locale, timeZone, options, quota, batches, stats, error }: Props) {
+export function LabPageClient({ locale, timeZone, options, quota, initialPage, stats, error }: Props) {
   const t = useTranslations('lab');
   const tNav = useTranslations('nav');
   const [, startTransition] = useTransition();
@@ -31,9 +31,8 @@ export function LabPageClient({ locale, timeZone, options, quota, batches, stats
   const [reuseBatch, setReuseBatch] = useState<LabBatchWithRuns | null>(null);
   // Hasil submit terakhir (side-by-side) — diambil via getLabBatch agar segar.
   const [lastResult, setLastResult] = useState<LabBatchWithRuns | null>(null);
-  // Setiap submit/hapus sukses → riwayat + statistik refresh.
+  // Setiap submit sukses → riwayat (hal. 1) + statistik (rentang aktif) refresh.
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-  const [liveStats, setLiveStats] = useState<LabSummary | null>(stats);
 
   function handleComplete(batchId: string) {
     startTransition(async () => {
@@ -42,11 +41,6 @@ export function LabPageClient({ locale, timeZone, options, quota, batches, stats
         setLastResult(full);
       } catch {
         setLastResult(null);
-      }
-      try {
-        setLiveStats(await getLabStats());
-      } catch {
-        // Statistik lama tetap tampil.
       }
       setHistoryRefreshKey((k) => k + 1);
     });
@@ -100,10 +94,11 @@ export function LabPageClient({ locale, timeZone, options, quota, batches, stats
 
       <LabCompareGrid result={lastResult} />
 
-      <LabStats summary={liveStats} locale={locale as Locale} />
+      <LabStats initial={stats} locale={locale as Locale} refreshKey={historyRefreshKey} />
 
       <LabHistory
-        batches={batches}
+        initialPage={initialPage}
+        options={options}
         locale={locale as Locale}
         timeZone={timeZone}
         refreshKey={historyRefreshKey}
@@ -112,7 +107,7 @@ export function LabPageClient({ locale, timeZone, options, quota, batches, stats
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
-      {batches.length === 0 && !lastResult ? (
+      {initialPage.total === 0 && !lastResult ? (
         <p className="mt-6 text-sm text-ink-muted">{t('notice.empty')}</p>
       ) : null}
     </div>

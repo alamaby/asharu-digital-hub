@@ -31,6 +31,8 @@ export interface LabBatchRow {
   user_prompt: string;
   temperature: number | null;
   max_tokens: number | null;
+  /** Denormalisasi dari runs (migrasi 20260918000002) agar filter status + count akurat di DB. */
+  has_error: boolean;
   expires_at: string;
   created_at: string;
 }
@@ -75,15 +77,27 @@ export interface LabOptions {
 }
 
 export interface LabListOptions {
-  limit?: number;
+  page?: number;
+  pageSize?: number;
   /** Sort tanggal batch: dibuat (default). */
   sortBy?: 'created_at';
   dir?: 'asc' | 'desc';
   providerSlug?: string | null;
   modelSlug?: string | null;
-  /** ok = semua run sukses; error = min. 1 run error. */
+  /** ok = semua run sukses; error = min. 1 run error (kolom has_error). */
   status?: 'all' | 'ok' | 'error';
 }
+
+export interface LabBatchPage {
+  items: LabBatchWithRuns[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/** Rentang statistik: `today` = sejak 00:00 UTC (sama definisi kuota harian). */
+export type LabRange = 'today' | '7d' | '14d' | '30d' | 'all';
 
 export interface LabQuota {
   used: number;
