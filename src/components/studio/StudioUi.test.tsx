@@ -72,6 +72,8 @@ function genRow(over: Partial<StudioGenerationRow> & { id: string }): StudioGene
     reference_storage_path: null,
     reference_public_url: null,
     reference_strength: null,
+    final_prompt: null,
+    final_negative: null,
     expires_at: '2026-10-11T00:00:00Z',
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',
@@ -420,5 +422,65 @@ describe('StudioHistory', () => {
     await user.click(screen.getByRole('button', { name: 'Yakin hapus?' }));
     expect(deleteStudioImage).toHaveBeenCalledTimes(1);
     expect(deleteStudioImage).toHaveBeenCalledWith('d2');
+  });
+
+  it('details parameter menampilkan 4 atribut + prompt final + tombol salin final', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([
+          genRow({
+            id: 'pm1',
+            status: 'ready',
+            public_url: 'https://cdn.test/1.png',
+            style_slug: 'photorealistic',
+            subject_slug: 'wanita-muda-modis',
+            camera_slug: 'eye-level-three-quarter',
+            aspect_slug: '1:1',
+            final_prompt: 'Wanita muda modis, tidy bedroom after declutter, soft light, Eye-Level Three-Quarter, photorealistic style',
+            final_negative: 'blurry, low quality'
+          })
+        ])}
+        onReuse={() => {}}
+      />
+    );
+    await user.click(screen.getByText('Parameter & prompt terkirim'));
+    const row = screen.getByTestId('studio-row');
+    expect(within(row as HTMLElement).getByText('Preset style')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Template subjek')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Camera angle')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Aspek rasio')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Photorealistic')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Wanita Muda Modis')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('Eye-Level Three-Quarter')).toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).getByText(
+        'Wanita muda modis, tidy bedroom after declutter, soft light, Eye-Level Three-Quarter, photorealistic style'
+      )
+    ).toBeInTheDocument();
+    // Dua tombol salin: input (di luar details) + final (di dalam details).
+    expect(within(row as HTMLElement).getByRole('button', { name: 'Salin prompt' })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole('button', { name: 'Salin prompt final' })).toBeInTheDocument();
+  });
+
+  it('pending tanpa final menampilkan fallback menunggu worker', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioHistory {...historyProps([genRow({ id: 'pd1', status: 'pending', provider_slug: '', model_slug: '' })])} />
+    );
+    await user.click(screen.getByText('Parameter & prompt terkirim'));
+    expect(screen.getByText('Prompt final tersedia setelah worker selesai.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Salin prompt final' })).not.toBeInTheDocument();
+  });
+
+  it('record lama tanpa final menampilkan fallback data lama', async () => {
+    const user = userEvent.setup();
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([genRow({ id: 'lg1', status: 'ready', public_url: 'https://cdn.test/1.png' })])}
+      />
+    );
+    await user.click(screen.getByText('Parameter & prompt terkirim'));
+    expect(screen.getByText('Prompt final belum tersedia untuk data lama — menampilkan prompt input.')).toBeInTheDocument();
   });
 });

@@ -262,4 +262,22 @@ describe('processOneStudioImage — strict-fail pin user', () => {
     expect(fin.status).toBe('failed');
     expect(String(fin.last_error)).toContain('HTTP 520');
   });
+
+  it('ready menyimpan snapshot final_prompt terkirim ke model', async () => {
+    const { updates } = useSetup({});
+    const res = await processOneStudioImage();
+    expect(res.imageId).toBe('img-1');
+    const fin = finalStatus(updates)?.patch as Row;
+    expect(fin.status).toBe('ready');
+    expect(fin.final_prompt).toBe('a cute cartoon cat sitting on a wooden chair, pastel colors');
+  });
+
+  it('failed provider tetap menyimpan snapshot prompt yang dicoba', async () => {
+    const { updates } = useSetup({ provider_id: 'prov-cf', model_id: 'model-cf-uuid' });
+    const res = await processOneStudioImage();
+    expect(res.imageId).toBeNull();
+    const fin = finalStatus(updates)?.patch as Row;
+    expect(fin.status).toBe('failed');
+    expect(fin.final_prompt).toBe('a cute cartoon cat sitting on a wooden chair, pastel colors');
+  });
 });

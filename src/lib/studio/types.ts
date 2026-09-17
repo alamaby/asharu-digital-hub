@@ -69,6 +69,9 @@ export interface StudioGenerationRow {
   reference_storage_path: string | null;
   reference_public_url: string | null;
   reference_strength: number | string | null;
+  /** Snapshot prompt final terkirim ke model (migrasi 20260918000004) — NULL = pending / data lama. */
+  final_prompt: string | null;
+  final_negative: string | null;
 }
 
 export interface StudioModelOption {

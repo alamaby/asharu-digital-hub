@@ -204,11 +204,22 @@ export async function claimPendingStudioImage(): Promise<StudioGenerationRow | n
   return (claimed as StudioGenerationRow | null) ?? null;
 }
 
-async function failStudioImage(imageId: string, message: string): Promise<void> {
+async function failStudioImage(
+  imageId: string,
+  message: string,
+  snapshot?: { finalPrompt: string | null; finalNegative: string | null }
+): Promise<void> {
   const supabase = getServiceClient();
   await supabase
     .from('user_image_generations')
-    .update({ status: 'failed', last_error: message.slice(0, 500), updated_at: new Date().toISOString() })
+    .update({
+      status: 'failed',
+      last_error: message.slice(0, 500),
+      // Snapshot prompt yang dicoba — agar record gagal tetap bisa diaudit.
+      ...(snapshot?.finalPrompt ? { final_prompt: snapshot.finalPrompt.slice(0, 4000) } : {}),
+      ...(snapshot?.finalNegative ? { final_negative: snapshot.finalNegative.slice(0, 1000) } : {}),
+      updated_at: new Date().toISOString()
+    })
     .eq('id', imageId);
 }
 
@@ -220,6 +231,11 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
   const row = await claimPendingStudioImage();
   if (!row) return { imageId: null };
   const imageId = row.id;
+  // Snapshot prompt final terkirim ke model (migrasi 20260918000004) — diisi
+  // setelah komposisi selesai agar jalur failed pun tetap bisa diaudit.
+  let composedSnapshot: string | null = null;
+  let finalNegativeSnapshot: string | null = null;
+  const snapshot = () => ({ finalPrompt: composedSnapshot, finalNegative: finalNegativeSnapshot });
 
   try {
     const config = await getStudioConfigRow();
@@ -265,6 +281,8 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
     }
     if (styleSuffix) composed = `${composed}, ${styleSuffix}`;
     const finalNegative = mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
+    composedSnapshot = composed.slice(0, 4000);
+    finalNegativeSnapshot = finalNegative ? finalNegative.slice(0, 1000) : null;
 
     const supabase = getServiceClient();
     const { data: provs } = await supabase
@@ -294,7 +312,7 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
         referenceB64 = bytesToBase64(fetched.bytes);
       } catch (e) {
         const message = e instanceof Error ? `referensi gagal diambil: ${e.message}` : 'referensi gagal diambil';
-        await failStudioImage(imageId, message);
+        await failStudioImage(imageId, message, snapshot());
         return { imageId: null, error: message };
       }
     }
@@ -378,7 +396,7 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
 
     if (!generated) {
       const message = lastError instanceof Error ? lastError.message : String(lastError);
-      await failStudioImage(imageId, message);
+      await failStudioImage(imageId, message, snapshot());
       return { imageId: null, error: message };
     }
 
@@ -403,6 +421,9 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
           width: generated.width,
           height: generated.height,
           last_error: null,
+          // Snapshot prompt final terkirim ke model (migrasi 20260918000004).
+          final_prompt: composedSnapshot,
+          final_negative: finalNegativeSnapshot,
           llm_meta: {
             provider: generated.provider.slug,
             model: generated.modelRow.model_id,
@@ -422,12 +443,12 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       return { imageId };
     } catch (e) {
       const message = describeStorageError(e);
-      await failStudioImage(imageId, message);
+      await failStudioImage(imageId, message, snapshot());
       return { imageId: null, error: message };
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await failStudioImage(imageId, message);
+    await failStudioImage(imageId, message, snapshot());
     return { imageId: null, error: message };
   }
 }

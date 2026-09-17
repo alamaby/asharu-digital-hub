@@ -212,6 +212,23 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
     setTimeout(() => setCopiedId((cur) => (cur === img.id ? null : cur)), 2000);
   }
 
+  async function copyFinalPrompt(img: StudioGenerationRow) {
+    const text = img.final_prompt?.trim() || '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedId(`final:${img.id}`);
+    setTimeout(() => setCopiedId((cur) => (cur === `final:${img.id}` ? null : cur)), 2000);
+  }
+
   async function copyId(img: StudioGenerationRow) {
     try {
       await navigator.clipboard.writeText(img.id);
@@ -288,6 +305,20 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
       style: img.style_slug || tHist('noStyle'),
       aspect: img.aspect_slug
     });
+  }
+
+  /** Label display_name katalog untuk 4 parameter enqueue (fallback slug/Auto). */
+  function paramLabels(img: StudioGenerationRow): { style: string; subject: string; camera: string; aspect: string } {
+    const styleKnown = img.style_slug ? options?.styles.find((s) => s.slug === img.style_slug)?.display_name : undefined;
+    const subjectKnown = img.subject_slug ? options?.subjects.find((s) => s.slug === img.subject_slug)?.display_name : undefined;
+    const cameraKnown = img.camera_slug ? options?.cameras.find((c) => c.slug === img.camera_slug)?.display_name : undefined;
+    const aspectKnown = options?.aspects.find((a) => a.slug === img.aspect_slug);
+    return {
+      style: styleKnown ?? (img.style_slug ? `${img.style_slug} ${tHist('inactiveSuffix')}` : tHist('autoValue')),
+      subject: subjectKnown ?? (img.subject_slug ? `${img.subject_slug} ${tHist('inactiveSuffix')}` : tHist('noneValue')),
+      camera: cameraKnown ?? (img.camera_slug ? `${img.camera_slug} ${tHist('inactiveSuffix')}` : tHist('autoValue')),
+      aspect: aspectKnown ? `${aspectKnown.display_name} (${aspectKnown.width}×${aspectKnown.height})` : img.aspect_slug
+    };
   }
 
   const filteredModels = filters.providerId
@@ -586,6 +617,59 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                   </div>
                 </div>
               </div>
+
+              {/* Parameter enqueue + prompt final terkirim ke model (hide by default). */}
+              <details className="mt-2 rounded-md border border-line/60 bg-background px-2 py-1.5 text-[11px]">
+                <summary className="cursor-pointer font-medium text-ink-muted">{tHist('paramDetails')}</summary>
+                <dl className="mt-1.5 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('styleParamLabel')}</dt>
+                    <dd className="text-ink">{paramLabels(img).style}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('subjectParamLabel')}</dt>
+                    <dd className="text-ink">{paramLabels(img).subject}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('cameraParamLabel')}</dt>
+                    <dd className="text-ink">{paramLabels(img).camera}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-ink-muted">{tHist('aspectParamLabel')}</dt>
+                    <dd className="text-ink">{paramLabels(img).aspect}</dd>
+                  </div>
+                </dl>
+                <div className="mt-1.5">
+                  <p className="font-medium text-ink-muted">{tHist('finalPromptLabel')}</p>
+                  {img.final_prompt ? (
+                    <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-ink">
+                      {img.final_prompt}
+                    </pre>
+                  ) : (
+                    <p className="mt-0.5 text-ink-muted">
+                      {img.status === 'pending' ? tHist('finalPending') : tHist('finalLegacy')}
+                    </p>
+                  )}
+                </div>
+                {img.final_negative ? (
+                  <div className="mt-1.5">
+                    <p className="font-medium text-ink-muted">{tHist('finalNegativeLabel')}</p>
+                    <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-ink">
+                      {img.final_negative}
+                    </pre>
+                  </div>
+                ) : null}
+                {img.final_prompt ? (
+                  <button
+                    type="button"
+                    onClick={() => copyFinalPrompt(img)}
+                    className="mt-1.5 inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover"
+                  >
+                    {copiedId === `final:${img.id}` ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+                    {copiedId === `final:${img.id}` ? tHist('copied') : tHist('copyFinal')}
+                  </button>
+                ) : null}
+              </details>
 
               {/* Detail log: last_error penuh + attempts + llm_meta + timestamp. */}
               <details className="mt-2 rounded-md border border-line/60 bg-background px-2 py-1.5 text-[11px]">
