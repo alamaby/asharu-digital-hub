@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-17 14:01 (local time)
+Last updated: 2026-09-17 15:33 (local time)
 
 ## Current State
 
@@ -66,6 +66,7 @@ Last updated: 2026-09-17 14:01 (local time)
 
 ## Recent Entries
 
+- [153300-bynara-10-models-additive.md](2026-09-17/153300-bynara-10-models-additive.md) — Tambah 10 model Bynara (naraya) reasoning max ADDITIVE (tanpa disable lama, sesuai konfirmasi user): atria-dawn, ling fin/sante/vl, nemotron super/ultra-free/lightning, union-alpha, glm-5.3-flash, gpt-5.6-luna, priority 200–290. Migrasi `20260918000003` applied prod via MCP, 10/10 aktif, gate 767 tests hijau, pushed `3526672`/parent. `nemotron-3-ultra-free` = model berbeda dari baris lama `nemotron-3-ultra` (dibiarkan nonaktif). [USER ACTION opsional] Smoke test per model via Chat Lab + cek `llm_call_logs`.
 - [140152-chat-lab-pagination-ranking.md](2026-09-17/140152-chat-lab-pagination-ranking.md) — Chat Lab pagination DB-driven (`has_error` + backfill, count akurat, filter DB) + statistik 1 tab rentang (Hari ini/7/14/30/Semua) + papan peringkat Best (sukses% → tok/s) provider & model. Migrasi `20260918000002` applied prod, gate 767 tests + build hijau, pushed `7467351`/`e1cfcfa`. [USER ACTION] Live verify pagination + tab + ★ juara.
 - [125908-chat-lab-improvements.md](2026-09-17/125908-chat-lab-improvements.md) — 4 peningkatan Chat Lab: highlight ★ pemenang (latensi/speed/token) di grid + chart, parse `usage` Cloudflare (tahap B ditunda menunggu live verify), halaman detail `/lab/[batchId]` (metrik+chart+log), kartu share PNG 1080 via next/og + Unduh/Bagikan. Gate 754 tests + build hijau, pushed `ac095c9`. [USER ACTION] Live verify token CF + highlight/detail/kartu.
 - [114800-chat-lab-menu.md](2026-09-17/114800-chat-lab-menu.md) — Menu **Chat Lab** `/lab` (login-only, sidebar sejajar Studio): 1 prompt → fan-out paralel 1–3 target strict-pin (tanpa fallback, adil) + side-by-side + metrik token/latency/tok/s + history per-user 30 hari + log detail + chart CSS-only + kuota 50/hari + rate 30/jam. Migrasi `20260918000001` applied prod, gate typecheck+lint+742 tests+build hijau, pushed `7541c8d`/`a6dfa2b`. [USER ACTION] Verifikasi live (atas).
