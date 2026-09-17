@@ -38,7 +38,7 @@ Out of scope: multi-reference Flux-2 (tetap single-ref), mask/inpainting, peruba
 - [x] Fase 2: `types.ts` detector+clamp, `cloudflare.ts` cabang Leonardo + Flux-2, pesan reference generik
 - [x] Fase 3a: Studio — validation/input/worker clamp+advanced, `StudioForm` `<details> Advanced`, history/i18n
 - [x] Fase 3b: Draft — override/actions/worker, `DraftImageCard`/`PostImageControl`/`StageModelPicker` advanced, manual-only Phoenix/Lucid, pengecualian `no text`
-- [ ] Fase 4: unit test adapter/worker/UI + `npm run typecheck` + `npm run lint` + `npm test` + `npm run build` + commit/push submodule+parent
+- [x] Fase 4: unit test adapter/worker/UI + `npm run typecheck` + `npm run lint` + `npm test` + `npm run build` + commit/push submodule+parent
 
 ## Risks
 
@@ -60,6 +60,7 @@ Out of scope: multi-reference Flux-2 (tetap single-ref), mask/inpainting, peruba
   - Keputusan desain: Flux-2 = **FormData primary** (`prompt` + field advanced user + part file `image` bila ref; tanpa set Content-Type manual) dengan **fallback JSON minimal 1x khusus HTTP 400**; override eksplisit via `parameters.transport` (`multipart|json|auto`). Alasan: docs tulis multipart required, tapi JSON generik kemungkinan diterima; fallback 400-only tidak boros (validasi gagal = tak ada gambar = tak tertagih) dan tak menutupi 401/403/429/5xx (tetap ke key-pool).
   - [USER ACTION] Live probe bila 400 ganda: user kirim contoh curl dengan dev key, atau izinkan admin flip `config.transport` (perlu Fase 3b forward config → parameters).
 - 2026-09-17 ~22:15 — Fase 1–3 SELESAI (kode). Migrasi `20260919000001` (5 model priority 23–27 + 5 kolom advanced × 2 tabel, semua is_default=false). Adapter: Leonardo (Phoenix native+biner, Lucid fold+dual steps) + Flux-2 (FormData primary, fallback JSON 400-only, override transport). Worker Studio+draft: `resolveEffectiveAdvanced` (Auto clamp ≤1024/≤25, pin sampai maks model) + `stripNoTextClause` untuk text-capable + audit `advanced/advanced_clamped`. UI: `<details> Advanced` Studio + cover + per-reply, label `· teks`, baris Advanced di history/carousel, i18n id/en. Gate: typecheck ✓ lint ✓ 816 tests ✓ build ✓.
+- 2026-09-17 ~22:25 — Fase 4 SELESAI. Test baru: adapter Leonardo/Flux-2 + helper clamp/detektor + validasi advanced + UI Studio/carousel (27 test baru, total 816 ✓). Gate hijau penuh. Commit submodule `31cc70a` + parent `6b7e4c3`, pushed. [USER ACTION] Apply migrasi prod + uji live 5 model.
 
 ## Notes
 
