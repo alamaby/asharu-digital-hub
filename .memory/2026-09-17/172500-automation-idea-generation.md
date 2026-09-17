@@ -59,9 +59,8 @@ via negative examples dari topik produk N hari terakhir.
 
 ## Blocker / Belum Selesai
 
-- [USER ACTION] Apply migrasi `20260918000004` ke prod → deploy Vercel →
-  `Run now` dengan `auto_publish_article=false` → cek log sesi +
-  `search_call_logs` → pantau 1 hari penuh sebelum auto-publish.
+- [x] ~~[USER ACTION] Apply migrasi `20260918000004` ke prod~~ — SELESAI 17:35 via MCP `apply_migration` + verifikasi `information_schema` (2 kolom + default benar; config id=1 ada).
+- [USER ACTION] Deploy Vercel → di `/admin/automation` nyalakan "Generate ide dari mekanisme produk" → `Run now` dengan `auto_publish_article=false` → cek log sesi + `search_call_logs` → pantau 1 hari penuh sebelum auto-publish.
 
 ## Verifikasi
 
