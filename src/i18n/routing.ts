@@ -138,6 +138,14 @@ export const routing = defineRouting({
       id: '/admin/automation',
       en: '/admin/automation'
     },
+    '/admin/produk': {
+      id: '/admin/produk',
+      en: '/admin/products'
+    },
+    '/admin/cron': {
+      id: '/admin/cron',
+      en: '/admin/cron'
+    },
     '/auth/exchange': {
       id: '/autentikasi/pertukaran',
       en: '/auth/exchange'

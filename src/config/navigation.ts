@@ -19,6 +19,8 @@ export interface NavItem {
     | 'adminVisual'
     | 'adminSosial'
     | 'adminAutomation'
+    | 'adminProduk'
+    | 'adminCron'
     | 'studio'
     | 'chatLab'
     | 'backToSite'
@@ -39,6 +41,8 @@ export interface NavItem {
     | '/admin/visual'
     | '/admin/sosial'
     | '/admin/automation'
+    | '/admin/produk'
+    | '/admin/cron'
     | '/konten/baru'
     | '/konten/review'
     | '/konten/review/[draftId]'
@@ -73,6 +77,8 @@ export const adminNavItems: readonly NavItem[] = [
   { key: 'adminVisual', pathname: '/admin/visual' },
   { key: 'adminSosial', pathname: '/admin/sosial' },
   { key: 'adminAutomation', pathname: '/admin/automation' },
+  { key: 'adminProduk', pathname: '/admin/produk' },
+  { key: 'adminCron', pathname: '/admin/cron' },
   { key: 'studio', pathname: '/studio' },
   { key: 'chatLab', pathname: '/lab' },
   { key: 'adminBaru', pathname: '/konten/baru' },

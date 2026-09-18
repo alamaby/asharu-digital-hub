@@ -10,7 +10,9 @@ import {
   MessagesSquare,
   Plus,
   Share2,
+  Timer,
   Workflow,
+  ShoppingBag,
   type LucideIcon
 } from 'lucide-react';
 import type { NavItem } from '@/config/navigation';
@@ -44,6 +46,8 @@ export const adminNavGroups: readonly AdminNavGroup[] = [
       { key: 'adminVisual', pathname: '/admin/visual', icon: Image, adminOnly: true },
       { key: 'adminSosial', pathname: '/admin/sosial', icon: Share2, adminOnly: true },
       { key: 'adminAutomation', pathname: '/admin/automation', icon: Workflow, adminOnly: true },
+      { key: 'adminProduk', pathname: '/admin/produk', icon: ShoppingBag, adminOnly: true },
+      { key: 'adminCron', pathname: '/admin/cron', icon: Timer, adminOnly: true },
       { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false },
       { key: 'chatLab', pathname: '/lab', icon: MessagesSquare, adminOnly: false },
     ]

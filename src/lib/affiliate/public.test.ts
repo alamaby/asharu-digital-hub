@@ -66,6 +66,8 @@ function row(friendlyCode: string, overrides: Partial<Record<string, unknown>> =
     url: 'https://example.com/p',
     image: 'https://example.supabase.co/storage/v1/object/public/affiliate-images/a.webp',
     is_featured: false,
+    featured_override: null as boolean | null,
+    featured_rank: 2,
     created_at: '2026-09-01T00:00:00Z',
     ...overrides
   };
@@ -81,22 +83,22 @@ beforeEach(() => {
 });
 
 describe('getActiveProducts', () => {
-  it('orders featured first, then newest — not by friendly_code', async () => {
-    state.rows = [row('ASH-255', { is_featured: true }), row('ASH-001')];
+  it('orders by featured_rank first, then newest — not by friendly_code', async () => {
+    state.rows = [row('ASH-255', { is_featured: true, featured_rank: 1 }), row('ASH-001')];
 
     const products = await getActiveProducts();
 
     expect(state.fromCalls).toEqual(['affiliate_products']);
     expect(state.eqCalls).toEqual([['is_active', true]]);
     expect(state.orderCalls).toEqual([
-      ['is_featured', { ascending: false }],
+      ['featured_rank', { ascending: true }],
       ['created_at', { ascending: false }]
     ]);
     expect(products.map((p) => p.id)).toEqual(['ASH-255', 'ASH-001']);
   });
 
   it('maps rows to AffiliateProduct and falls back to "others" for unknown categories', async () => {
-    state.rows = [row('ASH-255', { category: 'tidak-dikenal', is_featured: true })];
+    state.rows = [row('ASH-255', { category: 'tidak-dikenal', is_featured: true, featured_rank: 1 })];
 
     const [product] = await getActiveProducts();
 
@@ -115,25 +117,55 @@ describe('getActiveProducts', () => {
     await expect(getActiveProducts()).resolves.toEqual([]);
     expect(state.fromCalls).toEqual([]);
   });
+
+  it('flags pinned override as featured=true regardless of is_featured', async () => {
+    state.rows = [row('ASH-NEW', { is_featured: false, featured_override: true, featured_rank: 0 })];
+
+    const [product] = await getActiveProducts();
+    expect(product).toBeDefined();
+    expect(product!.featured).toBe(true);
+  });
+
+  it('flags excluded override as featured=false even if scraper set is_featured', async () => {
+    state.rows = [row('ASH-OLD', { is_featured: true, featured_override: false, featured_rank: 2 })];
+
+    const [product] = await getActiveProducts();
+    expect(product).toBeDefined();
+    expect(product!.featured).toBe(false);
+  });
 });
 
 describe('getFeaturedProductsDB', () => {
-  it('filters both is_active and is_featured, then orders newest first with a limit', async () => {
-    state.rows = [row('ASH-255', { is_featured: true })];
+  it('filters out featured_override=false and orders ranked, then newest with a limit', async () => {
+    // Simulasikan: 1 pinned (rank 0), 1 auto-scraper (rank 1), 1 excluded (rank 2)
+    state.rows = [
+      row('ASH-PINNED', { is_featured: false, featured_override: true, featured_rank: 0 }),
+      row('ASH-AUTO', { is_featured: true, featured_override: null, featured_rank: 1 }),
+      row('ASH-EXCL', { is_featured: true, featured_override: false, featured_rank: 2 })
+    ];
 
     const products = await getFeaturedProductsDB();
 
-    expect(state.eqCalls).toEqual([
-      ['is_active', true],
-      ['is_featured', true]
+    expect(state.eqCalls).toEqual([['is_active', true]]);
+    expect(state.orderCalls).toEqual([
+      ['featured_rank', { ascending: true }],
+      ['created_at', { ascending: false }]
     ]);
-    expect(state.orderCalls).toEqual([['created_at', { ascending: false }]]);
-    expect(state.limitCalls).toEqual([6]);
-    expect(products).toHaveLength(1);
+    // limit dibesarin buffer = max + 6 = 12 untuk filter JS
+    expect(state.limitCalls).toEqual([12]);
+    expect(products.map((p) => p.id)).toEqual(['ASH-PINNED', 'ASH-AUTO']);
+    expect(products).toHaveLength(2);
   });
 
   it('honours a custom max', async () => {
+    state.rows = [row('ASH-X', { is_featured: true, featured_rank: 1 })];
     await getFeaturedProductsDB(3);
-    expect(state.limitCalls).toEqual([3]);
+    expect(state.limitCalls).toEqual([9]); // max=3 + buffer=6
+  });
+
+  it('returns empty when all rows are excluded', async () => {
+    state.rows = [row('ASH-X', { is_featured: true, featured_override: false, featured_rank: 2 })];
+    const result = await getFeaturedProductsDB();
+    expect(result).toHaveLength(0);
   });
 });
