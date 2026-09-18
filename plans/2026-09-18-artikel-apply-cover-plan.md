@@ -105,9 +105,9 @@ Urutan wajib: A1 → A2 → B1 → B2 → C (satu file per langkah bila memungki
 - Setiap edit setelah gate hijau MEMBATALKAN gate — re-run `typecheck + lint` sebelum commit (insiden `prefer-const` 2026-09-10).
 
 ## Progress Log
-
 - 2026-09-18 14:10:00 — Plan detail dibuat (riset: 2 agen + cek `actions.ts:1-58`, review page `:125-174`). Kesepakatan user: banner di halaman review. Belum ada implementasi.
-- Belum mulai — A1 server action.
+- 2026-09-18 15:59:00 — **A1+B1+B2 gate selesai.** Commit `52f985b` + doc update `175caec`. Implementasi: server action `applyDraftCoverToArticle` (validasi keras, update hanya cover_image_url+updated_at, revalidasi locale), banner `ApplyCoverBanner` di halaman review, +9 test mock Supabase, +10 key i18n id/en. Gate: typecheck ✓ lint ✓ (2 warning `<img>` admin-only) test 869/869 ✓ build ✓.
+- Belum mulai — C verifikasi manual e2e (dev/staging): generate cover baru → banner `Berbeda` → Terapkan → live <60 detik.
 
 ## Notes
 
