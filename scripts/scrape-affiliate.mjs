@@ -145,7 +145,7 @@ async function main() {
     supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
     const { data: prevRows, error: prevError } = await supabase
       .from('affiliate_products')
-      .select('external_id, name_id, name_en, category, merchant, url, image, is_active, is_featured');
+      .select('external_id, friendly_code, name_id, name_en, category, merchant, url, image, is_active, is_featured');
     if (prevError) throw new Error(`Supabase fetch existing: ${prevError.message}`);
     prevById = new Map((prevRows ?? []).map((r) => [r.external_id, r]));
   }
@@ -194,7 +194,10 @@ async function main() {
     return;
   }
 
-  // Write to Supabase (incremental, friendly_code ASH-XXX auto-generated)
+  // Write to Supabase (incremental, friendly_code ASH-XXX explicit — no sequence burn).
+  // Generator gen_friendly_code() now uses MAX+1; trigger only fires when
+  // friendly_code is NULL (defensive fallback for non-scrape writers).
+  // Scraper always supplies friendly_code so the trigger path is never hit.
   // Fail-loud: partial syncs must never look green (kasus Sep 2026: 9 produk
   // hilang karena friendly_code collision, run tetap hijau). Non-dry-run
   // tanpa sync sukses = exit non-zero agar workflow merah.
@@ -202,17 +205,39 @@ async function main() {
   if (supabase) {
     try {
       console.error('Upserting to Supabase affiliate_products...');
-      const rows = products.map((p) => ({
-        external_id: p.id.replace('affiliate-', ''),
-        name_id: p.name.id,
-        name_en: p.name.en,
-        category: p.category,
-        merchant: p.merchant,
-        url: p.url,
-        image: p.image,
-        is_active: true,
-        is_featured: p.featured
-      }));
+      // Precompute new codes for truly new external_ids: MAX(numeric(friendly_code)) + 1
+      // per new item in scrape order. Deterministik & idempoten selama tidak ada
+      // concurrent writer (concurrency.group = scrape-affiliate di workflow).
+      const { data: maxRow } = await supabase
+        .from('affiliate_products')
+        .select('friendly_code')
+        .eq('is_active', true)
+        .order('friendly_code', { ascending: false })
+        .limit(1);
+      const maxNum = ((maxRow ?? [])[0]?.friendly_code ?? '')
+        .replace('ASH-', '')
+        .trim() === ''
+        ? 0
+        : Number(((maxRow ?? [])[0]?.friendly_code ?? '').replace('ASH-', ''));
+      let nextNewCode = maxNum + 1;
+      const rows = products.map((p) => {
+        const externalId = p.id.replace('affiliate-', '');
+        const existing = prevById.get(externalId);
+        return {
+          external_id: externalId,
+          // Keep existing code for changed rows; assign deterministic new code for
+          // truly new external_ids (avoids speculative sequence burn on every upsert).
+          friendly_code: existing?.friendly_code ?? ('ASH-' + String(nextNewCode++).padStart(3, '0')),
+          name_id: p.name.id,
+          name_en: p.name.en,
+          category: p.category,
+          merchant: p.merchant,
+          url: p.url,
+          image: p.image,
+          is_active: true,
+          is_featured: p.featured
+        };
+      });
       // Upsert hanya baris baru/berubah: tiap baris upsert memicu trigger
       // BEFORE INSERT spekulatif yang membakar 1 nilai sequence meski akhirnya
       // UPDATE — full-upsert 221 baris/hari menghabiskan sequence sia-sia.
@@ -232,7 +257,7 @@ async function main() {
       if (failedUploadIds.size > 0) {
         console.error(`  excluding ${failedUploadIds.size} new product(s) with failed image uploads from upsert: ${[...failedUploadIds].slice(0, 10).join(',')}`);
       }
-      console.error(`  ${changed.length}/${rows.length} new or changed, skipping ${rows.length - changed.length} identical (saves sequence burns)`);
+      console.error(`  ${changed.length}/${rows.length} new or changed, skipping ${rows.length - changed.length} identical (no sequence burn — friendly_code explicit)`);
       for (let i = 0; i < changed.length; i += 50) {
         const batch = changed.slice(i, i + 50);
         const { error } = await supabase.from('affiliate_products').upsert(batch, { onConflict: 'external_id' });
