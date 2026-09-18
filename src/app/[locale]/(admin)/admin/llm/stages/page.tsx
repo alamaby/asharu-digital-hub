@@ -31,7 +31,8 @@ async function StagesSection({ locale }: { locale: Locale }) {
     developing: t('stageLabel.developing'),
     regen_affiliate: t('stageLabel.regen_affiliate'),
     image_prompt: t('stageLabel.image_prompt'),
-    enhance_image_prompt: t('stageLabel.enhance_image_prompt')
+    enhance_image_prompt: t('stageLabel.enhance_image_prompt'),
+    compose_studio_prompt: t('stageLabel.compose_studio_prompt')
   };
   const modelList = (models ?? []) as Array<{ id: string; provider_id: string; model_id: string; display_name: string }>;
   const providerById = new Map(((providers ?? []) as Array<{ id: string; slug: string; display_name: string }>).map((p) => [p.id, p]));

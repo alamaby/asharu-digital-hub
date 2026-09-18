@@ -446,7 +446,8 @@
         "regen_affiliate": "Regen Affiliate (in Review, default Admin → LLM)",
         "regen_affiliate_hint": "Set regen default at Admin → LLM → Stage Defaults. When regenerating in Review, pick provider → model there.",
         "image_prompt": "Image Prompt (auto cover)",
-        "enhance_image_prompt": "Enhance Image Prompt (Polish in Review)"
+        "enhance_image_prompt": "Enhance Image Prompt (Polish in Review)",
+        "compose_studio_prompt": "Compose Studio Prompt (Studio Final)"
       }
     },
     "review": {

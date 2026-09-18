@@ -92,6 +92,7 @@ export const LOW_EFFORT_STAGES: readonly string[] = [
   'idea_generation',
   'image_prompt',
   'enhance_image_prompt',
+  'compose_studio_prompt',
   'scoring',
   'verifying',
   'regen_affiliate'

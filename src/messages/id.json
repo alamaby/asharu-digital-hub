@@ -446,7 +446,8 @@
         "regen_affiliate": "Regen Affiliate (di Review, default Admin → LLM)",
         "regen_affiliate_hint": "Atur default regen di Admin → LLM → Stage Defaults. Saat regen di Review, pilih provider → model di sana.",
         "image_prompt": "Image Prompt (auto cover)",
-        "enhance_image_prompt": "Enhance Image Prompt (Sempurnakan di Review)"
+        "enhance_image_prompt": "Enhance Image Prompt (Sempurnakan di Review)",
+        "compose_studio_prompt": "Compose Studio Prompt (Final Studio)"
       }
     },
     "review": {

@@ -308,3 +308,92 @@ export function buildStudioEnhanceMessages(input: StudioEnhanceInput): {
     .join('\n');
   return { system, user };
 }
+
+/** Input untuk komposisi final-prompt Studio oleh LLM di worker. */
+export interface ComposeStudioInput {
+  imagePrompt: string;
+  subjectEn?: string | null;
+  angleEn?: string | null;
+  styleSuffix?: string | null;
+  aspect: string;
+}
+
+/** Output JSON dari LLM komposisi Studio (validasi via parseComposeStudio). */
+export interface ComposeStudioOutput {
+  final_prompt: string;
+  final_negative?: string | null;
+  dropped: string[];
+  conflict_note?: string | null;
+}
+
+/**
+ * Builder pesan LLM untuk konsolidasi final prompt Studio.
+ * LLM menggabungkan subject_en + image_prompt + angle_en + style_suffix
+ * menjadi satu scene koheren — menghilangkan duplikat dan konflik eksplisit.
+ */
+export function buildComposeStudioMessages(input: ComposeStudioInput): { system: string; user: string } {
+  const segments: string[] = [];
+  if (input.imagePrompt?.trim()) segments.push(`Image prompt (user): ${input.imagePrompt.trim()}`);
+  if (input.subjectEn?.trim()) segments.push(`Subject template: ${input.subjectEn.trim()}`);
+  if (input.angleEn?.trim()) segments.push(`Camera angle: ${input.angleEn.trim()}`);
+  if (input.styleSuffix?.trim()) segments.push(`Style preset: ${input.styleSuffix.trim()}`);
+  const segmentText = segments.join('\n');
+  const system = [
+    'You are a prompt composer for FLUX and similar text-to-image models.',
+    'Your job: MERGE 4 text segments into ONE cohesive image-prompt scene — NO new objects/settings.',
+    'SEGMENTS PROVIDED (each is a separate visual instruction):',
+    segmentText || '(none provided)',
+    '',
+    'RULES (in priority order):',
+    '1. USER IMAGE PROMPT WINS: user-written scene (subject/action/setting) takes highest priority.',
+    '2. MERGE WITHOUT DUPLICATES: if multiple segments describe the same subject (e.g., "young woman" in both), merge into one description.',
+    '3. RESOLVE CONFLICTS — USER WINS:',
+    '   - "clean background" in subject vs "crowded park/beach/street" in user prompt → DROP "clean background".',
+    '   - "full-body editorial" framing in subject vs "three-quarter / side-profile" angle → use angle framing.',
+    '   - "vertical format" in style vs aspect "1:1" or "16:9" → DROP "vertical".',
+    '   - When in doubt, follow user prompt over template text.',
+    '4. STRIP IRRELEVANT CLAUSES:',
+    '   - Remove product-focused phrases ("featured product", "packaging", "product proportions", "product clearly visible") when the scene features a person, not a product shot.',
+    '   - Remove "no text, no watermark, no logo" from POSITIVE prompt — these belong ONLY in negative prompt.',
+    '5. OUTPUT STRUCTURE:',
+    '   - final_prompt: single descriptive scene ≤90 words, concrete, in English, NO instruction phrases like "must show".',
+    '   - final_negative: required — at least "no text, no watermark, no logo, blurry, low quality, distorted anatomy". Add style-relevant exclusions.',
+    '   - dropped: list of phrases/items you dropped from any segment and why (e.g., "clean background — conflicts with crowded park").',
+    '   - conflict_note: brief note explaining resolved conflicts (or null if none).',
+    '6. DO NOT invent new settings, objects, people, or actions not present in any segment.',
+    '',
+    'OUTPUT JSON ONLY. No markdown fences. Keys: "final_prompt", "final_negative", "dropped" (array), "conflict_note".'
+  ].join('\n');
+  const user = `Segments to merge:\n${segmentText}\n\nAspect ratio: ${input.aspect}`;
+  return { system, user };
+}
+
+/**
+ * Parse LLM JSON output for compose studio. Tolerant of markdown code fences.
+ * Returns parsed output with sanitization (length caps).
+ */
+export function parseComposeStudio(text: string): ComposeStudioOutput {
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error('compose_studio: no JSON object found');
+  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as {
+    final_prompt?: unknown;
+    final_negative?: unknown;
+    dropped?: unknown;
+    conflict_note?: unknown;
+  };
+  const prompt = typeof parsed.final_prompt === 'string' ? parsed.final_prompt.trim() : '';
+  if (prompt.length < 10) throw new Error(`compose_studio: final_prompt terlalu pendek (${prompt.length} char)`);
+  const negative = typeof parsed.final_negative === 'string' && parsed.final_negative.trim()
+    ? parsed.final_negative.trim().slice(0, 1000)
+    : undefined;
+  const dropped = (Array.isArray(parsed.dropped) ? parsed.dropped.filter((d): d is string => typeof d === 'string' && !!d.trim()).slice(0, 20) : []);
+  const conflictNote = typeof parsed.conflict_note === 'string' && parsed.conflict_note.trim()
+    ? parsed.conflict_note.trim().slice(0, 500)
+    : null;
+  return { final_prompt: prompt.slice(0, 2000), final_negative: negative, dropped, conflict_note: conflictNote };
+}

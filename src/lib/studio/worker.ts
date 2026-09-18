@@ -23,6 +23,8 @@ import { DEFAULT_STUDIO_CONFIG } from '@/lib/studio/types';
 import { uploadUserImageWithRetry, describeStorageError, removeUserImage, fetchReferenceBytes } from '@/lib/studio/storage';
 
 const MAX_ATTEMPTS = 3;
+/** Bucket rate-limit reserved untuk komposisi final-prompt Studio oleh LLM (worker cron). */
+export const COMPOSE_STUDIO_PROMPT_RATE_LIMIT_BUCKET = 'compose_studio_prompt';
 
 interface StudioTarget {
   provider: ImageProviderRow;
@@ -256,8 +258,7 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
       : styleSuffixRaw;
     // Urutan natural: [subject, prompt, angle, style]. Angle disisip sebelum
     // style suffix (instruksi render) agar framing terbaca sebagai scene.
-    let composed = prompt;
-    // Subject template: disisipkan di depan sebagai konteks visual (opsional).
+    let subjectEn = '';
     if (row.subject_slug) {
       const supabase = getServiceClient();
       const { data: tpl } = await supabase
@@ -266,10 +267,9 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
         .eq('slug', row.subject_slug)
         .eq('is_active', true)
         .maybeSingle();
-      const subjectEn = (tpl as { subject_en?: string } | null)?.subject_en?.trim();
-      if (subjectEn) composed = `${subjectEn}, ${composed}`;
+      subjectEn = (tpl as { subject_en?: string } | null)?.subject_en?.trim() ?? '';
     }
-    // Camera angle: auto-append natural di belakang prompt (opsional).
+    let angleEn = '';
     const angleSlug = row.camera_slug ?? config.default_camera_slug ?? null;
     if (angleSlug) {
       const supabase = getServiceClient();
@@ -279,18 +279,63 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
         .eq('slug', angleSlug)
         .eq('is_active', true)
         .maybeSingle();
-      const angleEn = (ang as { angle_en?: string } | null)?.angle_en?.trim();
+      angleEn = (ang as { angle_en?: string } | null)?.angle_en?.trim() ?? '';
+    }
+    // Resolve LLM-based composition (stage compose_studio_prompt). Gagal → fallback deterministik.
+    let composed = prompt;
+    let finalNegative: string | undefined;
+    let compositionAudit: Record<string, unknown> = { mode: 'deterministic' };
+    try {
+      const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
+      const { runLLMCompletion } = await import('@/lib/llm/completion');
+      const { buildComposeStudioMessages, parseComposeStudio } = await import('@/lib/image/prompt');
+      const { providerId, modelUuid } = await resolveStageModel('compose_studio_prompt', null);
+      if (providerId || modelUuid) {
+        const llmSupabase = getServiceClient();
+        const { system, user } = buildComposeStudioMessages({
+          imagePrompt: prompt,
+          subjectEn: subjectEn || null,
+          angleEn: angleEn || null,
+          styleSuffix: styleSuffix,
+          aspect: target.aspect,
+        });
+        const llmOut = await runLLMCompletion(llmSupabase, {
+          stage: 'compose_studio_prompt',
+          providerId,
+          modelUuid,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+          temperature: 0.3,
+          maxTokens: 800,
+        });
+        const parsed = parseComposeStudio(llmOut.output.text);
+        composed = parsed.final_prompt;
+        finalNegative = parsed.final_negative ?? mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
+        compositionAudit = {
+          mode: 'llm',
+          model: llmOut.model,
+          provider: llmOut.providerSlug,
+          dropped: parsed.dropped,
+          conflict_note: parsed.conflict_note ?? null,
+        };
+      }
+    } catch {
+      // LLM gagal → fallback deterministik (jangan ganggu generate image).
+      compositionAudit = { mode: 'deterministic', reason: 'llm_failed' };
+    }
+    // Deterministic fallback: concat subject + prompt + angle + style (tanpa LLM).
+    if (compositionAudit.mode !== 'llm') {
+      composed = prompt;
+      if (subjectEn) composed = `${subjectEn}, ${composed}`;
       if (angleEn) {
         const { appendCameraAngle } = await import('@/lib/image/camera-angles');
-        // Tanpa maxLen: prompt user tidak dipotong (batasan max_prompt_length
-        // hanya untuk textarea UX, bukan prompt provider).
         composed = appendCameraAngle(composed, angleEn);
       }
+      if (styleSuffix) composed = `${composed}, ${styleSuffix}`;
+      finalNegative = mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
     }
-    if (styleSuffix) composed = `${composed}, ${styleSuffix}`;
-    const finalNegative = mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
+    const finalNegativeResolved = finalNegative ?? mergeImageNegativePrompts(row.negative_prompt, target.style?.negative_prompt);
     composedSnapshot = composed.slice(0, 4000);
-    finalNegativeSnapshot = finalNegative ? finalNegative.slice(0, 1000) : null;
+    finalNegativeSnapshot = finalNegativeResolved ? finalNegativeResolved.slice(0, 1000) : null;
 
     // Advanced (form <details>): NULL = Auto/default model. Auto (non-pin)
     // di-clamp hemat (≤1024px / ≤25 steps); pin manual boleh sampai maks model.
