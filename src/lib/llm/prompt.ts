@@ -261,6 +261,8 @@ export interface ArticleLangDraft {
 export interface ParsedArticleDraft {
   id: ArticleLangDraft | null;
   en: ArticleLangDraft | null;
+  /** Prompt cover EN (satu untuk semua locale). Optional — hilang/invalid = fallback ke reasoning LLM. */
+  cover_image_prompt?: string;
 }
 
 /** Batas minimum kata agar layak publish (anti thin-content). */
@@ -290,7 +292,7 @@ export function buildArticlePrompt(
     'You are a senior SEO copywriter for Asharu (asharu.id), bilingual ID+EN, helpful and authentic.',
     'You write long-form articles that rank on Google: clear H1-title, scannable H2 sections, FAQ, natural affiliate mention.',
     'Rules:',
-    '- Output JSON ONLY with shape: {"id": <article|null>, "en": <article|null>} where <article> = {"title":"...","slug":"...","excerpt":"...","sections":[{"h2":"...","body":"..."}],"faq":[{"q":"...","a":"..."}],"meta_title":"...","meta_desc":"..."}',
+    '- Output JSON ONLY with shape: {"id": <article|null>, "en": <article|null>, "cover_image_prompt":"... (optional)"} where <article> = {"title":"...","slug":"...","excerpt":"...","sections":[{"h2":"...","body":"..."}],"faq":[{"q":"...","a":"..."}],"meta_title":"...","meta_desc":"..."}',
     '- JSON HARUS VALID (akan di-parse mesin): tiap elemen `sections` adalah objek `{"h2":"...","body":"..."}` yang berdiri sendiri, dipisah `},{` (contoh: `..."},{"h2":"...`). Jangan menggabung beberapa section dalam satu objek; jangan ada trailing comma; jangan ada teks di luar JSON.',
     '- PANJANG (WAJIB, anti thin-content): total isi (excerpt + semua body section) 800-1500 kata per bahasa. Tiap section body 150-300 kata — hitung sendiri sebelum output (±1 kata ≈ 5-6 karakter; 150 kata ≈ 900+ karakter). 4-7 sections berarti total body ≥ 600 kata SELALU. Jangan berhenti dini: bila total masih < 800 kata, tambah contoh konkret, tips praktis, atau sub-poin sampai cukup. Jangan bertele-tele, tiap paragraf menambah informasi baru.',
     '- EMOJI (WAJIB, natural): excerpt memuat 1 emoji relevan + tiap section body memuat TEPAT 1 emoji relevan yang inline menyatu dengan kalimat (mis. di akhir kalimat pembuka). Emoji harus berkaitan dengan isi; jangan mengganti kata dengan emoji; jangan lebih dari 1 per section agar tetap pantas untuk SEO.',
@@ -299,6 +301,7 @@ export function buildArticlePrompt(
     '- AFFILIATE: sisipkan {{PRODUCT_URL}} TEPAT 1 kali, inline di dalam body salah satu section tengah (bukan section pertama/terakhir), dibungkus 1-2 kalimat jembatan natural yang menjelaskan kenapa produk relevan + NAMA PRODUK persis seperti di blok produk. Jangan bare link tanpa konteks. Jangan hard-sell.',
     '- SLUG: huruf kecil, alfanumerik + strip saja (contoh: "tips-memilih-keyboard-mekanik-wfh"), 3-8 kata dari keyword utama.',
     '- META: meta_title ≤ 60 karakter (boleh = title bila sudah bagus), meta_desc 120-160 karakter yang memancing klik.',
+    '- COVER IMAGE PROMPT: "cover_image_prompt" top-level = EN image prompt ≤60 kata untuk cover artikel, photorealistic & konkret memvisualkan judul+isi (mis. sudut kamera, pencahayaan, komposisi, subjek). Tanpa teks/logo/wajah/tanda air. Turunkan dari title+excerpt+key facts. DILARANG kosongkan dengan spasi; bila ragu, omit field ini saja.',
     '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK. Tulis ID & EN yang benar dan natural.',
     langRule,
     ...(templateRule ? [templateRule] : []),
@@ -333,6 +336,20 @@ export function buildArticlePrompt(
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
+}
+
+/**
+ * Validasi cover_image_prompt (Latin-only, 10–500 char).
+ * Hasil true = aman diteruskan ke image lane `prompt_ready`.
+ * False → developer/fallback reasoning LLM menangani cover.
+ */
+export function isValidCoverPrompt(v: unknown): v is string {
+  if (!isNonEmptyString(v)) return false;
+  const s = v.trim();
+  if (s.length < 10 || s.length > 500) return false;
+  // Tolak CJK (sama dengan BAHASA rule di system prompt).
+  if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(s)) return false;
+  return true;
 }
 
 /** Batas excerpt yang DB `articles.excerpt` izinkan (CHECK 50–500). */
@@ -475,7 +492,10 @@ export function parseArticleDraft(text: string): ParsedArticleDraft | null {
   const id = parseArticleLang(parsed.id);
   const en = parseArticleLang(parsed.en);
   if (!id && !en) return null;
-  return { id, en };
+  // COVER: top-level field opsional — toleran (tidak gagalkan parse) sesuai prinsip T2.
+  const rawCover = parsed.cover_image_prompt;
+  const coverPrompt = typeof rawCover === 'string' && rawCover.trim().length > 0 ? rawCover.trim() : undefined;
+  return { id, en, ...(coverPrompt ? { cover_image_prompt: coverPrompt } : {}) };
 }
 
 /** Hitung kata (excerpt + body semua section) untuk gate thin-content. */
@@ -555,7 +575,7 @@ export function buildArticleExpandPrompt(
     '- Output JSON ONLY dengan shape yang SAMA PERSIS seperti input ({"id": <article|null>, "en": <article|null>} — field dan slug TIDAK BOLEH berubah).',
     '- JSON HARUS VALID (akan di-parse mesin): tiap elemen `sections` adalah objek `{"h2":"...","body":"..."}` yang berdiri sendiri, dipisah `},{`. Jangan menggabung beberapa section dalam satu objek; jangan ada trailing comma; jangan ada teks di luar JSON.',
     '- KEMBANGKAN tiap section body hingga 150-300 kata: tambah contoh konkret, tips praktis, detail use-case, atau sub-poin yang relevan — tiap kalimat baru menambah informasi, bukan pengulangan.',
-    '- PERTAHANKAN: title, slug, H2, faq, meta, fakta/key-facts, CTA, dan 1 sisipan {{PRODUCT_URL}} + NAMA PRODUK di section yang sama (jangan pindah/tambah/kurangi). Jangan mengarang data, angka, harga, atau klaim medis/finansial baru.',
+    '- PERTAHANKAN: title, slug, H2, faq, meta, fakta/key-facts, CTA, dan 1 sisipan {{PRODUCT_URL}} + NAMA PRODUK di section yang sama (jangan pindah/tambah/kurangi). JANGAN ubah cover_image_prompt bila ada (pertahankan persis apa adanya). Jangan mengarang data, angka, harga, atau klaim medis/finansial baru.',
     '- EMOJI: excerpt 1 emoji relevan + tiap section body TEPAT 1 emoji relevan inline (jangan ganti kata dengan emoji).',
     '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK.',
     langRule

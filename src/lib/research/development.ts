@@ -7,6 +7,7 @@ import {
   buildArticleExpandPrompt,
   buildArticlePrompt,
   countArticleWords,
+  isValidCoverPrompt,
   parseArticleDraft,
   type ParsedArticleDraft
 } from '@/lib/llm/prompt';
@@ -486,14 +487,40 @@ async function lookupProviderId(supabase: SupabaseClient, providerSlug: string):
 
 // Eventual cover: enqueue 1 pending post_index=0 agar worker cron
 // memproses otomatis tanpa tunggu lazy scan. Idempoten via count guard.
-async function enqueueCoverImage(supabase: SupabaseClient, sessionId: string, draftId: string): Promise<void> {
+async function enqueueCoverImage(
+  supabase: SupabaseClient,
+  sessionId: string,
+  draftId: string,
+  coverPrompt?: string
+): Promise<void> {
   try {
     const { count } = await supabase
       .from('content_draft_images')
       .select('id', { count: 'exact', head: true })
       .eq('draft_id', draftId)
       .eq('post_index', 0);
-    if ((count ?? 0) === 0) {
+    if ((count ?? 0) !== 0) return; // sudah ada baris cover (idempoten).
+
+    // VALIDASI ringkas via helper yang sama agar satu sumber kebenaran dengan parse di LLM stage.
+    // Bila valid → pre-isi prompt + status 'prompt_ready' = menunggu review.
+    // Bila tidak → fallback kosong agar reasoning LLM worker menangani cover (jalan lama).
+    const imagePrompt = isValidCoverPrompt(coverPrompt) ? coverPrompt.trim() : '';
+
+    if (imagePrompt) {
+      // Pre-isi prompt + status 'prompt_ready' = menunggu review (bukan 'pending' agar worker tidak langsung render).
+      // Column `reasoning` & `llm_meta` adalah JSON (existing shape), jadi bisa langsung diisi object.
+      await supabase.from('content_draft_images').insert({
+        draft_id: draftId,
+        post_index: 0,
+        image_prompt: imagePrompt,
+        status: 'prompt_ready',
+        reasoning: { visual_strategy: 'developing', justification: 'cover prompt dari LLM developing (konteks artikel penuh)' },
+        llm_meta: { stage: 'developing', from_developing: true },
+        provider_slug: '',
+        model_id: ''
+      });
+    } else {
+      // Fallback ke jalur lama: reasoning LLM di worker nanti mengisi prompt dari judul + topik.
       await supabase.from('content_draft_images').insert({
         draft_id: draftId,
         post_index: 0,
@@ -1113,7 +1140,8 @@ async function generateArticleAndInsertDraft(
   }
   const newDraftId = (createdDraft as { id: string }).id;
 
-  await enqueueCoverImage(supabase, sessionId, newDraftId);
+  // Kirim prompt cover (jika ada) agar worker review langsung bisa render tanpa reasoning LLM tambahan.
+  await enqueueCoverImage(supabase, sessionId, newDraftId, finalArticle.cover_image_prompt);
 
   await supabase.from('content_research_logs').insert({
     session_id: sessionId,

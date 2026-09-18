@@ -8,6 +8,7 @@ import {
   clampArticleExcerpt,
   countArticleWords,
   findAffiliateSectionIndex,
+  isValidCoverPrompt,
   parseArticleDraft,
   repairArticleJson,
   slugifyTitle,
@@ -236,5 +237,66 @@ describe('findAffiliateSectionIndex', () => {
   it('-1 bila URL kosong/tak ketemu', () => {
     expect(findAffiliateSectionIndex(sections, null)).toBe(-1);
     expect(findAffiliateSectionIndex(sections, 'https://lain.example/x')).toBe(-1);
+  });
+});
+
+describe('isValidCoverPrompt', () => {
+  it('mengizinkan string valid 10–500 char Latin', () => {
+    const ok = 'a'.repeat(10);
+    expect(isValidCoverPrompt(ok)).toBe(true);
+    const long = 'x'.repeat(500);
+    expect(isValidCoverPrompt(long)).toBe(true);
+  });
+
+  it('menolak string < 10 char', () => {
+    expect(isValidCoverPrompt('')).toBe(false);
+    expect(isValidCoverPrompt('    ')).toBe(false);
+    expect(isValidCoverPrompt('abcd')).toBe(false);
+  });
+
+  it('menolak string > 500 char', () => {
+    expect(isValidCoverPrompt('a'.repeat(501))).toBe(false);
+  });
+
+  it('menolak CJK', () => {
+    expect(isValidCoverPrompt('short 中文 ones')).toBe(false);
+    expect(isValidCoverPrompt('short valid ones')).toBe(true); // Latin OK
+  });
+
+  it('menolak non-string', () => {
+    expect(isValidCoverPrompt(null)).toBe(false);
+    expect(isValidCoverPrompt(undefined)).toBe(false);
+    expect(isValidCoverPrompt(123)).toBe(false);
+    expect(isValidCoverPrompt({})).toBe(false);
+  });
+});
+
+describe('parseArticleDraft cover_image_prompt', () => {
+  const base = JSON.stringify({ id: validLang(), en: null });
+
+  it('accept top-level cover_image_prompt dan menyimpannya', () => {
+    // base: {"id":{...},"en":null} — perlu ditambahkan field di dalam kurung kurawal terakhir.
+    const raw = '{"id":' + JSON.stringify(validLang()) + ',"en":null,"cover_image_prompt":"a nice indoor scene with soft lighting"}';
+    const parsed = parseArticleDraft(raw);
+    expect(parsed?.cover_image_prompt).toBe('a nice indoor scene with soft lighting');
+  });
+
+  it('toleran bila field tidak ada (fallback ke undefined)', () => {
+    const parsed = parseArticleDraft(base);
+    expect(parsed?.cover_image_prompt).toBeUndefined();
+  });
+
+  it('toleran bila field bukan string (undefined, tidak gagalkan parse)', () => {
+    const raw = '{"id":' + JSON.stringify(validLang()) + ',"en":null,"cover_image_prompt":123}';
+    const parsed = parseArticleDraft(raw);
+    expect(parsed?.cover_image_prompt).toBeUndefined();
+    // Parse tetap sukses selama id/en valid.
+    expect(parsed?.id).not.toBeNull();
+  });
+
+  it('menyimpan trim spasi ekstra di sekitar value', () => {
+    const raw = '{"id":' + JSON.stringify(validLang()) + ',"en":null,"cover_image_prompt":"   bright daylight, cozy room   "}';
+    const parsed = parseArticleDraft(raw);
+    expect(parsed?.cover_image_prompt).toBe('bright daylight, cozy room');
   });
 });
