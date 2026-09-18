@@ -130,9 +130,9 @@ Urutan wajib: A → B → C → D → E → F → G (satu area per commit bila m
 - Edit setelah gate hijau MEMBATALKAN gate — re-run `typecheck + lint` sebelum commit.
 
 ## Progress Log
-
 - 2026-09-18 16:20:00 — Plan detail dibuat (riset: 2 agen + baca `actions.ts:427-556`, `ContentDraftCard.tsx:255-349`). Keputusan user: auto-enhance saat Generate + port PENUH + collapse (default collapsed kecuali cover). Belum ada implementasi.
-- Belum mulai — A1 enhance field-aware.
+- 2026-09-18 21:40:00 — A1+A2+B+C selesai (field-aware enhance + negative gate + auto-enhance toggle + slug persist). Gate 899 tests ✓, pushed `48c3656`.
+- 2026-09-18 21:52:00 — D+E+F+G selesai: worker compose LLM + snapshot, picker model LLM, collapse native `<details>`. Gate 899 tests ✓, pushed `4a489b4`. Semua task plan SELESAI (kecuali test unit A1 `actions-enhance.test.ts` yang belum ditulis).
 
 ## Notes
 
