@@ -128,6 +128,7 @@ Out (JANGAN disentuh):
 ## Progress Log
 
 - 2026-09-18 10:00:00 — Plan dibuat dari riset plumbing stage (tipe, CHECK chain `20260905000001`→`20260907000003`→`20260908000001`, 2 pemanggil `enhance_image_prompt`, config image-only) + 10 log prod + jawaban user (nama/pemakaian/bucket). Status: belum ada eksekusi; T1–T8 pending untuk model pelaksana.
+- 2026-09-18 10:45:00 — **SELESAI.** T1 (`supabase/migrations/20260919000002_compose_studio_prompt_stage.sql`) → submodule commit `7dda351` pushed. T2–T3: `types.ts`, `model-config.ts`, `llm-actions.ts`, `stages/page.tsx`, `id.json`/`en.json`. T4: builder `buildComposeStudioMessages` + `parseComposeStudio` di `prompt.ts` (89 baris baru). T5: worker `compose` block diganti LLM-first + deterministic fallback; konstanta `COMPOSE_STUDIO_PROMPT_RATE_LIMIT_BUCKET` ditambahkan. T7 gate: `typecheck ✓ lint ✓ test 839 passed ✓ build ✓`. Parent commit `c4e6e10` pushed. T8: apply migration prod via MCP → success; CHECK 9 stage + seed row `compose_studio_prompt NULL NULL` terverifikasi.
 
 ## Notes
 
