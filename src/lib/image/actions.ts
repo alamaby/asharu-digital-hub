@@ -477,7 +477,8 @@ export async function enhanceImagePrompt(
   negativeDraft?: string | null,
   styleSlug?: string | null,
   subjectSlug?: string | null,
-  cameraSlug?: string | null
+  cameraSlug?: string | null,
+  llmModelId?: string | null
 ): Promise<EnhancePromptResult> {
   const supabase = await requireAdmin();
   const draftPrompt = promptDraft?.trim() ?? '';
@@ -577,7 +578,13 @@ export async function enhanceImagePrompt(
     cameraOptions: cameras.map(({ slug, display_name }) => ({ slug, display_name }))
   });
 
-  const { providerId, modelUuid } = await resolveStageModel('enhance_image_prompt', null);
+  // Validasi pin LLM aktif (sekali jalan, tanpa secret — tiru pola Studio).
+  if (llmModelId) {
+    const { data: lm } = await supabase.from('llm_models').select('id').eq('id', llmModelId).eq('is_active', true).maybeSingle();
+    if (!lm) throw new Error('model LLM tidak aktif — refresh pilihan');
+  }
+
+  const { providerId, modelUuid } = await resolveStageModel('enhance_image_prompt', llmModelId ?? null);
   const sourceText = `${sourcePost.id ?? ''} ${sourcePost.en ?? ''}`;
 
   async function attempt(temperature: number, gateNote?: string) {

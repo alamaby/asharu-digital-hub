@@ -15,6 +15,13 @@ export interface ImageOption {
   cameras?: { slug: string; display_name: string }[];
 }
 
+/** Opsi model LLM (stage default atau pin user) untuk panel Sempurnakan. */
+export interface LlmModelOption {
+  id: string;
+  model_id: string;
+  display_name: string;
+}
+
 interface Props {
   draftId: string;
   initialImages: DraftImageRow[];
@@ -25,19 +32,25 @@ interface Props {
   /** Locale + timezone zona-user untuk timeline carousel. */
   locale?: string | null;
   timeZone?: string | null;
+  /** Model LLM aktif untuk picker Sempurnakan (kosong = Auto default stage). */
+  llmModels?: LlmModelOption[];
+  /** Default collapsed saat first render (default false = terbuka untuk cover). */
+  defaultCollapsed?: boolean;
 }
 
 function latestOf(rows: DraftImageRow[]): DraftImageRow | null {
   return [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
 }
 
-export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false, locale = null, timeZone = null }: Props) {
+export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false, locale = null, timeZone = null, llmModels = [], defaultCollapsed = false }: Props) {
   const t = useTranslations('content.review');
   const [images, setImages] = useState<DraftImageRow[]>(initialImages);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
   // Auto-enhance default ON untuk cover (hemat ketik manual), bucket shared dengan Sempurnakan.
   const [autoEnhance, setAutoEnhance] = useState(true);
+  // Picker model LLM untuk Sempurnakan: null/Auto = stage default, UUID = pin.
+  const [llmModelUuid, setLlmModelUuid] = useState('');
   // Rehydrate dari style gambar terakhir agar dropdown mencerminkan yang terpakai.
   const [styleSlug, setStyleSlug] = useState(() => {
     const latest = latestOf(initialImages);
@@ -266,7 +279,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null);
+      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null, llmModelUuid || null);
       setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning, styleSlug: res.style_slug, subjectSlug: res.subject_slug, cameraSlug: res.camera_slug });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {
@@ -319,17 +332,29 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
 
   return (
     <section aria-label="Visualisasi pendukung" className={`${compact ? 'mt-4' : 'mt-6'} rounded-xl border border-line bg-surface p-4`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Visualisasi pendukung</h2>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={isPending}
-          className="text-xs text-primary hover:underline disabled:opacity-50"
-        >
-          {isPending ? 'Memuat…' : 'Muat ulang'}
-        </button>
-      </div>
+      <details open={!defaultCollapsed} className="space-y-3">
+        <summary className="flex flex-wrap items-center justify-between gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <h2 className="text-sm font-semibold">Visualisasi pendukung</h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={isPending}
+              className="text-xs text-primary hover:underline disabled:opacity-50"
+            >
+              {isPending ? 'Memuat...' : 'Muat ulang'}
+            </button>
+            <button
+              type="button"
+              onClick={enqueue}
+              disabled={isPending || isEnhancing || isSuggesting}
+              className="rounded-lg bg-primary px-2 py-0.5 text-xs font-medium text-white disabled:opacity-50"
+            >
+              {isPending ? '...' : hasVisual ? 'Regenerate' : 'Generate'}
+            </button>
+          </div>
+        </summary>
+        <div className="space-y-3">
 
       {images.length > 0 ? (
         <div className="mt-3">
@@ -486,6 +511,24 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           <span className="text-[11px] text-ink-muted">{negativeDraft.length}/300</span>
         </label>
       </div>
+      {llmModels.length > 0 ? (
+        <label className="mt-2 text-xs">
+          <span className="mb-1 block text-ink-muted">Model LLM Sempurnakan (opsional pin)</span>
+          <select
+            value={llmModelUuid}
+            onChange={(e) => setLlmModelUuid(e.target.value)}
+            disabled={isPending || isEnhancing || isSuggesting}
+            className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm disabled:opacity-60"
+          >
+            <option value="">Auto (default stage)</option>
+            {llmModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
@@ -614,6 +657,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           {notice}
         </p>
       ) : null}
+        </div>
+      </details>
     </section>
   );
 }

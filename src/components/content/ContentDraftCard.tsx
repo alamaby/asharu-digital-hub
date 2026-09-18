@@ -114,6 +114,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           options={imageOptions}
           locale={locale}
           timeZone={timeZone}
+          llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
+          defaultCollapsed={false}
         />
         <AffiliateProductCard
           draftId={draft.id}
@@ -331,6 +333,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   options={{ models: imageOptions.models, styles: imageOptions.styles, subjects: imageOptions.subjects, cameras: imageOptions.cameras }}
                   locale={locale}
                   timeZone={timeZone}
+                  llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
+                  collapsed={!perReplyEnabled}
                 />
               )}
             </div>
@@ -343,6 +347,8 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                 compact
                 locale={locale}
                 timeZone={timeZone}
+                llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
+                defaultCollapsed={false}
               />
             ) : null}
             </Fragment>

@@ -14,6 +14,13 @@ export interface ReplyImageOption {
   cameras?: { slug: string; display_name: string }[];
 }
 
+/** Opsi model LLM untuk picker Sempurnakan per-reply. */
+export interface ReplyLlmModelOption {
+  id: string;
+  model_id: string;
+  display_name: string;
+}
+
 interface Props {
   draftId: string;
   postIndex: number;
@@ -27,16 +34,22 @@ interface Props {
   /** Locale + timezone zona-user untuk timeline carousel. */
   locale?: string | null;
   timeZone?: string | null;
+  /** Model LLM aktif untuk picker Sempurnakan (kosong = Auto default stage). */
+  llmModels?: ReplyLlmModelOption[];
+  /** Default collapsed saat first render (default true = tertutup untuk reply). */
+  collapsed?: boolean;
 }
 
 /** Carousel riwayat + tombol generate per reply (opt-in, skip afiliasi) di dalam kartu post. */
-export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options, locale = null, timeZone = null }: Props) {
+export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options, locale = null, timeZone = null, llmModels = [], collapsed = true }: Props) {
   const t = useTranslations('content.review');
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<DraftImageRow[]>(initialHistory);
   const [modelUuid, setModelUuid] = useState('');
   // Auto-enhance default OFF untuk reply (hemat kuota; reply jarang dirender).
   const [autoEnhance, setAutoEnhance] = useState(false);
+  // Picker model LLM untuk Sempurnakan: null/Auto = stage default, UUID = pin.
+  const [llmModelUuid, setLlmModelUuid] = useState('');
   const [styleSlug, setStyleSlug] = useState('');
   const [promptDraft, setPromptDraft] = useState('');
   const [negativeDraft, setNegativeDraft] = useState('');
@@ -182,7 +195,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null);
+      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null, llmModelUuid || null);
       setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning, styleSlug: res.style_slug, subjectSlug: res.subject_slug, cameraSlug: res.camera_slug });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {
@@ -278,17 +291,31 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
 
   return (
     <div className="mt-2 border-t border-line/60 pt-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium text-ink-muted">Visual balasan</span>
-        <button
-          type="button"
-          onClick={refreshOne}
-          disabled={isPending}
-          className="text-[11px] text-primary hover:underline disabled:opacity-50"
-        >
-          {isPending ? 'Memuat…' : 'Muat ulang'}
-        </button>
-      </div>
+      <details open={!collapsed} className="space-y-2">
+        <summary className="flex items-center justify-between gap-2 cursor-pointer text-[11px] list-none [&::-webkit-details-marker]:hidden">
+          <span className="font-medium text-ink-muted">Visual balasan</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={refreshOne}
+              disabled={isPending}
+              className="text-[11px] text-primary hover:underline disabled:opacity-50"
+            >
+              {isPending ? 'Memuat...' : 'Muat ulang'}
+            </button>
+            {perReplyEnabled && postIndex > 0 ? (
+              <button
+                type="button"
+                onClick={enqueue}
+                disabled={isPending || isEnhancing || isSuggesting}
+                className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-medium text-white disabled:opacity-50"
+              >
+                {isPending ? '...' : hasVisual ? 'Regenerate' : 'Generate'}
+              </button>
+            ) : null}
+          </div>
+        </summary>
+        <div className="space-y-2">
       {history.length > 0 ? (
         <div className="mt-1">
           <ImageHistoryCarousel
@@ -509,6 +536,21 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             />
             {t('autoEnhanceLabel')}
           </label>
+          {llmModels.length > 0 ? (
+            <select
+              value={llmModelUuid}
+              onChange={(e) => setLlmModelUuid(e.target.value)}
+              disabled={isPending || isEnhancing || isSuggesting}
+              className="ml-1 rounded-md border border-line bg-surface px-1.5 py-0.5 text-[11px] disabled:opacity-60"
+            >
+              <option value="">Model LLM: Auto</option>
+              {llmModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
       ) : null}
       {proposed ? (
@@ -560,6 +602,8 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
           {notice}
         </p>
       ) : null}
+        </div>
+      </details>
     </div>
   );
 }

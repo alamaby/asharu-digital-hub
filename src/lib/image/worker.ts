@@ -9,8 +9,8 @@ import {
   markImageModelUsage,
   resolveImageTarget
 } from './config';
-import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts } from './prompt';
-import type { ImageReasoning } from './prompt';
+import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts, buildComposeReviewMessages, parseComposeReview } from './prompt';
+import type { ImageReasoning, ComposeAudit } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
 import { ImageHttpError, bytesToBase64, clampImg2ImgStrength, modelRendersText, modelSupportsReference, resolveEffectiveAdvanced, stripNoTextClause } from './types';
 import type {
@@ -321,6 +321,11 @@ export async function processImageTick(): Promise<{ imageId: string | null; proc
 /** Proses 1 baris yang sudah diklaim (klaim milik caller). */
 async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: string | null; error?: string }> {
   const imageId = row.id;
+  // Snapshot + audit yang diisi sepanjang proses; dipakai di success/fail path.
+  // eslint-disable-next-line prefer-const
+  let finalPrompt = '';
+  let finalNegative: string | undefined;
+  const composeAudit: ComposeAudit = { mode: 'deterministic', dropped: [], conflict_note: null };
 
   try {
     const ctx = await loadDraftContext(row.draft_id);
@@ -350,7 +355,7 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
     const imagePrompt = row.image_prompt?.trim() || '';
     const userNegative = row.negative_prompt ?? undefined;
     const styleNegative = target.style?.negative_prompt?.trim();
-    const finalNegative = mergeImageNegativePrompts(userNegative, styleNegative);
+    finalNegative = mergeImageNegativePrompts(userNegative, styleNegative);
     const promptMeta: Record<string, unknown> = {};
     const reasoning: Record<string, unknown> | null =
       (row as { reasoning?: Record<string, unknown> | null }).reasoning ?? null;
@@ -395,9 +400,8 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
     const styleSuffix = modelRendersText({ model_id: target.model.model_id, config: target.model.config })
       ? stripNoTextClause(styleSuffixRaw)
       : styleSuffixRaw;
-    // Camera angle: auto-append natural sebelum style suffix (opsional).
-    // Guard anti-duplikat: prompt textarea bisa sudah berisi angle (suggest).
-    let withAngle = imagePrompt;
+    // Camera angle: fetch EN text (diperlukan untuk LLM compose).
+    let angleEn: string | null = null;
     const camSlug = row.camera_slug ?? null;
     if (camSlug) {
       const supabase = getServiceClient();
@@ -407,13 +411,47 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
         .eq('slug', camSlug)
         .eq('is_active', true)
         .maybeSingle();
-      const angleEn = (cam as { angle_en?: string } | null)?.angle_en?.trim();
-      if (angleEn) {
-        const { appendCameraAngle } = await import('./camera-angles');
-        withAngle = appendCameraAngle(withAngle, angleEn);
-      }
+      angleEn = (cam as { angle_en?: string } | null)?.angle_en?.trim() ?? null;
     }
-    const finalPrompt = styleSuffix ? `${withAngle}, ${styleSuffix}` : withAngle;
+    // LLM-compose final prompt: gabung image_prompt + angle + style suffix.
+    // Fallback deterministik bila LLM gagal (tetap lancarkan generate).
+    let finalPrompt: string;
+    let composeAudit: ComposeAudit = { mode: 'deterministic', dropped: [], conflict_note: null };
+    if (imagePrompt.trim()) {
+      try {
+        const { system, user } = buildComposeReviewMessages({
+          imagePrompt,
+          angleEn,
+          styleSuffix: styleSuffix || null,
+          aspect: '' // aspect tidak dipakai di user prompt LLM (hanya untuk konteks)
+        });
+        const { providerId, modelUuid } = await resolveStageModel('image_prompt', undefined);
+        const svc = getServiceClient();
+        const out = await runLLMCompletion(svc, {
+          stage: 'image_prompt',
+          providerId,
+          modelUuid,
+          messages: [
+            { role: 'system' as const, content: system },
+            { role: 'user' as const, content: user }
+          ],
+          temperature: 0.2,
+          maxTokens: 500
+        });
+        const composed = parseComposeReview(out.output.text);
+        finalPrompt = composed.final_prompt;
+        composeAudit = { mode: 'llm', dropped: composed.dropped, conflict_note: composed.conflict_note };
+      } catch {
+        // Fallback deterministik: tempel angle + style suffix via concatenation.
+        const { appendCameraAngle } = await import('./camera-angles');
+        let withAngle = imagePrompt;
+        if (angleEn) withAngle = appendCameraAngle(withAngle, angleEn);
+        finalPrompt = styleSuffix ? `${withAngle}, ${styleSuffix}` : withAngle;
+      }
+    } else {
+      // Reasoning-only path sudah selesai di atas (prompt_ready); baris ini hanya untuk jaga-jaga.
+      finalPrompt = imagePrompt;
+    }
     const aspect: ImageAspect = target.aspect;
     // Advanced (picker review <details>): NULL = Auto/default model. Jalur
     // Auto di-clamp hemat (≤1024px / ≤25 steps); pin manual sampai maks model.
@@ -518,20 +556,24 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
             width: result.width ?? null,
             height: result.height ?? null,
             last_error: null,
-            llm_meta: {
-              ...promptMeta,
-              provider: provider.slug,
-              model: modelRow.model_id,
-              key_suffix: keyRow.key_suffix,
-              // Jejak audit: pin vs waterfall (kasus cloudflare→pixazo 11 Sep 2026).
-              pinned: target.pinned,
-              // Jejak audit img2img: referensi dipakai atau tidak + strength.
-              reference: referenceB64 ? true : false,
-              reference_strength: referenceB64 ? referenceStrength : null,
-              // Jejak audit advanced: nilai efektif terkirim + flag clamp Auto.
-              advanced: adv.audit,
-              advanced_clamped: adv.clamped
-            },
+             llm_meta: {
+               ...promptMeta,
+               provider: provider.slug,
+               model: modelRow.model_id,
+               key_suffix: keyRow.key_suffix,
+               // Jejak audit: pin vs waterfall (kasus cloudflare→pixazo 11 Sep 2026).
+               pinned: target.pinned,
+               // Jejak audit img2img: referensi dipakai atau tidak + strength.
+               reference: referenceB64 ? true : false,
+               reference_strength: referenceB64 ? referenceStrength : null,
+               // Jejak audit advanced: nilai efektif terkirim + flag clamp Auto.
+               advanced: adv.audit,
+               advanced_clamped: adv.clamped,
+               // Snapshot prompt final + audit komposisi (Task D+E).
+               final_prompt: finalPrompt,
+               final_negative: finalNegative ?? null,
+               compose_audit: composeAudit
+             },
             updated_at: new Date().toISOString()
           })
           .eq('id', imageId);
@@ -547,14 +589,47 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
         if (e instanceof ImageHttpError && [401, 403, 429].includes(e.status)) {
           await markImageModelFailure(modelRow.id);
         }
+        // Simpan snapshot final prompt sebelum tandai failed (Task E).
+        const supabaseFail = getServiceClient();
+        await supabaseFail.from('content_draft_images').update({
+          llm_meta: {
+            ...(typeof row.llm_meta === 'object' && row.llm_meta !== null ? row.llm_meta : {}),
+            final_prompt: finalPrompt,
+            final_negative: finalNegative ?? null,
+            compose_audit: composeAudit
+          },
+          updated_at: new Date().toISOString()
+        }).eq('id', imageId);
         continue;
       }
     }
     const message = lastError instanceof Error ? lastError.message : String(lastError);
+    // Snapshot final prompt pada semua jalur gagal (Task E).
+    const supabaseFailAll = getServiceClient();
+    await supabaseFailAll.from('content_draft_images').update({
+      llm_meta: {
+        ...(typeof row.llm_meta === 'object' && row.llm_meta !== null ? row.llm_meta : {}),
+        final_prompt: finalPrompt,
+        final_negative: finalNegative ?? null,
+        compose_audit: composeAudit
+      },
+      updated_at: new Date().toISOString()
+    }).eq('id', imageId);
     await failImage(imageId, message);
     return { imageId: null, error: message };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // Snapshot final prompt sebelum tandai failed (Task E).
+    const supabaseFailOuter = getServiceClient();
+    await supabaseFailOuter.from('content_draft_images').update({
+      llm_meta: {
+        ...(typeof row.llm_meta === 'object' && row.llm_meta !== null ? row.llm_meta : {}),
+        final_prompt: finalPrompt,
+        final_negative: finalNegative ?? null,
+        compose_audit: composeAudit
+      },
+      updated_at: new Date().toISOString()
+    }).eq('id', imageId);
     await failImage(imageId, message);
     return { imageId: null, error: message };
   }
