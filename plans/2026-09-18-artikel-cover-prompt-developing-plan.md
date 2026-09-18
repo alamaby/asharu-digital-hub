@@ -119,9 +119,13 @@ Urutan wajib: T1 → T2 → T3 → T4 (test tiap tahap, jangan lompat).
 - Single EN prompt untuk sesi `id`-only: tetap valid karena image model EN-only; bukan bug.
 
 ## Progress Log
-
 - 2026-09-18 13:30:00 — Plan detail dibuat (riset read-only: 2 agen + verifikasi baris `development.ts:489-513,809-1116`, `prompt.ts:250-332,361-578`, `worker.ts:42-111,295-394`). Belum ada implementasi.
-- Belum mulai — T1 tipe + system prompt.
+- 2026-09-18 13:54:00 — **T1+T2+T3 tuntas; T4 gate selesai.** Commit `6d0d64c`. Implementasi:
+  * `src/lib/llm/prompt.ts`: tambah `cover_image_prompt?: string` di `ParsedArticleDraft`; parser menerima field opsional (+ trim); expand membekukan; helper `isValidCoverPrompt` (10–500 char Latin) di-export.
+  * `src/lib/research/development.ts`: `enqueueCoverImage` terima `coverPrompt?`, validasi via helper, tulis `status:'prompt_ready'` + `reasoning.visual_strategy:'developing'` bila valid; fallback kosong bila tidak. Panggil dengan `finalArticle.cover_image_prompt` di jalur artikel (`:1116`); jalur thread tidak berubah.
+  * `src/lib/llm/prompt-article.test.ts`: +9 test (builder system prompt, parse dengan/tanpa field, field invalid, trim).
+  * Gate: typecheck ✓, lint ✓, test 860/860 ✓, build ✓ (statis SSG lolos — disinilah error digest dulu muncul di PR sebelumnya).
+- Belum mulai — T4 manual e2e (dev/staging): buat sesi riset artikel → verifikasi `cover_image_prompt` di draf → cover baris `prompt_ready` → Generate lancar → publish → cover tampil.
 
 ## Notes
 
