@@ -73,7 +73,7 @@ export default async function ArticlesPage({ params }: ArticlesPageProps) {
           locale={locale}
           readMoreLabel={t('readMore')}
           affiliateBadgeLabel={t('affiliateBadge')}
-          readingMinutesLabel={(n) => t('readingMinutes', { n })}
+          readingMinutesTemplate={String(t.raw('readingMinutes'))}
           searchPlaceholder={t('searchPlaceholder')}
           sortNewest={t('sortNewest')}
           sortOldest={t('sortOldest')}
@@ -81,7 +81,7 @@ export default async function ArticlesPage({ params }: ArticlesPageProps) {
           filterAffiliateOnly={t('filterAffiliateOnly')}
           loadMore={t('loadMore')}
           emptyFiltered={t('emptyFiltered')}
-          showingCount={(shown, total) => t('showingCount', { shown, total })}
+          showingCountTemplate={String(t.raw('showingCount'))}
           categoryLabels={categoryLabels}
         />
       )}

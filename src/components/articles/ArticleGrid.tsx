@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { PublishedArticle } from '@/lib/articles/types';
+import { localizedPathname } from '@/lib/seo/paths';
 
 export interface ArticleGridProps {
   articles: PublishedArticle[];
   locale: 'id' | 'en';
   readMoreLabel: string;
   affiliateBadgeLabel: string;
-  readingMinutesLabel: (n: number) => string;
+  /** Template mentah mis. "±{n} mnt baca" — diinterpolasi di klien (fungsi tak bisa lewat RSC). */
+  readingMinutesTemplate: string;
   showSearch?: boolean;
   searchPlaceholder: string;
   sortNewest: string;
@@ -18,7 +20,8 @@ export interface ArticleGridProps {
   filterAffiliateOnly: string;
   loadMore: string;
   emptyFiltered: string;
-  showingCount: (shown: number, total: number) => string;
+  /** Template mentah mis. "Menampilkan {shown} dari {total}". */
+  showingCountTemplate: string;
   /** i18n-safe category labels keyed by slug; undefined key → key itself. */
   categoryLabels?: Record<string, string>;
 }
@@ -31,7 +34,7 @@ function Card({
   locale,
   readMoreLabel,
   affiliateBadgeLabel,
-  readingMinutesLabel,
+  readingMinutesTemplate,
   featured,
   categoryLabel
 }: {
@@ -39,7 +42,7 @@ function Card({
   locale: 'id' | 'en';
   readMoreLabel: string;
   affiliateBadgeLabel: string;
-  readingMinutesLabel: (n: number) => string;
+  readingMinutesTemplate: string;
   featured?: boolean;
   categoryLabel?: string;
 }) {
@@ -61,7 +64,7 @@ function Card({
 
   return (
     <li className={`overflow-hidden rounded-xl border ${cardBorder} bg-surface shadow-card transition ${featured ? 'col-span-1 lg:col-span-2' : ''}`}>
-      <a href={`/id/artikel/${a.slug}`} className="block">
+      <a href={localizedPathname('/artikel/[slug]', locale, { slug: a.slug })} className="block">
         <div className={`aspect-video w-full overflow-hidden ${featured ? 'lg:h-72' : 'h-48'}`}>
           {a.cover_image_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -89,7 +92,7 @@ function Card({
           <footer className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
             {dateStr ? <time>{dateStr}</time> : null}
             {dateStr ? <span aria-hidden="true">·</span> : null}
-            <span>{readingMinutesLabel(readingMinutes)}</span>
+            <span>{readingMinutesTemplate.replace('{n}', String(readingMinutes))}</span>
             {categoryLabel ? (
               <>
                 <span aria-hidden="true">·</span>
@@ -118,7 +121,7 @@ export function ArticleGrid({
   locale,
   readMoreLabel,
   affiliateBadgeLabel,
-  readingMinutesLabel,
+  readingMinutesTemplate,
   showSearch = true,
   searchPlaceholder,
   sortNewest,
@@ -127,7 +130,7 @@ export function ArticleGrid({
   filterAffiliateOnly,
   loadMore,
   emptyFiltered,
-  showingCount,
+  showingCountTemplate,
   categoryLabels
 }: ArticleGridProps) {
   const searchParams = useSearchParams();
@@ -208,7 +211,9 @@ export function ArticleGrid({
       ) : null}
 
       <p className="mt-2 text-xs text-ink-muted" aria-live="polite">
-        {showingCount(shown.length, articles.length)}
+        {showingCountTemplate
+          .replace('{shown}', String(shown.length))
+          .replace('{total}', String(articles.length))}
       </p>
 
       {shown.length === 0 && filtered.length === 0 ? (
@@ -225,7 +230,7 @@ export function ArticleGrid({
                   locale={locale}
                   readMoreLabel={readMoreLabel}
                   affiliateBadgeLabel={affiliateBadgeLabel}
-                  readingMinutesLabel={readingMinutesLabel}
+                  readingMinutesTemplate={readingMinutesTemplate}
                   categoryLabel={a.category ? (categoryLabels?.[a.category] ?? a.category) : undefined}
                   featured={i === 0 && !q && afiliasi === 'semua' && sort === 'baru'}
                 />

@@ -168,6 +168,7 @@ Urutan wajib: P0 → P1 → P2. Jangan mulai P2 sebelum P0 hijau.
 - 2026-09-18 12:30:00 — Plan detail P0–P2 dibuat sebagai file handoff untuk model kurang mampu (dari analisa read-only 2026-09-18 pagi). Belum ada implementasi.
 - 2026-09-18 11:50:00 — **P0 + P1 + P2 SELESAI** (commit `be9f4bf` + submodule `1ddc3e1`). Gate typecheck ✓ lint ✓ test 851/851 ✓ build ✓. Migrasi prod sudah applied via MCP (`category, tags` ada; backfill 3 home-living + 1 fashion + 1 automotive). Rilis: hero auto terbaru, card bergambar, search/sort/afiliasi filter klien shareable, load-more, related articles di detail, badge kategori di footer card.
 - Belum mulai — follow-up opsional: chip filter `?kategori=`, sitemap limit 500 → 2000, Lighthouse audit, admin UI kelola tag.
+- 2026-09-18 sore — **Fix digest 2863325395**: `ArticleGrid` (Client) menerima props fungsi dari RSC → ganti `readingMinutesLabel`/`showingCount` menjadi template string via `t.raw()` + interpolasi `.replace()` di klien; bonus fix href card hardcode `/id/` → `localizedPathname()` agar locale `en` benar. Gate typecheck ✓ lint ✓ test artikel 41/41 ✓ build ✓; runtime `next start` LIST 200 + DETAIL 200 + EN 200, section terkait tampil, tanpa error serialisasi.
 
 ## Notes
 
