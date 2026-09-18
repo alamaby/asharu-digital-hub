@@ -830,7 +830,16 @@
       "noticeSwapped": "Slot penuh — yang terdampak: {code}.",
       "errorGeneric": "Gagal menyimpan perubahan.",
       "empty": "Tidak ada produk ditemukan.",
-      "updatedLabel": "Diperbarui"
+      "updatedLabel": "Diperbarui",
+      "loading": "Memuat produk...",
+      "saving": "Menyimpan...",
+      "applyFilter": "Terapkan",
+      "resetFilter": "Reset",
+      "pageOf": "Hal {page}/{total}",
+      "pagePrev": "Sebelumnya",
+      "pageNext": "Berikutnya",
+      "rangeInfo": "{from}–{to} dari {count}",
+      "paginationLabel": "Navigasi halaman produk"
     },
     "cron": {
       "title": "Monitor pg_cron",

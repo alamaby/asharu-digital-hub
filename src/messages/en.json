@@ -830,7 +830,16 @@
       "noticeSwapped": "Slot full — displaced: {code}.",
       "errorGeneric": "Failed to save changes.",
       "empty": "No products found.",
-      "updatedLabel": "Updated"
+      "updatedLabel": "Updated",
+      "loading": "Loading products...",
+      "saving": "Saving...",
+      "applyFilter": "Apply",
+      "resetFilter": "Reset",
+      "pageOf": "Page {page}/{total}",
+      "pagePrev": "Previous",
+      "pageNext": "Next",
+      "rangeInfo": "{from}–{to} of {count}",
+      "paginationLabel": "Product pages navigation"
     },
     "cron": {
       "title": "pg_cron Monitor",
