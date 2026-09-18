@@ -523,6 +523,15 @@
       "articlePreviewAffiliateCta": "View product on the seller platform",
       "articlePreviewAffiliateNote": "Affiliate link: if you buy through this link, Asharu may earn a commission at no extra cost to you.",
       "articlePreviewDisclosure": "Some links on this site are affiliate links.",
+      "coverBannerTitle": "Article cover sync",
+      "coverBannerSynced": "In sync — draft cover matches the live one",
+      "coverBannerDifferent": "Different — apply draft cover to published article",
+      "coverBannerLiveNoCover": "Live has no cover (published article missing image)",
+      "coverBannerDraftNoCover": "Draft has no cover (generate/select first in the image panel)",
+      "coverBannerApplyBtn": "Apply draft cover to article",
+      "coverBannerApplied": "Cover applied successfully!",
+      "coverBannerViewArticle": "View live article",
+      "coverBannerApplyDisabledHint": "Select or generate a draft cover first to enable this button.",
       "affiliate": {
         "title": "Affiliate Product",
         "relevance": {

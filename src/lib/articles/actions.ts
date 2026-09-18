@@ -10,6 +10,7 @@ import {
   type ParsedArticleDraft
 } from '@/lib/llm/prompt';
 import type { ArticleLocale } from './types';
+import type { Locale } from '@/i18n/routing';
 import { publishArticleDraftCore } from './publish';
 
 export type { ArticlePublishResult } from './publish';
@@ -55,6 +56,97 @@ export async function archiveArticle(articleId: string): Promise<{ success: bool
   revalidatePath('/artikel');
   revalidatePath('/artikel/[slug]', 'page');
   return { success: true };
+}
+
+/**
+ * Terapkan cover draf ke artikel yang sudah terbit (HANYA kolom cover_image_url).
+ * Beda dengan publish ulang: judul/isi/tanpa side-effect, TIDAK menimpa kolom lain.
+ * Hanya boleh dari cover yang sudah punya piksel (status ready/selected).
+ */
+export interface ApplyCoverResult {
+  success: boolean;
+  error?: string;
+  /** Locale yang berhasil di-update (bisa kosong bila tidak ada artikel terbit). */
+  updatedLocales?: string[];
+}
+
+export async function applyDraftCoverToArticle(
+  draftId: string,
+  draftImageId: string
+): Promise<ApplyCoverResult> {
+  if (!(await isAdmin())) {
+    return { success: false, error: 'forbidden' };
+  }
+  const supabase = createSupabaseService();
+  if (!supabase) return { success: false, error: 'Supabase not configured' };
+  if (!draftId || !draftImageId) {
+    return { success: false, error: 'draftId dan draftImageId wajib diisi' };
+  }
+
+  // Ambil baris cover draf; hanya yang sudah punya piksel yang valid.
+  const { data: imgRow, error: imgErr } = await supabase
+    .from('content_draft_images')
+    .select('id, draft_id, post_index, status, public_url')
+    .eq('id', draftImageId)
+    .maybeSingle();
+  if (imgErr || !imgRow) return { success: false, error: 'gambar cover tidak ditemukan' };
+  const img = imgRow as {
+    id: string;
+    draft_id: string;
+    post_index: number;
+    status: string;
+    public_url: string | null;
+  };
+  if (img.draft_id !== draftId) return { success: false, error: 'gambar bukan milik draf ini' };
+  if (img.post_index !== 0) return { success: false, error: 'hanya cover (post 0) yang bisa diterapkan' };
+  if (img.status !== 'ready' && img.status !== 'selected') {
+    return { success: false, error: 'gambar belum jadi — generate dulu sampai ready' };
+  }
+  if (!img.public_url?.trim()) return { success: false, error: 'gambar belum punya URL publik' };
+
+  // Ambil artikel published per locale (perlu slug + id untuk revalidasi).
+  const { data: artRows, error: artErr } = await supabase
+    .from('articles')
+    .select('id, locale, slug')
+    .eq('draft_id', draftId)
+    .eq('status', 'published');
+  if (artErr) return { success: false, error: artErr.message };
+  const articles = (artRows ?? []) as { id: string; locale: string; slug: string }[];
+  if (articles.length === 0) return { success: false, error: 'draf ini belum punya artikel terbit' };
+
+  const now = new Date().toISOString();
+  for (const art of articles) {
+    const { error: updErr } = await supabase
+      .from('articles')
+      .update({ cover_image_url: img.public_url, updated_at: now })
+      .eq('id', art.id);
+    if (updErr) {
+      // Fail-fast: jika ada 1 locale gagal, kembalikan pesan error spesifik.
+      return { success: false, error: `gagal update locale ${art.locale}: ${updErr.message}` };
+    }
+  }
+
+  // Audit singkat agar admin bisa melacak siapa/gimana.
+  try {
+    await supabase.from('content_research_logs').insert({
+      session_id: null,
+      stage: 'cover_apply',
+      level: 'info',
+      message: `cover draf ${draftId.slice(0, 8)} → artikel ${articles.map((a) => `${a.locale}/${a.slug}`).join(', ')} via image ${img.id.slice(0, 8)}`
+    });
+  } catch {
+    // Log audit opsional — jangan gagalkan aksi utama.
+  }
+
+  // Revalidasi dua varian (non-locale + locale-prefixed) agar ISR fresh.
+  const { localizedPathname } = await import('@/lib/seo/paths');
+  for (const art of articles) {
+    revalidatePath(localizedPathname('/artikel', art.locale as Locale));
+    revalidatePath(localizedPathname('/artikel/[slug]', art.locale as Locale, { slug: art.slug }));
+  }
+  revalidatePath('/konten/review/[draftId]', 'page');
+
+  return { success: true, updatedLocales: articles.map((a) => a.locale) };
 }
 
 export interface ArticleExpandResult {

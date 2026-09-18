@@ -523,6 +523,15 @@
       "articlePreviewAffiliateCta": "Lihat produk di platform penjual",
       "articlePreviewAffiliateNote": "Tautan afiliasi: bila Anda membeli melalui tautan ini, Asharu dapat menerima komisi tanpa menambah harga yang Anda bayar.",
       "articlePreviewDisclosure": "Sebagian tautan di situs ini adalah tautan afiliasi.",
+      "coverBannerTitle": "Sinkronisasi cover artikel",
+      "coverBannerSynced": "Sinkron — cover draf sama dengan yang live",
+      "coverBannerDifferent": "Berbeda — terapkan cover draf ke artikel publish",
+      "coverBannerLiveNoCover": "Live tanpa cover (artikel publish tanpa gambar)",
+      "coverBannerDraftNoCover": "Draf tanpa cover (generate/pilih dulu di panel gambar)",
+      "coverBannerApplyBtn": "Terapkan cover draf ke artikel",
+      "coverBannerApplied": "Cover berhasil diterapkan!",
+      "coverBannerViewArticle": "Lihat artikel live",
+      "coverBannerApplyDisabledHint": "Pilih/generate cover draf dulu agar tombol aktif.",
       "affiliate": {
         "title": "Produk Afiliasi",
         "relevance": {
