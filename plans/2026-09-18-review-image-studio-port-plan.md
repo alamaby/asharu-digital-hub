@@ -47,15 +47,23 @@ Urutan wajib: A → B → C → D → E → F → G (satu area per commit bila m
 
 ### A1 — `enhanceImagePrompt` field-aware (`src/lib/image/actions.ts:440-513`, `src/lib/image/prompt.ts:173-221`)
 
-- [ ] Signature tambah `subjectSlug?: string | null, cameraSlug?: string | null` SETELAH `styleSlug` (JANGAN ubah urutan param existing — penelepon lama `DraftImageCard.tsx:264`, `PostImageControl.tsx:180` tetap kompatibel):
-  ```ts
-  export async function enhanceImagePrompt(draftId, postIndex, promptDraft, negativeDraft?, styleSlug?, subjectSlug?, cameraSlug?): Promise<EnhancePromptResult>
-  ```
-- [ ] Validasi `subjectSlug` → tabel `image_subject_templates`, `cameraSlug` → `image_camera_angles` — TIRU persis `suggestImagePrompt` (`actions.ts:344-361`): slug tak dikenal → throw `'subject tidak dikenal — refresh pilihan'` / `'camera tidak dikenal — ...'` (konsisten gaya pesan existing).
-- [ ] Resolve tampilan+EN: `subject.display_name/subject_en`, `camera.display_name/angle_en` (kolom persis seperti yang dibaca `studio/actions.ts:406-451` — BACA file itu dulu, tiru nama kolom; JANGAN tebak).
-- [ ] `buildEnhancePromptMessages` (`prompt.ts:173-221`) tambah input opsional `subjectName/subjectEn/cameraName/cameraEn` + tiga option-list (`styleOptions/subjectOptions/cameraOptions: {slug,label}[]`); blok user tambah `Currently selected fields` + `OPTION LIST` (tiru `prompt.ts:292-308`); system tambah `Negative: REQUIRED…` + `jangan embed style/angle ke image_prompt` (tiru `prompt.ts:279,283`).
-- [ ] Return tambah `style_slug/subject_slug/camera_slug: string | null` (whitelist validasi ala `parseOptionalSlug` `prompt.ts:76-78` — invalid → null, BUKAN throw; tiru `studio/actions.ts:501-503`). Extend interface `EnhancePromptResult` (`:427-431`) — ini breaking-change tipe: perbarui SEMUA penelepon (hanya 2 file di atas + test).
+- [x] Signature tambah `subjectSlug?: string | null, cameraSlug?: string | null` SETELAH `styleSlug` (JANGAN ubah urutan param existing — penelepon lama `DraftImageCard.tsx:264`, `PostImageControl.tsx:180` tetap kompatibel).
+- [x] Validasi `subjectSlug` → tabel `image_subject_templates`, `cameraSlug` → `image_camera_angles` — TIRU persis `suggestImagePrompt` (`actions.ts:344-361`): slug tak dikenal → throw `'subject tidak dikenal — refresh pilihan'` / `'camera tidak dikenal — ...'` (konsisten gaya pesan existing).
+- [x] Resolve tampilan+EN: `subject.display_name/subject_en`, `camera.display_name/angle_en` (kolom persis seperti yang dibaca `studio/actions.ts:406-451`).
+- [x] `buildEnhancePromptMessages` (`prompt.ts:173-221`) tambah input opsional `subjectName/subjectEn/cameraName/cameraEn` + tiga option-list; blok user tambah `Currently selected fields` + `OPTION LIST`; system tambah `Negative: REQUIRED...` + `jangan embed style/angle ke image_prompt`.
+- [x] Return tambah `style_slug/subject_slug/camera_slug: string | null` (whitelist validasi ala `parseOptionalSlug` — invalid → null). Extend interface `EnhancePromptResult`.
 - [ ] Test `src/lib/image/actions-enhance.test.ts` (baru; mock `runLLMCompletion` + tabel template seperti pola test existing — cari pola mock LLM di `src/lib/studio/` test dulu): slug invalid → throw; enhance mengembalikan 3 slugs valid; invalid → null tanpa throw.
+
+### A2 — Negative wajib + retry + token (`actions.ts:518-550`)
+
+- [x] Tambah gate `requireNegative`-setara: setelah parse, bila `negative_prompt` kosong → retry SEKALI suhu rendah dengan catatan `...negative WAJIB terisi` (tiru `studio/actions.ts:459-460`); masih kosong → throw `'enhance gate: negative kosong'` (bukan silent).
+- [x] `maxTokens: 500 → 1000` (`:529`, sejajar Studio `:467`) — output kini mencakup 3 slugs + negative.
+- [x] Ganti wording echo gate-reason pada retry agar sama dengan Studio (`PENTING: output sebelumnya gagal gate...` sudah ada — pertahankan format, tambah alasan negative).
+- [ ] Test: negative kosong attempt-1 → attempt-2 terisi → sukses; dua-duanya kosong → throw gate.
+
+### A3 — Verifikasi generate/suggest TAK BERUBAH perilaku (tanpa kode, checklist baca)
+
+- [x] `suggest` (`:314-403`) dan `generate` override (`:159-270`) tetap; A1 tidak menyentuh signature mereka. Gate 899 tests hijau → lolos.
 
 ### A2 — Negative wajib + retry + token (`actions.ts:518-550`)
 
@@ -70,19 +78,19 @@ Urutan wajib: A → B → C → D → E → F → G (satu area per commit bila m
 
 ### B — Auto-enhance saat Generate (toggle)
 
-- [ ] `generateDraftImage/generatePostImage` (`actions.ts:33-51,159-270`) tambah opsi `autoEnhance?: boolean` di param `override` (JANGAN param posisi baru — masukkan ke objek override agar penelepon lama kompatibel).
-- [ ] Bila ON dan prompt efektif ≥10 char: panggil logika enhance INTERNAL (refactor inti A1 menjadi fungsi `runEnhance(...)` yang dipakai BERSAMA oleh `enhanceImagePrompt` dan generate — JANGAN duplikasi 60 baris). Pakai hasil (prompt+negative+slugs) untuk render; slugs diteruskan ke `llm_meta.override` agar worker resolve target konsisten.
-- [ ] Bila enhance gagal (throw/gate): FALLBACK prompt asli + lanjut render + sertakan `notice`/`warning` di return (`enhance_skipped: <alasan>`) — JANGAN gagalkan generate (prinsip: enhance = polish, bukan gate).
-- [ ] Rate limit: auto-enhance MENGHABISKAN bucket `enhance_image_prompt` yang sama (`:446,461-463`, 30/jam) — tambah hint di label toggle ("memakai kuota Sempurnakan"). JANGAN bikin bucket baru.
-- [ ] UI toggle di `DraftImageCard` (cover, default ON) + `PostImageControl` (reply, default OFF — hemat kuota; reply jarang dirender). Teruskan sebagai bagian override saat klik Generate. i18n key baru (parity id/en — `messages.test.ts`).
+- [x] `generateDraftImage/generatePostImage` (`actions.ts:33-51,159-270`) tambah opsi `autoEnhance?: boolean` di param `override` (JANGAN param posisi baru — masukkan ke objek override agar penelepon lama kompatibel).
+- [x] Bila ON dan prompt efektif ≥10 char: panggil logika enhance INTERNAL (refactor inti A1 menjadi fungsi `runEnhance(...)` yang dipakai BERSAMA oleh `enhanceImagePrompt` dan generate — JANGAN duplikasi 60 baris). Pakai hasil (prompt+negative+slugs) untuk render; slugs diteruskan ke `llm_meta.override` agar worker resolve target konsisten.
+- [x] Bila enhance gagal (throw/gate): FALLBACK prompt asli + lanjut render + sertakan `notice`/`warning` di return (`enhance_skipped: <alasan>`) — JANGAN gagalkan generate (prinsip: enhance = polish, bukan gate).
+- [x] Rate limit: auto-enhance MENGHABISKAN bucket `enhance_image_prompt` yang sama (`:446,461-463`, 30/jam) — tambah hint di label toggle ("memakai kuota Sempurnakan"). JANGAN bikin bucket baru.
+- [x] UI toggle di `DraftImageCard` (cover, default ON) + `PostImageControl` (reply, default OFF — hemat kuota; reply jarang dirender). Teruskan sebagai bagian override saat klik Generate. i18n key baru (parity id/en — `messages.test.ts`).
 - [ ] Test: ON + enhance sukses → render pakai prompt enhance; ON + enhance throw → render pakai prompt asli + flag skipped; OFF → enhance tak terpanggil (assert mock tidak dipanggil).
 
 ### C — Terapkan slugs + undo persisten (`DraftImageCard.tsx:264-281,532-571`, `PostImageControl.tsx:172-197`)
 
-- [ ] `Terima`: selain prompt+negative, set dropdown style/subject/camera dari slugs hasil enhance (null → jangan ubah pilihan user). Tiru `StudioForm acceptProposed` (`:293-305`) termasuk snapshot `prevPrompt/prevNegative/prevSlugs` SEBELUM apply.
-- [ ] `Urungkan`: PINDAHKAN keluar blok `proposed?...` (`DraftImageCard.tsx:560-568`) agar tetap ada setelah Terima (tiru `StudioForm.tsx:307-316,742-751`); klik mengembalikan snapshot + hapus snapshot (sekali pakai).
-- [ ] Diff side-by-side tambah baris picker (draf vs usulan, via label display — tiru `:319-322,706-739`); JANGAN tampilkan slug mentah ke user.
-- [ ] Terapkan identik di KEDUA file (DraftImageCard + PostImageControl) — keduanya punya blok enhance sendiri; JANGAN hanya satu.
+- [x] `Terima`: selain prompt+negative, set dropdown style/subject/camera dari slugs hasil enhance (null → jangan ubah pilihan user). Tiru `StudioForm acceptProposed` (`:293-305`) termasuk snapshot `prevPrompt/prevNegative/prevSlugs` SEBELUM apply.
+- [x] `Urungkan`: PINDAHKAN keluar blok `proposed?...` (`DraftImageCard.tsx:560-568`) agar tetap ada setelah Terima (tiru `StudioForm.tsx:307-316,742-751`); klik mengembalikan snapshot + hapus snapshot (sekali pakai).
+- [x] Diff side-by-side tambah baris picker (draf vs usulan, via label display — tiru `:319-322,706-739`); JANGAN tampilkan slug mentah ke user.
+- [x] Terapkan identik di KEDUA file (DraftImageCard + PostImageControl) — keduanya punya blok enhance sendiri; JANGAN hanya satu.
 - [ ] Test komponen (pola `ArticleCard.test.tsx`): Terima mengisi 3 picker; Undo muncul setelah Terima dan mengembalikan; diff menampilkan label (bukan slug).
 
 ### D — Compose LLM-merge + fallback (`src/lib/image/prompt.ts`, `src/lib/image/worker.ts:400-416`)

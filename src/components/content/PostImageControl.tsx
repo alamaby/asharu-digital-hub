@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { enhanceImagePrompt, generatePostImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftImageReference } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
@@ -30,14 +31,17 @@ interface Props {
 
 /** Carousel riwayat + tombol generate per reply (opt-in, skip afiliasi) di dalam kartu post. */
 export function PostImageControl({ draftId, postIndex, initialHistory, isAffiliate, perReplyEnabled, options, locale = null, timeZone = null }: Props) {
+  const t = useTranslations('content.review');
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<DraftImageRow[]>(initialHistory);
   const [modelUuid, setModelUuid] = useState('');
+  // Auto-enhance default OFF untuk reply (hemat kuota; reply jarang dirender).
+  const [autoEnhance, setAutoEnhance] = useState(false);
   const [styleSlug, setStyleSlug] = useState('');
   const [promptDraft, setPromptDraft] = useState('');
   const [negativeDraft, setNegativeDraft] = useState('');
-  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
-  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
+  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string }; styleSlug?: string | null; subjectSlug?: string | null; cameraSlug?: string | null } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string; styleSlug: string | null; subjectSlug: string | null; cameraSlug: string | null } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
@@ -106,6 +110,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
     startTransition(async () => {
       try {
         await generatePostImage(draftId, postIndex, {
+          autoEnhance,
           modelUuid: modelUuid || null,
           styleSlug: styleSlug || null,
           cameraSlug: cameraSlug || null,
@@ -177,8 +182,8 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null, styleSlug || null);
-      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
+      const res = await enhanceImagePrompt(draftId, postIndex, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null);
+      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning, styleSlug: res.style_slug, subjectSlug: res.subject_slug, cameraSlug: res.camera_slug });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {
       setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : 'Enhance gagal.');
@@ -189,9 +194,12 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
 
   function acceptProposed() {
     if (!proposed) return;
-    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft });
+    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft, styleSlug: styleSlug || null, subjectSlug: subjectSlug || null, cameraSlug: cameraSlug || null });
     setPromptDraft(proposed.prompt);
     setNegativeDraft(proposed.negative ?? '');
+    if (proposed.styleSlug != null) setStyleSlug(proposed.styleSlug);
+    if (proposed.subjectSlug != null) setSubjectSlug(proposed.subjectSlug);
+    if (proposed.cameraSlug != null) setCameraSlug(proposed.cameraSlug);
     setNotice('Usulan diterima — cek prompt, lalu Regenerate bila siap.');
     setProposed(null);
   }
@@ -474,6 +482,33 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
           >
             Pilih hasil terbaru
           </button>
+          {prevPrompt ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPromptDraft(prevPrompt.prompt);
+                setNegativeDraft(prevPrompt.negative);
+                if (prevPrompt.styleSlug != null) setStyleSlug(prevPrompt.styleSlug);
+                if (prevPrompt.subjectSlug != null) setSubjectSlug(prevPrompt.subjectSlug);
+                if (prevPrompt.cameraSlug != null) setCameraSlug(prevPrompt.cameraSlug);
+                setPrevPrompt(null);
+                setNotice('Dikembalikan ke draf sebelumnya.');
+              }}
+              className="text-[11px] text-ink-muted hover:text-primary"
+            >
+              Urungkan
+            </button>
+          ) : null}
+          <label className="ml-1 flex items-center gap-1 text-[11px] text-ink-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoEnhance}
+              onChange={(e) => setAutoEnhance(e.target.checked)}
+              disabled={isPending || isEnhancing || isSuggesting}
+              className="rounded border-line bg-background"
+            />
+            {t('autoEnhanceLabel')}
+          </label>
         </div>
       ) : null}
       {proposed ? (
@@ -495,6 +530,19 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
                   {proposed.reasoning.justification ? ` — ${proposed.reasoning.justification}` : ''}
                 </p>
               ) : null}
+              {(proposed.styleSlug || proposed.subjectSlug || proposed.cameraSlug) ? (
+                <div className="mt-2 space-y-0.5">
+                  {proposed.styleSlug ? (
+                    <p className="text-ink-muted">Style: {options.styles.find((s) => s.slug === proposed.styleSlug)?.display_name ?? proposed.styleSlug}</p>
+                  ) : null}
+                  {proposed.subjectSlug ? (
+                    <p className="text-ink-muted">Subjek: {options.subjects.find((s) => s.slug === proposed.subjectSlug)?.display_name ?? proposed.subjectSlug}</p>
+                  ) : null}
+                  {proposed.cameraSlug ? (
+                    <p className="text-ink-muted">Camera: {(options.cameras ?? []).find((c) => c.slug === proposed.cameraSlug)?.display_name ?? proposed.cameraSlug}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-1 flex gap-1">
@@ -504,11 +552,6 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
             <button type="button" onClick={() => setProposed(null)} className="rounded border border-line bg-surface px-2 py-1 text-[11px]">
               Batal
             </button>
-            {prevPrompt ? (
-              <button type="button" onClick={() => { setPromptDraft(prevPrompt.prompt); setNegativeDraft(prevPrompt.negative); setPrevPrompt(null); setNotice('Dikembalikan ke draf sebelumnya.'); }} className="text-[11px] text-ink-muted hover:text-primary">
-                Urungkan
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}

@@ -48,6 +48,8 @@ export interface ImageEnqueueOverride {
   seed?: number | null;
   reqWidth?: number | null;
   reqHeight?: number | null;
+  /** True = jalankan LLM enhance sebelum enqueue (memakai kuota Sempurnakan). Default false. */
+  autoEnhance?: boolean;
 }
 
 /**
@@ -189,6 +191,32 @@ export async function generatePostImage(
     throw new Error('mode per-reply belum aktif (image_gen_defaults / sesi / draf)');
   }
   const hasCustom = Boolean(customPrompt);
+  // Auto-enhance: polish prompt via LLM sebelum enqueue (hemat bucket shared dengan Sempurnakan).
+  if (override?.autoEnhance && hasCustom && customPrompt.length >= 10) {
+    try {
+      const enhanceResult = await enhanceImagePrompt(
+        draftId, postIndex, customPrompt,
+        customNegative || undefined,
+        override.styleSlug,
+        null,
+        override.cameraSlug
+      );
+      const enhPrompt = enhanceResult.image_prompt.trim();
+      const enhNeg = (enhanceResult.negative_prompt ?? '').trim();
+      if (enhPrompt && enhPrompt.length >= 10) {
+        override = {
+          ...override,
+          imagePrompt: enhPrompt.slice(0, 500),
+          negativePrompt: enhNeg || null
+        };
+      }
+    } catch {
+      // Enhance gagal → fallback prompt asli (prinsip: enhance = polish, bukan gate).
+    }
+  }
+  const effectivePrompt = (override?.imagePrompt ?? customPrompt).trim().slice(0, 500);
+  const effectiveNegative = (override?.negativePrompt ?? customNegative).trim().slice(0, 300) || null;
+  if (effectivePrompt && effectivePrompt.length < 10) throw new Error('image prompt minimal 10 karakter (EN, ≤60 kata)');
   let cameraSlug: string | null = null;
   if (override?.cameraSlug) {
     const slug = override.cameraSlug.trim().slice(0, 120);
@@ -246,8 +274,8 @@ export async function generatePostImage(
     .insert({
       draft_id: draftId,
       post_index: postIndex,
-      image_prompt: hasCustom ? customPrompt : '',
-      negative_prompt: hasCustom ? (customNegative || null) : null,
+      image_prompt: effectivePrompt || '',
+      negative_prompt: effectiveNegative || (hasCustom ? null : null),
       provider_slug: '',
       model_id: '',
       camera_slug: cameraSlug,
@@ -428,6 +456,10 @@ export interface EnhancePromptResult {
   image_prompt: string;
   negative_prompt?: string;
   reasoning: { visual_strategy: string; hook_keywords?: string[]; contradiction_check?: string; justification?: string };
+  /** Pilihan picker hasil enhance — null = biarkan Auto/default. */
+  style_slug: string | null;
+  subject_slug: string | null;
+  camera_slug: string | null;
 }
 
 /**
@@ -435,14 +467,17 @@ export interface EnhancePromptResult {
  * Hanya bila sudah ada draf prompt (≥10 char), tanpa insert DB.
  * Stage: enhance_image_prompt (picker Admin→LLM), limit 30/jam, admin bypass.
  * styleSlug: bila diisi, style hint (suffix) mengikuti pilihan picker review,
- * bukan default global.
+ * bukan default global. subjectSlug/cameraSlug dikirim sebagai konteks agar
+ * LLM memilihkan slug untuk field Auto (validasi ke himpunan aktif).
  */
 export async function enhanceImagePrompt(
   draftId: string,
   postIndex: number,
   promptDraft: string,
   negativeDraft?: string | null,
-  styleSlug?: string | null
+  styleSlug?: string | null,
+  subjectSlug?: string | null,
+  cameraSlug?: string | null
 ): Promise<EnhancePromptResult> {
   const supabase = await requireAdmin();
   const draftPrompt = promptDraft?.trim() ?? '';
@@ -497,6 +532,29 @@ export async function enhanceImagePrompt(
   });
   const styleSuffix = target.style?.prompt_suffix ?? null;
 
+  // Ambil opsi picker aktif (slug + display_name) sekaligus validasi slug
+  const [{ data: styleRows }, { data: subjectRows }, { data: cameraRows }] = await Promise.all([
+    supabase.from('image_style_presets').select('slug, display_name').eq('is_active', true).order('slug'),
+    supabase.from('image_subject_templates').select('slug, display_name, subject_en').eq('is_active', true).order('sort_order').order('slug'),
+    supabase.from('image_camera_angles').select('slug, display_name, angle_en').eq('is_active', true).order('sort_order').order('slug')
+  ]);
+  const styles = (styleRows ?? []) as { slug: string; display_name: string }[];
+  const subjects = (subjectRows ?? []) as { slug: string; display_name: string; subject_en: string | null }[];
+  const cameras = (cameraRows ?? []) as { slug: string; display_name: string; angle_en: string | null }[];
+
+  // Validasi slug: tak dikenal → throw (sama gaya dengan suggestImagePrompt).
+  if (subjectSlug) {
+    const found = subjects.find((s) => s.slug === subjectSlug);
+    if (!found) throw new Error('subject tidak dikenal — refresh pilihan');
+  }
+  if (cameraSlug) {
+    const found = cameras.find((c) => c.slug === cameraSlug);
+    if (!found) throw new Error('camera tidak dikenal — refresh pilihan');
+  }
+
+  const pickedSubject = subjectSlug ? subjects.find((s) => s.slug === subjectSlug) ?? null : null;
+  const pickedCamera = cameraSlug ? cameras.find((c) => c.slug === cameraSlug) ?? null : null;
+
   const { buildEnhancePromptMessages, parseImagePrompt, validateImagePromptContradiction } = await import('./prompt');
   const { resolveStageModel } = await import('@/lib/llm/stage-defaults');
   const { runLLMCompletion } = await import('@/lib/llm/completion');
@@ -509,7 +567,14 @@ export async function enhanceImagePrompt(
     negativeDraft: negDraft,
     topic: topicTitle ?? undefined,
     styleSuffix: styleSuffix ?? undefined,
-    postIndex
+    postIndex,
+    subjectName: pickedSubject?.display_name ?? null,
+    subjectEn: pickedSubject?.subject_en?.trim() ?? null,
+    cameraName: pickedCamera?.display_name ?? null,
+    cameraEn: pickedCamera?.angle_en?.trim() ?? null,
+    styleOptions: styles.map(({ slug, display_name }) => ({ slug, display_name })),
+    subjectOptions: subjects.map(({ slug, display_name }) => ({ slug, display_name })),
+    cameraOptions: cameras.map(({ slug, display_name }) => ({ slug, display_name }))
   });
 
   const { providerId, modelUuid } = await resolveStageModel('enhance_image_prompt', null);
@@ -518,7 +583,7 @@ export async function enhanceImagePrompt(
   async function attempt(temperature: number, gateNote?: string) {
     const msgs = [
       { role: 'system' as const, content: system },
-      { role: 'user' as const, content: gateNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${gateNote}). Perbaiki visual_strategy + image_prompt + negative_prompt.` : user }
+      { role: 'user' as const, content: gateNote ? `${user}\n\nPENTING: output sebelumnya gagal gate (${gateNote}). Perbaiki visual_strategy + image_prompt + negative_prompt (negative WAJIB terisi).` : user }
     ];
     const out = await runLLMCompletion(svc, {
       stage: 'enhance_image_prompt',
@@ -526,33 +591,44 @@ export async function enhanceImagePrompt(
       modelUuid,
       messages: msgs,
       temperature,
-      maxTokens: 500,
+      maxTokens: 1000,
       sessionId
     });
     return { parsed: parseImagePrompt(out.output.text), raw: out.output.text };
   }
 
+  // Gate self-consistency + negative WAJIB (align Studio rule untuk review enhance).
+  const gateWith = (parsed: ReturnType<typeof parseImagePrompt>) =>
+    validateImagePromptContradiction(
+      { image_prompt: parsed.image_prompt, negative_prompt: parsed.negative_prompt, reasoning: parsed.reasoning },
+      sourceText,
+      { requireNegative: true }
+    );
+
   let chosen = await attempt(0.5);
-  const gate = validateImagePromptContradiction(
-    { image_prompt: chosen.parsed.image_prompt, negative_prompt: chosen.parsed.negative_prompt, reasoning: chosen.parsed.reasoning },
-    sourceText
-  );
+  const gate = gateWith(chosen.parsed);
   if (!gate.ok) {
     const retry = await attempt(0.3, gate.reasons.join('; '));
-    const gate2 = validateImagePromptContradiction(
-      { image_prompt: retry.parsed.image_prompt, negative_prompt: retry.parsed.negative_prompt, reasoning: retry.parsed.reasoning },
-      sourceText
-    );
+    const gate2 = gateWith(retry.parsed);
     if (!gate2.ok) throw new Error(`enhance gate: ${[...gate.reasons, ...gate2.reasons].join(' | ').slice(0, 500)}`);
     chosen = retry;
   }
 
+  // Anti-halusinasi: slug di luar himpunan aktif → null (biarkan Auto),
+  // bukan menggagalkan seluruh enhance.
+  const activeSlugs = (rows: { slug: string }[], slug: string | null | undefined) =>
+    slug && rows.some((r) => r.slug === slug) ? slug : null;
+  const parsed = chosen.parsed;
+
   if (!isAdminUser) await incrementRateLimit(ip, 'enhance_image_prompt').catch(() => {});
 
   return {
-    image_prompt: chosen.parsed.image_prompt,
-    negative_prompt: chosen.parsed.negative_prompt,
-    reasoning: chosen.parsed.reasoning
+    image_prompt: parsed.image_prompt,
+    negative_prompt: parsed.negative_prompt,
+    reasoning: parsed.reasoning,
+    style_slug: activeSlugs(styles, parsed.style_slug),
+    subject_slug: activeSlugs(subjects, parsed.subject_slug),
+    camera_slug: activeSlugs(cameras, parsed.camera_slug)
   };
 }
 

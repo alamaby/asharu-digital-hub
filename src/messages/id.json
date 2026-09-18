@@ -571,7 +571,8 @@
         "statusTechDetails": "Detail teknis",
         "pickAndGenerate": "Pilih Produk & Generate",
         "randomBridgeTitle": "Dipilih random dari 20 terbaru (bridging)"
-      }
+      },
+      "autoEnhanceLabel": "Sempurnakan otomatis (kuota Sempurnakan)"
     }
   },
   "admin": {

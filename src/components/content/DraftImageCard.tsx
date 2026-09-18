@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { enhanceImagePrompt, generateDraftImage, listDraftImages, retryFailedImage, selectDraftImage, suggestImagePrompt, uploadDraftCoverImage, uploadDraftImageReference } from '@/lib/image/actions';
 import type { DraftImageRow } from '@/lib/image/types';
 import { ImageHistoryCarousel } from './ImageHistoryCarousel';
@@ -31,9 +32,12 @@ function latestOf(rows: DraftImageRow[]): DraftImageRow | null {
 }
 
 export function DraftImageCard({ draftId, initialImages, initialSelectedId, options, compact = false, locale = null, timeZone = null }: Props) {
+  const t = useTranslations('content.review');
   const [images, setImages] = useState<DraftImageRow[]>(initialImages);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [modelUuid, setModelUuid] = useState('');
+  // Auto-enhance default ON untuk cover (hemat ketik manual), bucket shared dengan Sempurnakan.
+  const [autoEnhance, setAutoEnhance] = useState(true);
   // Rehydrate dari style gambar terakhir agar dropdown mencerminkan yang terpakai.
   const [styleSlug, setStyleSlug] = useState(() => {
     const latest = latestOf(initialImages);
@@ -49,8 +53,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     const slug = latest?.camera_slug ?? '';
     return (options.cameras ?? []).some((c) => c.slug === slug) ? slug : '';
   });
-  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string } } | null>(null);
-  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string } | null>(null);
+  const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string }; styleSlug?: string | null; subjectSlug?: string | null; cameraSlug?: string | null } | null>(null);
+  const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string; styleSlug: string | null; subjectSlug: string | null; cameraSlug: string | null } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
@@ -158,6 +162,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     startTransition(async () => {
       try {
         await generateDraftImage(draftId, {
+          autoEnhance,
           modelUuid: modelUuid || null,
           styleSlug: styleSlug || null,
           cameraSlug: cameraSlug || null,
@@ -261,8 +266,8 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     setIsEnhancing(true);
     setNotice('Memperhalus prompt...');
     try {
-      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null, styleSlug || null);
-      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning });
+      const res = await enhanceImagePrompt(draftId, 0, p, negativeDraft.trim() || null, styleSlug || null, subjectSlug || null, cameraSlug || null);
+      setProposed({ prompt: res.image_prompt, negative: res.negative_prompt, reasoning: res.reasoning, styleSlug: res.style_slug, subjectSlug: res.subject_slug, cameraSlug: res.camera_slug });
       setNotice('Usulan siap — cek side-by-side, lalu Terima atau Batal.');
     } catch (e) {
       setNotice(e instanceof Error ? `Gagal enhance: ${e.message}` : 'Enhance gagal.');
@@ -273,9 +278,12 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
 
   function acceptProposed() {
     if (!proposed) return;
-    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft });
+    setPrevPrompt({ prompt: promptDraft, negative: negativeDraft, styleSlug: styleSlug || null, subjectSlug: subjectSlug || null, cameraSlug: cameraSlug || null });
     setPromptDraft(proposed.prompt);
     setNegativeDraft(proposed.negative ?? '');
+    if (proposed.styleSlug != null) setStyleSlug(proposed.styleSlug);
+    if (proposed.subjectSlug != null) setSubjectSlug(proposed.subjectSlug);
+    if (proposed.cameraSlug != null) setCameraSlug(proposed.cameraSlug);
     setNotice('Usulan diterima — cek prompt, lalu Regenerate bila siap.');
     setProposed(null);
   }
@@ -487,7 +495,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
           className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary disabled:opacity-50"
           title={options.subjects.length === 0 ? 'Belum ada template subjek aktif' : 'Buat draf prompt dari template subjek + isi postingan'}
         >
-          {isSuggesting ? 'Menyiapkan…' : 'Siapkan prompt awal'}
+          {isSuggesting ? 'Menyiapkan...' : 'Siapkan prompt awal'}
         </button>
         <button
           type="button"
@@ -506,6 +514,33 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
         >
           {isPending ? 'Memproses...' : hasVisual ? 'Regenerate' : 'Generate ilustrasi'}
         </button>
+        {prevPrompt ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPromptDraft(prevPrompt.prompt);
+              setNegativeDraft(prevPrompt.negative);
+              if (prevPrompt.styleSlug != null) setStyleSlug(prevPrompt.styleSlug);
+              if (prevPrompt.subjectSlug != null) setSubjectSlug(prevPrompt.subjectSlug);
+              if (prevPrompt.cameraSlug != null) setCameraSlug(prevPrompt.cameraSlug);
+              setPrevPrompt(null);
+              setNotice('Dikembalikan ke draf sebelumnya.');
+            }}
+            className="text-sm text-ink-muted hover:text-primary"
+          >
+            Urungkan
+          </button>
+        ) : null}
+        <label className="ml-2 flex items-center gap-1 text-[11px] text-ink-muted cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoEnhance}
+            onChange={(e) => setAutoEnhance(e.target.checked)}
+            disabled={isPending || isEnhancing || isSuggesting}
+            className="rounded border-line bg-background"
+          />
+          {t('autoEnhanceLabel')}
+        </label>
         <span className="ml-2 text-[11px] text-ink-muted">Sempurnakan = side-by-side (prompt+negative) → Terima/Batal → Regenerate.</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-background px-3 py-2">
@@ -548,6 +583,19 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
                   {proposed.reasoning.justification ? ` — ${proposed.reasoning.justification}` : ''}
                 </p>
               ) : null}
+              {(proposed.styleSlug || proposed.subjectSlug || proposed.cameraSlug) ? (
+                <div className="mt-2 space-y-0.5 text-[11px] text-ink-muted">
+                  {proposed.styleSlug ? (
+                    <p>Style: {options.styles.find((s) => s.slug === proposed.styleSlug)?.display_name ?? proposed.styleSlug}</p>
+                  ) : null}
+                  {proposed.subjectSlug ? (
+                    <p>Subjek: {options.subjects.find((s) => s.slug === proposed.subjectSlug)?.display_name ?? proposed.subjectSlug}</p>
+                  ) : null}
+                  {proposed.cameraSlug ? (
+                    <p>Camera: {(options.cameras ?? []).find((c) => c.slug === proposed.cameraSlug)?.display_name ?? proposed.cameraSlug}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-2 flex gap-2">
@@ -557,15 +605,6 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             <button type="button" onClick={() => setProposed(null)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs">
               Batal
             </button>
-            {prevPrompt ? (
-              <button
-                type="button"
-                onClick={() => { setPromptDraft(prevPrompt.prompt); setNegativeDraft(prevPrompt.negative); setPrevPrompt(null); setNotice('Dikembalikan ke draf sebelumnya.'); }}
-                className="text-xs text-ink-muted hover:text-primary"
-              >
-                Urungkan
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}

@@ -178,6 +178,15 @@ export interface EnhancePromptInput {
   topic?: string;
   styleSuffix?: string;
   postIndex?: number;
+  /** Konteks pilihan picker user (nama + teks EN) — jadikan input polish. */
+  subjectName?: string | null;
+  subjectEn?: string | null;
+  cameraName?: string | null;
+  cameraEn?: string | null;
+  /** Daftar opsi aktif: LLM HANYA boleh memilih slug dari daftar ini. */
+  styleOptions?: StudioOption[];
+  subjectOptions?: StudioOption[];
+  cameraOptions?: StudioOption[];
 }
 
 export function buildEnhancePromptMessages(input: EnhancePromptInput): {
@@ -190,9 +199,9 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     'Preserve intent, correct English, make it single scene, concrete objects/action/setting, ≤60 words.',
     'First REASON about the post vs visual, then output the polished visual.',
     'Rules:',
-    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
+    '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "...", "style_slug": "...|null", "subject_slug": "...|null", "camera_slug": "...|null"}.',
     '- image_prompt: polished English, ≤60 words (hard limit), concrete, no text/watermark/logo.',
-    '- Negative: polish too (no text, no watermark, no logo), ≤300 chars.',
+    '- Negative: REQUIRED, never empty — always cover at least "no text, no watermark, no logo, blurry, low quality, distorted anatomy", plus anything the draft must avoid. Max 300 chars.',
     '- visual_strategy: AFTER = direct/aspirational illustration of the post; BRIDGE = curiosity-gap object.',
     '- MISSED-DETAIL COMPLETION: compare the user draft against the source post. ADD every concrete visual detail from the source post that the draft missed (setting/location, objects, clothing, people, weather/atmosphere, time of day). NEVER drop details already in the draft — only add the missing ones. If the draft already covers everything, polish wording only.',
     '- CRITICAL PRESERVATION: User draft may be in Indonesian — translate to English FAITHFULLY and keep EVERY explicit detail. Do NOT drop or generalize:',
@@ -204,8 +213,19 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     '- If you omit any of these, the output is WRONG. When in doubt, keep the detail verbatim (translated).',
     '- Do not invent new setting (street/alley) if user specified house exterior; do not drop "fitted".',
     '- No people faces close-up unless source demands it; prefer medium shot that shows outfit + setting.',
-    '- No violent, sexual, or political content.'
+    '- Do NOT write the style preset wording or the camera angle wording into image_prompt — the pipeline appends them automatically. Just make the scene fit them.',
+    '- No violent, sexual, or political content.',
+    'FIELD SELECTION (style_slug / subject_slug / camera_slug):',
+    '- Choose ONLY from the OPTION LISTS below and return the exact slug string. NEVER invent a slug.',
+    '- If the user already selected a field, treat it as an INPUT: keep the scene consistent with it. You MAY recommend a different slug when clearly better.',
+    '- subject_slug MUST be null when the draft clearly has no person/subject; do not force a human subject.',
+    '- camera_slug: pick the angle that best fits the draft scene and shot; null only if no angle in the list fits.'
   ].join('\n');
+  const selected: string[] = [];
+  if (input.subjectName) selected.push(`- Subject template selected: ${input.subjectName}`);
+  if (input.subjectEn) selected.push(`  (subject template EN, will be prepended by the pipeline): ${input.subjectEn}`);
+  if (input.cameraName) selected.push(`- Camera angle selected: ${input.cameraName}`);
+  if (input.cameraEn) selected.push(`  (camera angle EN, will be appended by the pipeline): ${input.cameraEn}`);
   const user = [
     `Source post (ID): ${input.sourceId}`,
     `Source post (EN): ${input.sourceEn}`,
@@ -213,7 +233,11 @@ export function buildEnhancePromptMessages(input: EnhancePromptInput): {
     input.negativeDraft ? `User draft negative: ${input.negativeDraft}` : '',
     input.topic ? `Topic: ${input.topic}` : '',
     typeof input.postIndex === 'number' ? `Source post_index: ${input.postIndex} (0=cover, >=1=reply)` : '',
-    input.styleSuffix ? `Style hint (will be appended by worker): ${input.styleSuffix}` : ''
+    input.styleSuffix ? `Style hint (will be appended by worker): ${input.styleSuffix}` : '',
+    selected.length ? `Currently selected fields:\n${selected.join('\n')}` : 'Currently selected fields: none (all Auto) — pick the best option for each list.',
+    input.styleOptions?.length ? `OPTION LIST style_slug: ${optionLines(input.styleOptions)}` : '',
+    input.subjectOptions?.length ? `OPTION LIST subject_slug: ${optionLines(input.subjectOptions)}` : '',
+    input.cameraOptions?.length ? `OPTION LIST camera_slug: ${optionLines(input.cameraOptions)}` : ''
   ]
     .filter(Boolean)
     .join('\n');
