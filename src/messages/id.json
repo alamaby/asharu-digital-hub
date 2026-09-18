@@ -164,7 +164,19 @@
     "shareVia": "Bagikan via {channel}",
     "shareCopy": "Salin tautan",
     "shareCopied": "Tautan disalin!",
-    "shareNative": "Lainnya..."
+    "shareNative": "Lainnya...",
+    "featuredBadge": "Unggulan",
+    "readingMinutes": "±{n} mnt baca",
+    "affiliateBadge": "Tautan afiliasi",
+    "searchPlaceholder": "Cari artikel…",
+    "sortNewest": "Terbaru",
+    "sortOldest": "Terlama",
+    "filterAll": "Semua",
+    "filterAffiliateOnly": "Berafiliasi",
+    "loadMore": "Muat lebih banyak",
+    "emptyFiltered": "Tidak ada artikel yang cocok.",
+    "showingCount": "Menampilkan {shown} dari {total}",
+    "relatedHeading": "Artikel terkait"
   },
   "categories": {
     "automotive": "Otomotif",

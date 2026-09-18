@@ -164,7 +164,19 @@
     "shareVia": "Share via {channel}",
     "shareCopy": "Copy link",
     "shareCopied": "Link copied!",
-    "shareNative": "More..."
+    "shareNative": "More...",
+    "featuredBadge": "Featured",
+    "readingMinutes": "±{n} min read",
+    "affiliateBadge": "Affiliate link",
+    "searchPlaceholder": "Search articles…",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "filterAll": "All",
+    "filterAffiliateOnly": "Affiliate only",
+    "loadMore": "Load more",
+    "emptyFiltered": "No articles match your search.",
+    "showingCount": "Showing {shown} of {total}",
+    "relatedHeading": "Related articles"
   },
   "categories": {
     "automotive": "Automotive",

@@ -8,9 +8,11 @@ import { buildMetadata, truncateAtWord } from '@/lib/seo/metadata';
 import { articleFaqSchema, articleSchema, breadcrumbSchema } from '@/lib/seo/jsonld';
 import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
-import { getAllPublishedSlugs, getArticleProduct, getPublishedArticleBySlug } from '@/lib/articles/public';
+import { getAllPublishedSlugs, getArticleProduct, getPublishedArticleBySlug, getRelatedArticles } from '@/lib/articles/public';
+import { estimateReadingMinutes } from '@/lib/articles/reading-time';
 import { ArticlePublicView } from '@/components/articles/ArticlePublicView';
 import { ShareButtons } from '@/components/articles/ShareButtons';
+import { ArticleCard } from '@/components/articles/ArticleCard';
 import { JsonLd } from '@/components/ui/JsonLd';
 
 interface ArticleDetailPageProps {
@@ -57,6 +59,7 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
 
   const t = await getTranslations({ locale, namespace: 'articles' });
   const product = await getArticleProduct(article.product_id);
+  const related = await getRelatedArticles(locale, slug, 3);
 
   const breadcrumb = breadcrumbSchema([
     { name: 'Asharu', url: `${env.siteUrl}${localizedPathname('/', locale)}` },
@@ -106,6 +109,32 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
       />
 
       <ShareButtons canonicalUrl={canonical} title={article.title} />
+
+      {related.length > 0 ? (
+        <section className="mt-12" aria-labelledby="related-heading">
+          <h2 id="related-heading" className="text-xl font-semibold text-ink">
+            {t('relatedHeading')}
+          </h2>
+          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {related.map((a) => (
+              <ArticleCard
+                key={a.id}
+                slug={a.slug}
+                title={a.title}
+                excerpt={a.excerpt}
+                coverUrl={a.cover_image_url}
+                publishedAt={a.published_at}
+                locale={locale}
+                readingMinutes={estimateReadingMinutes(a.body_md ?? '')}
+                hasAffiliate={Boolean(a.affiliate_url)}
+                readMoreLabel={t('readMore')}
+                affiliateBadgeLabel={t('affiliateBadge')}
+                readingMinutesLabel={(n) => t('readingMinutes', { n })}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <JsonLd
         data={articleSchema({

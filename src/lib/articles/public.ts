@@ -12,15 +12,16 @@ function anonClient() {
 }
 
 const ARTICLE_SELECT =
-  'id, slug, locale, title, excerpt, body_md, faq, cover_image_url, affiliate_url, product_id, published_at, updated_at';
+  'id, slug, locale, title, excerpt, body_md, faq, cover_image_url, affiliate_url, product_id, category, tags, published_at, updated_at';
 
 type ArticleRow = Omit<PublishedArticle, 'locale' | 'faq'> & {
   locale: string;
   faq: { q: string; a: string }[] | null;
+  tags: string[] | null;
 };
 
 function toPublished(row: ArticleRow): PublishedArticle {
-  return { ...row, locale: row.locale as ArticleLocale, faq: row.faq ?? [] };
+  return { ...row, locale: row.locale as ArticleLocale, faq: row.faq ?? [], tags: row.tags ?? [] };
 }
 
 export async function getPublishedArticles(locale: ArticleLocale, limit = 50): Promise<PublishedArticle[]> {
@@ -81,4 +82,23 @@ export async function getArticleProduct(productId: string | null): Promise<Artic
   const p = data as { name_id: string; name_en: string; url: string; image: string | null } | null;
   if (!p) return null;
   return { name: p.name_id, url: p.url, image: p.image };
+}
+
+/** Artikel terkait (terbaru selain diri sendiri). Panggil setelah slug diketahui. */
+export async function getRelatedArticles(
+  locale: ArticleLocale,
+  excludeSlug: string,
+  limit = 3
+): Promise<PublishedArticle[]> {
+  const supabase = anonClient();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('articles')
+    .select(ARTICLE_SELECT)
+    .eq('locale', locale)
+    .eq('status', 'published')
+    .neq('slug', excludeSlug)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  return ((data ?? []) as ArticleRow[]).map(toPublished);
 }

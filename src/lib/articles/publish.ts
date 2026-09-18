@@ -108,6 +108,22 @@ export async function publishArticleDraftCore(
     .maybeSingle();
   const coverImageUrl = ((coverRow as { public_url: string | null } | null)?.public_url ?? null) || null;
 
+  // Kategori artikel: ambil dari produk afiliasi bila tersedia dan slug valid.
+  // Hanya 6 slug resmi yang diterima; selain itu → null agar CHECK tak pecah.
+  let articleCategory: string | null = null;
+  if (d.product_id) {
+    const { data: prodRow } = await supabase
+      .from('affiliate_products')
+      .select('category')
+      .eq('id', d.product_id)
+      .eq('is_active', true)
+      .maybeSingle();
+    const raw = ((prodRow as { category: string | null } | null)?.category ?? null);
+    if (raw && ['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others'].includes(raw)) {
+      articleCategory = raw;
+    }
+  }
+
   const published: { locale: ArticleLocale; slug: string; id: string }[] = [];
   for (const locale of picked.locales) {
     const content = contents.get(locale)!;
@@ -137,6 +153,8 @@ export async function publishArticleDraftCore(
           faq: content.faq,
           cover_image_url: coverImageUrl,
           affiliate_url: affiliateUrl,
+          category: articleCategory,
+          tags: [],
           status: 'published',
           draft_id: draftId,
           session_id: sessionId,

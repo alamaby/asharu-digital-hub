@@ -2,6 +2,13 @@ import type { ArticleLangDraft } from '@/lib/llm/prompt';
 
 export type ArticleLocale = 'id' | 'en';
 
+/** Valid category slug — sama dengan kunci di messages.categories.* */
+export const VALID_ARTICLE_CATEGORIES = [
+  'automotive', 'electronics', 'home-living',
+  'fashion', 'sports-hobby', 'others'
+] as const;
+export type ArticleCategory = typeof VALID_ARTICLE_CATEGORIES[number];
+
 export interface ArticleFaqItem {
   q: string;
   a: string;
@@ -18,6 +25,10 @@ export interface PublishedArticle {
   cover_image_url: string | null;
   affiliate_url: string | null;
   product_id: string | null;
+  /** Kategori artikel (fallback null bila produk tidak punya kategori). */
+  category: string | null;
+  /** Max 5 lowercase tag; tanpa duplikat & spasi ganda. */
+  tags: string[];
   published_at: string | null;
   updated_at: string;
 }

@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
-import { Link } from '@/i18n/navigation';
 import { buildMetadata } from '@/lib/seo/metadata';
 import { breadcrumbSchema } from '@/lib/seo/jsonld';
 import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
 import { pageHeading } from '@/lib/utils/title';
 import { getPublishedArticles } from '@/lib/articles/public';
+import { ArticleGrid } from '@/components/articles/ArticleGrid';
 import { JsonLd } from '@/components/ui/JsonLd';
 
 interface ArticlesPageProps {
@@ -37,7 +37,14 @@ export default async function ArticlesPage({ params }: ArticlesPageProps) {
 
   const tMeta = await getTranslations({ locale, namespace: 'meta.artikel' });
   const t = await getTranslations({ locale, namespace: 'articles' });
-  const articles = await getPublishedArticles(locale);
+  const catT = await getTranslations({ locale, namespace: 'categories' });
+  // Build i18n-safe category label map from same keys that DB validation accepts.
+  const categoryLabels: Record<string, string> = {};
+  for (const k of ['automotive', 'electronics', 'home-living', 'fashion', 'sports-hobby', 'others'] as const) {
+    try { categoryLabels[k] = catT(k); } catch { categoryLabels[k] = k; }
+  }
+  // Up limit to 100 to support client-side search/filter within ISR budget.
+  const articles = await getPublishedArticles(locale, 100);
 
   const breadcrumb = breadcrumbSchema([
     { name: 'Asharu', url: `${env.siteUrl}${localizedPathname('/', locale)}` },
@@ -61,32 +68,22 @@ export default async function ArticlesPage({ params }: ArticlesPageProps) {
           {t('empty')}
         </p>
       ) : (
-        <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((a) => (
-            <li key={a.id} className="rounded-xl border border-line bg-surface p-5 shadow-card transition-colors hover:border-primary">
-              <Link href={{ pathname: '/artikel/[slug]', params: { slug: a.slug } }} className="block">
-                <h2 className="text-lg font-semibold leading-snug text-ink hover:text-primary">
-                  {a.title}
-                </h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink-muted">
-                  {a.excerpt}
-                </p>
-                <span className="mt-3 inline-block text-sm font-medium text-primary">
-                  {t('readMore')} →
-                </span>
-              </Link>
-              {a.published_at ? (
-                <p className="mt-2 text-xs text-ink-muted">
-                  {new Date(a.published_at).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <ArticleGrid
+          articles={articles}
+          locale={locale}
+          readMoreLabel={t('readMore')}
+          affiliateBadgeLabel={t('affiliateBadge')}
+          readingMinutesLabel={(n) => t('readingMinutes', { n })}
+          searchPlaceholder={t('searchPlaceholder')}
+          sortNewest={t('sortNewest')}
+          sortOldest={t('sortOldest')}
+          filterAll={t('filterAll')}
+          filterAffiliateOnly={t('filterAffiliateOnly')}
+          loadMore={t('loadMore')}
+          emptyFiltered={t('emptyFiltered')}
+          showingCount={(shown, total) => t('showingCount', { shown, total })}
+          categoryLabels={categoryLabels}
+        />
       )}
 
       <JsonLd data={breadcrumb} />
