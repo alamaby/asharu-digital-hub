@@ -6,6 +6,7 @@ import {
   retryAutomationRun,
   runAutomationNow,
   updateAutomationConfig,
+  sendAutomationTestEmail,
   type AutomationActionResult
 } from '@/lib/automation/actions';
 import {
@@ -123,6 +124,7 @@ export function AutomationConfigForm({
   const [isPending, startTransition] = useTransition();
   const { notice: saveNotice, run: runSave } = useNotice();
   const { notice: runNotice, run: runTick } = useNotice();
+  const { notice: testNotice, run: runTest } = useNotice();
   async function handleSave(fd: FormData): Promise<void> {
     const ok = await runSave(
       () => updateAutomationConfig(fd),
@@ -134,6 +136,9 @@ export function AutomationConfigForm({
   async function handleRunNow(): Promise<void> {
     await runTick(() => runAutomationNow(), 'Tick dijalankan.', 'Menjalankan...', 'Gagal menjalankan.');
     startTransition(() => router.refresh());
+  }
+  async function handleTestEmail(): Promise<void> {
+    await runTest(() => sendAutomationTestEmail(), 'Email test terkirim.', 'Mengirim email test...', 'Gagal mengirim email test.');
   }
   return (
     <div>
@@ -319,7 +324,7 @@ export function AutomationConfigForm({
         ) : null}
       </form>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => {
@@ -332,9 +337,26 @@ export function AutomationConfigForm({
         >
           Run now
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            void handleTestEmail();
+          }}
+          disabled={isPending}
+          aria-busy={isPending}
+          className="rounded-lg border border-line px-4 py-2 text-sm text-ink hover:bg-background disabled:cursor-not-allowed disabled:opacity-60"
+          title="Kirim 1 email probe ke penerima config untuk diagnosa Resend"
+        >
+          Kirim email test
+        </button>
         {runNotice ? (
           <div className="mt-3">
             <ActionNoticeView notice={runNotice} />
+          </div>
+        ) : null}
+        {testNotice ? (
+          <div className="mt-3">
+            <ActionNoticeView notice={testNotice} />
           </div>
         ) : null}
       </div>

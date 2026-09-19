@@ -33,6 +33,14 @@ export interface AutomationConfig {
   notifyEmails: string[];
   emailFrom: string;
   emailReplyTo: string | null;
+  /** Discovery knob (Fase 3): max iterasi discovery single-pass; default konservatif 1. */
+  maxIterations: number;
+  /** Minimum score kandidat (0–100); null = tidak ada batas. */
+  minScore: number | null;
+  /** Minimum kandidat yang lolos shortlist; null = warisi maxTopics. */
+  minCandidates: number | null;
+  /** Freshness hours: hanya produk dalam N jam terakhir; null = tak terbatas. */
+  freshnessHours: number | null;
 }
 
 interface AutomationConfigRow {
@@ -67,6 +75,11 @@ interface AutomationConfigRow {
   notify_emails: string[] | null;
   email_from: string;
   email_reply_to: string | null;
+  // Kolom discovery (migrasi 20260920000003; opsional agar pre-migrasi termuat).
+  maximum_iterations?: number | null;
+  minimum_score?: number | null;
+  minimum_candidates?: number | null;
+  freshness_hours?: number | null;
 }
 
 const NOTIFY_VALUES = new Set(['draft_ready', 'published', 'both', 'none']);
@@ -106,7 +119,12 @@ export function mapConfigRow(row: AutomationConfigRow): AutomationConfig {
     notifyOn,
     notifyEmails: row.notify_emails ?? [],
     emailFrom: row.email_from,
-    emailReplyTo: row.email_reply_to
+    emailReplyTo: row.email_reply_to,
+    // Discovery knob (Fase 3): default konservatif 1 agar perilaku lama tak berubah.
+    maxIterations: row.maximum_iterations ?? 1,
+    minScore: row.minimum_score ?? null,
+    minCandidates: row.minimum_candidates ?? null,
+    freshnessHours: row.freshness_hours ?? null
   };
 }
 

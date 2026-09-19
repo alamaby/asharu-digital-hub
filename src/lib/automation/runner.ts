@@ -7,11 +7,8 @@ import { loadAutomationConfig, resolveRecipients, resolveRunLocales, type Automa
 import { defaultIdeaDeps, generateSessionIdea, type GeneratedIdea, type IdeaProduct } from '@/lib/research/idea';
 import { getResearchTemplateHint } from '@/lib/research/templates';
 import { isRunDue, localDateString, pickRandomProduct } from './scheduler';
-import {
-  sendDraftReadyEmail,
-  sendFailureEmail,
-  sendPublishedEmail
-} from './email';
+import { loadEnabledSlots, mergeSlotParams, isSlotDue } from './schedules';
+import { sendDraftReadyEmail, sendFailureEmail, sendPublishedEmail, logAutomationEmail } from './email';
 
 export type AutomationRunStatus =
   | 'session_created'
@@ -40,6 +37,8 @@ interface AutomationRunRow {
   notified_at: string | null;
   attempts: number;
   error_message: string | null;
+  /** Ditambahkan Fase 2; pre-migrasi bernilai undefined (koersi ke null saat log). */
+  slot_key?: string | null;
 }
 
 export interface AutomationTickResult {
@@ -49,6 +48,8 @@ export interface AutomationTickResult {
   status?: AutomationRunStatus;
   advanced?: boolean;
   error?: string;
+  /** Slot-level detail (Fase 2). Isi dari slot pertama yang berubah untuk kompatibilitas renderTickMessage. */
+  slots?: Array<{ slot_key: string; status: AutomationRunStatus; advanced: boolean }>;
 }
 
 async function log(
@@ -252,12 +253,15 @@ async function enrichSessionIdea(
     return null;
   }
 }
-/** Buat sesi riset `dua` + produk tetap, lalu `automation_runs` untuk hari ini. */
+/** Buat sesi riset `dua` + produk tetap, lalu `automation_runs` untuk hari ini + slot tertentu. */
 async function createRun(
   supabase: SupabaseClient,
   cfg: AutomationConfig,
-  runDate: string
+  runDate: string,
+  slotKey: string
 ): Promise<AutomationRunRow | { error: string }> {
+  // Dedup produk: exclude product_id yang sudah dipakai run lain hari itu.
+  // Pool kecil ≤500 jadi aman filter di-memory.
   let poolQuery = supabase
     .from('affiliate_products')
     .select('id')
@@ -267,7 +271,21 @@ async function createRun(
   if (cfg.productCategory) poolQuery = poolQuery.eq('category', cfg.productCategory);
   const { data: pool, error: poolError } = await poolQuery;
   if (poolError) return { error: `pool produk: ${poolError.message}` };
-  const chosen = pickRandomProduct((pool ?? []) as { id: string }[]);
+  const poolRows = (pool ?? []) as { id: string }[];
+  if (poolRows.length === 0) return { error: 'tidak ada produk afiliasi aktif untuk dipilih' };
+
+  // Ambil produk yang sudah dipakai run lain hari ini (bukan slot ini).
+  const { data: occupied } = await supabase
+    .from('automation_runs')
+    .select('product_id')
+    .eq('run_date', runDate)
+    .neq('slot_key', slotKey);
+  const occupiedIds = ((occupied ?? []) as { product_id: string | null }[])
+    .map((r) => r.product_id)
+    .filter(Boolean) as string[];
+  const available = poolRows
+    .filter((p) => !occupiedIds.includes(p.id));
+  const chosen = pickRandomProduct(available.length > 0 ? available : poolRows);
   if (!chosen) return { error: 'tidak ada produk afiliasi aktif untuk dipilih' };
 
   const { data: session, error: sessionError } = await supabase
@@ -288,7 +306,8 @@ async function createRun(
       template_slug: cfg.templateSlug,
       target_reply_count: cfg.targetReplyCount,
       required_winners: cfg.maxTopics,
-      maximum_iterations: 1,
+      /** Knob discovery: pakai cfg.maxIterations (Fase 3), fallback 1 bila belum di-migrate. */
+      maximum_iterations: cfg.maxIterations ?? 1,
       created_by: null
     })
     .select('id')
@@ -336,6 +355,7 @@ async function createRun(
     .from('automation_runs')
     .insert({
       run_date: runDate,
+      slot_key: slotKey,
       status: 'session_created',
       config_snapshot: cfg as unknown as Record<string, unknown>,
       product_id: chosen.id,
@@ -353,6 +373,7 @@ async function createRun(
       .from('automation_runs')
       .select('*')
       .eq('run_date', runDate)
+      .eq('slot_key', slotKey)
       .maybeSingle();
     if (winner) {
       await supabase.from('content_research_sessions').delete().eq('id', sessionId);
@@ -368,7 +389,7 @@ async function createRun(
       .eq('id', sessionId);
     return { error: `insert run: ${runError?.message ?? 'no id'}` };
   }
-  await log(supabase, sessionId, 'automation', 'info', `run ${runDate} dibuat untuk produk ${chosen.id}`);
+  await log(supabase, sessionId, 'automation', 'info', `run ${runDate} slot=${slotKey} dibuat untuk produk ${chosen.id}`);
   return run as AutomationRunRow;
 }
 
@@ -376,10 +397,11 @@ async function createRun(
  * Jalankan satu tick automation. Idempoten: aman dipanggil tiap 5 menit.
  * `now`/`startMinutes` opsional untuk test; `force` (tombol admin "Run now")
  * mengabaikan jendela jadwal agar uji coba bisa kapan saja.
+ * `slotKey` opsional: bila diisi hanya proses slot itu; bila kosong proses semua slot enabled.
  */
 export async function runAutomationTick(
   supabase: SupabaseClient,
-  opts: { now?: Date; startMinutes?: number; force?: boolean } = {}
+  opts: { now?: Date; startMinutes?: number; force?: boolean; slotKey?: string } = {}
 ): Promise<AutomationTickResult> {
   const now = opts.now ?? new Date();
   const cfg = await loadAutomationConfig(supabase);
@@ -388,59 +410,157 @@ export async function runAutomationTick(
 
   const runDate = localDateString(now, cfg.timezone);
 
-  const { data: existing } = await supabase
+  // Muat slot-enabled dari DB. Bila tabel belum ada (pre-migrasi), fallback
+  // ke 1 slot virtual agar perilaku existing tak berubah diam-diam.
+  let slots = await loadEnabledSlots(supabase);
+  if (slots.length === 0) {
+    // Virtual slot `default` meniru singleton lama.
+    slots = [{
+      id: 'virtual',
+      slot_key: 'default',
+      label: 'Jadwal utama (fallback)',
+      hour: cfg.scheduleHour,
+      minute: cfg.scheduleMinute,
+      weekdays: 127,
+      is_enabled: true,
+      window_minutes: null,
+      priority: 0,
+      platform_slugs: null,
+      max_topics: null,
+      product_pool_size: null,
+      product_category: null,
+      auto_publish_article: null,
+      require_cover: null,
+      notify_on: null,
+      notify_emails: null,
+      maximum_iterations: null,
+      minimum_score: null,
+      minimum_candidates: null,
+      freshness_hours: null,
+      cover_max_wait_minutes: null,
+      cover_max_attempts: null,
+      max_retry_attempts: null,
+      language: null,
+      tone: null,
+      audience: null,
+      purpose: null,
+      cta_style: null,
+      target_reply_count: null,
+      template_slug: null,
+      idea_generation_enabled: null,
+      idea_product_search: null,
+      email_from: null,
+      email_reply_to: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }];
+  }
+
+  // Filter slot berdasarkan force slotKey bila diminta.
+  const targetSlots = opts.slotKey
+    ? slots.filter((s) => s.slot_key === opts.slotKey && s.is_enabled)
+    : slots.filter((s) => s.is_enabled);
+
+  // Muat SEMUA run hari ini untuk dedup & advance multiplex.
+  const { data: allRunsData } = await supabase
     .from('automation_runs')
     .select('*')
-    .eq('run_date', runDate)
-    .maybeSingle();
-  let run = existing as AutomationRunRow | null;
+    .eq('run_date', runDate);
+  // Fallback: bila mock/client mengembalikan bukan array, coba maybeSingle.
+  const rawAll = allRunsData as unknown[] | null;
+  const allRuns = Array.isArray(rawAll) ? rawAll : rawAll ? [rawAll] : [];
+  const existingRuns = (allRuns as AutomationRunRow[]).reduce<Record<string, AutomationRunRow>>((acc, r) => {
+    const key = (r.slot_key ?? 'default') as string;
+    acc[key] = r;
+    return acc;
+  }, {} as Record<string, AutomationRunRow>);
 
-  // Belum ada run hari ini → cek jendela jadwal lalu buat.
-  if (!run) {
-    if (!opts.force && !isRunDue(cfg, now, opts.startMinutes)) {
-      return { ok: true, skipped: 'not_due', runDate };
+  const created: Array<{ slot_key: string; run: AutomationRunRow }> = [];
+  for (const slot of targetSlots) {
+    const due = opts.force || isSlotDue(slot, cfg, now, opts.startMinutes);
+    if (!due) continue;
+    if (!existingRuns[slot.slot_key]) {
+      const merged = mergeSlotParams(cfg, slot);
+      const createdRun = await createRun(supabase, merged, runDate, slot.slot_key);
+      if ('error' in createdRun) {
+        // Gagal membuat salah satu slot → lanjut slot lain (best-effort).
+        await log(supabase, null, 'automation', 'warn', `slot ${slot.slot_key} gagal: ${createdRun.error}`);
+        continue;
+      }
+      created.push({ slot_key: slot.slot_key, run: createdRun });
     }
-    const created = await createRun(supabase, cfg, runDate);
-    if ('error' in created) return { ok: false, error: created.error, runDate };
-    run = created;
+  }
+  // Catat last_run_at bila setidaknya 1 run berhasil dibuat hari ini.
+  if (created.length > 0) {
     await supabase
       .from('automation_configs')
       .update({ last_run_at: now.toISOString() })
       .eq('id', 1);
   }
 
-  // Sudah selesai / menunggu retry manual.
-  if (run.status === 'completed') return { ok: true, skipped: 'already_done', runDate, status: run.status };
-  if (run.status === 'failed') {
-    if (run.attempts >= cfg.maxRetryAttempts) {
-      return { ok: true, skipped: 'already_done', runDate, status: run.status };
-    }
-    // Sesi riset failed tidak bisa pulih dari sisi automation (butuh
-    // perbaikan di halaman riset) — jangan retry berulang tanpa guna.
-    if (run.session_id) {
-      const sessionStatus = await loadSessionStatus(supabase, run.session_id);
-      if (sessionStatus === 'failed') {
+  // Advance SEMUA run terbuka hari itu (bukan hanya 1).
+  const openStatuses = new Set<AutomationRunStatus>([
+    'session_created', 'developing', 'awaiting_cover', 'publishing', 'published', 'notifying'
+  ]);
+  const results: Array<{ slot_key: string; status: AutomationRunStatus; advanced: boolean }> = [];
+  let hadOpenRun = false;
+  for (const run of Object.values(existingRuns)) {
+    if (openStatuses.has(run.status)) {
+      hadOpenRun = true;
+      const sk = (run.slot_key ?? 'default') as string;
+      const advanced = await advanceRun(supabase, cfg, run);
+      // advanceRun modifies run in place via updateRun → ambil status terbaru.
+      results.push({ slot_key: sk, status: run.status, advanced: advanced.changed });
+    } else if (run.status === 'completed') {
+      if (!hadOpenRun && results.length === 0) {
+        return { ok: true, skipped: 'already_done', runDate, status: run.status };
+      }
+    } else if (run.status === 'failed') {
+      // Retry: reset ke tahap aman sebelum advanceRun memprosesnya lagi.
+      if (run.attempts < cfg.maxRetryAttempts) {
+        const sessionStatus = await loadSessionStatus(supabase, run.session_id ?? '');
+        if (sessionStatus !== 'failed') {
+          await updateRun(supabase, run.id, {
+            status: run.session_id ? 'developing' : 'session_created',
+            attempts: run.attempts + 1,
+            error_message: null,
+            cover_started_at: null
+          });
+          run.status = run.session_id ? 'developing' : 'session_created';
+          run.attempts = run.attempts + 1;
+          run.cover_started_at = null;
+          hadOpenRun = true;
+          const sk = (run.slot_key ?? 'default') as string;
+          const advanced = await advanceRun(supabase, cfg, run);
+          results.push({ slot_key: sk, status: run.status, advanced: advanced.changed });
+          continue;
+        }
+      }
+      // Attempts habis atau sesi failed → terminal.
+      if (!hadOpenRun && results.length === 0) {
         return { ok: true, skipped: 'already_done', runDate, status: run.status };
       }
     }
-    // Reset cover_started_at: tanpa ini, batas tunggu cover dihitung dari
-    // timestamp run pertama sehingga retry langsung timeout lagi.
-    await updateRun(supabase, run.id, {
-      status: run.session_id ? 'developing' : 'session_created',
-      attempts: run.attempts + 1,
-      error_message: null,
-      cover_started_at: null
-    });
-    run = {
-      ...run,
-      status: run.session_id ? 'developing' : 'session_created',
-      attempts: run.attempts + 1,
-      cover_started_at: null
-    };
+  }
+  // Tambahkan hasil dari run yang baru dibuat (belum masuk existingRuns).
+  for (const c of created) {
+    const advanced = await advanceRun(supabase, cfg, c.run);
+    results.push({ slot_key: c.slot_key, status: c.run.status, advanced: advanced.changed });
   }
 
-  const advanced = await advanceRun(supabase, cfg, run);
-  return { ok: true, runDate, status: advanced.status, advanced: advanced.changed };
+  // Bila force tapi semua slot gagal membuat run → kembalikan error (backward-compat).
+  if (!hadOpenRun && results.length === 0 && opts.force) {
+    return { ok: false, error: 'semua slot gagal membuat run hari ini', runDate };
+  }
+
+  // Check not_due bila tidak ada run & force bukan mode.
+  if (!hadOpenRun && results.length === 0 && !opts.force) {
+    const firstDue = targetSlots.some((s) => isSlotDue(s, cfg, now, opts.startMinutes));
+    if (!firstDue) return { ok: true, skipped: 'not_due', runDate };
+  }
+
+  const last = results[results.length - 1];
+  return { ok: true, runDate, status: last?.status, advanced: last?.advanced ?? false, slots: results };
 }
 
 /**
@@ -561,9 +681,18 @@ async function advanceRun(
         });
         if (!res.ok && !res.skipped) {
           await log(supabase, sessionId, 'automation', 'warn', `email draft_ready gagal: ${res.error}`);
-        } else {
+        } else if (res.ok) {
           await updateRun(supabase, run.id, { draft_ready_notified_at: new Date().toISOString() });
         }
+        // Log selalu ditulis (termasuk skipped) agar badge UI menampilkan alasan.
+        void logAutomationEmail(supabase, {
+          runId: run.id,
+          runDate: run.run_date,
+          slotKey: run.slot_key ?? null,
+          moment: 'draft_ready',
+          recipients,
+          result: res
+        });
       } catch (e) {
         await log(
           supabase,
@@ -637,41 +766,54 @@ async function advanceRun(
     return { status: 'published', changed: true };
   }
 
-  // 6) Notifikasi published → selesai.
-  if (run.status === 'published') {
-    // Seluruh langkah notifikasi dibungkus try/catch: kegagalan (query data,
-    // render, pengiriman) harus membuat run tetap maju ke `completed` —
-    // status artikel sudah benar-benar published di titik ini.
-    if (wantsNotification(cfg, 'published') && !run.notified_at) {
-      try {
-        const recipients = await resolveRecipients(supabase, cfg);
-        const articles = await loadArticleLinks(supabase, run.article_ids ?? []);
-        const res = await sendPublishedEmail(supabase, cfg, {
-          recipients,
-          runDate: run.run_date,
-          productName: await productLabel(supabase, run.product_id),
-          articles,
-          siteUrl: env.siteUrl
-        });
-        if (!res.ok && !res.skipped) {
-          await log(supabase, sessionId, 'automation', 'warn', `email published gagal: ${res.error}`);
+    // 6) Notifikasi published → selesai.
+    if (run.status === 'published') {
+      // Seluruh langkah notifikasi dibungkus try/catch: kegagalan (query data,
+      // render, pengiriman) harus membuat run tetap maju ke `completed` —
+      // status artikel sudah benar-benar published di titik ini.
+      if (wantsNotification(cfg, 'published') && !run.notified_at) {
+        try {
+          const recipients = await resolveRecipients(supabase, cfg);
+          const articles = await loadArticleLinks(supabase, run.article_ids ?? []);
+          const res = await sendPublishedEmail(supabase, cfg, {
+            recipients,
+            runDate: run.run_date,
+            productName: await productLabel(supabase, run.product_id),
+            articles,
+            siteUrl: env.siteUrl
+          });
+          if (!res.ok && !res.skipped) {
+            await log(supabase, sessionId, 'automation', 'warn', `email published gagal: ${res.error}`);
+          } else if (res.ok) {
+            // JUJUR: notified_at HANYA saat email benar-benar terkirim.
+            await updateRun(supabase, run.id, { notified_at: new Date().toISOString() });
+          } else {
+            await log(supabase, sessionId, 'automation', 'warn', `email published dilewati: ${res.error}`);
+          }
+          // Log selalu ditulis (termasuk skipped) agar badge UI menampilkan alasan.
+          void logAutomationEmail(supabase, {
+            runId: run.id,
+            runDate: run.run_date,
+            slotKey: run.slot_key ?? null,
+            moment: 'published',
+            recipients,
+            result: res
+          });
+        } catch (e) {
+          await log(
+            supabase,
+            sessionId,
+            'automation',
+            'warn',
+            `notifikasi published error: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
-      } catch (e) {
-        await log(
-          supabase,
-          sessionId,
-          'automation',
-          'warn',
-          `notifikasi published error: ${e instanceof Error ? e.message : String(e)}`
-        );
       }
+      await updateRun(supabase, run.id, {
+        status: 'completed'
+      });
+      return { status: 'completed', changed: true };
     }
-    await updateRun(supabase, run.id, {
-      status: 'completed',
-      notified_at: new Date().toISOString()
-    });
-    return { status: 'completed', changed: true };
-  }
 
   return { status: run.status, changed: false };
 }
@@ -706,6 +848,15 @@ async function notifyFailure(
     if (!res.ok && !res.skipped) {
       await log(supabase, run.session_id, 'automation', 'warn', `email failure gagal: ${res.error}`);
     }
+    // Log selalu ditulis (termasuk skipped) agar badge UI menampilkan alasan.
+    void logAutomationEmail(supabase, {
+      runId: run.id,
+      runDate: run.run_date,
+      slotKey: run.slot_key ?? null,
+      moment: 'failure',
+      recipients,
+      result: res
+    });
   } catch (e) {
     await log(
       supabase,

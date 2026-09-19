@@ -46,8 +46,12 @@ function cfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
     notifyOn: 'both',
     notifyEmails: ['admin@asharu.id'],
     emailFrom: 'Asharu <updates@alamaby.com>',
-    emailReplyTo: null,
-    ...over
+      emailReplyTo: null,
+      maxIterations: 1,
+      minScore: null,
+      minCandidates: null,
+      freshnessHours: null,
+      ...over
   };
 }
 
@@ -86,15 +90,15 @@ describe('sendViaResend', () => {
   it('tanpa penerima → skipped tanpa memanggil fetch', async () => {
     const fetchImpl = mockFetch(200, '{}');
     const res = await sendViaResend('re_test', { ...input, to: [] }, fetchImpl);
-    expect(res).toMatchObject({ ok: false, skipped: true });
+    expect(res).toMatchObject({ ok: false, skipped: true, skippedReason: 'no_recipients' });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('status non-2xx → error berisi status + body (terpotong)', async () => {
-    const fetchImpl = mockFetch(422, 'domain not verified');
+  it('status 403 → error string mengandung 403 (bukan throw)', async () => {
+    const fetchImpl = mockFetch(403, 'domain not verified');
     const res = await sendViaResend('re_test', input, fetchImpl);
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('422');
+    expect(res.error).toContain('403');
     expect(res.error).toContain('domain not verified');
   });
 
@@ -168,6 +172,16 @@ describe('sender publik selalu best-effort', () => {
       rpc: async () => ({ data: null, error: { message: 'not found' } })
     } as never;
     const res = await sendPublishedEmail(noKeyClient, cfg(), publishedInput);
-    expect(res).toMatchObject({ ok: false, skipped: true, error: 'resend key not configured' });
+    expect(res).toMatchObject({ ok: false, skipped: true, skippedReason: 'key_missing', error: 'resend key not configured' });
+  });
+
+  it('deliver via sendDraftReadyEmail tidak pernah melempar walau fetch reject', async () => {
+    const rejectingFetch = vi.fn(async () => {
+      throw new Error('ECONNRESET');
+    }) as unknown as typeof fetch;
+    // sendViaResend menangani reject → resolve dengan error, bukan throw.
+    const res = await sendViaResend('re_test', input, rejectingFetch);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('ECONNRESET');
   });
 });

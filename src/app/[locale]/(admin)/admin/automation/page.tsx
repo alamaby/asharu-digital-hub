@@ -67,6 +67,78 @@ interface RunRow {
   error_message: string | null;
   published_at: string | null;
   updated_at: string;
+  /** Ditambahkan Fase 2; pre-migrasi bernilai null. */
+  slot_key?: string | null;
+}
+
+interface EmailLogRow {
+  id: string;
+  run_id: string | null;
+  moment: 'draft_ready' | 'published' | 'failure' | 'test';
+  ok: boolean;
+  skipped: boolean;
+  resend_id: string | null;
+  error: string | null;
+  created_at: string;
+}
+
+/** Grup log email per run_id (hanya momen yang relevan bagi UI). */
+type EmailLogMap = Map<string, Array<{ moment: string; ok: boolean; skipped: boolean; resend_id: string | null; error: string | null }>>;
+
+function buildEmailLogMap(rows: EmailLogRow[] | null): EmailLogMap {
+  const map = new Map<string, Array<{ moment: string; ok: boolean; skipped: boolean; resend_id: string | null; error: string | null }>>();
+  if (!rows) return map;
+  for (const r of rows) {
+    if (!r.run_id) continue;
+    const list = map.get(r.run_id) ?? [];
+    list.push({ moment: r.moment, ok: r.ok, skipped: r.skipped, resend_id: r.resend_id, error: r.error });
+    map.set(r.run_id, list);
+  }
+  return map;
+}
+
+function renderEmailBadge(logs: Array<{ moment: string; ok: boolean; skipped: boolean; resend_id: string | null; error: string | null }>): React.JSX.Element | null {
+  // Urutkan: published terakhir (paling meaningful), lalu draft_ready.
+  const sorted = logs
+    .filter((l) => l.moment !== 'test')
+    .sort((a, b) => {
+      const order: Record<string, number> = { published: 1, draft_ready: 2, failure: 3 };
+      return (order[a.moment] ?? 9) - (order[b.moment] ?? 9);
+    });
+  if (sorted.length === 0) {
+    return (
+      <span className="ml-2 text-xs text-ink-muted" title="Belum ada percobaan email untuk run ini">
+        belum ada percobaan
+      </span>
+    );
+  }
+  // Ambil log published dulu, fallback draft_ready.
+  const published = sorted.find((l) => l.moment === 'published');
+  const draftReady = sorted.find((l) => l.moment === 'draft_ready');
+  const primary = published ?? draftReady;
+  if (!primary) return null;
+  if (primary.ok) {
+    return (
+      <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-700" title={`resend id ${primary.resend_id ?? '?'}`}>
+        ● terkirim{primary.resend_id ? ` (${primary.resend_id.slice(0, 8)}…)` : ''}
+      </span>
+    );
+  }
+  if (primary.skipped) {
+    const reason = primary.error === 'no recipients' ? 'tanpa penerima'
+      : primary.error === 'resend key not configured' ? 'key Resend belum dikonfigurasi'
+      : primary.error?.slice(0, 60) ?? 'dilewati';
+    return (
+      <span className="ml-2 text-xs text-amber-700" title={reason}>
+        ○ dilewati: {reason}
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 text-xs text-red-700" title={primary.error ?? 'gagal kirim'}>
+      ● gagal: {primary.error?.slice(0, 80) ?? 'resend error'}
+    </span>
+  );
 }
 // Nilai null/undefined dari Supabase dinormalkan agar props serializable
 // dan cocok dengan tipe form client.
@@ -117,24 +189,56 @@ export default async function AutomationAdminPage({
   const supabase = createSupabaseService();
   if (!supabase) throw new Error('Supabase not configured — set SUPABASE_SECRET_KEY');
 
-  const [{ data: config }, { data: runs }, { data: platforms }, { data: templates }] =
+  const [{ data: config }, { data: runs }, { data: platforms }, { data: templates }, { data: emailLogs }, { data: slots }] =
     await Promise.all([
       supabase.from('automation_configs').select('*').eq('id', 1).maybeSingle(),
       supabase
         .from('automation_runs')
         .select(
-          'id, run_date, status, product_id, session_id, article_draft_id, article_ids, cover_attempts, attempts, error_message, published_at, updated_at'
+          'id, run_date, status, product_id, session_id, article_draft_id, article_ids, cover_attempts, attempts, error_message, published_at, updated_at, slot_key'
         )
         .order('run_date', { ascending: false })
         .limit(20),
       supabase.from('platforms').select('slug, display_name').eq('is_active', true).neq('slug', 'all').order('slug'),
-      supabase.from('research_templates').select('slug, display_name').eq('is_active', true).order('sort_order')
+      supabase.from('research_templates').select('slug, display_name').eq('is_active', true).order('sort_order'),
+      supabase
+        .from('automation_email_log')
+        .select('run_id, moment, ok, skipped, resend_id, error, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabase
+        .from('automation_schedules')
+        .select('slot_key, label, hour, minute, weekdays, is_enabled, window_minutes, priority, updated_at')
+        .order('priority', { ascending: true })
+        .order('hour', { ascending: true })
+        .order('minute', { ascending: true })
     ]);
 
   const cfg = config as ConfigRow | null;
   const runRows = (runs as RunRow[] | null) ?? [];
   const platformRows = (platforms as { slug: string; display_name: string }[] | null) ?? [];
   const templateRows = (templates as { slug: string; display_name: string }[] | null) ?? [];
+  const emailLogMap = buildEmailLogMap(emailLogs as EmailLogRow[] | null);
+  const slotRows = (slots as Array<{
+    slot_key: string; label: string; hour: number; minute: number;
+    weekdays: number; is_enabled: boolean; window_minutes: number | null; priority: number; updated_at: string;
+  }> | null) ?? [];
+
+  // Bitmask → readable label (Senin–Jumat = 31, Sabtu+Minggu = 96, semua = 127)
+  function weekdaysLabel(bits: number): string {
+    if (bits === 127) return 'setiap hari';
+    if (bits === 31) return 'Senin–Jumat';
+    if (bits === 96) return 'Sabtu–Minggu';
+    const days: string[] = [];
+    if (bits & 1) days.push('Sen');
+    if (bits & 2) days.push('Sel');
+    if (bits & 4) days.push('Rab');
+    if (bits & 8) days.push('Kam');
+    if (bits & 16) days.push('Jum');
+    if (bits & 32) days.push('Sab');
+    if (bits & 64) days.push('Min');
+    return days.join(',') || '?';
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -160,6 +264,51 @@ export default async function AutomationAdminPage({
         />
       )}
       
+      <h2 className="mt-8 text-lg font-semibold text-ink">Slot jadwal</h2>
+      <p className="mt-1 text-xs text-ink-muted">
+        N slot per hari, masing-masing jam + hari aktif (bitmask Senin–Minggu) + on/off. 
+        Maks 4 slot aktif; window default 60 mnt. Slot <code>default</code> dibuat otomatis dari konfigurasi lama.
+      </p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line text-left text-xs text-ink-muted">
+              <th className="pb-2 pr-4">Slot</th>
+              <th className="pb-2 pr-4">Jam</th>
+              <th className="pb-2 pr-4">Hari</th>
+              <th className="pb-2 pr-4">Window</th>
+              <th className="pb-2 pr-4">Status</th>
+              <th className="pb-2">Terakhir update</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slotRows.map((s) => (
+              <tr key={s.slot_key} className="border-b border-line/50 hover:bg-background/50">
+                <td className="py-2 pr-4 font-mono text-xs">{s.slot_key}</td>
+                <td className="py-2 pr-4 font-mono text-xs">{String(s.hour).padStart(2, '0')}:{String(s.minute).padStart(2, '0')}</td>
+                <td className="py-2 pr-4 text-xs">{weekdaysLabel(s.weekdays)}</td>
+                <td className="py-2 pr-4 text-xs">{s.window_minutes ?? '—'} mnt</td>
+                <td className="py-2 pr-4">
+                  <span className={`text-xs ${s.is_enabled ? 'text-green-700' : 'text-ink-muted'}`}>
+                    {s.is_enabled ? 'aktif' : 'nonaktif'}
+                  </span>
+                </td>
+                <td className="py-2 text-xs text-ink-muted">
+                  {new Date(s.updated_at).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+            {slotRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-3 text-sm text-ink-muted">
+                  Belum ada slot — migrasi <code>20260920000002</code> belum dijalankan.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
       <h2 className="mt-8 text-lg font-semibold text-ink">Riwayat run (20 terbaru)</h2>
       <div className="mt-3 space-y-3">
         {runRows.map((r) => (
@@ -169,6 +318,7 @@ export default async function AutomationAdminPage({
                 <p className="text-sm font-semibold text-ink">
                   {r.run_date} · <span className="font-mono text-xs">{r.status}</span>
                   {r.attempts > 0 ? <span className="ml-2 text-xs text-ink-muted">retry {r.attempts}</span> : null}
+                  {renderEmailBadge(emailLogMap.get(r.id) ?? [])}
                 </p>
                 <p className="mt-1 text-xs text-ink-muted">
                   produk <span className="font-mono">{r.product_id?.slice(0, 8) ?? '—'}</span> ·

@@ -21,6 +21,8 @@ export interface SendResult {
   error?: string;
   /** True bila email memang dilewati (tidak ada penerima / key). */
   skipped?: boolean;
+  /** Alasan terstruktur `skipped`: 'no_recipients' | 'key_missing' | null. */
+  skippedReason?: 'no_recipients' | 'key_missing' | null;
 }
 
 /**
@@ -52,7 +54,7 @@ export async function sendViaResend(
   input: AutomationEmailInput,
   fetchImpl: typeof fetch = fetch
 ): Promise<SendResult> {
-  if (input.to.length === 0) return { ok: false, skipped: true, error: 'no recipients' };
+  if (input.to.length === 0) return { ok: false, skipped: true, skippedReason: 'no_recipients', error: 'no recipients' };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
   try {
@@ -122,10 +124,10 @@ async function deliver(
 ): Promise<SendResult> {
   try {
     if (input.recipients.length === 0) {
-      return { ok: false, skipped: true, error: 'no recipients' };
+      return { ok: false, skipped: true, skippedReason: 'no_recipients', error: 'no recipients' };
     }
     const apiKey = await resolveResendKey(supabase);
-    if (!apiKey) return { ok: false, skipped: true, error: 'resend key not configured' };
+    if (!apiKey) return { ok: false, skipped: true, skippedReason: 'key_missing', error: 'resend key not configured' };
     return await sendViaResend(apiKey, {
       to: input.recipients,
       subject: input.subject,
@@ -136,6 +138,39 @@ async function deliver(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, error: `email gagal: ${message}` };
+  }
+}
+
+/**
+ * Insert satu baris ke `automation_email_log` (best-effort): kegagalan insert
+ * tidak boleh menggagalkan tick automation atau pemanggil lainnya.
+ * `run_id` opsional (test email dipakai `null`).
+ */
+export async function logAutomationEmail(
+  supabase: SupabaseClient,
+  opts: {
+    runId?: string | null;
+    runDate?: string | null;
+    slotKey?: string | null;
+    moment: 'draft_ready' | 'published' | 'failure' | 'test';
+    recipients: string[];
+    result: SendResult;
+  }
+): Promise<void> {
+  try {
+    await supabase.from('automation_email_log').insert({
+      run_id: opts.runId ?? null,
+      run_date: opts.runDate ?? null,
+      slot_key: opts.slotKey ?? null,
+      moment: opts.moment,
+      recipients: opts.recipients,
+      ok: opts.result.ok,
+      skipped: opts.result.skipped ?? false,
+      resend_id: opts.result.id ?? null,
+      error: opts.result.error ?? null
+    });
+  } catch {
+    /* audit best-effort — jangan pernah menggagalkan tick */
   }
 }
 
@@ -176,11 +211,19 @@ export async function sendDraftReadyEmail(
   } catch (e) {
     return { ok: false, error: `render draft_ready gagal: ${e instanceof Error ? e.message : String(e)}` };
   }
-  return deliver(supabase, cfg, {
+  const result = await deliver(supabase, cfg, {
     recipients: input.recipients,
     subject: `[Asharu] Draf riset ${input.runDate} siap`,
     html: shell
   });
+  // Log best-effort; kegagalan insert TIDAK menggagalkan tick.
+  void logAutomationEmail(supabase, {
+    moment: 'draft_ready',
+    runDate: input.runDate,
+    recipients: input.recipients,
+    result
+  });
+  return result;
 }
 
 /**
@@ -217,11 +260,18 @@ export async function sendPublishedEmail(
   } catch (e) {
     return { ok: false, error: `render published gagal: ${e instanceof Error ? e.message : String(e)}` };
   }
-  return deliver(supabase, cfg, {
+  const result = await deliver(supabase, cfg, {
     recipients: input.recipients,
     subject: `[Asharu] Artikel ${input.runDate} sudah terbit`,
     html: shell
   });
+  void logAutomationEmail(supabase, {
+    moment: 'published',
+    runDate: input.runDate,
+    recipients: input.recipients,
+    result
+  });
+  return result;
 }
 
 /** Email kegagalan run (best-effort). Tidak melempar. */
@@ -243,9 +293,16 @@ export async function sendFailureEmail(
   } catch (e) {
     return { ok: false, error: `render failure gagal: ${e instanceof Error ? e.message : String(e)}` };
   }
-  return deliver(supabase, cfg, {
+  const result = await deliver(supabase, cfg, {
     recipients: input.recipients,
     subject: `[Asharu] Automation gagal (${input.runDate})`,
     html: shell
   });
+  void logAutomationEmail(supabase, {
+    moment: 'failure',
+    runDate: input.runDate,
+    recipients: input.recipients,
+    result
+  });
+  return result;
 }

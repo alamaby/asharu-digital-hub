@@ -155,13 +155,14 @@ function renderTickMessage(tick: AutomationTickResult): string {
 
 /**
  * Jalankan satu tick sekarang (tombol Run now) — mengabaikan jendela jadwal.
+ * `slotKey` opsional: bila diisi hanya proses slot itu; kosong = semua slot enabled.
  * Tidak pernah melempar: kegagalan diringkas ke `AutomationActionResult`
  * agar komponen client menampilkannya sebagai notice inline.
  */
-export async function runAutomationNow(): Promise<AutomationActionResult> {
+export async function runAutomationNow(slotKey?: string): Promise<AutomationActionResult> {
   try {
     const supabase = await requireAdmin();
-    const tick = await runAutomationTick(supabase, { force: true });
+    const tick = await runAutomationTick(supabase, { force: true, slotKey: slotKey || undefined });
     revalidatePath('/admin/automation');
     if (!tick.ok) return automationFail(tick.error ?? 'run gagal');
     return automationOk(renderTickMessage(tick));
@@ -214,6 +215,206 @@ export async function retryAutomationRun(runId: string): Promise<AutomationActio
   if (error) return automationFail(error.message);
   revalidatePath('/admin/automation');
   return automationOk(`Run dikembalikan ke ${nextStatus}.`);
+  } catch (e) {
+    return automationFail(e);
+  }
+}
+
+/**
+ * Kirim email test automation ke penerima yangterkonfigurasi (atau admin).
+ * Admin-only; tidak pernah melempar — semua error diringkas ke AutomationActionResult.
+ * Resend ID / error asli dikembalikan agar badge UI bisa menampilkan "terkirim (id...)" atau "gagal: ...".
+ */
+export async function sendAutomationTestEmail(): Promise<AutomationActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const cfgModule = await import('@/lib/automation/config');
+    const cfg = await cfgModule.loadAutomationConfig(supabase);
+    const recipients = cfg ? await cfgModule.resolveRecipients(supabase, cfg) : [];
+    const { resolveResendKey } = await import('@/lib/automation/email');
+    const apiKey = await resolveResendKey(supabase);
+    if (!apiKey) {
+      void supabase.from('automation_email_log').insert({
+        moment: 'test',
+        recipients: [],
+        ok: false,
+        skipped: true,
+        error: 'resend key not configured'
+      });
+      return automationFail('Resend key belum dikonfigurasi di Vault/env');
+    }
+    const { sendDraftReadyEmail } = await import('@/lib/automation/email');
+    const envModule = await import('@/lib/env');
+    const res = await sendDraftReadyEmail(supabase, {
+      id: 0,
+      isEnabled: true,
+      scheduleHour: 10,
+      scheduleMinute: 0,
+      timezone: 'Asia/Jakarta',
+      scheduleWindowMinutes: 180,
+      mechanism: 'dua',
+      platformSlugs: [],
+      templateSlug: null,
+      maxTopics: 1,
+      language: 'both',
+      tone: 'casual',
+      audience: 'umum',
+      purpose: 'x',
+      ctaStyle: 'soft_sell',
+      targetReplyCount: null,
+      productPoolSize: 50,
+      productCategory: null,
+      ideaGenerationEnabled: false,
+      ideaProductSearch: true,
+      requireCover: false,
+      coverMaxWaitMinutes: 60,
+      coverMaxAttempts: 3,
+      autoPublishArticle: false,
+      maxRetryAttempts: 3,
+      notifyOn: 'none',
+      notifyEmails: [],
+      emailFrom: 'Asharu <updates@alamaby.com>',
+      emailReplyTo: null
+    } as never, {
+      recipients,
+      runDate: new Date().toISOString().slice(0, 10),
+      productName: '(test)',
+      drafts: [],
+      siteUrl: envModule.env.siteUrl
+    });
+    revalidatePath('/admin/automation');
+    if (!res.ok) {
+      return automationFail(res.error ?? 'email test gagal');
+    }
+    return automationOk(`Terkirim${recipients.length ? ' ke ' + recipients.join(', ') : ''}${res.id ? ` (id ${res.id})` : ''}`);
+  } catch (e) {
+    return automationFail(e);
+  }
+}
+
+// --- Slot CRUD --------------------------------------------------------------
+
+/** Regex slot_key: lowercase alphanumeric + hyphen, 1–32 chars. */
+const SLOT_KEY_RE = /^[a-z0-9-]{1,32}$/;
+const MAX_ENABLED_SLOTS_PER_DAY = 4;
+
+async function countEnabledSlots(supabase: NonNullable<ReturnType<typeof createSupabaseService>>): Promise<number> {
+  try {
+    const { count } = await supabase
+      .from('automation_schedules')
+      .select('*', { count: 'exact', head: true });
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Buat slot baru. Divalidasi DB (CHECK) + app-level cap & format. */
+export async function createAutomationSlot(formData: FormData): Promise<AutomationActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const slotKey = str(formData, 'slot_key');
+    if (!slotKey || !SLOT_KEY_RE.test(slotKey)) {
+      return automationFail('slot_key wajib huruf kecil/angka/hyphen, maks 32 karakter');
+    }
+    const hour = num(formData, 'hour', 10);
+    const minute = num(formData, 'minute', 0);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return automationFail('jam 0–23, menit 0–59');
+    }
+    const weekdays = num(formData, 'weekdays', 127);
+    if (weekdays < 0 || weekdays > 127) return automationFail('weekdays 0–127');
+    const windowMinutes = str(formData, 'window_minutes') === null ? null : num(formData, 'window_minutes', 60);
+    if (windowMinutes !== null && (windowMinutes < 5 || windowMinutes > 720)) {
+      return automationFail('window_minutes 5–720');
+    }
+    const label = str(formData, 'label') ?? slotKey;
+    const enabledCount = await countEnabledSlots(supabase);
+    if (enabledCount >= MAX_ENABLED_SLOTS_PER_DAY) {
+      return automationFail(`maksimal ${MAX_ENABLED_SLOTS_PER_DAY} slot aktif per hari`);
+    }
+    const { error } = await supabase.from('automation_schedules').insert({
+      slot_key: slotKey,
+      label,
+      hour,
+      minute,
+      weekdays,
+      is_enabled: bool(formData, 'is_enabled'),
+      window_minutes: windowMinutes,
+      priority: num(formData, 'priority', 0)
+    });
+    if (error) return automationFail(error.message);
+    revalidatePath('/admin/automation');
+    return automationOk(`Slot ${slotKey} dibuat.`);
+  } catch (e) {
+    return automationFail(e);
+  }
+}
+
+/** Perbarui slot yang sudah ada. */
+export async function updateAutomationSlot(formData: FormData): Promise<AutomationActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const slotKey = str(formData, 'slot_key');
+    if (!slotKey) return automationFail('slot_key wajib');
+    const patch: Record<string, unknown> = {
+      label: str(formData, 'label') ?? '',
+      hour: num(formData, 'hour', 10),
+      minute: num(formData, 'minute', 0),
+      weekdays: num(formData, 'weekdays', 127),
+      is_enabled: bool(formData, 'is_enabled'),
+      window_minutes: str(formData, 'window_minutes') === null ? null : num(formData, 'window_minutes', 60),
+      priority: num(formData, 'priority', 0),
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('automation_schedules').update(patch).eq('slot_key', slotKey);
+    if (error) return automationFail(error.message);
+    revalidatePath('/admin/automation');
+    return automationOk(`Slot ${slotKey} diperbarui.`);
+  } catch (e) {
+    return automationFail(e);
+  }
+}
+
+/** Toggle on/off slot tanpa menghapus. */
+export async function toggleAutomationSlot(slotKey: string): Promise<AutomationActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const { data: row } = await supabase
+      .from('automation_schedules')
+      .select('is_enabled')
+      .eq('slot_key', slotKey)
+      .maybeSingle();
+    const r = row as { is_enabled: boolean } | null;
+    if (!r) return automationFail('slot tidak ditemukan');
+    const { error } = await supabase
+      .from('automation_schedules')
+      .update({ is_enabled: !r.is_enabled, updated_at: new Date().toISOString() })
+      .eq('slot_key', slotKey);
+    if (error) return automationFail(error.message);
+    revalidatePath('/admin/automation');
+    return automationOk(`Slot ${slotKey} ${!r.is_enabled ? 'diaktifkan' : 'dinonaktifkan'}.`);
+  } catch (e) {
+    return automationFail(e);
+  }
+}
+
+/** Hapus slot; tolak bila masih ada run merujuk. */
+export async function deleteAutomationSlot(slotKey: string): Promise<AutomationActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    if (slotKey === 'default') return automationFail('slot default tidak bisa dihapus');
+    const { count } = await supabase
+      .from('automation_runs')
+      .select('*', { count: 'exact', head: true })
+      .eq('slot_key', slotKey);
+    if ((count ?? 0) > 0) {
+      return automationFail(`slot ${slotKey} masih punya ${count} run — hapus run dulu`);
+    }
+    const { error } = await supabase.from('automation_schedules').delete().eq('slot_key', slotKey);
+    if (error) return automationFail(error.message);
+    revalidatePath('/admin/automation');
+    return automationOk(`Slot ${slotKey} dihapus.`);
   } catch (e) {
     return automationFail(e);
   }

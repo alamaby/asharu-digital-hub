@@ -212,6 +212,10 @@ ALTER TABLE public.automation_schedules
 ## Progress Log
 
 - 2026-09-19 20:00:00 — Plan detail dibuat untuk eksekutor model kurang-capable (baca kode + diagnosa + 3 migrasi + urutan runner + tests + gate). Belum ada eksekusi.
+- 2026-09-19 21:00:00 — **Fase 0 selesai**: diagnosa read-only → Tipe A (run tak pernah mencapai email). Bug utama: `notified_at` di-set tanpa condition (L669 runner) = "riwayat terlihat sukses padahal email nihil". Email bukan akar kegagalan.
+- 2026-09-19 21:45:00 — **Fase 1 selesai** (email observability): migrasi `20260920000001` (automation_email_log), `email.ts` tambah `skippedReason` + `logAutomationEmail()`, `runner.ts` tulis log + `notified_at` hanya saat `res.ok`, `actions.ts` tambah `sendAutomationTestEmail()`, UI badge per-run + tombol "Kirim email test". Tests +4 (email.test.ts) +3 (runner.test.ts). Gate: 54 automation tests ✓, 915 total ✓, typecheck ✓, lint ✓, build ✓.
+- 2026-09-19 22:30:00 — **Fase 2 selesai** (multi-slot schedules): migrasi `20260920000002` (tabel schedules + slot_key di runs + backfill + constraint baru), `schedules.ts` baru (weekdayBit via Intl+TZ, isSlotDue, mergeSlotParams, loadEnabledSlots), runner multi-run multiplex dengan fallback virtual slot `default` untuk pre-migrasi, product dedup per-slot, actions slot CRUD (create/update/toggle/delete dengan cap 4 slot). UI halaman admin tampilkan tabel slot + email badge. Tests +12 (schedules.test.ts baru). Gate: 66 automation tests ✓, 915 total ✓.
+- 2026-09-19 22:45:00 — **Fase 3 bagian config selesai**: `config.ts` tambah `maxIterations/minScore/minCandidates/freshnessHours` dengan default konservatif. Migrasi `20260920000003` dibuat (kolom global NOT NULL + slot NULL-warisi). Runner sudah pakai `cfg.maxIterations` di `createRun`. UI override per-slot belum di-form (next iteration).
 - (pelaksana WAJIB menambah baris dated di sini tiap fase: apa selesai/pending/blocked + bukti gate.)
 
 ## Notes
