@@ -1,11 +1,11 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-18 21:55 (local time)
+Last updated: 2026-09-19 23:15 (local time)
 
 ## Current State
 
-- **Status:** Admin menu baru SELESAI (18 Sep): `/admin/produk` (kelola featured via override layer `featured_override` + generated `featured_rank`, auto-swap cap 6, scraper untouched) + `/admin/cron` (monitor 7-8 job via SECURITY DEFINER RPC service_role-only, last 50 runs + HTTP response best-effort via x-matched-path). Migrasi applied prod `20260916000001`+`0002`. Gate 839 tests + build hijau, pushed `45d5ae5`/`24ae5d1`. Content factory 4-tahap + automation harian aktif (10:00 WIB) + publish artikel + email Resend (dry-run siap). Cron semua aktif di `*/5` kecuali studio-cleanup (19:00).
+- **Status:** Automation riset harian upgraded (19 Sep): email log (`automation_email_log`) + badge UI + tombol test; jadwal multi-slot (N slot/hari, bitmask Senin–Minggu, cap 4, window per-slot) + product dedup; knob discovery full (`maxIterations/minScore/minCandidates/freshnessHours`) global + override per-slot. 3 migrasi prod siap `20260920000001`/`002`/`003`. Gate 915 tests ✓, build ✓, pushed `af6de25`/`92f2c18`. Cron `asharu-automation-run` tetap `*/5`.
 - **Stack:** Next.js 15 App Router + React 19 + TS strict + Tailwind 4.3 (CSS-first `@theme`, migrasi 11 Sep dari 3.4; token Asharu 1:1 + token TailAdmin khusus admin) + next-intl v4 + Zod + Supabase (auth Magic Link, Postgres+RLS, Vault, pg_cron+pg_net). Situs publik tetap statis/SSG; rute `(admin)` dinamis (slot sidebar baca auth).
 - **Halaman publik:** `/id` & `/en` (home urutan: afiliasi → properti → toko → medsos → matematika + carousel afiliasi 6 produk, 7 Sep), produk (240 dari scraper; urut featured-dulu sejak 16 Sep), properti (+detail), **artikel (13 Sep: `/artikel`+`/articles` list+detail, SSG/ISR, Article+FAQPage JSON-LD — butuh migrasi prod `20260913000001`)**, tentang, privasi, disclosure, not-found. Root `/` → 307 `/id`.
 - **Halaman admin (11 Sep: shell TailAdmin):** sidebar classic-collapsible + header (breadcrumb, toggle tema, bahasa) + dark mode + chart Apex (tren 14h, funnel) di `/id/admin`; guard middleware `/admin/*` + `/konten/(review|riset)`; 4 view agregasi (`v_admin_content_daily`, `v_admin_research_funnel`, `v_admin_llm_usage_daily`, `v_admin_image_stats`, applied prod). Rute grup `(public)/(admin)` (URL tak berubah); `AdminTopBar` dihapus; `/masuk` kartu auth. Isi halaman dalam belum di-restyle (follow-up).
@@ -99,7 +99,7 @@ Last updated: 2026-09-18 21:55 (local time)
 - [155500-artikel-rich-text.md](2026-09-14/155500-artikel-rich-text.md) — `*`/`**` kini dirender miring/tebal di body artikel (publik + pratinjau + draf) via `renderRichText`. Gate 577 tests + build hijau.
 - [155000-artikel-linkify-afiliasi.md](2026-09-14/155000-artikel-linkify-afiliasi.md) — URL inline di body artikel kini anchor bisa diklik (publik + pratinjau + draf review) via `linkifyText`; tanda baca akhir tak ikut href. Gate 574 tests + build hijau.
 - [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
-- _(entri lebih lama diarsipkan sebagai file di .memory/ - tidak dihapus, hanya tidak ditautkan di indeks 20-terbaru)_
+- [230000-automation-email-multislot.md](2026-09-19/230000-automation-email-multislot.md) — Email observability (log tabel + badge UI + test email) + multi-slot schedules (tabel automation_schedules + runner multiplex + dedup produk) + discovery params global+per-slot. Migrasi prod `20260920000001`/`002`/`003`. Gate 915 tests ✓, pushed `92f2c18` (submodule) + `af6de25` (parent). [USER ACTION] Apply 3 migrasi prod → deploy Vercel → dry-run per slot dengan auto_publish_article=false.
 ## Legacy Archive
 
 ## Legacy Archive
