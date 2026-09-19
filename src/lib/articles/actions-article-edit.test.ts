@@ -134,7 +134,8 @@ describe('updateArticleDraft', () => {
       title: 'Pan生热 guide' // contains CJK
     });
     expect(res.success).toBe(false);
-    expect(res.error).toContain('CJK');
+    expect(res.error).toContain('judul');
+    expect(res.error).toContain('生');
   });
 
   it('tolak CJK di body section', async () => {
@@ -164,7 +165,63 @@ describe('updateArticleDraft', () => {
       ]
     });
     expect(res.success).toBe(false);
-    expect(res.error).toContain('CJK');
+    // Pesan presisi: nomor section + karakter pelanggar (kasus 36bb2945).
+    expect(res.error).toContain('Section 1');
+    expect(res.error).toContain('散');
+  });
+
+  it('tolak CJK di meta_title dengan pesan presisi', async () => {
+    const draft = validDraft({
+      id: {
+        title: 'Keyboard Mekanik Guide',
+        slug: 'tips-keyboard-wfh',
+        excerpt: 'Panduan lengkap memilih keyboard mekanik untuk kerja dari rumah.',
+        sections: [
+          { h2: 'A', body: 'Body A content here.'.repeat(30) },
+          { h2: 'B', body: 'Body B content here.'.repeat(30) },
+          { h2: 'C', body: 'Body C content here.'.repeat(30) }
+        ],
+        faq: [{ q: 'Q?', a: 'A.' }],
+        meta_title: 'KB Guide',
+        meta_desc: 'Panduan.'
+      },
+      en: null
+    });
+    svcClient = buildDraftTable(draft);
+    const res = await updateArticleDraft('draft-001', {
+      locale: 'id',
+      meta_title: 'Panduan 散热 keyboard'
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('meta_title');
+    expect(res.error).toContain('散');
+  });
+
+  it('tolak CJK di FAQ jawaban dengan nomor FAQ presisi', async () => {
+    const draft = validDraft({
+      id: {
+        title: 'Keyboard Mekanik Guide',
+        slug: 'tips-keyboard-wfh',
+        excerpt: 'Panduan lengkap memilih keyboard mekanik untuk kerja dari rumah.',
+        sections: [
+          { h2: 'A', body: 'Body A content here.'.repeat(30) },
+          { h2: 'B', body: 'Body B content here.'.repeat(30) },
+          { h2: 'C', body: 'Body C content here.'.repeat(30) }
+        ],
+        faq: [{ q: 'Q?', a: 'A.' }, { q: 'Q2?', a: 'A2.' }],
+        meta_title: 'KB Guide',
+        meta_desc: 'Panduan.'
+      },
+      en: null
+    });
+    svcClient = buildDraftTable(draft);
+    const res = await updateArticleDraft('draft-001', {
+      locale: 'id',
+      faq: [{ q: 'Q?', a: 'A.' }, { q: 'Q2?', a: 'Jawaban 夹式 di sini.' }]
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('FAQ #2');
+    expect(res.error).toContain('夹');
   });
 
   it('tolak slug tidak valid', async () => {

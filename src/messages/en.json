@@ -551,6 +551,8 @@
        "articleEditMetaTitle": "Meta Title",
        "articleEditMetaDesc": "Meta Description",
        "articleEditLangLabel": "Editing language",
+       "articleCjkWarn": "⚠ CJK: {hit}",
+       "articleCjkRemaining": "{n} field(s) still contain CJK characters — save will be rejected until all are clean.",
        "articleSaved": "Article saved successfully.",
        "articleArchive": "Archive",
        "articlePublishedList": "Published articles by locale",

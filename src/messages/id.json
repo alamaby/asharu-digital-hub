@@ -551,6 +551,8 @@
        "articleEditMetaTitle": "Meta Title",
        "articleEditMetaDesc": "Meta Description",
        "articleEditLangLabel": "Bahasa yang diedit",
+       "articleCjkWarn": "⚠ CJK: {hit}",
+       "articleCjkRemaining": "Masih ada {n} field memuat karakter CJK — simpan akan ditolak sampai semuanya bersih.",
        "articleSaved": "Artikel berhasil disimpan.",
        "articleArchive": "Arsipkan",
        "articlePublishedList": "Artikel terbit per bahasa",

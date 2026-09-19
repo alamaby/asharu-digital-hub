@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-19 14:05 (local time)
+Last updated: 2026-09-19 malam (local time)
 
 ## Current State
 
@@ -66,6 +66,8 @@ Last updated: 2026-09-19 14:05 (local time)
 
 ## Recent Entries
 
+- [2026-09-19 221500-cjk-error-presisi-badge-live.md](2026-09-19/221500-cjk-error-presisi-badge-live.md) — RCA pesan CJK berulang: bukan false positive, draf 36bb2945/id masih ada 5 titik (S2 团战, S3 关闭+散热, FAQ#4 夹式). Server kini kembalikan lokasi presisi + snippet; form edit tampilkan badge CJK live + banner sisa field. Gate typecheck ✓ lint ✓ 18/18 ✓ build ✓ (1 flaky tak terkait).
+- [2026-09-19 203000-admin-konten-mobile-klik-review.md](2026-09-19/203000-admin-konten-mobile-klik-review.md) — Kartu konten mobile bisa di-tap ke review (`/konten/review/[draftId]`) + perbaiki link desktop + `RecentDraftsList` dashboard + touch target 44px + hapus dead code `DraftListCard.tsx`. Gate 951 tests ✓, build ✓, pushed `3e343ca`. [USER ACTION] Verifikasi manual mobile tap.
 - [2026-09-19 140500-review-fix-complete.md](2026-09-19/140500-review-fix-complete.md) — Review `36bb2945` fix SELESAI (M1–M4): CJK gate di parseArticleLang + prompt, truncateImagePrompt sadar-kalimat, ::selection opaque solid light+dark, 4 server action baru (update/reject/reset draft + update published) + UI editor draf/published. Gate 951 tests ✓, build ✓, pushed `f750164`/`bc0d3f0`.
 - [235500-automation-slot-forms.md](2026-09-19/235500-automation-slot-forms.md) — Slot CRUD UI: form tambah/edit (26 override per-slot) + Run per-slot + Toggle + Hapus via `<details>` card. Fix bug `countEnabledSlots` (sebelumnya hitung semua baris tanpa filter `is_enabled`). Gate 925 tests ✓, pushed `6048280`.
 

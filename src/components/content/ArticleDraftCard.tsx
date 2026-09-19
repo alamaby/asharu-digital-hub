@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import type { ParsedArticleDraft } from '@/lib/llm/prompt';
-import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex } from '@/lib/llm/prompt';
+import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex, findCjkHit } from '@/lib/llm/prompt';
 import { approveArticleAndPublish, expandArticleDraft, updateArticleDraft, rejectArticleDraft } from '@/lib/articles/actions';
 import { renderArticleMarkdown, type ArticleLocale } from '@/lib/articles/types';
 import { ArticlePublicView, renderRichText } from '@/components/articles/ArticlePublicView';
@@ -33,6 +33,22 @@ export interface ArticleDraftCardProps {
   /** Katalog provider/model aktif untuk picker model expand. */
   expandProviders?: { id: string; slug: string; display_name: string }[];
   expandModels?: { id: string; provider_id: string; model_id: string; display_name: string; priority: number; config: Record<string, unknown> | null }[];
+}
+
+/**
+ * Badge peringatan live bila sebuah field masih memuat karakter CJK.
+ * Membantu admin melihat SEMUA titik tersisa sebelum klik Simpan
+ * (server menolak save selama masih ada 1 titik pun).
+ */
+function CjkBadge({ value }: { value: string }) {
+  const t = useTranslations('content.review');
+  const hit = findCjkHit(value ?? '');
+  if (!hit) return null;
+  return (
+    <span className="ml-2 inline-block rounded bg-red-100 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-red-700">
+      {t('articleCjkWarn', { hit })}
+    </span>
+  );
 }
 
 /**
@@ -228,6 +244,15 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
       </article>
     );
   }
+
+  // Hitung field form edit yang masih memuat CJK (live, sebelum save).
+  const cjkFieldCount =
+    (findCjkHit(editTitle ?? '') ? 1 : 0) +
+    (findCjkHit(editExcerpt ?? '') ? 1 : 0) +
+    editSections.filter((s) => findCjkHit(s.h2 ?? '') || findCjkHit(s.body ?? '')).length +
+    editFaq.filter((f) => findCjkHit(f.q ?? '') || findCjkHit(f.a ?? '')).length +
+    (findCjkHit(editMetaTitle ?? '') ? 1 : 0) +
+    (findCjkHit(editMetaDesc ?? '') ? 1 : 0);
 
   return (
     <article className="rounded-xl border border-line bg-surface p-4 shadow-card sm:p-6">
@@ -489,10 +514,15 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
       {editing ? (
         <div className="mt-4 space-y-4 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
           <p className="text-sm font-semibold text-primary">{t('articleEditHeader')}</p>
+          {cjkFieldCount > 0 ? (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+              {t('articleCjkRemaining', { n: cjkFieldCount })}
+            </p>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditTitle')}</label>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditTitle')}<CjkBadge value={editTitle} /></label>
               <input
                 type="text"
                 value={editTitle}
@@ -514,7 +544,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditExcerpt')}</label>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditExcerpt')}<CjkBadge value={editExcerpt} /></label>
             <textarea
               value={editExcerpt}
               onChange={(e) => setEditExcerpt(e.target.value)}
@@ -538,7 +568,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
               {editSections.map((s, i) => (
                 <div key={i} className="rounded-md border border-line bg-background p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-ink-muted">{t('articleSection', { n: i + 1 })}</span>
+                    <span className="text-xs font-medium text-ink-muted">{t('articleSection', { n: i + 1 })}<CjkBadge value={`${s.h2 ?? ''} ${s.body ?? ''}`} /></span>
                     <button
                       type="button"
                       onClick={() => removeSection(i)}
@@ -582,7 +612,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
               {editFaq.map((f, i) => (
                 <div key={i} className="rounded-md border border-line bg-background p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-ink-muted">FAQ #{i + 1}</span>
+                    <span className="text-xs font-medium text-ink-muted">FAQ #{i + 1}<CjkBadge value={`${f.q ?? ''} ${f.a ?? ''}`} /></span>
                     <button
                       type="button"
                       onClick={() => removeFaq(i)}
@@ -613,7 +643,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaTitle')}</label>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaTitle')}<CjkBadge value={editMetaTitle} /></label>
               <input
                 type="text"
                 value={editMetaTitle}
@@ -623,7 +653,7 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaDesc')}</label>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaDesc')}<CjkBadge value={editMetaDesc} /></label>
               <input
                 type="text"
                 value={editMetaDesc}

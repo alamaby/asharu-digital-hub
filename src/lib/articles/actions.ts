@@ -397,7 +397,7 @@ export async function updateArticleDraft(
   }
 
   // 2. Bangun object parsial untuk validasi parseArticleLang
-  const { parseArticleLang, clampArticleExcerpt, countArticleWords, CJK_RE } = await import('@/lib/llm/prompt');
+  const { parseArticleLang, clampArticleExcerpt, countArticleWords, findCjkHit } = await import('@/lib/llm/prompt');
   const { locale } = patch;
   const existing = d.article_draft[locale];
   if (!existing) {
@@ -418,27 +418,46 @@ export async function updateArticleDraft(
   // Validasi via parseArticleLang (sudah include CJK gate, slug regex, sections, faq, excerpt clamp)
   const validated = parseArticleLang(mergedRaw);
   if (!validated) {
-    // Coba identifikasi masalah untuk pesan error yang lebih helpful
-    const tTitle = (patch.title ?? existing.title).trim();
-    const tSlug = (patch.slug ?? existing.slug).trim();
-    const tExcerpt = (patch.excerpt ?? existing.excerpt).trim();
-    if (CJK_RE.test(tTitle)) return { success: false, error: 'judul memuat karakter CJK terlarang' };
-    if (CJK_RE.test(tExcerpt)) return { success: false, error: 'excerpt memuat karakter CJK terlarang' };
-    if (patch.sections) {
-      for (const s of patch.sections) {
-        if (CJK_RE.test(s.h2) || CJK_RE.test(s.body)) {
-          return { success: false, error: 'ada section yang memuat karakter CJK terlarang' };
-        }
-      }
+    // Identifikasi lokasi CJK secara presisi (nomor section/FAQ + karakter +
+    // cuplikan konteks) agar admin tahu persis field mana yang harus
+    // dibersihkan — satu draf bisa punya banyak titik (kasus 36bb2945: 5
+    // titik di 3 field) sehingga pesan generik membuat save gagal terus.
+    const asText = (v: unknown): string => (typeof v === 'string' ? v : '');
+    const cjkAt = (v: string): { hit: string; ctx: string } | null => {
+      const hit = findCjkHit(v);
+      if (!hit) return null;
+      const i = v.indexOf(hit);
+      const start = Math.max(0, i - 25);
+      const end = Math.min(v.length, i + hit.length + 25);
+      return { hit, ctx: `${start > 0 ? '…' : ''}${v.slice(start, end)}${end < v.length ? '…' : ''}` };
+    };
+    const titleHit = cjkAt(asText(mergedRaw.title).trim());
+    if (titleHit) return { success: false, error: `judul memuat karakter CJK terlarang "${titleHit.hit}" (${titleHit.ctx})` };
+    const slugHit = cjkAt(asText(mergedRaw.slug).trim());
+    if (slugHit) return { success: false, error: `slug memuat karakter CJK terlarang "${slugHit.hit}"` };
+    const excerptHit = cjkAt(asText(mergedRaw.excerpt).trim());
+    if (excerptHit) return { success: false, error: `excerpt memuat karakter CJK terlarang "${excerptHit.hit}" (${excerptHit.ctx})` };
+    const mergedSections = Array.isArray(mergedRaw.sections) ? mergedRaw.sections : [];
+    for (let i = 0; i < mergedSections.length; i++) {
+      const s = mergedSections[i] as { h2?: unknown; body?: unknown };
+      const h2Hit = cjkAt(asText(s?.h2));
+      if (h2Hit) return { success: false, error: `Section ${i + 1} (judul) memuat karakter CJK terlarang "${h2Hit.hit}" (${h2Hit.ctx})` };
+      const bodyHit = cjkAt(asText(s?.body));
+      if (bodyHit) return { success: false, error: `Section ${i + 1} (isi) memuat karakter CJK terlarang "${bodyHit.hit}" (${bodyHit.ctx})` };
     }
-    if (patch.faq) {
-      for (const f of patch.faq) {
-        if (CJK_RE.test(f.q) || CJK_RE.test(f.a)) {
-          return { success: false, error: 'ada FAQ yang memuat karakter CJK terlarang' };
-        }
-      }
+    const mergedFaq = Array.isArray(mergedRaw.faq) ? mergedRaw.faq : [];
+    for (let i = 0; i < mergedFaq.length; i++) {
+      const f = mergedFaq[i] as { q?: unknown; a?: unknown };
+      const qHit = cjkAt(asText(f?.q));
+      if (qHit) return { success: false, error: `FAQ #${i + 1} (pertanyaan) memuat karakter CJK terlarang "${qHit.hit}" (${qHit.ctx})` };
+      const aHit = cjkAt(asText(f?.a));
+      if (aHit) return { success: false, error: `FAQ #${i + 1} (jawaban) memuat karakter CJK terlarang "${aHit.hit}" (${aHit.ctx})` };
     }
-    return { success: false, error: 'validasi gaga—periksa slug, section count (3-8), atau excerpt length' };
+    const metaTitleHit = cjkAt(asText(mergedRaw.meta_title).trim());
+    if (metaTitleHit) return { success: false, error: `meta_title memuat karakter CJK terlarang "${metaTitleHit.hit}"` };
+    const metaDescHit = cjkAt(asText(mergedRaw.meta_desc).trim());
+    if (metaDescHit) return { success: false, error: `meta_desc memuat karakter CJK terlarang "${metaDescHit.hit}"` };
+    return { success: false, error: 'validasi gagal — periksa slug, section count (3-8), atau excerpt length' };
   }
 
   // 3. Hitung ulang word_count

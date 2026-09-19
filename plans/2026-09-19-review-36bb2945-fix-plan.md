@@ -88,6 +88,7 @@ Kerjakan berurutan M1 → M4. Setiap milestone harus hijau `typecheck+lint+test`
   - M4: 4 server action baru (`updateArticleDraft`, `rejectArticleDraft`, `resetArticleApproval`, `updatePublishedArticle`); `ArticleDraftCard` mode Edit + Tolak; `PublishedArticleEditor` di review page; 16 test baru di `actions-article-edit.test.ts`.
   - Gate: typecheck ✓, lint ✓ (0 errors), 951 tests ✓ (↑16), build ✓, pushed.
 - 2026-09-19 14:05 — Plan tasks all checked off.
+- 2026-09-19 malam — Follow-up RCA pesan "ada section yang memuat karakter CJK terlarang" berulang: BUKAN false positive — draf 36bb2945 (locale id) masih memuat 5 titik CJK di 3 field (Section 2 isi: 团战; Section 3 isi: 关闭 + 散热; FAQ #4 q+a: 夹式; locale en bersih; judul masih typo `Lemat`). Gate menolak save sampai SEMUA titik bersih dalam 1x simpan, tapi pesan generik tak menunjukkan lokasi → user stuck. Fix: (1) server `updateArticleDraft` kini kembalikan lokasi presisi `Section N (isi) "..."` + karakter + cuplikan konteks, tambah cek slug/meta_title/meta_desc, perbaiki typo `validasi gaga`; (2) form edit `ArticleDraftCard` tampilkan badge CJK live per field + banner jumlah field tersisa (`articleCjkWarn`, `articleCjkRemaining` id/en); (3) +2 test pesan presisi (meta_title, FAQ #2). Gate: typecheck ✓, lint 0 errors, tests 18/18 file + 952/953 suite (1 flaky `FeaturedProductBoard` spinner-timing tak terkait, lolos 12/12 saat run sendiri), build ✓.
 
 ## Notes
 
