@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-19 23:30 (local time)
+Last updated: 2026-09-19 14:05 (local time)
 
 ## Current State
 
@@ -66,6 +66,9 @@ Last updated: 2026-09-19 23:30 (local time)
 
 ## Recent Entries
 
+- [2026-09-19 140500-review-fix-complete.md](2026-09-19/140500-review-fix-complete.md) — Review `36bb2945` fix SELESAI (M1–M4): CJK gate di parseArticleLang + prompt, truncateImagePrompt sadar-kalimat, ::selection opaque solid light+dark, 4 server action baru (update/reject/reset draft + update published) + UI editor draf/published. Gate 951 tests ✓, build ✓, pushed `f750164`/`bc0d3f0`.
+- [235500-automation-slot-forms.md](2026-09-19/235500-automation-slot-forms.md) — Slot CRUD UI: form tambah/edit (26 override per-slot) + Run per-slot + Toggle + Hapus via `<details>` card. Fix bug `countEnabledSlots` (sebelumnya hitung semua baris tanpa filter `is_enabled`). Gate 925 tests ✓, pushed `6048280`.
+
 - [214000-review-image-studio-port-a1-b-c.md](2026-09-18/214000-review-image-studio-port-a1-b-c.md) — Review konten port Pola Studio: A1 (enhance field-aware + slugs) + A2 (negative WAJIB gate + retry + maxTokens 1000) + B (auto-enhance toggle, default ON cover / OFF reply) + C (slug persist di slider + undo persisten). Gate 899 tests ✓, pushed `48c3656`. Lanjutan D–G (compose LLM worker + snapshot llm_meta + picker model LLM + collapse `<details>`) diselesaikan di commit `4a489b4`/`42eb84d`.
 - [223000-cloudflare-flux2-leonardo-studio-draft.md](2026-09-17/223000-cloudflare-flux2-leonardo-studio-draft.md) — 5 model image Cloudflare (FLUX.2 klein-4b/9b/dev + Leonardo Phoenix-1.0/Lucid) → Studio + draft: migrasi `20260919000001` (5 model + 5 kolom advanced), adapter Leonardo + Flux-2 (FormData primary, fallback JSON 400-only), clamp Auto ≤1024/≤25, UI `<details> Advanced` + label `· teks`. Gate 816 tests + build hijau. [USER ACTION] Apply migrasi prod + uji live.
 - [172500-automation-idea-generation.md](2026-09-17/172500-automation-idea-generation.md) — Tahap ideation workflow otomatis: riset mekanisme produk (Tavily 2 query + extract, cap 2000 char) → LLM stage `idea_generation` → parameter sesi diperkaya (topic/keywords/kategori/audience/dst); fail-soft berlapis, knob `idea_generation_enabled=false` default + `idea_product_search=true`, UI admin 2 checkbox. Migrasi `20260918000004`. Gate typecheck+lint+796 tests+build hijau, pushed `6592c5c`/`ef755e4`. [USER ACTION] Apply migrasi prod → Run now dry-run → pantau 1 hari.
@@ -100,6 +103,7 @@ Last updated: 2026-09-19 23:30 (local time)
 - [155000-artikel-linkify-afiliasi.md](2026-09-14/155000-artikel-linkify-afiliasi.md) — URL inline di body artikel kini anchor bisa diklik (publik + pratinjau + draf review) via `linkifyText`; tanda baca akhir tak ikut href. Gate 574 tests + build hijau.
 - [153500-artikel-expand-preview-status.md](2026-09-14/153500-artikel-expand-preview-status.md) — Expand artikel bisa pilih provider/model (validasi aktif + rate limit) + tab Pratinjau via `ArticlePublicView` bersama halaman publik + badge status Indonesia (Antre/Draf prompt/Siap/Dipilih/Gagal). Gate 570 tests + build hijau, tanpa migrasi.
 - [230000-automation-email-multislot.md](2026-09-19/230000-automation-email-multislot.md) — Email observability (log tabel + badge UI + test email) + multi-slot schedules (tabel automation_schedules + runner multiplex + dedup produk) + discovery params global+per-slot. Migrasi prod `20260920000001`/`002`/`003`. Gate 915 tests ✓, pushed `92f2c18` (submodule) + `af6de25` (parent). [USER ACTION] Apply 3 migrasi prod → deploy Vercel → dry-run per slot dengan auto_publish_article=false.
+- [235500-automation-slot-forms.md](2026-09-19/235500-automation-slot-forms.md) — Slot CRUD UI: form tambah/edit (26 override per-slot) + Run per-slot + Toggle + Hapus via `<details>` card. Fix bug `countEnabledSlots` (sebelumnya hitung semua baris tanpa filter `is_enabled`). Gate 925 tests ✓, pushed `6048280`.
 ## Legacy Archive
 
 ## Legacy Archive
