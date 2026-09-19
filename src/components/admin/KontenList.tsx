@@ -194,7 +194,7 @@ export function KontenList({
               type="button"
               onClick={() => setPlatformOpen((v) => !v)}
               aria-expanded={platformOpen}
-              className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-left text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="min-h-touch w-full rounded-lg border border-line bg-background px-2 py-1.5 text-left text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {selectedPlatforms.length === 0
                 ? t('platformAll')
@@ -206,14 +206,14 @@ export function KontenList({
                   <button
                     type="button"
                     onClick={() => setSelectedPlatforms(platforms.map((p) => p.slug))}
-                    className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+                    className="min-h-touch inline-flex items-center rounded border border-line px-3 py-0.5 text-xs text-ink hover:border-primary"
                   >
                     {t('platformSelectAll')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedPlatforms([])}
-                    className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+                    className="min-h-touch inline-flex items-center rounded border border-line px-3 py-0.5 text-xs text-ink hover:border-primary"
                   >
                     {t('platformClear')}
                   </button>
@@ -253,7 +253,7 @@ export function KontenList({
             ) : null}
             <span>{t('apply')}</span>
           </button>
-          <Link href={pathname as never} className="rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink hover:border-primary">
+          <Link href={pathname as never} className="min-h-touch inline-flex items-center rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink hover:border-primary">
             {t('reset')}
           </Link>
         </div>
@@ -273,7 +273,7 @@ export function KontenList({
                       type="button"
                       onClick={() => toggleSort(col.key)}
                       aria-label={t('sortBy', { column: t(col.labelKey) })}
-                      className="font-medium uppercase tracking-wide hover:text-ink"
+                      className="min-h-touch inline-flex items-center font-medium uppercase tracking-wide hover:text-ink"
                     >
                       {t(col.labelKey)}{arrow}
                     </button>
@@ -295,9 +295,16 @@ export function KontenList({
                 </td>
                 <td className="px-4 py-2 text-xs text-ink-muted">{formatRowDate(item.createdAt, locale, timeZone)}</td>
                 <td className="px-4 py-2">
-                  <Link href={{ pathname: '/konten/review' }} className="text-xs text-primary underline">
-                    {t('viewDraft')}
-                  </Link>
+                  {item.kind === 'draft' ? (
+                    <Link
+                      href={{ pathname: '/konten/review/[draftId]', params: { draftId: item.id } }}
+                      className="inline-flex min-h-touch items-center text-xs text-primary underline"
+                    >
+                      {t('viewDraft')}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-ink-muted">—</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -314,24 +321,43 @@ export function KontenList({
 
       {/* Mobile card list */}
       <ul className="space-y-3 md:hidden">
-        {items.map((item) => (
-          <li key={`m-${item.kind}-${item.id}`} className="rounded-xl border border-line bg-surface p-4 shadow-card">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium text-ink">{shortTopic(item.topic, 100)}</p>
-              <StatusBadge status={item.status} />
-            </div>
-            <p className="mt-1 text-xs text-ink-muted">{item.platform ?? '—'} · {formatRowDate(item.createdAt, locale, timeZone)}</p>
-            <p className="mt-1 text-xs text-ink-muted">
-              {t('colCategory')}: {item.category ?? '—'}
-              {item.kind === 'request' ? ` · ${t('colAttempts')}: ${item.attempts ?? 0}` : ''}
-            </p>
-            {item.provider ? (
+        {items.map((item) => {
+          const body = (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium text-ink">{shortTopic(item.topic, 100)}</p>
+                <StatusBadge status={item.status} />
+              </div>
+              <p className="mt-1 text-xs text-ink-muted">{item.platform ?? '—'} · {formatRowDate(item.createdAt, locale, timeZone)}</p>
               <p className="mt-1 text-xs text-ink-muted">
-                {item.provider}{item.model ? ` · ${item.model}` : ''}
+                {t('colCategory')}: {item.category ?? '—'}
+                {item.kind === 'request' ? ` · ${t('colAttempts')}: ${item.attempts ?? 0}` : ''}
               </p>
-            ) : null}
-          </li>
-        ))}
+              {item.provider ? (
+                <p className="mt-1 text-xs text-ink-muted">
+                  {item.provider}{item.model ? ` · ${item.model}` : ''}
+                </p>
+              ) : null}
+            </>
+          );
+          return (
+            <li key={`m-${item.kind}-${item.id}`}>
+              {item.kind === 'draft' ? (
+                <Link
+                  href={{ pathname: '/konten/review/[draftId]', params: { draftId: item.id } }}
+                  className="block rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary active:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                  aria-label={`${t('viewDraft')}: ${item.topic ?? item.id}`}
+                >
+                  {body}
+                </Link>
+              ) : (
+                <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
+                  {body}
+                </div>
+              )}
+            </li>
+          );
+        })}
         {items.length === 0 ? (
           <li className="rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-ink-muted">
             {t('empty')}
@@ -380,7 +406,7 @@ function FilterSelect({ label, name, value, options }: FilterSelectProps) {
       <select
         name={name}
         defaultValue={value}
-        className="rounded-lg border border-line bg-background px-2 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="min-h-touch rounded-lg border border-line bg-background px-2 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -407,7 +433,7 @@ function PaginationLink({
       onClick={() => onNavigate(href)}
       disabled={isPending}
       aria-busy={isPending}
-      className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink transition-colors hover:border-primary disabled:pointer-events-none disabled:opacity-60"
+      className="min-h-touch flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink transition-colors hover:border-primary disabled:pointer-events-none disabled:opacity-60"
     >
       {isPending ? (
         <svg viewBox="0 0 20 20" fill="none" className="size-3 animate-spin" aria-hidden>

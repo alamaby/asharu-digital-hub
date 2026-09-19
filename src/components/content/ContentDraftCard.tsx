@@ -293,7 +293,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                         setEditText(text);
                         setEditingIdx(idx);
                       }}
-                      className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary"
+                      className="min-h-touch inline-flex items-center rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary"
                     >
                       {t('edit')}
                     </button>
@@ -382,7 +382,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           onClick={() => updateStatus('rejected')}
           disabled={draft.status === 'rejected' || isUpdating}
           aria-busy={isRejecting}
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
+          className="min-h-touch inline-flex items-center rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isRejecting ? (
             <span className="inline-flex items-center gap-1">

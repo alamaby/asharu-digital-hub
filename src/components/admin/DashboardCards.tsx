@@ -234,7 +234,7 @@ function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
           {drafts.map((d) => (
             <li key={d.id}>
               <Link
-                href={{ pathname: '/konten/review' }}
+                href={{ pathname: '/konten/review/[draftId]', params: { draftId: d.id } }}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               >
                 <div className="min-w-0 flex-1">

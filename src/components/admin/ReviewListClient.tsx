@@ -59,7 +59,7 @@ function MultiSelect({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="w-full rounded-lg border border-line bg-background px-2 py-2 text-left text-sm font-normal text-ink focus:border-primary focus:outline-none"
+          className="min-h-touch w-full rounded-lg border border-line bg-background px-2 py-2 text-left text-sm font-normal text-ink focus:border-primary focus:outline-none"
         >
           {selected.length === 0 ? allLabel : countHint(selected.length)}
         </button>
@@ -69,14 +69,14 @@ function MultiSelect({
               <button
                 type="button"
                 onClick={() => onChange(options.map((o) => o.value))}
-                className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+                className="min-h-touch inline-flex items-center rounded border border-line px-3 py-0.5 text-xs text-ink hover:border-primary"
               >
                 Pilih semua
               </button>
               <button
                 type="button"
                 onClick={() => onChange([])}
-                className="rounded border border-line px-2 py-0.5 text-xs text-ink hover:border-primary"
+                className="min-h-touch inline-flex items-center rounded border border-line px-3 py-0.5 text-xs text-ink hover:border-primary"
               >
                 Hapus
               </button>
@@ -193,8 +193,8 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
           </label>
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <button type="submit" disabled={isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{isPending ? 'Memuat…' : 'Terapkan'}</button>
-          <I18nLink href={{ pathname: '/konten/review' }} className="rounded-lg border border-line px-4 py-2 text-sm">Reset</I18nLink>
+          <button type="submit" disabled={isPending} className="min-h-touch inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{isPending ? 'Memuat…' : 'Terapkan'}</button>
+          <I18nLink href={{ pathname: '/konten/review' }} className="min-h-touch inline-flex items-center rounded-lg border border-line px-4 py-2 text-sm">Reset</I18nLink>
           <span className="ml-auto text-xs text-ink-muted">{totalCount} total · hal {page}/{totalPages}</span>
         </div>
       </form>
@@ -253,8 +253,8 @@ export function ReviewListClient({ drafts, topicSessionMap, platforms, filters, 
       <nav aria-label="pagination" className="flex items-center justify-between">
         <span className="text-xs text-ink-muted">Hal {page} dari {totalPages}</span>
         <div className="flex gap-2">
-          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page - 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page <= 1 ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Prev</I18nLink>
-          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page + 1) } }} className={`rounded-lg border px-3 py-1 text-sm ${page >= totalPages ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Next</I18nLink>
+          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page - 1) } }} className={`min-h-touch inline-flex items-center rounded-lg border px-3 py-1 text-sm ${page <= 1 ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Prev</I18nLink>
+          <I18nLink href={{ pathname: '/konten/review', query: { ...queryObject(), page: String(page + 1) } }} className={`min-h-touch inline-flex items-center rounded-lg border px-3 py-1 text-sm ${page >= totalPages ? 'pointer-events-none opacity-40' : 'border-line hover:border-primary'}`}>Next</I18nLink>
         </div>
       </nav>
     </div>
