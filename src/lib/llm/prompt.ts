@@ -301,8 +301,8 @@ export function buildArticlePrompt(
     '- AFFILIATE: sisipkan {{PRODUCT_URL}} TEPAT 1 kali, inline di dalam body salah satu section tengah (bukan section pertama/terakhir), dibungkus 1-2 kalimat jembatan natural yang menjelaskan kenapa produk relevan + NAMA PRODUK persis seperti di blok produk. Jangan bare link tanpa konteks. Jangan hard-sell.',
     '- SLUG: huruf kecil, alfanumerik + strip saja (contoh: "tips-memilih-keyboard-mekanik-wfh"), 3-8 kata dari keyword utama.',
     '- META: meta_title ≤ 60 karakter (boleh = title bila sudah bagus), meta_desc 120-160 karakter yang memancing klik.',
-    '- COVER IMAGE PROMPT: "cover_image_prompt" top-level = EN image prompt ≤60 kata untuk cover artikel, photorealistic & konkret memvisualkan judul+isi (mis. sudut kamera, pencahayaan, komposisi, subjek). Tanpa teks/logo/wajah/tanda air. Turunkan dari title+excerpt+key facts. DILARANG kosongkan dengan spasi; bila ragu, omit field ini saja.',
-    '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK. Tulis ID & EN yang benar dan natural.',
+    '- COVER IMAGE PROMPT: "cover_image_prompt" top-level = EN image prompt ≤60 kata untuk cover artikel, photorealistic & konkret memvisualkan judul+isi (mis. sudut kamera, pencahayaan, komposisi, subjek). Tanpa teks/logo/wajah/tanda air. Turunkan dari title+excerpt+key facts. DILARANG kosongkan dengan spasi; bila ragu, omit field ini saja. Target ≤480 karakter agar tidak terpotong di batas 500.',
+    '- BAHASA: tulis Bahasa Indonesia yang natural dan benar (atau EN natural untuk field en). HANYA huruf Latin, angka, tanda baca standar. DILARANG keras karakter CJK/Jepang/Korea/Cina (contoh: 散热, 关闭, 夹式, 团战). Jangan campur bahasa lain di dalam kalimat ID.',
     langRule,
     ...(templateRule ? [templateRule] : []),
     '- Tone, audience, CTA style, purpose, dan constraints harus dihormati. CTA diletakkan natural di paragraf penutup.'
@@ -375,7 +375,7 @@ export function clampArticleExcerpt(text: string, max: number = ARTICLE_EXCERPT_
   return chars.slice(0, max).join('').trim();
 }
 
-function parseArticleLang(raw: unknown): ArticleLangDraft | null {
+export function parseArticleLang(raw: unknown): ArticleLangDraft | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (!isNonEmptyString(r.title) || r.title.trim().length > 200) return null;
@@ -388,7 +388,10 @@ function parseArticleLang(raw: unknown): ArticleLangDraft | null {
     const h2 = (s as Record<string, unknown>).h2;
     const body = (s as Record<string, unknown>).body;
     if (!isNonEmptyString(h2) || !isNonEmptyString(body)) return null;
-    sections.push({ h2: h2.trim(), body: body.trim() });
+    const trimmedH2 = h2.trim();
+    const trimmedBody = body.trim();
+    if (CJK_RE.test(trimmedH2) || CJK_RE.test(trimmedBody)) return null;
+    sections.push({ h2: trimmedH2, body: trimmedBody });
   }
   const faqRaw = Array.isArray(r.faq) ? r.faq : [];
   if (faqRaw.length > 6) return null;
@@ -398,18 +401,26 @@ function parseArticleLang(raw: unknown): ArticleLangDraft | null {
     const q = (f as Record<string, unknown>).q;
     const a = (f as Record<string, unknown>).a;
     if (!isNonEmptyString(q) || !isNonEmptyString(a)) return null;
-    faq.push({ q: q.trim(), a: a.trim() });
+    const trimmedQ = q.trim();
+    const trimmedA = a.trim();
+    if (CJK_RE.test(trimmedQ) || CJK_RE.test(trimmedA)) return null;
+    faq.push({ q: trimmedQ, a: trimmedA });
   }
   if (!isNonEmptyString(r.meta_title) || r.meta_title.trim().length > 70) return null;
   if (!isNonEmptyString(r.meta_desc) || r.meta_desc.trim().length > 200) return null;
+  const titleTrim = (r.title as string).trim();
+  const excerptTrim = (r.excerpt as string).trim();
+  const metaTitleTrim = (r.meta_title as string).trim();
+  const metaDescTrim = (r.meta_desc as string).trim();
+  if (CJK_RE.test(titleTrim) || CJK_RE.test(excerptTrim) || CJK_RE.test(metaTitleTrim) || CJK_RE.test(metaDescTrim)) return null;
   return {
-    title: (r.title as string).trim(),
+    title: titleTrim,
     slug: (r.slug as string).trim(),
-    excerpt: clampArticleExcerpt((r.excerpt as string).trim()),
+    excerpt: clampArticleExcerpt(excerptTrim),
     sections,
     faq,
-    meta_title: (r.meta_title as string).trim(),
-    meta_desc: (r.meta_desc as string).trim()
+    meta_title: metaTitleTrim,
+    meta_desc: metaDescTrim
   };
 }
 
@@ -522,6 +533,15 @@ export function slugifyTitle(title: string): string {
 // dari file ini sehingga import balik akan circular).
 const ARTICLE_EMOJI_RE = /\p{Extended_Pictographic}/u;
 
+/** Regex karakter CJK/Jepang/Korea/Cina untuk gate parser artikel. */
+export const CJK_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+
+/** Kembalikan karakter CJK pertama yang ditemukan, atau null bila tak ada. */
+export function findCjkHit(s: string): string | null {
+  const m = s.match(CJK_RE);
+  return m ? m[0] : null;
+}
+
 export interface ArticleEmojiGap {
   /** 'excerpt' atau index section yang tanpa emoji. */
   part: 'excerpt' | number;
@@ -577,7 +597,7 @@ export function buildArticleExpandPrompt(
     '- KEMBANGKAN tiap section body hingga 150-300 kata: tambah contoh konkret, tips praktis, detail use-case, atau sub-poin yang relevan — tiap kalimat baru menambah informasi, bukan pengulangan.',
     '- PERTAHANKAN: title, slug, H2, faq, meta, fakta/key-facts, CTA, dan 1 sisipan {{PRODUCT_URL}} + NAMA PRODUK di section yang sama (jangan pindah/tambah/kurangi). JANGAN ubah cover_image_prompt bila ada (pertahankan persis apa adanya). Jangan mengarang data, angka, harga, atau klaim medis/finansial baru.',
     '- EMOJI: excerpt 1 emoji relevan + tiap section body TEPAT 1 emoji relevan inline (jangan ganti kata dengan emoji).',
-    '- BAHASA: HANYA huruf Latin, angka, tanda baca standar. DILARANG karakter CJK.',
+    '- BAHASA: tulis Bahasa Indonesia yang natural dan benar (atau EN natural untuk field en). HANYA huruf Latin, angka, tanda baca standar. DILARANG keras karakter CJK/Jepang/Korea/Cina (contoh: 散热, 关闭, 夹式, 团战). Jangan campur bahasa lain di dalam kalimat ID.',
     langRule
   ].join('\n');
   const deficit = langs.map((l) => `${l}: ${input.wordCount[l] ?? 0} → target 800+`).join(', ');

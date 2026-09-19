@@ -6,6 +6,7 @@ import { createSupabaseService } from '@/lib/supabase/server';
 import { REFERENCE_IMAGE_ALLOWED_MIME, REFERENCE_IMAGE_MAX_BYTES, clampImg2ImgStrength } from './types';
 import { uploadDraftImage, uploadDraftReference } from './storage';
 import type { DraftImageRow } from './types';
+import { truncateImagePrompt } from './prompt';
 
 async function requireAdmin() {
   if (!(await isAdmin())) throw new Error('Unauthorized: admin only');
@@ -166,7 +167,7 @@ export async function generatePostImage(
   const supabase = await requireAdmin();
   if (!draftId) throw new Error('draftId required');
   if (!Number.isInteger(postIndex) || postIndex < 0) throw new Error('postIndex must be >= 0');
-  const customPrompt = override?.imagePrompt?.trim().slice(0, 500) ?? '';
+  const customPrompt = override?.imagePrompt ? truncateImagePrompt(override.imagePrompt) : '';
   const customNegative = override?.negativePrompt?.trim().slice(0, 300) ?? '';
   if (customPrompt && customPrompt.length < 10) throw new Error('image prompt minimal 10 karakter (EN, ≤60 kata)');
   const { data: draft } = await supabase
@@ -206,7 +207,7 @@ export async function generatePostImage(
       if (enhPrompt && enhPrompt.length >= 10) {
         override = {
           ...override,
-          imagePrompt: enhPrompt.slice(0, 500),
+          imagePrompt: truncateImagePrompt(enhPrompt),
           negativePrompt: enhNeg || null
         };
       }
@@ -214,7 +215,7 @@ export async function generatePostImage(
       // Enhance gagal → fallback prompt asli (prinsip: enhance = polish, bukan gate).
     }
   }
-  const effectivePrompt = (override?.imagePrompt ?? customPrompt).trim().slice(0, 500);
+  const effectivePrompt = truncateImagePrompt(override?.imagePrompt ?? customPrompt);
   const effectiveNegative = (override?.negativePrompt ?? customNegative).trim().slice(0, 300) || null;
   if (effectivePrompt && effectivePrompt.length < 10) throw new Error('image prompt minimal 10 karakter (EN, ≤60 kata)');
   let cameraSlug: string | null = null;

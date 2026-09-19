@@ -197,7 +197,20 @@
   }
 
   ::selection {
-    background-color: rgba(7, 89, 133, 0.18);
+    background-color: #075985;
+    color: #ffffff;
+  }
+  ::-moz-selection {
+    background-color: #075985;
+    color: #ffffff;
+  }
+  .dark ::selection {
+    background-color: #7cd4fd;
+    color: #0c111d;
+  }
+  .dark ::-moz-selection {
+    background-color: #7cd4fd;
+    color: #0c111d;
   }
 
   @media (prefers-reduced-motion: reduce) {

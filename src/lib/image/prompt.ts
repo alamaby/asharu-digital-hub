@@ -1,5 +1,23 @@
 /** Prompt builder stage image_prompt — LLM memikirkan visualisasi dari post utama. */
 
+/**
+ * Potong prompt gambar ke max karakter tanpa memotong tengah kata.
+ * Prioritas: akhir kalimat (. / ! / ?) lalu akhir kata (spasi).
+ * Didesain agar output tidak berakhir huruf menggantung seperti "...phone. N".
+ * Target LLM: ≤480 char agar aman dari ambang 500.
+ */
+export function truncateImagePrompt(text: string, max = 500): string {
+  const clean = text.trim().replace(/\s+/g, ' ');
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSentence = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  if (lastSentence > max * 0.5) return cut.slice(0, lastSentence + 1).trim();
+  const lastSpace = cut.lastIndexOf(' ');
+  if (lastSpace > max * 0.5) return cut.slice(0, lastSpace).trim();
+  return cut.trim();
+}
+
+
 /** Strategi visual: after = ilustrasi langsung/aspirasional; bridge = objek curiosity-gap. */
 export type VisualStrategy = 'after' | 'bridge';
 
@@ -45,7 +63,7 @@ export function buildImagePromptMessages(input: ImagePromptInput): {
     'First REASON explicitly about the post vs visual, then output the visual.',
     'Rules:',
     '- Output JSON ONLY: {"visual_strategy": "after|bridge", "hook_keywords": ["..."], "contradiction_check": "...", "justification": "...", "image_prompt": "...", "negative_prompt": "..."}.',
-    '- image_prompt: single scene in English, ≤60 words, concrete objects/action/setting.',
+    '- image_prompt: single scene in English, ≤60 words, concrete objects/action/setting. Target ≤480 characters agar tidak terpotong di batas 500.',
     '- Derive the scene from the post (e.g. sticky pan with stuck food for a non-stick cookware post).',
     '- visual_strategy: AFTER = direct/aspirational illustration of the post; BRIDGE = curiosity-gap object (tape measure, empty dead corner).',
     '- DETAIL COMPLETENESS: every concrete detail in the source post (setting/location, objects, clothing, people, weather/atmosphere, time of day) MUST appear in image_prompt in some form. If you omit any explicit detail, the output is WRONG.',
@@ -109,7 +127,7 @@ export function parseImagePrompt(text: string): ImagePromptOutput {
     ? parsed.hook_keywords.filter((w): w is string => typeof w === 'string').slice(0, 10)
     : [];
   return {
-    image_prompt: parsed.image_prompt.trim().slice(0, 500),
+    image_prompt: truncateImagePrompt(parsed.image_prompt),
     negative_prompt:
       typeof parsed.negative_prompt === 'string' && parsed.negative_prompt.trim()
         ? parsed.negative_prompt.trim().slice(0, 300)

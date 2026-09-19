@@ -9,6 +9,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { createSupabaseService } from '@/lib/supabase/server';
 import { ContentDraftCard } from '@/components/content/ContentDraftCard';
 import { ApplyCoverBanner } from '@/components/content/ApplyCoverBanner';
+import { PublishedArticleEditor } from '@/components/content/PublishedArticleEditor';
 import { formatDateTime } from '@/lib/utils/format';
 import { getDisplayTimezone } from '@/lib/auth/timezone';
 
@@ -143,11 +144,11 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   }
 
   // Baris articles yang sudah terbit dari draf ini (untuk kartu artikel + banner cover).
-  let publishedArticles: { locale: string; slug: string; cover_image_url: string | null }[] = [];
+  let publishedArticles: { id: string; locale: string; slug: string; cover_image_url: string | null }[] = [];
   if (d.platform_slug === 'artikel') {
     const { data: pubRows } = await supabase!
       .from('articles')
-      .select('locale, slug, cover_image_url')
+      .select('id, locale, slug, cover_image_url')
       .eq('draft_id', draftId)
       .eq('status', 'published');
     if (pubRows) publishedArticles = pubRows as typeof publishedArticles;
@@ -272,17 +273,23 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       </div>
 
       {d.platform_slug === 'artikel' && publishedArticles.length > 0 ? (
-        <ApplyCoverBanner
-          draftId={draftId}
-          draftImageId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
-          liveUrl={publishedArticles[0]?.cover_image_url ?? null}
-          draftUrl={((draft as { selected_image_id?: string | null }).selected_image_id
-            ? draftImages.find((i) => i.id === ((draft as { selected_image_id?: string | null }).selected_image_id))?.public_url ?? null
-            : null)}
-          locale={locale}
-          slug={publishedArticles[0]?.slug ?? ''}
-          publishedLocaleCount={publishedArticles.length}
-        />
+        <>
+          <ApplyCoverBanner
+            draftId={draftId}
+            draftImageId={(draft as { selected_image_id?: string | null }).selected_image_id ?? null}
+            liveUrl={publishedArticles[0]?.cover_image_url ?? null}
+            draftUrl={((draft as { selected_image_id?: string | null }).selected_image_id
+              ? draftImages.find((i) => i.id === ((draft as { selected_image_id?: string | null }).selected_image_id))?.public_url ?? null
+              : null)}
+            locale={locale}
+            slug={publishedArticles[0]?.slug ?? ''}
+            publishedLocaleCount={publishedArticles.length}
+          />
+          <PublishedArticleEditor
+            articles={publishedArticles}
+            draftId={draftId}
+          />
+        </>
       ) : null}
     </div>
   );

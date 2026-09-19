@@ -5,9 +5,11 @@ import {
   auditArticleEmoji,
   buildArticleExpandPrompt,
   buildArticlePrompt,
+  CJK_RE,
   clampArticleExcerpt,
   countArticleWords,
   findAffiliateSectionIndex,
+  findCjkHit,
   isValidCoverPrompt,
   parseArticleDraft,
   repairArticleJson,
@@ -300,3 +302,60 @@ describe('parseArticleDraft cover_image_prompt', () => {
     expect(parsed?.cover_image_prompt).toBe('bright daylight, cozy room');
   });
 });
+
+describe('CJK gate (M1)', () => {
+  it('findCjkHit mengembalikan karakter CJK pertama atau null', () => {
+    expect(findCjkHit('halo dunia')).toBeNull();
+    expect(findCjkHit('panas 散热 bagus')).toBe('散');
+    expect(findCjkHit('close 关闭')).toBe('关');
+  });
+
+  it('CJK_RE cocok untuk karakter Cina/Jepang/Korea', () => {
+    expect(CJK_RE.test('散热')).toBe(true);
+    expect(CJK_RE.test('关闭')).toBe(true);
+    expect(CJK_RE.test('夹式')).toBe(true);
+    expect(CJK_RE.test('团战')).toBe(true);
+    expect(CJK_RE.test('abc')).toBe(false);
+  });
+
+  it('parseArticleDraft menolak body section yang memuat CJK (散热)', () => {
+    const bad = validLang({
+      sections: [
+        { h2: 'Bagian Satu', body: 'Isi tentang pelepasan panas (散热) dan lainnya.'.repeat(30) },
+        { h2: 'Bagian Dua', body: 'Isi bagian dua yang valid.'.repeat(30) },
+        { h2: 'Bagian Tiga', body: 'Isi bagian tiga yang valid.'.repeat(30) }
+      ]
+    });
+    expect(parseArticleDraft(JSON.stringify({ id: bad, en: null }))).toBeNull();
+  });
+
+  it('parseArticleDraft menolak FAQ answer yang memuat CJK (夹式)', () => {
+    const bad = validLang({
+      faq: [{ q: 'Apakah aman?', a: 'Ya, model 夹式 sangat aman digunakan.' }]
+    });
+    // Tambah section agar >= 3
+    bad.sections.push({ h2: 'X', body: 'Y'.repeat(200) });
+    bad.sections.push({ h2: 'Z', body: 'W'.repeat(200) });
+    expect(parseArticleDraft(JSON.stringify({ id: bad, en: null }))).toBeNull();
+  });
+
+  it('buildArticlePrompt system memuat larangan keras CJK', () => {
+    const { system } = buildArticlePrompt(
+      { topic: 'keyboard', tone: 'casual', audience: 'pekerja', ctaStyle: 'soft_sell', purpose: 'edukasi', language: 'id' },
+      product
+    );
+    expect(system).toContain('DILARANG keras karakter CJK');
+    expect(system).toContain('散热');
+  });
+
+  it('buildArticleExpandPrompt system juga memuat larangan keras CJK', () => {
+    const current = { id: validLang(), en: null };
+    const { system } = buildArticleExpandPrompt(
+      { topic: 'keyboard', language: 'id', wordCount: { id: 400 } },
+      current as unknown as import('./prompt').ParsedArticleDraft,
+      product
+    );
+    expect(system).toContain('DILARANG keras karakter CJK');
+  });
+});
+

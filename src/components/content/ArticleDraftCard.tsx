@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import type { ParsedArticleDraft } from '@/lib/llm/prompt';
 import { ARTICLE_MIN_WORDS, countArticleWords, findAffiliateSectionIndex } from '@/lib/llm/prompt';
-import { approveArticleAndPublish, expandArticleDraft } from '@/lib/articles/actions';
+import { approveArticleAndPublish, expandArticleDraft, updateArticleDraft, rejectArticleDraft } from '@/lib/articles/actions';
 import { renderArticleMarkdown, type ArticleLocale } from '@/lib/articles/types';
 import { ArticlePublicView, renderRichText } from '@/components/articles/ArticlePublicView';
 import { StageModelPicker } from './StageModelPicker';
@@ -19,7 +19,7 @@ export interface ArticleAffiliateInfo {
   friendlyCode?: string | null;
 }
 
-interface Props {
+export interface ArticleDraftCardProps {
   draftId: string;
   status: string;
   article: ParsedArticleDraft;
@@ -40,7 +40,7 @@ interface Props {
  * per bahasa ke tabel `articles`. Pengganti ContentDraftCard (thread)
  * khusus platform `artikel`.
  */
-export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published, affiliate = null, coverUrl = null, expandProviders = [], expandModels = [] }: Props) {
+export function ArticleDraftCard({ draftId, status, article, sessionLanguage, published, affiliate = null, coverUrl = null, expandProviders = [], expandModels = [] }: ArticleDraftCardProps) {
   const t = useTranslations('content.review');
   const router = useRouter();
   const available = (['id', 'en'] as const).filter((l) => article[l]);
@@ -55,6 +55,119 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
   const [expandOk, setExpandOk] = useState<string | null>(null);
   const [expandProviderId, setExpandProviderId] = useState('');
   const [expandModelId, setExpandModelId] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectOk, setRejectOk] = useState<string | null>(null);
+
+  // Edit form state — satu locale yang sedang diedit (lazy init, content tersedia nanti)
+  type EditSection = { h2: string; body: string };
+  type EditFaq = { q: string; a: string };
+  const [editTitle, setEditTitle] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editExcerpt, setEditExcerpt] = useState('');
+  const [editSections, setEditSections] = useState<EditSection[]>([]);
+  const [editFaq, setEditFaq] = useState<EditFaq[]>([]);
+  const [editMetaTitle, setEditMetaTitle] = useState('');
+  const [editMetaDesc, setEditMetaDesc] = useState('');
+  const [editLang, setEditLang] = useState<'id' | 'en'>('id');
+
+  function startEdit() {
+    if (!content) return;
+    setEditTitle(content.title);
+    setEditSlug(content.slug);
+    setEditExcerpt(content.excerpt);
+    setEditSections([...content.sections]);
+    setEditFaq([...content.faq]);
+    setEditMetaTitle(content.meta_title);
+    setEditMetaDesc(content.meta_desc);
+    setEditLang(lang);
+    setEditing(true);
+    setSaveError(null);
+    setSaveOk(null);
+  }
+
+  function resetEditForm() {
+    if (content) {
+      setEditTitle(content.title);
+      setEditSlug(content.slug);
+      setEditExcerpt(content.excerpt);
+      setEditSections([...content.sections]);
+      setEditFaq([...content.faq]);
+      setEditMetaTitle(content.meta_title);
+      setEditMetaDesc(content.meta_desc);
+    }
+    setEditing(false);
+    setSaveError(null);
+    setSaveOk(null);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    setSaveOk(null);
+    try {
+      const result = await updateArticleDraft(draftId, {
+        locale: editLang,
+        title: editTitle,
+        slug: editSlug,
+        excerpt: editExcerpt,
+        sections: editSections,
+        faq: editFaq,
+        meta_title: editMetaTitle,
+        meta_desc: editMetaDesc
+      });
+      if (!result.success) {
+        setSaveError(result.error ?? 'save failed');
+      } else {
+        setSaveOk('Tersimpan');
+        router.refresh();
+      }
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReject() {
+    setRejecting(true);
+    setRejectOk(null);
+    try {
+      const result = await rejectArticleDraft(draftId);
+      if (!result.success) {
+        alert(result.error ?? 'reject failed');
+      } else {
+        setRejectOk(t('articleRejected'));
+        router.refresh();
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRejecting(false);
+    }
+  }
+
+  function addSection() {
+    setEditSections((prev) => [...prev, { h2: '', body: '' }]);
+  }
+  function removeSection(idx: number) {
+    setEditSections((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function updateSection(idx: number, field: 'h2' | 'body', value: string) {
+    setEditSections((prev) => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  }
+  function addFaq() {
+    setEditFaq((prev) => [...prev, { q: '', a: '' }]);
+  }
+  function removeFaq(idx: number) {
+    setEditFaq((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function updateFaq(idx: number, field: 'q' | 'a', value: string) {
+    setEditFaq((prev) => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f));
+  }
 
   const content = article[lang];
   const words = content ? countArticleWords(content) : 0;
@@ -120,9 +233,17 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
     <article className="rounded-xl border border-line bg-surface p-4 shadow-card sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="chip bg-primary/10 text-primary">artikel</span>
-        <span className="text-xs text-ink-muted">
-          {t('articleWords', { words })} · {status}
+        <span className="chip border border-line bg-surface text-ink text-xs">
+          {status === 'rejected' ? 'Ditolak' : status === 'needs_review' ? 'Perlu Review' : status}
         </span>
+        <button
+          type="button"
+          onClick={startEdit}
+          disabled={editing}
+          className="btn-secondary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {editing ? t('articleEditing') : t('articleEdit')}
+        </button>
       </div>
 
       {thin ? (
@@ -350,7 +471,209 @@ export function ArticleDraftCard({ draftId, status, article, sessionLanguage, pu
             {t('articlePublishOk')}: {publishOk.map((p) => `${p.locale}/${p.slug}`).join(', ')}
           </p>
         ) : null}
+        <button
+          type="button"
+          onClick={handleReject}
+          disabled={rejecting}
+          aria-busy={rejecting}
+          className="mt-3 border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {rejecting ? '...' : t('articleReject')}
+        </button>
+        {rejectOk ? (
+          <p role="status" className="mt-2 text-xs text-red-700">{rejectOk}</p>
+        ) : null}
       </fieldset>
+
+      {/* Edit mode */}
+      {editing ? (
+        <div className="mt-4 space-y-4 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-primary">{t('articleEditHeader')}</p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditTitle')}</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                maxLength={200}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditSlug')}</label>
+              <input
+                type="text"
+                value={editSlug}
+                onChange={(e) => setEditSlug(e.target.value.toLowerCase())}
+                className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                placeholder="tips-memilih-keyboard-wfh"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditExcerpt')}</label>
+            <textarea
+              value={editExcerpt}
+              onChange={(e) => setEditExcerpt(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs font-medium text-ink-muted">{t('articleEditSections')}</label>
+              <button
+                type="button"
+                onClick={addSection}
+                className="text-xs text-primary hover:underline"
+              >
+                + {t('articleAddSection')}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {editSections.map((s, i) => (
+                <div key={i} className="rounded-md border border-line bg-background p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-ink-muted">{t('articleSection', { n: i + 1 })}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSection(i)}
+                      disabled={editSections.length <= 3}
+                      className="text-xs text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {t('articleRemove')}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={s.h2}
+                    onChange={(e) => updateSection(i, 'h2', e.target.value)}
+                    placeholder="H2 title"
+                    className="mt-2 w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                  <textarea
+                    value={s.body}
+                    onChange={(e) => updateSection(i, 'body', e.target.value)}
+                    rows={4}
+                    placeholder="Body text..."
+                    className="mt-2 w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs font-medium text-ink-muted">{t('articleEditFaq')}</label>
+              <button
+                type="button"
+                onClick={addFaq}
+                className="text-xs text-primary hover:underline"
+              >
+                + {t('articleAddFaq')}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {editFaq.map((f, i) => (
+                <div key={i} className="rounded-md border border-line bg-background p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-ink-muted">FAQ #{i + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFaq(i)}
+                      disabled={editFaq.length <= 1}
+                      className="text-xs text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {t('articleRemove')}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={f.q}
+                    onChange={(e) => updateFaq(i, 'q', e.target.value)}
+                    placeholder="Question..."
+                    className="mt-2 w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                  <textarea
+                    value={f.a}
+                    onChange={(e) => updateFaq(i, 'a', e.target.value)}
+                    rows={3}
+                    placeholder="Answer..."
+                    className="mt-2 w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaTitle')}</label>
+              <input
+                type="text"
+                value={editMetaTitle}
+                onChange={(e) => setEditMetaTitle(e.target.value)}
+                className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                maxLength={70}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink-muted">{t('articleEditMetaDesc')}</label>
+              <input
+                type="text"
+                value={editMetaDesc}
+                onChange={(e) => setEditMetaDesc(e.target.value)}
+                className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                maxLength={200}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-ink-muted">
+            <span>{t('articleEditLangLabel')}:</span>
+            <select
+              value={editLang}
+              onChange={(e) => setEditLang(e.target.value as 'id' | 'en')}
+              className="rounded-md border border-line bg-surface px-2 py-1 text-sm"
+            >
+              {(['id', 'en'] as const).map((l) => (
+                <option key={l} value={l}>{l === 'id' ? 'Indonesia' : 'English'}</option>
+              ))}
+            </select>
+          </div>
+
+          {saveError ? (
+            <p role="alert" className="text-xs text-red-700">{saveError}</p>
+          ) : null}
+          {saveOk ? (
+            <p role="status" className="text-xs text-green-700">{saveOk}</p>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              aria-busy={saving}
+              className="btn-primary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {saving ? '...' : t('articleSave')}
+            </button>
+            <button
+              type="button"
+              onClick={resetEditForm}
+              className="border border-line px-3 py-1.5 text-xs text-ink hover:bg-background"
+            >
+              {t('articleCancel')}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }

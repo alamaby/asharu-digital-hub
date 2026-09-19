@@ -337,3 +337,272 @@ export async function expandArticleDraft(
   revalidatePath('/konten/review/[draftId]', 'page');
   return { success: true, words: newWords, expanded: true };
 }
+
+/* ------------------------------------------------------------------ */
+/* M4 — Sunting draf & published artikel                               */
+/* ------------------------------------------------------------------ */
+
+/** Patch yang bisa disunting admin pada draf artikel per bahasa. */
+export interface ArticleDraftPatch {
+  locale: 'id' | 'en';
+  title?: string;
+  slug?: string;
+  excerpt?: string;
+  sections?: Array<{ h2: string; body: string }>;
+  faq?: Array<{ q: string; a: string }>;
+  meta_title?: string;
+  meta_desc?: string;
+}
+
+export interface UpdateArticleDraftResult {
+  success: boolean;
+  words?: Record<string, number>;
+  error?: string;
+}
+
+/**
+ * Perbarui field draf artikel (tanpa LLM). Validasi CJK + slug + excerpt
+ * clamp + sections 3-8 + faq ≤6 dipakai ulang dari parseArticleLang.
+ * thin_content hanya flag, TIDAK blokir save — blokir tetap di publish.
+ */
+export async function updateArticleDraft(
+  draftId: string,
+  patch: ArticleDraftPatch
+): Promise<UpdateArticleDraftResult> {
+  if (!(await isAdmin())) {
+    return { success: false, error: 'forbidden' };
+  }
+  const supabase = createSupabaseService();
+  if (!supabase) return { success: false, error: 'Supabase not configured' };
+  if (!draftId || !patch.locale) {
+    return { success: false, error: 'draftId dan locale wajib diisi' };
+  }
+
+  // 1. Ambil draf
+  const { data: draft, error: draftError } = await supabase
+    .from('content_drafts')
+    .select('article_draft, research_topic_id, llm_meta')
+    .eq('id', draftId)
+    .maybeSingle();
+  if (draftError || !draft) {
+    return { success: false, error: draftError?.message ?? 'draft not found' };
+  }
+  const d = draft as {
+    article_draft: ParsedArticleDraft | null;
+    research_topic_id: string | null;
+    llm_meta: Record<string, unknown> | null;
+  };
+  if (!d.article_draft) {
+    return { success: false, error: 'draft is not an article draft' };
+  }
+
+  // 2. Bangun object parsial untuk validasi parseArticleLang
+  const { parseArticleLang, clampArticleExcerpt, countArticleWords, CJK_RE } = await import('@/lib/llm/prompt');
+  const { locale } = patch;
+  const existing = d.article_draft[locale];
+  if (!existing) {
+    return { success: false, error: `locale ${locale} tidak ada di draf` };
+  }
+
+  // Gabung patch ke locale yang ada
+  const mergedRaw: Record<string, unknown> = {
+    title: patch.title ?? existing.title,
+    slug: patch.slug ?? existing.slug,
+    excerpt: patch.excerpt ?? existing.excerpt,
+    sections: patch.sections ?? existing.sections,
+    faq: patch.faq ?? existing.faq,
+    meta_title: patch.meta_title ?? existing.meta_title,
+    meta_desc: patch.meta_desc ?? existing.meta_desc
+  };
+
+  // Validasi via parseArticleLang (sudah include CJK gate, slug regex, sections, faq, excerpt clamp)
+  const validated = parseArticleLang(mergedRaw);
+  if (!validated) {
+    // Coba identifikasi masalah untuk pesan error yang lebih helpful
+    const tTitle = (patch.title ?? existing.title).trim();
+    const tSlug = (patch.slug ?? existing.slug).trim();
+    const tExcerpt = (patch.excerpt ?? existing.excerpt).trim();
+    if (CJK_RE.test(tTitle)) return { success: false, error: 'judul memuat karakter CJK terlarang' };
+    if (CJK_RE.test(tExcerpt)) return { success: false, error: 'excerpt memuat karakter CJK terlarang' };
+    if (patch.sections) {
+      for (const s of patch.sections) {
+        if (CJK_RE.test(s.h2) || CJK_RE.test(s.body)) {
+          return { success: false, error: 'ada section yang memuat karakter CJK terlarang' };
+        }
+      }
+    }
+    if (patch.faq) {
+      for (const f of patch.faq) {
+        if (CJK_RE.test(f.q) || CJK_RE.test(f.a)) {
+          return { success: false, error: 'ada FAQ yang memuat karakter CJK terlarang' };
+        }
+      }
+    }
+    return { success: false, error: 'validasi gaga—periksa slug, section count (3-8), atau excerpt length' };
+  }
+
+  // 3. Hitung ulang word_count
+  const words: Record<string, number> = {};
+  for (const lang of ['id', 'en'] as const) {
+    const a = d.article_draft![lang];
+    if (a) words[lang] = countArticleWords(a);
+  }
+  // Override locale yang baru di-update
+  words[locale] = countArticleWords(validated);
+
+  // 4. Update article_draft + llm_meta
+  const updatedDraft = { ...d.article_draft };
+  (updatedDraft as Record<string, unknown>)[locale] = validated;
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from('content_drafts')
+    .update({
+      article_draft: updatedDraft as unknown as string,
+      llm_meta: {
+        ...(d.llm_meta ?? {}),
+        word_count: words,
+        thin_content: Object.values(words).some((w) => w < ARTICLE_MIN_WORDS),
+        edited_at: now,
+        edited_manually: true
+      }
+    })
+    .eq('id', draftId);
+  if (updateError) return { success: false, error: updateError.message };
+
+  revalidatePath('/konten/review');
+  revalidatePath('/konten/review/[draftId]', 'page');
+  return { success: true, words };
+}
+
+export interface RejectArticleResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Tolak draf artikel: set status='rejected'.
+ * Admin required. Revalidate review page.
+ */
+export async function rejectArticleDraft(draftId: string): Promise<RejectArticleResult> {
+  if (!(await isAdmin())) {
+    return { success: false, error: 'forbidden' };
+  }
+  const supabase = createSupabaseService();
+  if (!supabase) return { success: false, error: 'Supabase not configured' };
+  if (!draftId) return { success: false, error: 'draftId required' };
+
+  const { error } = await supabase
+    .from('content_drafts')
+    .update({ status: 'rejected', updated_at: new Date().toISOString() })
+    .eq('id', draftId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/konten/review');
+  revalidatePath('/konten/review/[draftId]', 'page');
+  return { success: true };
+}
+
+/**
+ * Reset draf ke needs_review (setelah revisi admin).
+ * Admin required.
+ */
+export async function resetArticleApproval(draftId: string): Promise<RejectArticleResult> {
+  if (!(await isAdmin())) {
+    return { success: false, error: 'forbidden' };
+  }
+  const supabase = createSupabaseService();
+  if (!supabase) return { success: false, error: 'Supabase not configured' };
+  if (!draftId) return { success: false, error: 'draftId required' };
+
+  const { error } = await supabase
+    .from('content_drafts')
+    .update({ status: 'needs_review', updated_at: new Date().toISOString() })
+    .eq('id', draftId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/konten/review');
+  revalidatePath('/konten/review/[draftId]', 'page');
+  return { success: true };
+}
+
+export interface UpdatePublishedArticleResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Perbarui artikel yang sudah terbit (judul, excerpt, body, FAQ, slug, kategori, tag).
+ * TIDAK menyentuh cover_image_url (banner khusus). Guard admin.
+ */
+export async function updatePublishedArticle(
+  articleId: string,
+  patch: {
+    title?: string;
+    excerpt?: string;
+    body_md?: string;
+    faq?: Array<{ q: string; a: string }>;
+    slug?: string;
+    category?: string | null;
+    tags?: string[];
+  }
+): Promise<UpdatePublishedArticleResult> {
+  if (!(await isAdmin())) {
+    return { success: false, error: 'forbidden' };
+  }
+  const supabase = createSupabaseService();
+  if (!supabase) return { success: false, error: 'Supabase not configured' };
+  if (!articleId) return { success: false, error: 'articleId required' };
+
+  // Validasi slug bila diubah
+  if (patch.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(patch.slug.trim())) {
+    return { success: false, error: 'slug tidak valid (huruf kecil, angka, strip saja)' };
+  }
+  // CJK check on text fields
+  const { CJK_RE } = await import('@/lib/llm/prompt');
+  if (patch.title && CJK_RE.test(patch.title.trim())) {
+    return { success: false, error: 'judul memuat karakter CJK terlarang' };
+  }
+  if (patch.excerpt && CJK_RE.test(patch.excerpt.trim())) {
+    return { success: false, error: 'excerpt memuat karakter CJK terlarang' };
+  }
+  if (patch.faq) {
+    for (const f of patch.faq) {
+      if (CJK_RE.test(f.q) || CJK_RE.test(f.a)) {
+        return { success: false, error: 'FAQ memuat karakter CJK terlarang' };
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const updateData: Record<string, unknown> = { updated_at: now };
+  if (patch.title !== undefined) updateData.title = patch.title.trim();
+  if (patch.excerpt !== undefined) updateData.excerpt = patch.excerpt.trim();
+  if (patch.body_md !== undefined) updateData.body_md = patch.body_md;
+  if (patch.faq !== undefined) updateData.faq = patch.faq;
+  if (patch.slug !== undefined) updateData.slug = patch.slug.trim();
+  if (patch.category !== undefined) updateData.category = patch.category;
+  if (patch.tags !== undefined) updateData.tags = patch.tags;
+
+  const { error } = await supabase
+    .from('articles')
+    .update(updateData)
+    .eq('id', articleId)
+    .eq('status', 'published'); // hanya artikel published yang boleh diedit
+  if (error) return { success: false, error: error.message };
+
+  // Ambil slug + locale untuk revalidate
+  const { data: art } = await supabase
+    .from('articles')
+    .select('slug, locale')
+    .eq('id', articleId)
+    .maybeSingle();
+  const a = art as { slug: string; locale: string } | null;
+  if (a) {
+    const { localizedPathname } = await import('@/lib/seo/paths');
+    revalidatePath(localizedPathname('/artikel', a.locale as 'id' | 'en'));
+    revalidatePath(localizedPathname('/artikel/[slug]', a.locale as 'id' | 'en', { slug: a.slug }));
+  }
+  revalidatePath('/konten/review');
+
+  return { success: true };
+}
