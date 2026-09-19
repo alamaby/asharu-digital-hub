@@ -292,6 +292,20 @@ export async function sendAutomationTestEmail(): Promise<AutomationActionResult>
   }
 }
 
+/** Select tri-state ""/"true"/"false" → null/true/false. */
+function triBool(form: FormData, key: string): boolean | null {
+  const raw = form.get(key);
+  if (raw == null || raw === '') return null;
+  return raw === 'true';
+}
+
+function numNull(form: FormData, key: string): number | null {
+  const raw = form.get(key);
+  if (raw == null || String(raw).trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 // --- Slot CRUD --------------------------------------------------------------
 
 /** Regex slot_key: lowercase alphanumeric + hyphen, 1–32 chars. */
@@ -302,7 +316,8 @@ async function countEnabledSlots(supabase: NonNullable<ReturnType<typeof createS
   try {
     const { count } = await supabase
       .from('automation_schedules')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('is_enabled', true);
     return count ?? 0;
   } catch {
     return 0;
@@ -329,9 +344,12 @@ export async function createAutomationSlot(formData: FormData): Promise<Automati
       return automationFail('window_minutes 5–720');
     }
     const label = str(formData, 'label') ?? slotKey;
-    const enabledCount = await countEnabledSlots(supabase);
-    if (enabledCount >= MAX_ENABLED_SLOTS_PER_DAY) {
-      return automationFail(`maksimal ${MAX_ENABLED_SLOTS_PER_DAY} slot aktif per hari`);
+    const isNewEnabled = bool(formData, 'is_enabled');
+    if (isNewEnabled) {
+      const enabledCount = await countEnabledSlots(supabase);
+      if (enabledCount >= MAX_ENABLED_SLOTS_PER_DAY) {
+        return automationFail(`maksimal ${MAX_ENABLED_SLOTS_PER_DAY} slot aktif per hari`);
+      }
     }
     const { error } = await supabase.from('automation_schedules').insert({
       slot_key: slotKey,
@@ -351,20 +369,106 @@ export async function createAutomationSlot(formData: FormData): Promise<Automati
   }
 }
 
-/** Perbarui slot yang sudah ada. */
+/** Perbarui slot yang sudah ada. Field kosong/null tetap menjadi NULL agar runner warisi global. */
 export async function updateAutomationSlot(formData: FormData): Promise<AutomationActionResult> {
   try {
     const supabase = await requireAdmin();
     const slotKey = str(formData, 'slot_key');
     if (!slotKey) return automationFail('slot_key wajib');
+    const notifyOnRaw = str(formData, 'notify_on');
+    if (notifyOnRaw !== null && !['draft_ready', 'published', 'both', 'none'].includes(notifyOnRaw)) {
+      return automationFail('notify_on tidak valid');
+    }
+    const hour = num(formData, 'hour', 10);
+    const minute = num(formData, 'minute', 0);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return automationFail('jam 0–23, menit 0–59');
+    }
+    const weekdays = num(formData, 'weekdays', 127);
+    if (weekdays < 0 || weekdays > 127) return automationFail('weekdays 0–127');
+    const windowMinutes = numNull(formData, 'window_minutes');
+    if (windowMinutes !== null && (windowMinutes < 5 || windowMinutes > 720)) {
+      return automationFail('window_minutes 5–720');
+    }
+    const maxTopics = numNull(formData, 'max_topics');
+    if (maxTopics !== null && (maxTopics < 1 || maxTopics > 10)) return automationFail('max_topics 1–10');
+    const productPoolSize = numNull(formData, 'product_pool_size');
+    if (productPoolSize !== null && (productPoolSize < 1 || productPoolSize > 500)) {
+      return automationFail('product_pool_size 1–500');
+    }
+    const maximumIterations = numNull(formData, 'maximum_iterations');
+    if (maximumIterations !== null && (maximumIterations < 1 || maximumIterations > 5)) {
+      return automationFail('maximum_iterations 1–5');
+    }
+    const minimumScore = numNull(formData, 'minimum_score');
+    if (minimumScore !== null && (minimumScore < 0 || minimumScore > 100)) {
+      return automationFail('minimum_score 0–100');
+    }
+    const minimumCandidates = numNull(formData, 'minimum_candidates');
+    if (minimumCandidates !== null && (minimumCandidates < 1 || minimumCandidates > 50)) {
+      return automationFail('minimum_candidates 1–50');
+    }
+    const freshnessHours = numNull(formData, 'freshness_hours');
+    if (freshnessHours !== null && (freshnessHours < 1 || freshnessHours > 720)) {
+      return automationFail('freshness_hours 1–720');
+    }
+    const coverMaxWaitMinutes = numNull(formData, 'cover_max_wait_minutes');
+    if (coverMaxWaitMinutes !== null && (coverMaxWaitMinutes < 5 || coverMaxWaitMinutes > 720)) {
+      return automationFail('cover_max_wait_minutes 5–720');
+    }
+    const coverMaxAttempts = numNull(formData, 'cover_max_attempts');
+    if (coverMaxAttempts !== null && (coverMaxAttempts < 1 || coverMaxAttempts > 10)) {
+      return automationFail('cover_max_attempts 1–10');
+    }
+    const maxRetryAttempts = numNull(formData, 'max_retry_attempts');
+    if (maxRetryAttempts !== null && (maxRetryAttempts < 0 || maxRetryAttempts > 10)) {
+      return automationFail('max_retry_attempts 0–10');
+    }
+    const targetReplyCount = numNull(formData, 'target_reply_count');
+    if (targetReplyCount !== null && (targetReplyCount < 1 || targetReplyCount > 10)) {
+      return automationFail('target_reply_count 1–10');
+    }
+    const platformSlugs = (() => {
+      const v = checkboxValues(formData, 'platform_slugs');
+      return v.length ? v : null;
+    })();
     const patch: Record<string, unknown> = {
       label: str(formData, 'label') ?? '',
-      hour: num(formData, 'hour', 10),
-      minute: num(formData, 'minute', 0),
-      weekdays: num(formData, 'weekdays', 127),
+      hour,
+      minute,
+      weekdays,
       is_enabled: bool(formData, 'is_enabled'),
-      window_minutes: str(formData, 'window_minutes') === null ? null : num(formData, 'window_minutes', 60),
+      window_minutes: windowMinutes,
       priority: num(formData, 'priority', 0),
+      platform_slugs: platformSlugs,
+      max_topics: maxTopics,
+      product_pool_size: productPoolSize,
+      product_category: str(formData, 'product_category'),
+      auto_publish_article: triBool(formData, 'auto_publish_article'),
+      require_cover: triBool(formData, 'require_cover'),
+      notify_on: notifyOnRaw,
+      notify_emails: (() => {
+        const v = csv(formData, 'notify_emails');
+        return v.length ? v : null;
+      })(),
+      maximum_iterations: maximumIterations,
+      minimum_score: minimumScore,
+      minimum_candidates: minimumCandidates,
+      freshness_hours: freshnessHours,
+      cover_max_wait_minutes: coverMaxWaitMinutes,
+      cover_max_attempts: coverMaxAttempts,
+      max_retry_attempts: maxRetryAttempts,
+      language: str(formData, 'language'),
+      tone: str(formData, 'tone'),
+      audience: str(formData, 'audience'),
+      purpose: str(formData, 'purpose'),
+      cta_style: str(formData, 'cta_style'),
+      target_reply_count: targetReplyCount,
+      template_slug: str(formData, 'template_slug'),
+      idea_generation_enabled: triBool(formData, 'idea_generation_enabled'),
+      idea_product_search: triBool(formData, 'idea_product_search'),
+      email_from: str(formData, 'email_from'),
+      email_reply_to: str(formData, 'email_reply_to'),
       updated_at: new Date().toISOString()
     };
     const { error } = await supabase.from('automation_schedules').update(patch).eq('slot_key', slotKey);

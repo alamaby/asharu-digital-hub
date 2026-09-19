@@ -11,6 +11,7 @@ import {
   AutomationConfigForm,
   RetryRunForm
 } from '@/components/admin/automation/AutomationForms';
+import { SlotSection, type SlotRowData, type GlobalDefaults } from '@/components/admin/automation/SlotForms';
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata({
@@ -52,6 +53,11 @@ interface ConfigRow {
   email_from: string;
   email_reply_to: string | null;
   last_run_at: string | null;
+  // Kolom discovery (Fase 3 — opsional agar pre-migrasi tetap termuat).
+  maximum_iterations?: number | null;
+  minimum_score?: number | null;
+  minimum_candidates?: number | null;
+  freshness_hours?: number | null;
 }
 
 interface RunRow {
@@ -177,6 +183,37 @@ function toConfigFormData(cfg: ConfigRow): ConfigFormData {
   };
 }
 
+/** Turunkan global defaults untuk placeholder override per-slot. */
+function toGlobalDefaults(cfg: ConfigRow): GlobalDefaults {
+  return {
+    max_topics: cfg.max_topics,
+    product_pool_size: cfg.product_pool_size,
+    language: cfg.language,
+    tone: cfg.tone,
+    audience: cfg.audience,
+    purpose: cfg.purpose,
+    cta_style: cfg.cta_style,
+    target_reply_count: cfg.target_reply_count,
+    template_slug: cfg.template_slug,
+    maximum_iterations: cfg.maximum_iterations ?? null,
+    minimum_score: cfg.minimum_score ?? null,
+    minimum_candidates: cfg.minimum_candidates ?? null,
+    freshness_hours: cfg.freshness_hours ?? null,
+    cover_max_wait_minutes: cfg.cover_max_wait_minutes,
+    cover_max_attempts: cfg.cover_max_attempts,
+    max_retry_attempts: cfg.max_retry_attempts,
+    notify_on: cfg.notify_on,
+    notify_emails: cfg.notify_emails ?? null,
+    idea_generation_enabled: cfg.idea_generation_enabled ?? false,
+    idea_product_search: cfg.idea_product_search ?? true,
+    require_cover: cfg.require_cover,
+    auto_publish_article: cfg.auto_publish_article,
+    email_from: cfg.email_from,
+    email_reply_to: cfg.email_reply_to,
+    product_category: cfg.product_category
+  };
+}
+
 export default async function AutomationAdminPage({
   params
 }: {
@@ -208,7 +245,14 @@ export default async function AutomationAdminPage({
         .limit(200),
       supabase
         .from('automation_schedules')
-        .select('slot_key, label, hour, minute, weekdays, is_enabled, window_minutes, priority, updated_at')
+        .select(
+          'slot_key, label, hour, minute, weekdays, is_enabled, window_minutes, priority, ' +
+          'platform_slugs, max_topics, product_pool_size, product_category, auto_publish_article, require_cover, ' +
+          'notify_on, notify_emails, maximum_iterations, minimum_score, minimum_candidates, freshness_hours, ' +
+          'cover_max_wait_minutes, cover_max_attempts, max_retry_attempts, language, tone, audience, purpose, ' +
+          'cta_style, target_reply_count, template_slug, idea_generation_enabled, idea_product_search, ' +
+          'email_from, email_reply_to, updated_at'
+        )
         .order('priority', { ascending: true })
         .order('hour', { ascending: true })
         .order('minute', { ascending: true })
@@ -219,26 +263,8 @@ export default async function AutomationAdminPage({
   const platformRows = (platforms as { slug: string; display_name: string }[] | null) ?? [];
   const templateRows = (templates as { slug: string; display_name: string }[] | null) ?? [];
   const emailLogMap = buildEmailLogMap(emailLogs as EmailLogRow[] | null);
-  const slotRows = (slots as Array<{
-    slot_key: string; label: string; hour: number; minute: number;
-    weekdays: number; is_enabled: boolean; window_minutes: number | null; priority: number; updated_at: string;
-  }> | null) ?? [];
-
-  // Bitmask → readable label (Senin–Jumat = 31, Sabtu+Minggu = 96, semua = 127)
-  function weekdaysLabel(bits: number): string {
-    if (bits === 127) return 'setiap hari';
-    if (bits === 31) return 'Senin–Jumat';
-    if (bits === 96) return 'Sabtu–Minggu';
-    const days: string[] = [];
-    if (bits & 1) days.push('Sen');
-    if (bits & 2) days.push('Sel');
-    if (bits & 4) days.push('Rab');
-    if (bits & 8) days.push('Kam');
-    if (bits & 16) days.push('Jum');
-    if (bits & 32) days.push('Sab');
-    if (bits & 64) days.push('Min');
-    return days.join(',') || '?';
-  }
+  const slotRows = (slots as SlotRowData[] | null) ?? [];
+  const globalDefaults = cfg ? toGlobalDefaults(cfg) : ({} as GlobalDefaults);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -263,51 +289,13 @@ export default async function AutomationAdminPage({
           templateRows={templateRows}
         />
       )}
-      
-      <h2 className="mt-8 text-lg font-semibold text-ink">Slot jadwal</h2>
-      <p className="mt-1 text-xs text-ink-muted">
-        N slot per hari, masing-masing jam + hari aktif (bitmask Senin–Minggu) + on/off. 
-        Maks 4 slot aktif; window default 60 mnt. Slot <code>default</code> dibuat otomatis dari konfigurasi lama.
-      </p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs text-ink-muted">
-              <th className="pb-2 pr-4">Slot</th>
-              <th className="pb-2 pr-4">Jam</th>
-              <th className="pb-2 pr-4">Hari</th>
-              <th className="pb-2 pr-4">Window</th>
-              <th className="pb-2 pr-4">Status</th>
-              <th className="pb-2">Terakhir update</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slotRows.map((s) => (
-              <tr key={s.slot_key} className="border-b border-line/50 hover:bg-background/50">
-                <td className="py-2 pr-4 font-mono text-xs">{s.slot_key}</td>
-                <td className="py-2 pr-4 font-mono text-xs">{String(s.hour).padStart(2, '0')}:{String(s.minute).padStart(2, '0')}</td>
-                <td className="py-2 pr-4 text-xs">{weekdaysLabel(s.weekdays)}</td>
-                <td className="py-2 pr-4 text-xs">{s.window_minutes ?? '—'} mnt</td>
-                <td className="py-2 pr-4">
-                  <span className={`text-xs ${s.is_enabled ? 'text-green-700' : 'text-ink-muted'}`}>
-                    {s.is_enabled ? 'aktif' : 'nonaktif'}
-                  </span>
-                </td>
-                <td className="py-2 text-xs text-ink-muted">
-                  {new Date(s.updated_at).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-            {slotRows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-3 text-sm text-ink-muted">
-                  Belum ada slot — migrasi <code>20260920000002</code> belum dijalankan.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+
+      <SlotSection
+        slots={slotRows}
+        platforms={platformRows}
+        templates={templateRows}
+        globalDefaults={globalDefaults}
+      />
 
       <h2 className="mt-8 text-lg font-semibold text-ink">Riwayat run (20 terbaru)</h2>
       <div className="mt-3 space-y-3">
