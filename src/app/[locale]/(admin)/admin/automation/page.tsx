@@ -103,8 +103,23 @@ function buildEmailLogMap(rows: EmailLogRow[] | null): EmailLogMap {
   return map;
 }
 
+function classifyResendErrorSnippet(error: string | null): { label: string; hint: string } | null {
+  if (!error) return null;
+  const lower = error.toLowerCase();
+  if (lower.includes('not authorized to send emails from')) {
+    return { label: 'domain pengirim belum terverifikasi / key tak berhak kirim dari domain ini', hint: 'domain pengirim belum terverifikasi di Resend / key tak berhak kirim dari domain ini — cek Resend Domains & API Keys' };
+  }
+  if (lower.includes('domain is not verified') || lower.includes('not verified')) {
+    return { label: 'domain pengirim belum diverifikasi di Resend', hint: 'domain belum diverifikasi via DNS di Resend — verifikasi sebelum pakai email tersebut' };
+  }
+  if (lower.includes('api key is invalid') || lower.includes('authentication required') || lower.includes('invalid api key')) {
+    return { label: 'key Resend tidak valid atau kedaluwarsa', hint: 'API key Resend tidak valid — periksa Vault atau buat key baru di Resend Dashboard' };
+  }
+  return null;
+}
+
 function renderEmailBadge(logs: Array<{ moment: string; ok: boolean; skipped: boolean; resend_id: string | null; error: string | null }>): React.JSX.Element | null {
-  // Urutkan: published terakhir (paling meaningful), lalu draft_ready.
+  // Urutkan: published terakhir (paling meaningful), lalu draft_ready, lalu failure.
   const sorted = logs
     .filter((l) => l.moment !== 'test')
     .sort((a, b) => {
@@ -118,15 +133,16 @@ function renderEmailBadge(logs: Array<{ moment: string; ok: boolean; skipped: bo
       </span>
     );
   }
-  // Ambil log published dulu, fallback draft_ready.
+  // Ambil log published dulu, fallback draft_ready, fallback failure terbaru.
   const published = sorted.find((l) => l.moment === 'published');
   const draftReady = sorted.find((l) => l.moment === 'draft_ready');
-  const primary = published ?? draftReady;
+  const failure = sorted.find((l) => l.moment === 'failure');
+  const primary = published ?? draftReady ?? failure;
   if (!primary) return null;
   if (primary.ok) {
     return (
       <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-700" title={`resend id ${primary.resend_id ?? '?'}`}>
-        ● terkirim{primary.resend_id ? ` (${primary.resend_id.slice(0, 8)}…)` : ''}
+        ● terkirim{primary.resend_id ? ` (${primary.resend_id.slice(0, 8)}...)` : ''}
       </span>
     );
   }
@@ -140,9 +156,12 @@ function renderEmailBadge(logs: Array<{ moment: string; ok: boolean; skipped: bo
       </span>
     );
   }
+  const classified = classifyResendErrorSnippet(primary.error);
+  const body = classified?.label ?? primary.error?.slice(0, 80) ?? 'resend error';
+  const title = classified?.hint ?? (primary.error ?? 'gagal kirim');
   return (
-    <span className="ml-2 text-xs text-red-700" title={primary.error ?? 'gagal kirim'}>
-      ● gagal: {primary.error?.slice(0, 80) ?? 'resend error'}
+    <span className="ml-2 text-xs text-red-700" title={title}>
+      ● gagal: {body}
     </span>
   );
 }

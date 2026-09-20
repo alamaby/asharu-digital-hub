@@ -107,6 +107,19 @@ const NOTIFY_OPTIONS = [
 const inputCls = 'mt-1 w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink';
 const labelCls = 'block text-sm text-ink';
 
+/** Format `Name <email@domain>` — longgar: butuh `<`, `>`, dan minimal 1 titik di domain. */
+function isValidEmailFrom(value: string): boolean {
+  if (!value) return false;
+  const m = value.match(/^(.+?)\s*<([^>@]+)@([^>@]+\.[^>@]+)>$/);
+  return m !== null;
+}
+
+/** Cek apakah domain pengirim berubah dari nilai awal (perlu verifikasi DNS). */
+function extractDomain(value: string): string | null {
+  const m = value.match(/<([^>@]+)@([^>@]+)>$/);
+  return m ? (m[2] as string) : null;
+}
+
 /**
  * Form konfigurasi automation + tombol Run now, dengan feedback inline
  * (pending → sukses/error) mengikuti pola form admin LLM/Visual.
@@ -299,6 +312,26 @@ export function AutomationConfigForm({
           <label className={labelCls}>
             From
             <input name="email_from" defaultValue={cfg.email_from} className={inputCls} />
+            {(() => {
+              const valid = isValidEmailFrom(cfg.email_from);
+              const domain = extractDomain(cfg.email_from);
+              const defaultDomain = extractDomain('Asharu <updates@alamaby.com>');
+              if (!valid) {
+                return (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Format wajib &quot;Nama &lt;email@domain&gt;&quot; — simpan tetap lolos tapi Resend akan tolak bila format salah.
+                  </p>
+                );
+              }
+              if (domain && domain !== defaultDomain) {
+                return (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Domain baru ({domain}) — pastikan sudah terverifikasi di Resend Domains sebelum mengirim email.
+                  </p>
+                );
+              }
+              return null;
+            })()}
           </label>
           <label className={labelCls}>
             Reply-to (opsional)

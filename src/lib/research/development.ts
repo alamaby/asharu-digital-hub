@@ -9,6 +9,8 @@ import {
   countArticleWords,
   isValidCoverPrompt,
   parseArticleDraft,
+  debugArticleRejectReason,
+  repairArticleJson,
   type ParsedArticleDraft
 } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
@@ -942,11 +944,15 @@ async function generateArticleAndInsertDraft(
     }).catch(() => null);
     parsed = retry ? parseArticleDraft(retry.output.text) : null;
     if (!parsed || missingLangs(parsed).length > 0) {
+      // best-effort: coba deteksi alasan penolakan parser dari raw JSON (hanya untuk log).
+
+      const rawJson = repairArticleJson(retry?.output.text ?? llmResult?.output.text ?? '');
+      const rejectReason = rawJson ? debugArticleRejectReason(rawJson).trim().slice(0, 200) : '(tidak bisa parse raw)';
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'developing',
         level: 'error',
-        message: `development LLM raw article topic ${topicId} (first 2000 chars, attempt 2): ${(retry?.output.text ?? llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
+        message: `development LLM raw article topic ${topicId} (first 2000 chars, attempt 2, reject: ${rejectReason}): ${(retry?.output.text ?? llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
       });
       throw new Error(
         !parsed ? 'article parse failed' : `article language missing: ${missingLangs(parsed).join(',')}`

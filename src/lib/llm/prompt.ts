@@ -424,6 +424,53 @@ export function parseArticleLang(raw: unknown): ArticleLangDraft | null {
   };
 }
 
+
+/**
+ * Debugging helper: kembalikan alasan pertama penolakan parseArticleLang
+ * untuk satu bahasa (raw article object). HANYA untuk log — tidak mengubah
+ * kriteria penerimaan parseArticleLang.
+ */
+export function debugArticleRejectReason(parsed: Record<string, unknown> | null): string {
+  if (!parsed) return 'top-level JSON bukan objek';
+  for (const lang of ['id', 'en'] as const) {
+    const art = parsed[lang];
+    if (!art || typeof art !== 'object') continue;
+    const r = art as Record<string, unknown>;
+    if (!isNonEmptyString(r.title)) return lang + ': title kosong atau bukan string';
+    if (r.title && String(r.title).trim().length > 200) return lang + ': title > 200 karakter';
+    if (!isNonEmptyString(r.slug) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(r.slug).trim())) return lang + ': slug tak valid (hanya lowercase alphanumeric + strip)';
+    if (!isNonEmptyString(r.excerpt) || String(r.excerpt).trim().length < ARTICLE_EXCERPT_MIN) return lang + ': excerpt kosong atau < ' + ARTICLE_EXCERPT_MIN + ' karakter';
+    if (!Array.isArray(r.sections) || r.sections.length < 3 || r.sections.length > 8) return lang + ': sections \'' + (Array.isArray(r.sections) ? r.sections.length : 'bukan array') + '\' (harus 3–8)';
+    for (let i = 0; i < (Array.isArray(r.sections) ? r.sections.length : 0); i++) {
+      const s = r.sections[i];
+      if (!s || typeof s !== 'object') return lang + '.sections[' + i + ']: bukan objek';
+      const h2 = (s as Record<string, unknown>).h2;
+      const body = (s as Record<string, unknown>).body;
+      if (!isNonEmptyString(h2)) return lang + '.sections[' + i + '].h2 kosong atau bukan string';
+      if (!isNonEmptyString(body)) return lang + '.sections[' + i + '].body kosong atau bukan string';
+      if (CJK_RE.test(String(h2).trim()) || CJK_RE.test(String(body).trim())) return lang + '.sections[' + i + ']: ada karakter CJK';
+    }
+    const faqRaw = Array.isArray(r.faq) ? r.faq : [];
+    if (faqRaw.length > 6) return lang + ': faq > 6 item';
+    for (let j = 0; j < faqRaw.length; j++) {
+      const f = faqRaw[j];
+      if (!f || typeof f !== 'object') return lang + '.faq[' + j + ']: bukan objek';
+      const q = (f as Record<string, unknown>).q;
+      const a = (f as Record<string, unknown>).a;
+      if (!isNonEmptyString(q)) return lang + '.faq[' + j + '].q kosong';
+      if (!isNonEmptyString(a)) return lang + '.faq[' + j + '].a kosong';
+      if (CJK_RE.test(String(q).trim()) || CJK_RE.test(String(a).trim())) return lang + '.faq[' + j + ']: ada karakter CJK';
+    }
+    if (!isNonEmptyString(r.meta_title) || String(r.meta_title).trim().length > 70) return lang + ': meta_title kosong atau > 70 karakter';
+    if (!isNonEmptyString(r.meta_desc) || String(r.meta_desc).trim().length > 200) return lang + ': meta_desc kosong atau > 200 karakter';
+    const titleTrim = String(r.title).trim();
+    const excerptTrim = String(r.excerpt).trim();
+    const mtTrim = String(r.meta_title).trim();
+    const mdTrim = String(r.meta_desc).trim();
+    if (CJK_RE.test(titleTrim) || CJK_RE.test(excerptTrim) || CJK_RE.test(mtTrim) || CJK_RE.test(mdTrim)) return lang + ': ada karakter CJK di title/excerpt/meta';
+  }
+  return 'semua field valid';
+}
 function stripCodeFence(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 }

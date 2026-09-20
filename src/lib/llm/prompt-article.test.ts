@@ -11,6 +11,7 @@ import {
   findAffiliateSectionIndex,
   findCjkHit,
   isValidCoverPrompt,
+  debugArticleRejectReason,
   parseArticleDraft,
   repairArticleJson,
   slugifyTitle,
@@ -356,6 +357,36 @@ describe('CJK gate (M1)', () => {
       product
     );
     expect(system).toContain('DILARANG keras karakter CJK');
+  });
+});
+describe('debugArticleRejectReason', () => {
+  it('null input → top-level JSON bukan objek', () => {
+    expect(debugArticleRejectReason(null)).toContain('top-level JSON bukan objek');
+  });
+  it('title kosong → menolak di title', () => {
+    const raw = { id: { slug: 'a', excerpt: 'x'.repeat(60), sections: [{ h2: 'A', body: 'b'.repeat(100) }, { h2: 'B', body: 'c'.repeat(100) }, { h2: 'C', body: 'd'.repeat(100) }], faq: [], meta_title: 't', meta_desc: 'm' }, en: null };
+    delete (raw.id as Record<string, unknown>).title;
+    expect(debugArticleRejectReason(raw)).toContain('title');
+  });
+  it('slug tak valid → menolak di slug', () => {
+    const raw = { id: { title: 'Judul', slug: 'Slug Buruk!!', excerpt: 'x'.repeat(60), sections: [{ h2: 'A', body: 'b'.repeat(100) }, { h2: 'B', body: 'c'.repeat(100) }, { h2: 'C', body: 'd'.repeat(100) }], faq: [], meta_title: 't', meta_desc: 'm' }, en: null };
+    expect(debugArticleRejectReason(raw)).toContain('slug');
+  });
+  it('excerpt pendek → menolak di excerpt', () => {
+    const raw = { id: { title: 'Judul', slug: 'judul-valid', excerpt: 'pendek', sections: [{ h2: 'A', body: 'b'.repeat(100) }, { h2: 'B', body: 'c'.repeat(100) }, { h2: 'C', body: 'd'.repeat(100) }], faq: [], meta_title: 't', meta_desc: 'm' }, en: null };
+    expect(debugArticleRejectReason(raw)).toContain('excerpt');
+  });
+  it('sections < 3 → menolak di sections', () => {
+    const raw = { id: { title: 'Judul', slug: 'judul-valid', excerpt: 'x'.repeat(60), sections: [{ h2: 'A', body: 'b'.repeat(100) }], faq: [], meta_title: 't', meta_desc: 'm' }, en: null };
+    expect(debugArticleRejectReason(raw)).toContain('sections');
+  });
+  it('CJK di section body → menolak di CJK', () => {
+    const raw = { id: { title: 'Judul', slug: 'judul-valid', excerpt: 'x'.repeat(60), sections: [{ h2: 'Bagian 散热', body: 'isi'.repeat(30) }, { h2: 'B', body: 'c'.repeat(100) }, { h2: 'C', body: 'd'.repeat(100) }], faq: [], meta_title: 't', meta_desc: 'm' }, en: null };
+    expect(debugArticleRejectReason(raw)).toContain('CJK');
+  });
+  it('semua valid → semua field valid', () => {
+    const raw = { id: validLang(), en: null };
+    expect(debugArticleRejectReason(raw)).toContain('semua field valid');
   });
 });
 
