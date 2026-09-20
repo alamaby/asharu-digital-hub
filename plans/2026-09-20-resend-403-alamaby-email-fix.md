@@ -59,7 +59,7 @@ Keluar scope (JANGAN dikerjakan di plan ini):
 - [x] B3. Tampilkan badge `failure` + pesan 403 yang actionable (`src/app/[locale]/(admin)/admin/automation/page.tsx:106-148`, fungsi `renderEmailBadge`).
 - [x] B4. Validasi `email_from` saat simpan (non-blocking). Lokasi: `AutomationForms.tsx`.
 - [x] B5. Komentar anti-secret di `resolveResendKey` (`src/lib/automation/email.ts:28-49`).
-- [ ] C1. Ambil full output LLM developing sesi gagal (read-only, investigasi).
+- [x] C1. Ambil full output LLM developing sesi gagal (read-only, investigasi).
 - [x] C2. Tambah helper alasan penolakan murni + pakai hanya di jalur log (`src/lib/llm/prompt.ts` + `src/lib/research/development.ts`).
 - [ ] D1. Gate kode: `npm run typecheck`, `npm run lint` hijau. Bila menyentuh pola yang hanya ditangkap build (mis. konstanta di-assign ulang — insiden 2026-09-10), tambah `npm run build`. Aturan final: SETIAP edit setelah gate hijau membatalkan gate — re-run sebelum commit.
 - [ ] D2. Test: `npm test -- src/lib/automation/email.test.ts src/lib/automation/actions.test.ts src/lib/llm/prompt-article.test.ts` hijau, lalu `npm test` penuh hijau. Perbarui `actions.test.ts` (test-email memakai `cfg.emailFrom`) dan `email.test.ts` (klasifikasi 403) yang ditambah di B1/B2.
@@ -80,6 +80,7 @@ Keluar scope (JANGAN dikerjakan di plan ini):
 
 - 2026-09-20 10:40:00 — Plan dibuat dari RCA sesi `91b668a0` (developing `article parse failed` → run failed → `notifyFailure` 403 dari `updates@alamaby.com`). Belum ada implementasi; menunggu eksekusi Fase A→D.
 - 2026-09-20 14:10:00 — Fase B+C kode selesai diimplementasi. B1: test-email pakai `cfg.emailFrom`. B2: `classifyResendError` + field `code` pada `SendResult`. B3: badge fallback ke log `failure` terbaru + pesan Indonesia actionable. B4: validasi format email_from non-blocking di UI (hint amber). B5: komentar anti-secret di resolveResendKey. C2: `debugArticleRejectReason` helper + dipakai di development.ts error log. Gate typecheck ✓, lint ✓ (0 errors), build ✓, 968 tests ✓. [USER ACTION] Fase A (cek Resend Domains & API Keys di dashboard) tetap diperlukan sebelum test email live berhasil kirim.
+- 2026-09-20 16:25:00 — C1 SELESAI via MCP production (read-only SELECT, boleh). Kolom output = `response_text` (bukan `output`). Attempt-2 (naraya agnes-2.5-flash, 7995 char, `{"id":null,"en":null,...,"id":{...}}` duplikat key) dijalankan lewat validator asli repo: `repairArticleJson` → null, `parseArticleDraft` → null → cocok dengan error produksi `article parse failed`. Akar: JSON TERPOTONG — berhenti di tengah FAQ ke-4 (`...lalu switch pakai`, tanpa `meta_title`/`meta_desc`/kurung tutup; `position(meta)=0` terverifikasi SQL). Bukan aturan field-level. Temuan laten: 5 sections valid tapi `sections[2].body` mengandung CJK `multit设备` (pos 4125) + `faq[3].a` mengandung `主打` — akan kena CJK gate walau JSON lengkap. Attempt-1 pakai key salah `"article"` bukan `"id"`. Sesi `language=id`/`mechanism=dua`, jadi `en:null` bukan penyebab.
 
 ## Notes
 
