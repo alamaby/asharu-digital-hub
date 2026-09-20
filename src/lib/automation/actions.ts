@@ -245,6 +245,8 @@ export async function sendAutomationTestEmail(): Promise<AutomationActionResult>
     }
     const { sendDraftReadyEmail } = await import('@/lib/automation/email');
     const envModule = await import('@/lib/env');
+    const emailFrom = cfg?.emailFrom ?? 'Asharu <updates@alamaby.com>';
+    const emailReplyTo = cfg?.emailReplyTo ?? null;
     const res = await sendDraftReadyEmail(supabase, {
       id: 0,
       isEnabled: true,
@@ -273,8 +275,8 @@ export async function sendAutomationTestEmail(): Promise<AutomationActionResult>
       maxRetryAttempts: 3,
       notifyOn: 'none',
       notifyEmails: [],
-      emailFrom: 'Asharu <updates@alamaby.com>',
-      emailReplyTo: null
+      emailFrom,
+      emailReplyTo
     } as never, {
       recipients,
       runDate: new Date().toISOString().slice(0, 10),

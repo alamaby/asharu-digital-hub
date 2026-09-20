@@ -23,6 +23,8 @@ export interface SendResult {
   skipped?: boolean;
   /** Alasan terstruktur `skipped`: 'no_recipients' | 'key_missing' | null. */
   skippedReason?: 'no_recipients' | 'key_missing' | null;
+  /** Kode klasifikasi error Resend (hanya terisi saat ok=false & !skipped). */
+  code?: 'domain_not_verified' | 'unauthorized_sender' | 'invalid_api_key' | 'resend_error';
 }
 
 /**
@@ -30,8 +32,9 @@ export interface SendResult {
  * rotasi lewat Dashboard tanpa deploy) → env `RESEND_API_KEY` (fallback
  * lokal/dev saja). Service-role client wajib untuk RPC.
  *
- * Tidak pernah melempar — RPC bisa gagal jaringan; caller memperlakukannya
- * sebagai "email di-skip", bukan error fatal bagi alur automation.
+ * TIDAK PERNAH log/mengembalikan nilai key ke error message atau SendResult.
+ * Key hanya dipakai sebagai header Authorization; caller tidak pernah
+ * melihat nilainya. Urutan Vault → env tetap.
  */
 export async function resolveResendKey(supabase: SupabaseClient): Promise<string | null> {
   try {
@@ -46,6 +49,20 @@ export async function resolveResendKey(supabase: SupabaseClient): Promise<string
     /* jatuh ke env */
   }
   return env.resendApiKey?.trim() || null;
+}
+
+/** Klasifikasi error HTTP Resend berdasarkan status + body substring.
+ * Never throws — mengembalikan default `resend_error` bila tidak cocok. */
+export function classifyResendError(status: number, text: string): SendResult['code'] {
+  const body = text.toLowerCase();
+  if (status === 401 || body.includes('api key is invalid') || body.includes('authentication required')) {
+    return 'invalid_api_key';
+  }
+  if (status === 403) {
+    if (body.includes('not authorized to send emails from')) return 'unauthorized_sender';
+    if (body.includes('domain is not verified') || body.includes('domain.*not verified') || body.includes('not verified')) return 'domain_not_verified';
+  }
+  return 'resend_error';
 }
 
 /** Kirim 1 email via Resend REST (tanpa dependency baru). */
@@ -75,7 +92,7 @@ export async function sendViaResend(
     });
     const text = await res.text();
     if (!res.ok) {
-      return { ok: false, error: `resend ${res.status}: ${text.slice(0, 300)}` };
+      return { ok: false, code: classifyResendError(res.status, text), error: `resend ${res.status}: ${text.slice(0, 300)}` };
     }
     let id: string | undefined;
     try {

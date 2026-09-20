@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  classifyResendError,
   sendDraftReadyEmail,
   sendFailureEmail,
   sendPublishedEmail,
@@ -185,3 +186,42 @@ describe('sender publik selalu best-effort', () => {
     expect(res.error).toContain('ECONNRESET');
   });
 });
+describe('classifyResendError', () => {
+  it('403 + "not authorized to send emails from" → unauthorized_sender', () => {
+    expect(classifyResendError(403, '{"message":"This API key is not authorized to send emails from alamaby.com"}')).toBe('unauthorized_sender');
+  });
+  it('403 + "domain is not verified" → domain_not_verified', () => {
+    expect(classifyResendError(403, '{"message":"Domain is not verified"}')).toBe('domain_not_verified');
+  });
+  it('403 + generic → resend_error', () => {
+    expect(classifyResendError(403, 'something went wrong')).toBe('resend_error');
+  });
+  it('401 + invalid key → invalid_api_key', () => {
+    expect(classifyResendError(401, '{"message":"API key is invalid"}')).toBe('invalid_api_key');
+  });
+  it('500 → resend_error', () => {
+    expect(classifyResendError(500, 'internal error')).toBe('resend_error');
+  });
+});
+
+describe('sendViaResend code field', () => {
+  it('403 unauthorized_sender sets code + error non-breaking', async () => {
+    const fetchImpl = mockFetch(403, '{"statusCode":403,"message":"This API key is not authorized to send emails from alamaby.com"}');
+    const res = await sendViaResend('re_test', input, fetchImpl);
+    expect(res.ok).toBe(false);
+    expect(res.code).toBe('unauthorized_sender');
+    expect(res.error).toContain('403');
+  });
+  it('403 domain_not_verified sets code', async () => {
+    const fetchImpl = mockFetch(403, '{"message":"Domain is not verified"}');
+    const res = await sendViaResend('re_test', input, fetchImpl);
+    expect(res.code).toBe('domain_not_verified');
+  });
+  it('sukses tidak punya code', async () => {
+    const fetchImpl = mockFetch(200, JSON.stringify({ id: 'msg_ok' }));
+    const res = await sendViaResend('re_test', input, fetchImpl);
+    expect(res.ok).toBe(true);
+    expect(res.code).toBeUndefined();
+  });
+});
+
