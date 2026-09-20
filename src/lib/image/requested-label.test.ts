@@ -14,7 +14,7 @@ const options = {
   ]
 };
 
-const labels = { auto: 'auto', queued: 'antre' };
+const labels = { auto: 'auto', queued: 'antre', failed: 'gagal' };
 
 describe('requestedImageModelUuid', () => {
   it('membaca pin studio langsung dari baris', () => {
@@ -78,5 +78,40 @@ describe('requestedImageProviderLabel', () => {
         labels
       )
     ).toBe('auto · auto (antre)');
+  });
+
+  it('pin cloudflare gagal menampilkan (gagal) bukan (antre)', () => {
+    expect(
+      requestedImageProviderLabel(
+        {
+          provider_slug: '',
+          model_id: '',
+          status: 'failed',
+          llm_meta: { override: { modelUuid: 'model-cf-uuid', styleSlug: null } }
+        },
+        options,
+        labels
+      )
+    ).toBe('cloudflare · @cf/black-forest-labs/flux-1-schnell (gagal)');
+  });
+
+  it('Auto murni gagal tetap auto · auto (gagal)', () => {
+    expect(
+      requestedImageProviderLabel(
+        { provider_slug: '', model_id: '', status: 'failed', llm_meta: null },
+        options,
+        labels
+      )
+    ).toBe('auto · auto (gagal)');
+  });
+
+  it('slug hasil + status gagal ikut suffix gagal', () => {
+    expect(
+      requestedImageProviderLabel(
+        { provider_slug: 'pixazo', model_id: 'flux-1-schnell', status: 'failed', llm_meta: null },
+        options,
+        labels
+      )
+    ).toBe('pixazo · flux-1-schnell (gagal)');
   });
 });

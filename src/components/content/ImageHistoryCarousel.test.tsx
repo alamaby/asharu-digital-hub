@@ -217,6 +217,52 @@ describe('ImageHistoryCarousel', () => {
     );
   });
 
+  it('tombol Pakai prompt memanggil onReuse dengan row yang diklik (bukan selalu terbaru)', () => {
+    const onReuse = vi.fn();
+    const { container } = render(
+      <ImageHistoryCarousel rows={rows} selectedId="chosen" onReuse={onReuse} />
+    );
+    // Slide aktif = index 0 (newest). Pindah ke slide 1 via dots agar inert lepas.
+    const dot2 = screen.getByRole('button', { name: 'Slide 2 dari 3' });
+    fireEvent.click(dot2);
+    const target = slideAt(container, 1);
+    const btn = Array.from(target.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === 'Pakai prompt');
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn as HTMLButtonElement);
+    expect(onReuse).toHaveBeenCalledTimes(1);
+    expect(onReuse.mock.calls[0]?.[0]).toMatchObject({ id: 'older-failed' });
+  });
+
+  it('tombol Salin prompt menyalin image_prompt slide aktif', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { container } = render(<ImageHistoryCarousel rows={rows} selectedId="chosen" />);
+    const btn = Array.from(slideAt(container, 0).querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === 'Salin prompt');
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn as HTMLButtonElement);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('newest prompt text'));
+  });
+
+  it('slide failed pin-manual tampil (gagal) bukan (antre); Auto murni gagal tampil auto (gagal)', () => {
+    const modelOptions = [
+      { id: 'm-cf', provider_id: 'p-cf', model_id: '@cf/black-forest-labs/flux-1-schnell', display_name: 'Flux 1 Schnell', provider_slug: 'cloudflare' }
+    ];
+    const { container } = render(
+      <ImageHistoryCarousel
+        rows={[
+          row({ id: 'fp', status: 'failed', llm_meta: { override: { modelUuid: 'm-cf' } }, image_prompt: 'x' }),
+          row({ id: 'fa', status: 'failed', image_prompt: 'y' })
+        ]}
+        selectedId={null}
+        modelOptions={modelOptions}
+      />
+    );
+    expect(slideAt(container, 0).textContent).toContain(
+      'cloudflare · @cf/black-forest-labs/flux-1-schnell (gagal)'
+    );
+    expect(slideAt(container, 1).textContent).toContain('auto · auto (gagal)');
+  });
+
   it('menampilkan badge ref + tombol Jadikan referensi pada hasil ready', () => {
     const onUseAsReference = vi.fn();
     const { container } = render(

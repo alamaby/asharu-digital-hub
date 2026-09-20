@@ -285,19 +285,29 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
   }
 
   function metaLabel(img: StudioGenerationRow): string {
-    // Baris hasil: provider/model aktual. Baris antre (slug '') dengan pin
-    // user: yang diminta + "(antre)" agar tidak disangka Auto.
-    if (!img.provider_slug && !img.model_slug && img.status === 'pending' && img.model_id && options) {
+    // Baris hasil: provider/model aktual. Baris antre/gagal (slug '') dengan pin
+    // user: yang diminta + suffix status agar tidak disangka Auto.
+    if (!img.provider_slug && !img.model_slug && img.model_id && options && (img.status === 'pending' || img.status === 'failed')) {
       const model = options.models.find((m) => m.id === img.model_id);
       if (model) {
         const provider = options.providers.find((p) => p.id === model.provider_id);
-        return tHist('metaQueued', {
+        const key = img.status === 'failed' ? 'metaFailed' : 'metaQueued';
+        return tHist(key, {
           provider: provider?.slug ?? model.provider_slug,
           model: model.model_id,
           style: img.style_slug || tHist('noStyle'),
           aspect: img.aspect_slug
         });
       }
+    }
+    // Failed tanpa pin (Auto murni) tetap jujur auto·auto + suffix gagal via metaFailed.
+    if (img.status === 'failed' && !img.provider_slug && !img.model_slug) {
+      return tHist('metaFailed', {
+        provider: 'auto',
+        model: 'auto',
+        style: img.style_slug || tHist('noStyle'),
+        aspect: img.aspect_slug
+      });
     }
     return tHist('meta', {
       provider: img.provider_slug || 'auto',

@@ -371,6 +371,38 @@ describe('StudioHistory', () => {
     ).toBeInTheDocument();
   });
 
+  it('baris failed pin-manual tampil request + (gagal), bukan auto', () => {
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([
+          genRow({
+            id: 'f-pin',
+            status: 'failed',
+            provider_slug: '',
+            model_slug: '',
+            provider_id: 'prov-cf',
+            model_id: 'model-cf',
+            last_error: 'boom'
+          })
+        ])}
+      />
+    );
+    expect(
+      screen.getByText('cloudflare · @cf/black-forest-labs/flux-1-schnell · tanpa style · 1:1 (gagal)')
+    ).toBeInTheDocument();
+  });
+
+  it('baris failed Auto murni tampil auto + (gagal)', () => {
+    renderWithMessages(
+      <StudioHistory
+        {...historyProps([
+          genRow({ id: 'f-auto', status: 'failed', provider_slug: '', model_slug: '', last_error: 'boom' })
+        ])}
+      />
+    );
+    expect(screen.getByText('auto · auto · tanpa style · 1:1 (gagal)')).toBeInTheDocument();
+  });
+
   it('toolbar sort + filter status tersedia', () => {
     renderWithMessages(
       <StudioHistory {...historyProps([genRow({ id: 's1', status: 'ready' })])} />

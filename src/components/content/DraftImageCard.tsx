@@ -127,6 +127,26 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     });
   }
 
+  function reuseFromHistory(img: DraftImageRow) {
+    setPromptDraft(img.image_prompt ?? '');
+    setNegativeDraft(img.negative_prompt ?? '');
+    if (img.style_slug && options.styles.some((s) => s.slug === img.style_slug)) setStyleSlug(img.style_slug);
+    if (img.camera_slug && (options.cameras ?? []).some((c) => c.slug === img.camera_slug)) setCameraSlug(img.camera_slug);
+    // subject tidak ada di baris cover → jangan tebak, biarkan pilihan user.
+    // advanced: kosong = Auto (tiru StudioForm optNum).
+    setAdvGuidance(advOf(img.guidance));
+    setAdvSteps(advOf(img.steps));
+    setAdvSeed(advOf(img.seed));
+    setAdvWidth(advOf(img.req_width));
+    setAdvHeight(advOf(img.req_height));
+    setProposed(null);
+    try {
+      setNotice(t('reusedFrom', { id: img.id.slice(0, 8) }));
+    } catch {
+      setNotice(`Dipakai dari riwayat ${img.id.slice(0, 8)} — cek lalu Regenerate.`);
+    }
+  }
+
   function enqueue() {
     const p = promptDraft.trim();
     const n = negativeDraft.trim();
@@ -206,6 +226,9 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
     try {
       const res = await suggestImagePrompt(draftId, 0, subjectSlug || null, cameraSlug || null);
       setPromptDraft(res.prompt);
+      // suggest hanya menghasilkan prompt (tanpa negative LLM) — isi default
+      // statis bila textarea negative masih kosong agar negative tetap ikut.
+      if (!negativeDraft.trim()) setNegativeDraft('no text, watermark, logo');
       setProposed(null);
       setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
     } catch (e) {
@@ -369,6 +392,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
               setReferenceUrl(url);
               setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
             }}
+            onReuse={reuseFromHistory}
             modelOptions={options.models}
             locale={locale}
             timeZone={timeZone}

@@ -16,6 +16,8 @@ interface QueuedRow {
   provider_id?: string | null;
   model_id_uuid?: string | null;
   llm_meta: Record<string, unknown> | null;
+  /** Status baris — untuk suffix jujur "(antre)" vs "(gagal)". */
+  status?: string | null;
 }
 
 /** Ambil pin UUID dari baris studio maupun baris konten (override review). */
@@ -31,14 +33,20 @@ export function requestedImageModelUuid(row: QueuedRow): string | null {
 export function requestedImageProviderLabel(
   row: QueuedRow,
   options: ImageOptionEntry | null | undefined,
-  labels: { auto: string; queued: string }
+  labels: { auto: string; queued: string; failed?: string }
 ): string {
-  if (row.provider_slug || row.model_id) return `${row.provider_slug} · ${row.model_id}`;
+  const failedLabel = labels.failed ?? 'gagal';
+  const isFailed = row.status === 'failed';
+  const suffix = isFailed ? failedLabel : labels.queued;
+  if (row.provider_slug || row.model_id) {
+    const base = `${row.provider_slug} · ${row.model_id}`;
+    return isFailed ? `${base} (${suffix})` : base;
+  }
   const uuid = requestedImageModelUuid(row);
-  if (!uuid || !options) return `${labels.auto} · ${labels.auto} (${labels.queued})`;
+  if (!uuid || !options) return `${labels.auto} · ${labels.auto} (${suffix})`;
   const model = options.models.find((m) => m.id === uuid);
-  if (!model) return `${labels.auto} · ${labels.auto} (${labels.queued})`;
+  if (!model) return `${labels.auto} · ${labels.auto} (${suffix})`;
   const provider = options.providers.find((p) => p.id === model.provider_id);
   const who = provider ? `${provider.slug} · ${model.model_id}` : `${model.provider_slug} · ${model.model_id}`;
-  return `${who} (${labels.queued})`;
+  return `${who} (${suffix})`;
 }

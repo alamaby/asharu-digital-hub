@@ -20,6 +20,8 @@ interface Props {
   onRetry?: (imageId: string) => void;
   /** Dipanggil saat user memakai hasil sebagai referensi img2img (public_url). */
   onUseAsReference?: (publicUrl: string) => void;
+  /** Dipanggil saat user memakai prompt slide mana pun untuk isi form (prompt + negative + style/kamera/advanced). */
+  onReuse?: (img: DraftImageRow) => void;
   /** Katalog model aktif — untuk label request saat antre (bukan "auto"). */
   modelOptions?: { id: string; provider_id: string; model_id: string; display_name: string; provider_slug: string }[];
   /** Locale + timezone zona-user untuk timeline antre/proses/selesai. */
@@ -70,10 +72,14 @@ function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string
 }
 
 /** Label provider·model: hasil aktual bila slug terisi; request pin + "(antre)"
- *  bila masih antre dengan override manual; "auto · auto" untuk Auto murni. */
+ *  bila masih antre dengan override manual; "(gagal)" bila failed dengan pin
+ *  atau Auto murni gagal; "auto · auto" untuk Auto murni antre. */
 function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptions']): string {
+  const styleSuffix = img.style_slug ? ` · ${img.style_slug}` : '';
+  const isFailed = img.status === 'failed';
   if (img.provider_slug || img.model_id) {
-    return `${img.provider_slug || 'auto'} · ${img.model_id || 'auto'}${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+    const base = `${img.provider_slug || 'auto'} · ${img.model_id || 'auto'}${styleSuffix}`;
+    return isFailed ? `${base} (gagal)` : base;
   }
   const uuid = requestedImageModelUuid({
     provider_slug: img.provider_slug,
@@ -82,9 +88,11 @@ function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptio
   });
   const model = uuid ? modelOptions?.find((m) => m.id === uuid) : undefined;
   if (!model) {
-    return `auto · auto${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+    const base = `auto · auto${styleSuffix}`;
+    return isFailed ? `${base} (gagal)` : base;
   }
-  return `${model.provider_slug} · ${model.model_id} (antre)${img.style_slug ? ` · ${img.style_slug}` : ''}`;
+  const suffix = isFailed ? '(gagal)' : '(antre)';
+  return `${model.provider_slug} · ${model.model_id} ${suffix}${styleSuffix}`;
 }
 /** Baris kedua timeline per status (selain "Masuk antrean"). Null = tak ada. */
 function stageLineFor(status: string, updatedAt: string): string | null {
@@ -111,11 +119,12 @@ function filenameFor(img: DraftImageRow, url: string): string {
  * Tanpa auto-advance — alat review admin. Slide non-aktif diberi inert agar
  * fokus/aksinya tidak bocor ke layar pembaca.
  */
-export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, onUseAsReference, modelOptions, locale = null, timeZone = null }: Props) {
+export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPending = false, onSelect, onRetry, onUseAsReference, onReuse, modelOptions, locale = null, timeZone = null }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'start', slidesToScroll: 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set());
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const latestIdRef = useRef<string | null>(rows[0]?.id ?? null);
   const focusIdRef = useRef<string | null>(rows[0]?.id ?? null);
 
@@ -184,6 +193,23 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
       event.preventDefault();
       scrollNext();
     }
+  }
+
+  async function copyPromptText(img: DraftImageRow) {
+    const text = img.image_prompt?.trim() || '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedId(img.id);
+    setTimeout(() => setCopiedId((cur) => (cur === img.id ? null : cur)), 2000);
   }
 
   async function download(img: DraftImageRow) {
@@ -356,6 +382,28 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                       className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
                     >
                       Jadikan referensi
+                    </button>
+                  ) : null}
+                  {img.image_prompt ? (
+                    <button
+                      type="button"
+                      onClick={() => void copyPromptText(img)}
+                      disabled={isPending}
+                      title="Salin prompt slide ini ke clipboard"
+                      className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
+                    >
+                      {copiedId === img.id ? 'Disalin' : 'Salin prompt'}
+                    </button>
+                  ) : null}
+                  {onReuse && img.image_prompt ? (
+                    <button
+                      type="button"
+                      onClick={() => onReuse(img)}
+                      disabled={isPending}
+                      title="Isi form dari riwayat ini (prompt + negative + style/kamera)"
+                      className={`text-primary hover:underline disabled:opacity-50 ${isCover ? 'text-xs' : 'text-[11px]'}`}
+                    >
+                      Pakai prompt
                     </button>
                   ) : null}
                 </div>

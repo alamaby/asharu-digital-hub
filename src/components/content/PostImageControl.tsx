@@ -50,25 +50,42 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
   const [autoEnhance, setAutoEnhance] = useState(false);
   // Picker model LLM untuk Sempurnakan: null/Auto = stage default, UUID = pin.
   const [llmModelUuid, setLlmModelUuid] = useState('');
-  const [styleSlug, setStyleSlug] = useState('');
-  const [promptDraft, setPromptDraft] = useState('');
-  const [negativeDraft, setNegativeDraft] = useState('');
+  // Inisialisasi malas dari histori terbaru (sort eksplisit — query desc terbaru-dulu,
+  // tapi jangan andalkan rows[0] mentah bila asumsi order berubah).
+  const latestInitial = (rows: DraftImageRow[]): DraftImageRow | null =>
+    [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
+  const advOf = (v: string | number | null | undefined): string => {
+    if (v === null || v === undefined || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? String(n) : '';
+  };
+  const [styleSlug, setStyleSlug] = useState(() => {
+    const latest = latestInitial(initialHistory);
+    const slug = latest?.style_slug ?? '';
+    return options.styles.some((s) => s.slug === slug) ? slug : '';
+  });
+  const [promptDraft, setPromptDraft] = useState(() => latestInitial(initialHistory)?.image_prompt ?? '');
+  const [negativeDraft, setNegativeDraft] = useState(() => latestInitial(initialHistory)?.negative_prompt ?? '');
   const [proposed, setProposed] = useState<{ prompt: string; negative?: string; reasoning?: { visual_strategy?: string; justification?: string }; styleSlug?: string | null; subjectSlug?: string | null; cameraSlug?: string | null } | null>(null);
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string; styleSlug: string | null; subjectSlug: string | null; cameraSlug: string | null } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
-  const [cameraSlug, setCameraSlug] = useState('');
+  const [cameraSlug, setCameraSlug] = useState(() => {
+    const latest = latestInitial(initialHistory);
+    const slug = latest?.camera_slug ?? '';
+    return (options.cameras ?? []).some((c) => c.slug === slug) ? slug : '';
+  });
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
   const [referenceStrength, setReferenceStrength] = useState(0.6);
   const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   // Advanced (opsional): kosong = Auto (hemat, clamp ≤1024px/≤25 steps).
-  const [advGuidance, setAdvGuidance] = useState('');
-  const [advSteps, setAdvSteps] = useState('');
-  const [advSeed, setAdvSeed] = useState('');
-  const [advWidth, setAdvWidth] = useState('');
-  const [advHeight, setAdvHeight] = useState('');
+  const [advGuidance, setAdvGuidance] = useState(() => advOf(latestInitial(initialHistory)?.guidance));
+  const [advSteps, setAdvSteps] = useState(() => advOf(latestInitial(initialHistory)?.steps));
+  const [advSeed, setAdvSeed] = useState(() => advOf(latestInitial(initialHistory)?.seed));
+  const [advWidth, setAdvWidth] = useState(() => advOf(latestInitial(initialHistory)?.req_width));
+  const [advHeight, setAdvHeight] = useState(() => advOf(latestInitial(initialHistory)?.req_height));
   const [isPending, startTransition] = useTransition();
 
   const selected = history.find((r) => r.status === 'selected') ?? null;
@@ -178,6 +195,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
     try {
       const res = await suggestImagePrompt(draftId, postIndex, subjectSlug || null, cameraSlug || null);
       setPromptDraft(res.prompt);
+      if (!negativeDraft.trim()) setNegativeDraft('no text, watermark, logo');
       setProposed(null);
       setNotice(`Prompt awal siap (${res.subjectName}) — cek, edit bila perlu, lalu Sempurnakan.`);
     } catch (e) {
@@ -223,6 +241,25 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
       setHistory(mine);
       return mine;
     });
+  }
+
+  function reuseFromHistory(img: DraftImageRow) {
+    setPromptDraft(img.image_prompt ?? '');
+    setNegativeDraft(img.negative_prompt ?? '');
+    if (img.style_slug && options.styles.some((s) => s.slug === img.style_slug)) setStyleSlug(img.style_slug);
+    if (img.camera_slug && (options.cameras ?? []).some((c) => c.slug === img.camera_slug)) setCameraSlug(img.camera_slug);
+    // subject tidak tersimpan di baris — jangan timpa pilihan user.
+    setAdvGuidance(advOf(img.guidance));
+    setAdvSteps(advOf(img.steps));
+    setAdvSeed(advOf(img.seed));
+    setAdvWidth(advOf(img.req_width));
+    setAdvHeight(advOf(img.req_height));
+    setProposed(null);
+    try {
+      setNotice(t('reusedFrom', { id: img.id.slice(0, 8) }));
+    } catch {
+      setNotice(`Dipakai dari riwayat ${img.id.slice(0, 8)} — cek lalu Regenerate.`);
+    }
   }
 
   async function refreshOne() {
@@ -329,6 +366,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
               setReferenceUrl(url);
               setReferenceNotice('Referensi diambil dari histori — pilih model bertanda ref atau Auto.');
             }}
+            onReuse={reuseFromHistory}
             modelOptions={options.models}
             locale={locale}
             timeZone={timeZone}

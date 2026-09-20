@@ -596,7 +596,11 @@
         "pickAndGenerate": "Pick Product & Generate",
         "randomBridgeTitle": "Random from 20 newest (bridging)"
       },
-      "autoEnhanceLabel": "Auto-enhance (uses polish quota)"
+      "autoEnhanceLabel": "Auto-enhance (uses polish quota)",
+      "reusePrompt": "Reuse prompt",
+      "copyPrompt": "Copy prompt",
+      "copiedPrompt": "Copied",
+      "reusedFrom": "Reused from history {id} — review then Regenerate."
     }
   },
   "admin": {
@@ -1005,6 +1009,7 @@
       "expired": "Expired (removed {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
       "metaQueued": "{provider} · {model} · {style} · {aspect} (queued)",
+      "metaFailed": "{provider} · {model} · {style} · {aspect} (failed)",
       "noStyle": "no style",
       "processing": "Worker is processing...",
       "noImage": "No image yet.",

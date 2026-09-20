@@ -596,7 +596,11 @@
         "pickAndGenerate": "Pilih Produk & Generate",
         "randomBridgeTitle": "Dipilih random dari 20 terbaru (bridging)"
       },
-      "autoEnhanceLabel": "Sempurnakan otomatis (kuota Sempurnakan)"
+      "autoEnhanceLabel": "Sempurnakan otomatis (kuota Sempurnakan)",
+      "reusePrompt": "Pakai prompt",
+      "copyPrompt": "Salin prompt",
+      "copiedPrompt": "Disalin",
+      "reusedFrom": "Dipakai dari riwayat {id} — cek lalu Regenerate."
     }
   },
   "admin": {
@@ -1005,6 +1009,7 @@
       "expired": "Kedaluwarsa (dihapus {ago})",
       "meta": "{provider} · {model} · {style} · {aspect}",
       "metaQueued": "{provider} · {model} · {style} · {aspect} (antre)",
+      "metaFailed": "{provider} · {model} · {style} · {aspect} (gagal)",
       "noStyle": "tanpa style",
       "processing": "Worker sedang memproses...",
       "noImage": "Belum ada gambar.",
