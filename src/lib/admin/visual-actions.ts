@@ -59,11 +59,14 @@ export async function updateSubject(slug: string, formData: FormData): Promise<L
   const supabase = await requireAdmin();
   const displayName = String(formData.get('display_name') ?? '').trim();
   const subjectEn = String(formData.get('subject_en') ?? '').trim();
-  const sortOrder = Number(String(formData.get('sort_order') ?? '').trim());
   if (!displayName) return fail('display_name required');
   if (subjectEn.length < SUBJECT_EN_MIN || subjectEn.length > SUBJECT_EN_MAX) return fail(`subject_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const patch: Record<string, unknown> = { display_name: displayName, subject_en: subjectEn };
-  if (Number.isFinite(sortOrder)) patch.sort_order = Math.floor(sortOrder);
+  const rawSort = String(formData.get('sort_order') ?? '').trim();
+  if (rawSort !== '') {
+    const n = Number(rawSort);
+    if (Number.isFinite(n)) patch.sort_order = Math.floor(n);
+  }
   const { error } = await supabase.from('image_subject_templates').update(patch).eq('slug', slug);
   if (error) return fail(error.message);
   revalidatePath('/admin/visual');
@@ -139,11 +142,14 @@ export async function updateCameraAngle(slug: string, formData: FormData): Promi
   const supabase = await requireAdmin();
   const displayName = String(formData.get('display_name') ?? '').trim();
   const angleEn = String(formData.get('angle_en') ?? '').trim();
-  const sortOrder = Number(String(formData.get('sort_order') ?? '').trim());
   if (!displayName) return failAngle('display_name required');
   if (angleEn.length < SUBJECT_EN_MIN || angleEn.length > SUBJECT_EN_MAX) return failAngle(`angle_en ${SUBJECT_EN_MIN}–${SUBJECT_EN_MAX} karakter`);
   const patch: Record<string, unknown> = { display_name: displayName, angle_en: angleEn };
-  if (Number.isFinite(sortOrder)) patch.sort_order = Math.floor(sortOrder);
+  const rawSortAngle = String(formData.get('sort_order') ?? '').trim();
+  if (rawSortAngle !== '') {
+    const n = Number(rawSortAngle);
+    if (Number.isFinite(n)) patch.sort_order = Math.floor(n);
+  }
   const { error } = await supabase.from('image_camera_angles').update(patch).eq('slug', slug);
   if (error) return failAngle(error.message);
   revalidateAnglePaths();

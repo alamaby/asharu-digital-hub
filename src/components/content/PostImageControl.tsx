@@ -70,7 +70,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string; styleSlug: string | null; subjectSlug: string | null; cameraSlug: string | null } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
-  const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
+  const [subjectSlug, setSubjectSlug] = useState(() => '');
   const [cameraSlug, setCameraSlug] = useState(() => {
     const latest = latestInitial(initialHistory);
     const slug = latest?.camera_slug ?? '';
@@ -420,6 +420,7 @@ export function PostImageControl({ draftId, postIndex, initialHistory, isAffilia
               onChange={(e) => setSubjectSlug(e.target.value)}
               className="w-full rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
             >
+              <option value="">(tanpa subjek khusus)</option>
               {options.subjects.map((s) => (
                 <option key={s.slug} value={s.slug}>
                   {s.display_name}

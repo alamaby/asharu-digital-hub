@@ -115,23 +115,23 @@ export function ResearchListClient({ sessions, sessionsError, platforms, filters
             <li key={s.id}>
               <Link
                 href={{ pathname: '/admin/riset/[sessionId]', params: { sessionId: s.id } }}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary"
+                className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-primary sm:flex-row sm:items-center sm:justify-between sm:gap-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">{s.topic ?? s.target_location ?? t('sessionLabel', { id: s.id.slice(0, 8) })}</p>
-                  <p className="text-xs text-ink-muted">
-                    {(s.platform_slugs && s.platform_slugs.length > 0 ? s.platform_slugs.join(', ') : s.platform_slug) ?? t('platformAll')} · {formatDateTime(s.created_at, locale as never, timeZone)} · {s.target_location ?? '-'}
+                  <p className="break-words line-clamp-2 text-sm font-medium text-ink sm:truncate">{s.topic ?? s.target_location ?? t('sessionLabel', { id: s.id.slice(0, 8) })}</p>
+                  <p className="flex flex-wrap gap-x-2 break-words text-xs text-ink-muted">
+                    <span>{(s.platform_slugs && s.platform_slugs.length > 0 ? s.platform_slugs.join(', ') : s.platform_slug) ?? t('platformAll')}</span><span aria-hidden>·</span><span>{formatDateTime(s.created_at, locale as never, timeZone)}</span><span aria-hidden>·</span><span>{s.target_location ?? '-'}</span>
                   </p>
-                  {s.error_message ? <p className="truncate text-xs text-red-600">{s.error_message.slice(0, 80)}</p> : null}
+                  {s.error_message ? <p className="break-words line-clamp-2 text-xs text-red-600">{s.error_message.slice(0, 80)}</p> : null}
                 </div>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BG[s.status] ?? 'bg-surface text-ink-muted'}`}>{s.status}</span>
+                <span className={`self-start shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:self-center ${STATUS_BG[s.status] ?? 'bg-surface text-ink-muted'}`}>{s.status}</span>
               </Link>
             </li>
           ))
         )}
       </ul>
 
-      <nav aria-label="pagination" className="flex items-center justify-between">
+      <nav aria-label="pagination" className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-ink-muted">Hal {page} dari {totalPages}</span>
         <div className="flex gap-2">
           <Link

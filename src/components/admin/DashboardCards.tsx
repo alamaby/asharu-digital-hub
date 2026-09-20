@@ -9,6 +9,8 @@ import { AdminTrendChart } from '@/components/admin/charts/AdminTrendChart';
 interface RecentDraft {
   id: string;
   request_id: string;
+  research_topic_id: string | null;
+  platform_slug: string | null;
   status: string;
   created_at: string;
   topic: string;
@@ -45,6 +47,7 @@ interface DashboardCardsProps {
   trend: TrendDay[];
   funnel: FunnelRow[];
   llmWeek: LlmWeek;
+  locale?: string | null;
 }
 
 function badgeColor(status: string): 'warning' | 'success' | 'error' | 'neutral' {
@@ -90,7 +93,8 @@ export function DashboardCards({
   recentDrafts,
   trend,
   funnel,
-  llmWeek
+  llmWeek,
+  locale
 }: DashboardCardsProps) {
   const t = useTranslations('admin.dashboard');
 
@@ -181,7 +185,7 @@ export function DashboardCards({
         </dl>
       </AdminCard>
 
-      <RecentDraftsList drafts={recentDrafts} />
+      <RecentDraftsList drafts={recentDrafts} locale={locale} />
 
       <section aria-labelledby="actions-heading" className="space-y-3">
         <h2 id="actions-heading" className="text-lg font-semibold text-ink">{t('actionsHeading')}</h2>
@@ -213,7 +217,7 @@ export function DashboardCards({
   );
 }
 
-function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
+function RecentDraftsList({ drafts, locale }: { drafts: RecentDraft[]; locale?: string | null }) {
   const t = useTranslations('admin.dashboard');
   return (
     <AdminCard
@@ -240,6 +244,9 @@ function RecentDraftsList({ drafts }: { drafts: RecentDraft[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink">{shortTopic(d.topic)}</p>
                   <p className="text-xs text-ink-muted">
+                    {d.platform_slug ?? 'all'} · {d.status} · {new Date(d.created_at).toLocaleString(locale ?? undefined)}
+                  </p>
+                  <p className="text-[11px] text-ink-muted">
                     {d.llm_meta?.provider ?? '—'} · {d.llm_meta?.model ?? '—'}
                   </p>
                 </div>

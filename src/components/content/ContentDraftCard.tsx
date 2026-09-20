@@ -115,7 +115,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
           locale={locale}
           timeZone={timeZone}
           llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
-          defaultCollapsed={false}
+          defaultCollapsed={true}
         />
         <AffiliateProductCard
           draftId={draft.id}
@@ -334,7 +334,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                   locale={locale}
                   timeZone={timeZone}
                   llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
-                  collapsed={!perReplyEnabled}
+                  collapsed
                 />
               )}
             </div>
@@ -348,7 +348,7 @@ export function ContentDraftCard({ draft: initial, regenProviders = [], regenMod
                 locale={locale}
                 timeZone={timeZone}
                 llmModels={regenModels.map((m) => ({ id: m.id, model_id: m.model_id, display_name: m.display_name }))}
-                defaultCollapsed={false}
+                defaultCollapsed={true}
               />
             ) : null}
             </Fragment>

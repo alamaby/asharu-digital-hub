@@ -70,7 +70,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
   const [prevPrompt, setPrevPrompt] = useState<{ prompt: string; negative: string; styleSlug: string | null; subjectSlug: string | null; cameraSlug: string | null } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
-  const [subjectSlug, setSubjectSlug] = useState(() => options.subjects[0]?.slug ?? '');
+  const [subjectSlug, setSubjectSlug] = useState(() => '');
   // Referensi img2img cover: URL aktif + strength + notice upload.
   const [referenceUrl, setReferenceUrl] = useState<string | null>(() => latestOf(initialImages)?.reference_public_url ?? null);
   const [referenceStrength, setReferenceStrength] = useState<number>(() => {
@@ -444,6 +444,7 @@ export function DraftImageCard({ draftId, initialImages, initialSelectedId, opti
             onChange={(e) => setSubjectSlug(e.target.value)}
             className="w-full rounded-lg border border-line bg-background px-2 py-1.5 text-sm"
           >
+            <option value="">(tanpa subjek khusus)</option>
             {options.subjects.map((s) => (
               <option key={s.slug} value={s.slug}>
                 {s.display_name}

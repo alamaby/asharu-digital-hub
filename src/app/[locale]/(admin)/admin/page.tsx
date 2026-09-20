@@ -62,7 +62,7 @@ export default async function AdminDashboardPage({ params }: PageProps) {
           supabase.from('content_drafts').select('*', { count: 'exact', head: true }).eq('status', 'needs_review'),
           supabase
             .from('content_drafts')
-            .select('id, request_id, status, created_at, generated_thread, affiliate_injections, llm_meta')
+            .select('id, request_id, research_topic_id, platform_slug, status, created_at, generated_thread, affiliate_injections, llm_meta')
             .order('created_at', { ascending: false })
             .limit(5)
         ])
@@ -80,8 +80,9 @@ export default async function AdminDashboardPage({ params }: PageProps) {
       ])
     : [{ data: null }, { data: null }, { data: null }];
 
-  // Resolve topic text per draft via request_id
-  const requestIds = (recentDrafts ?? [])
+  // Resolve topic text per draft via request_id (legacy) atau research_topic_id (riset).
+  const draftRows = recentDrafts ?? [];
+  const requestIds = draftRows
     .map((d) => (d as { request_id: string }).request_id)
     .filter((id): id is string => Boolean(id));
   const requestTopicById = new Map<string, string>();
@@ -92,6 +93,19 @@ export default async function AdminDashboardPage({ params }: PageProps) {
       .in('id', requestIds);
     for (const r of (reqs ?? []) as { id: string; topic: string }[]) {
       requestTopicById.set(r.id, r.topic);
+    }
+  }
+  const topicIds = draftRows
+    .map((d) => (d as { research_topic_id: string | null }).research_topic_id)
+    .filter((id): id is string => Boolean(id));
+  const researchTopicById = new Map<string, string>();
+  if (supabase && topicIds.length > 0) {
+    const { data: topics } = await supabase
+      .from('content_research_topics')
+      .select('id, topic')
+      .in('id', topicIds);
+    for (const t of (topics ?? []) as { id: string; topic: string }[]) {
+      researchTopicById.set(t.id, t.topic);
     }
   }
 
@@ -122,6 +136,24 @@ export default async function AdminDashboardPage({ params }: PageProps) {
     llmWeek.sukses_pct = Math.round(weighted * 10) / 10;
   }
 
+  const resolvedDrafts = ((recentDrafts ?? []) as Array<{
+    id: string;
+    request_id: string;
+    research_topic_id: string | null;
+    platform_slug: string | null;
+    status: string;
+    created_at: string;
+    generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+    affiliate_injections: { friendly_code: string; post_index: number }[];
+    llm_meta?: { provider: string; model: string };
+  }>).map((d) => {
+    const requestTopic = requestTopicById.get(d.request_id);
+    const researchTopic = d.research_topic_id ? researchTopicById.get(d.research_topic_id) : undefined;
+    const rawTopic = researchTopic ?? requestTopic ?? '';
+    const topic = rawTopic || (d.generated_thread.main.id.length > 80 ? d.generated_thread.main.id.slice(0, 80) + '...' : d.generated_thread.main.id);
+    return { ...d, topic };
+  });
+
   return (
     <DashboardCards
       pending={pending ?? 0}
@@ -129,21 +161,11 @@ export default async function AdminDashboardPage({ params }: PageProps) {
       needsReview={needsReview ?? 0}
       awaitingSelection={awaitingSelection}
       email={email ?? ''}
-      recentDrafts={((recentDrafts ?? []) as Array<{
-        id: string;
-        request_id: string;
-        status: string;
-        created_at: string;
-        generated_thread: { main: { id: string; en: string }; replies: { id: string; en: string }[] };
-        affiliate_injections: { friendly_code: string; post_index: number }[];
-        llm_meta?: { provider: string; model: string };
-      }>).map((d) => ({
-        ...d,
-        topic: requestTopicById.get(d.request_id) ?? ''
-      }))}
+      recentDrafts={resolvedDrafts}
       trend={trend}
       funnel={funnel}
       llmWeek={llmWeek}
+      locale={locale}
     />
   );
 }
