@@ -9,3 +9,4 @@
 - Verifikasi: test vitest sementara memakai kode validator asli (1 test hijau, file dihapus); cek struktural SQL (`meta_pos=0`, `h2_count=5`, tail); `git status` bersih dari file sementara.
 - Commit proposal: `docs(plan): catat hasil C1 + temuan mismatch domain resend`
 - Terkait: `plans/2026-09-20-resend-403-alamaby-email-fix.md`, memory `2026-09-19/230000-automation-email-multislot.md`.
+- A4 2026-09-20 16:35: user pilih Opsi 1 — `email_from` diganti ke `@updates.alamaby.com` via UI admin (disarankan `Asharu <noreply@updates.alamaby.com>`); E1 cancelled (sementara, tanpa migrasi). Operator lanjut D3 manual.
