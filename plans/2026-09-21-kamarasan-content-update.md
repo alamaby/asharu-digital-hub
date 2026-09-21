@@ -32,9 +32,9 @@ Out-of-scope: listing Buahbatu/Sukaraja, perubahan global CSS, perubahan struktu
 - [x] Skema *Points + render <ul> + bullet ID/EN (dokumen tanpa PBG)
 - [x] Hapus PBG di extraSpecs + buyingGuide + FAQ
 - [x] Nearby: 2 update + 6 tambah + re-sort + bump updatedAt
-- [ ] Test (integrity + render)
-- [ ] Gate: typecheck + lint + test + build
-- [ ] Commit-push Conventional Commits
+- [x] Test (integrity + render)
+- [x] Gate: typecheck + lint + test + build
+- [x] Commit-push Conventional Commits
 
 ## Progress Log
 
