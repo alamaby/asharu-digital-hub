@@ -97,6 +97,4 @@ Last updated: 2026-09-21 pagi (local time)
 
 ## Legacy Archive
 
-## Legacy Archive
-
 Tidak ada `PROJECT_MEMORY.md` (format `.memory/` langsung dipakai sejak awal).
