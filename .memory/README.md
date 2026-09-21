@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-20 sore (local time)
+Last updated: 2026-09-21 pagi (local time)
 
 ## Current State
 
@@ -65,6 +65,8 @@ Last updated: 2026-09-20 sore (local time)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-21 120000-kamarasan-content-update.md](2026-09-21/120000-kamarasan-content-update.md) — Update halaman Kamarasan: chip lokasi card+hero, wording "daerah Gedebage/Ciwastra", emoji 10 highlights (8+2 baru bata), bullet location/buying guide, nearby 11→17 (RS Edelweiss+Stasiun Kereta Gedebage diupdate, 6 sekolah ditambah), hapus PBG dari dokumen. Gate 976 tests ✓ build ✓ pushed `f56af02`.
 
 - [162600-resend-c1-domain-diagnosis.md](2026-09-20/162600-resend-c1-domain-diagnosis.md) — C1 developing parse-failed selesai via MCP prod read-only: akar = JSON terpotong (tanpa meta/penutup) + CJK laten (`multit设备`, `主打`); domain verified `updates.alamaby.com` != pengirim `updates@alamaby.com` -> 403. [USER ACTION] Putuskan strategi domain (A4) + cek scope API key.
 - [2026-09-19 221500-cjk-error-presisi-badge-live.md](2026-09-19/221500-cjk-error-presisi-badge-live.md) — RCA pesan CJK berulang: bukan false positive, draf 36bb2945/id masih ada 5 titik (S2 团战, S3 关闭+散热, FAQ#4 夹式). Server kini kembalikan lokasi presisi + snippet; form edit tampilkan badge CJK live + banner sisa field. Gate typecheck ✓ lint ✓ 18/18 ✓ build ✓ (1 flaky tak terkait).
