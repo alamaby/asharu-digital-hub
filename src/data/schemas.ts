@@ -179,6 +179,8 @@ export const propertySchema = z.object({
     .array(
       z.object({
         title: localizedTextSchema,
+        /** Decorative emoji prefix (rendered aria-hidden). Optional so legacy items without emoji still validate. */
+        emoji: z.string().optional(),
         body: localizedTextSchema
       })
     )
@@ -220,13 +222,27 @@ export const propertySchema = z.object({
   /**
    * Long-form hyperlocal guide (lokasi + akses + commute). Rendered as its
    * own H2 section on the detail page; keeps `description` short for meta.
+   * When `locationGuidePoints` is provided, it renders as a bullet list
+   * beneath the intro paragraph.
    */
   locationGuide: localizedTextSchema.optional(),
+  /**
+   * Bullet-point breakdown of the location guide (e.g. commute times,
+   * commute-friendly areas, security notes). Renders as an ordered list
+   * under the intro paragraph; omit to fall back to paragraph-only.
+   */
+  locationGuidePoints: z.array(localizedTextSchema).optional(),
   /**
    * Long-form transaction guide (harga + KPR + biaya + survei). Rendered as
    * its own H2 section on the detail page.
    */
   buyingGuide: localizedTextSchema.optional(),
+  /**
+   * Bullet-point breakdown of the buying guide (price, mortgage steps,
+   * specs summary, viewing instructions). Renders as a list under the
+   * intro paragraph; omit to fall back to paragraph-only.
+   */
+  buyingGuidePoints: z.array(localizedTextSchema).optional(),
   contacts: z.array(contactSchema).optional(),
   mapsUrl: httpsUrl.optional(),
   disclaimers: z

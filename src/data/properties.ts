@@ -66,6 +66,7 @@ export const properties: Property[] = [
     ],
     highlights: [
       {
+        emoji: '🏠',
         title: { id: 'Bangunan Siap Huni', en: 'Move-in Ready' },
         body: {
           id: 'Kondisi bangunan baik dan terawat, tidak perlu renovasi besar — tinggal pindah.',
@@ -73,6 +74,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '🔒',
         title: { id: 'Keamanan 24 Jam', en: '24-Hour Security' },
         body: {
           id: 'Sistem keamanan dan CCTV aktif 24 jam, dilengkapi one-way gate system.',
@@ -80,6 +82,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '📍',
         title: { id: 'Lokasi Strategis', en: 'Strategic Location' },
         body: {
           id: 'Dekat tol, rumah sakit, pusat perbelanjaan, dan stasiun kereta cepat.',
@@ -87,6 +90,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '☀️',
         title: { id: 'Tidak Pernah Banjir', en: 'No Flood History' },
         body: {
           id: 'Tidak pernah mengalami banjir selama rumah dihuni.',
@@ -94,6 +98,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '🔌',
         title: { id: 'Infrastruktur Lengkap', en: 'Complete Infrastructure' },
         body: {
           id: 'Listrik 2.200 VA, air sumur pompa submersible, toren 1.000 L, filter air, jaringan IndiHome (tersedia, belum aktif), antena TV digital.',
@@ -101,6 +106,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '🛣️',
         title: { id: 'Jalan Lebar', en: 'Wide Road Access' },
         body: {
           id: 'Jalan depan 6 meter, memudahkan akses kendaraan dan truk pengiriman.',
@@ -108,6 +114,7 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '🕌',
         title: { id: 'Dekat Masjid', en: 'Nearby Mosques' },
         body: {
           id: '20 meter ke Masjid Al-Ikhlas Kamarasan, sekitar 17 menit ke Masjid Raya Al Jabbar.',
@@ -115,25 +122,48 @@ export const properties: Property[] = [
         }
       },
       {
+        emoji: '🛒',
         title: { id: 'Akses Fasilitas Umum', en: 'Daily Needs Within Reach' },
         body: {
           id: 'Sekitar 200 meter ke Indomaret, 300 meter ke Yomart/ATM BCA, 300 meter ke Apotek Griya Farma, 400 meter ke Alfamart dan Amandamart/Freshmart.',
           en: 'About 200 m to Indomaret, 300 m to Yomart/BCA ATM, 300 m to Griya Farma pharmacy, 400 m to Alfamart and Amandamart/Freshmart.'
         }
+      },
+      {
+        emoji: '🧱',
+        title: { id: 'Tembok Batas 2 Lapis Bata', en: 'Double-Layer Boundary Walls' },
+        body: {
+          id: 'Tembok pembatas dengan tetangga dibangun 2 lapis bata (bukan 1 lapis) — lebih kokoh, lebih kedap suara, dan lebih awet.',
+          en: 'Shared boundary walls are built with a double layer of bricks (not a single layer) — sturdier, quieter, and longer-lasting.'
+        }
+      },
+      {
+        emoji: '🏗️',
+        title: { id: 'Full Bata Merah', en: 'Full Red-Brick Walls' },
+        body: {
+          id: 'Seluruh tembok rumah menggunakan bata merah (bukan batako/hebel) — lebih kuat, lebih adem, dan minim retak rambut.',
+          en: 'All walls use solid red bricks (no concrete blocks/hebel) — stronger, cooler indoors, and less prone to hairline cracks.'
+        }
       }
     ],
     nearbyPlaces: [
       { name: { id: 'Jl. Ciwastra', en: 'Jl. Ciwastra' }, travelTime: { id: '3 menit', en: '3 min' } },
+      { name: { id: 'MIN 2 Bandung', en: 'MIN 2 Bandung' }, travelTime: { id: '5 menit', en: '5 min' } },
       { name: { id: 'Griya Derwati', en: 'Griya Derwati' }, travelTime: { id: '6 menit', en: '6 min' } },
+      { name: { id: 'SMPN 51 Bandung', en: 'SMPN 51 Bandung' }, travelTime: { id: '6 menit', en: '6 min' } },
+      { name: { id: 'SMAN 21 Bandung', en: 'SMAN 21 Bandung' }, travelTime: { id: '7 menit', en: '7 min' } },
       { name: { id: 'RS Ibu Anak Harapan Bunda', en: 'Harapan Bunda Mother & Child Hospital' }, travelTime: { id: '9 menit', en: '9 min' } },
       { name: { id: 'Sekolah Terpadu Al Kenzie', en: 'Al Kenzie Integrated School' }, travelTime: { id: '9 menit', en: '9 min' } },
+      { name: { id: 'SD Islam Asy-Syifa 1', en: 'SD Islam Asy-Syifa 1' }, travelTime: { id: '11 menit', en: '11 min' } },
+      { name: { id: 'SDIT Bojongsoang Inspiratif', en: 'SDIT Bojongsoang Inspiratif' }, travelTime: { id: '11 menit', en: '11 min' } },
       { name: { id: 'RS Al Islam', en: 'Al Islam Hospital' }, travelTime: { id: '12 menit', en: '12 min' } },
+      { name: { id: 'Ashfiya Primary School', en: 'Ashfiya Primary School' }, travelTime: { id: '13 menit', en: '13 min' } },
       { name: { id: 'Tol Gedebage', en: 'Gedebage Toll Gate' }, travelTime: { id: '14 menit', en: '14 min' } },
       { name: { id: 'Summarecon Mall Bandung', en: 'Summarecon Mall Bandung' }, travelTime: { id: '15 menit', en: '15 min' } },
+      { name: { id: 'RS Edelweiss', en: 'Edelweiss Hospital' }, travelTime: { id: '15 menit', en: '15 min' } },
       { name: { id: 'Stasiun Kereta Cepat Tegalluar', en: 'Tegalluar High-Speed Rail Station' }, travelTime: { id: '16 menit', en: '16 min' } },
-      { name: { id: 'Metro Indah Mall / Tol Buahbatu', en: 'Metro Indah Mall / Buahbatu Toll Gate' }, travelTime: { id: '18 menit', en: '18 min' } },
-      { name: { id: 'RS Edelweiss', en: 'Edelweiss Hospital' } },
-      { name: { id: 'Stasiun Kereta Gedebage', en: 'Gedebage Railway Station' } }
+      { name: { id: 'Stasiun Kereta Gedebage', en: 'Gedebage Railway Station' }, travelTime: { id: '17 menit', en: '17 min' } },
+      { name: { id: 'Metro Indah Mall / Tol Buahbatu', en: 'Metro Indah Mall / Buahbatu Toll Gate' }, travelTime: { id: '18 menit', en: '18 min' } }
     ],
     extraSpecs: [
       { label: { id: 'Lantai', en: 'Storeys' }, value: { id: '1', en: '1' } },
@@ -142,19 +172,59 @@ export const properties: Property[] = [
       { label: { id: 'Dimensi', en: 'Dimensions' }, value: { id: '7 × 13,2 m', en: '7 × 13.2 m' } },
       { label: { id: 'Tahun dibangun', en: 'Year built' }, value: { id: '2016 (renovasi teras & dapur 2022)', en: '2016 (terrace & kitchen renovated 2022)' } },
       { label: { id: 'Listrik', en: 'Power' }, value: { id: '2.200 VA', en: '2,200 VA' } },
-      { label: { id: 'Dokumen', en: 'Documents' }, value: { id: 'SHM · PBG/IMB tersedia · PBB tertib', en: 'Freehold (SHM) · PBG/IMB available · PBB up to date' } },
+      { label: { id: 'Dokumen', en: 'Documents' }, value: { id: 'SHM · PBB tertib', en: 'Freehold (SHM) · PBB up to date' } },
       { label: { id: 'Status KPR', en: 'Mortgage status' }, value: { id: 'Berjalan — dilunasi notaris saat deal', en: 'Active — settled via notary upon agreement' } },
       { label: { id: 'Termasuk penjualan', en: 'Included in sale' }, value: { id: 'Kitchen set, kompor tanam 3 tungku, cooking hood, toren 1.000 L, filter air, pompa submersible, antena TV digital, fixture permanen', en: 'Kitchen set, 3-burner built-in hob, cooking hood, 1,000 L water tower, water filter, submersible pump, digital TV antenna, permanent fixtures' } }
     ],
-    updatedAt: '2026-09-08',
+    updatedAt: '2026-09-21',
     locationGuide: {
-      id: 'Rumah ini dijual di Kelurahan Buahbatu, Kecamatan Bojongsoang, Kabupaten Bandung — tepat di tepi perbatasan Kota Bandung. Secara administratif ini rumah dijual Bojongsoang, namun posisinya adalah alternatif paling dekat untuk pencari rumah dijual Gedebage dan dijual rumah Ciwastra: hanya sekitar 3 menit ke Jalan Ciwastra, 14 menit ke Tol Gedebage, 15 menit ke Summarecon Mall Bandung, dan 16 menit ke Stasiun Kereta Cepat Tegalluar. Keluarga yang bekerja di Gedebage, Ciwastra, Buahbatu, atau Tegalluar mendapat commute harian yang pendek tanpa membayar harga cluster Summarecon. Lingkungan Kamarasan Residence satu arah gerbang (one-way gate), keamanan dan CCTV 24 jam, jalan depan selebar 6 meter, dan tidak pernah banjir selama rumah dihuni — poin penting bagi pembeli rumah 3 kamar tidur di Bandung Timur.',
-      en: 'This house is for sale in Buahbatu Village, Bojongsoang District, Bandung Regency — right on the Bandung city border. Administratively a Bojongsoang listing, it is the closest alternative for Gedebage and Ciwastra buyers: about 3 minutes to Jl. Ciwastra, 14 minutes to the Gedebage Toll Gate, 15 minutes to Summarecon Mall Bandung, and 16 minutes to the Tegalluar high-speed rail station. Families working in Gedebage, Ciwastra, Buahbatu, or Tegalluar get a short daily commute without paying Summarecon cluster prices. Kamarasan Residence is a one-way-gate estate with 24-hour security and CCTV, a 6-metre front road, and no flood history while occupied — key points for 3-bedroom buyers in East Bandung.'
+      id: 'Rumah ini dijual di Kelurahan Buahbatu, Kecamatan Bojongsoang, Kabupaten Bandung — tepat di tepi perbatasan Kota Bandung. Secara administratif ini rumah dijual Bojongsoang, namun posisinya adalah alternatif paling dekat untuk pencari rumah dijual daerah Gedebage dan rumah dijual daerah Ciwastra: hanya sekitar 3 menit ke Jalan Ciwastra, 14 menit ke Tol Gedebage, 15 menit ke Summarecon Mall Bandung, dan 16 menit ke Stasiun Kereta Cepat Tegalluar. Keluarga yang bekerja di Gedebage, Ciwastra, Buahbatu, atau Tegalluar mendapat commute harian yang pendek tanpa membayar harga cluster Summarecon. Lingkungan Kamarasan Residence satu arah gerbang (one-way gate), keamanan dan CCTV 24 jam, jalan depan selebar 6 meter, dan tidak pernah banjir selama rumah dihuni — poin penting bagi pembeli rumah 3 kamar tidur di Bandung Timur.',
+      en: 'This house is for sale in Buahbatu Village, Bojongsoang District, Bandung Regency — right on the Bandung city border. Administratively a Bojongsoang listing, it is the closest alternative for buyers of houses for sale in the Gedebage area and houses for sale in the Ciwastra area: about 3 minutes to Jl. Ciwastra, 14 minutes to the Gedebage Toll Gate, 15 minutes to Summarecon Mall Bandung, and 16 minutes to the Tegalluar high-speed rail station. Families working in Gedebage, Ciwastra, Buahbatu, or Tegalluar get a short daily commute without paying Summarecon cluster prices. Kamarasan Residence is a one-way-gate estate with 24-hour security and CCTV, a 6-metre front road, and no flood history while occupied — key points for 3-bedroom buyers in East Bandung.'
     },
+    locationGuidePoints: [
+      {
+        id: 'Kel. Buahbatu, Kec. Bojongsoang, Kab. Bandung — tepi perbatasan Kota Bandung.',
+        en: 'Buahbatu Village, Bojongsoang District, Bandung Regency — on the Bandung city border.'
+      },
+      {
+        id: 'Commute: 3 menit ke Jl. Ciwastra, 14 menit ke Tol Gedebage, 15 menit ke Summarecon Mall Bandung, 16 menit ke Whoosh Tegalluar.',
+        en: 'Commute: 3 min to Jl. Ciwastra, 14 min to Gedebage Toll Gate, 15 min to Summarecon Mall Bandung, 16 min to Tegalluar Whoosh station.'
+      },
+      {
+        id: 'Cocok untuk pekerja di Gedebage, Ciwastra, Buahbatu, atau Tegalluar — harga lebih terjangkau dibanding cluster Summarecon.',
+        en: 'Ideal for commuters working in Gedebage, Ciwastra, Buahbatu, or Tegalluar — more affordable than Summarecon-cluster pricing.'
+      },
+      {
+        id: 'Lingkungan one-way gate + CCTV 24 jam + jalan depan 6 meter + bebas banjir.',
+        en: 'One-way-gate estate with 24-hour CCTV, 6-metre front road, and no flood history.'
+      }
+    ],
     buyingGuide: {
-      id: 'Harga rumah ini Rp650 juta nego wajar, bisa tunai atau KPR, plus iuran lingkungan Rp125 ribu per bulan. KPR yang sedang berjalan dilunasi melalui notaris saat deal, dan biaya notaris, pajak, pelunasan KPR, serta balik nama dinegosiasikan terpisah — standar transaksi rumah dijual Bojongsoang SHM. Dokumen SHM, PBG/IMB tersedia, dan PBB tertib, sehingga proses KPR bank lebih mudah. Spesifikasinya rumah 1 lantai LT 92 m² LB 75 m² dengan 3 kamar tidur dan 2 kamar mandi (salah satunya kamar mandi dalam di kamar utama), dimensi 7 × 13,2 meter, hadap barat, carport 1 mobil sedalam 5 meter, listrik 2.200 VA, air sumur pompa submersible dengan toren 1.000 liter dan filter air. Yang termasuk penjualan: kitchen set, kompor tanam 3 tungku, cooking hood, toren, filter air, pompa submersible, antena TV digital, dan fixture permanen — rumah dijual tanpa perabot. Untuk survei, hubungi pemilik langsung via WhatsApp (tanpa perantara) dan sepakati jadwal; titik pasti dibagikan saat koordinasi lanjutan.',
-      en: 'The price is IDR 650 million (negotiable), payable in cash or by mortgage, plus a community fee of IDR 125K per month. The active mortgage is settled via notary upon agreement, and notary fees, taxes, mortgage settlement, and ownership transfer are negotiated separately — standard for a freehold Bojongsoang sale. Documents are freehold (SHM) with PBG/IMB available and PBB up to date, which simplifies bank mortgage approval. The spec is a single-storey 92 sqm / 75 sqm home with 3 bedrooms and 2 bathrooms (one en-suite in the main bedroom), 7 × 13.2 m dimensions, west-facing, a 5-metre-deep 1-car carport, 2,200 VA power, and pumped well water with a 1,000 L tower and filter. Included in the sale: kitchen set, 3-burner built-in hob, cooking hood, water tower, water filter, submersible pump, digital TV antenna, and permanent fixtures — sold unfurnished. To view the house, contact the owner directly via WhatsApp (no middleman) and agree a schedule; the exact pin is shared during follow-up coordination.'
+      id: 'Harga rumah ini Rp650 juta nego wajar, bisa tunai atau KPR, plus iuran lingkungan Rp125 ribu per bulan. KPR yang sedang berjalan dilunasi melalui notaris saat deal, dan biaya notaris, pajak, pelunasan KPR, serta balik nama dinegosiasikan terpisah — standar transaksi rumah dijual Bojongsoang SHM. Dokumen SHM dan PBB tertib memudahkan proses KPR bank. Spesifikasinya rumah 1 lantai LT 92 m2 LB 75 m2 dengan 3 kamar tidur dan 2 kamar mandi (salah satunya kamar mandi dalam di kamar utama), dimensi 7 × 13,2 meter, hadap barat, carport 1 mobil sedalam 5 meter, listrik 2.200 VA, air sumur pompa submersible dengan toren 1.000 liter dan filter air. Yang termasuk penjualan: kitchen set, kompor tanam 3 tungku, cooking hood, toren, filter air, pompa submersible, antena TV digital, dan fixture permanen — rumah dijual tanpa perabot. Untuk survei, hubungi pemilik langsung via WhatsApp (tanpa perantara) dan sepakati jadwal; titik pasti dibagikan saat koordinasi lanjutan.',
+      en: 'The price is IDR 650 million (negotiable), payable in cash or by mortgage, plus a community fee of IDR 125K per month. The active mortgage is settled via notary upon agreement, and notary fees, taxes, mortgage settlement, and ownership transfer are negotiated separately — standard for a freehold Bojongsoang sale. Freehold (SHM) title and up-to-date PBB simplify bank mortgage approval. The spec is a single-storey 92 sqm / 75 sqm home with 3 bedrooms and 2 bathrooms (one en-suite in the main bedroom), 7 × 13.2 m dimensions, west-facing, a 5-metre-deep 1-car carport, 2,200 VA power, and pumped well water with a 1,000 L tower and filter. Included in the sale: kitchen set, 3-burner built-in hob, cooking hood, water tower, water filter, submersible pump, digital TV antenna, and permanent fixtures — sold unfurnished. To view the house, contact the owner directly via WhatsApp (no middleman) and agree a schedule; the exact pin is shared during follow-up coordination.'
     },
+    buyingGuidePoints: [
+      {
+        id: 'Harga Rp650 juta nego wajar, tunai atau KPR, iuran lingkungan Rp125 rb/bulan.',
+        en: 'IDR 650M negotiable, cash or mortgage, community fee IDR 125K/month.'
+      },
+      {
+        id: 'KPR berjalan dilunasi notaris saat deal; biaya notaris, pajak, dan balik nama dinegosiasikan terpisah.',
+        en: 'Active mortgage settled via notary at closing; notary fees, taxes, and transfer costs negotiated separately.'
+      },
+      {
+        id: 'Spesifikasi: LT 92 m2 · LB 75 m2 · 3 KT/2 KM (1 en-suite) · 7 × 13,2 m · hadap barat · carport 1 mobil.',
+        en: 'Specs: LT 92 m2 · LB 75 m2 · 3 BD/2 BA (1 en-suite) · 7 × 13.2 m · west-facing · 1-car carport.'
+      },
+      {
+        id: 'Termasuk penjualan: kitchen set, kompor tanam, cooking hood, toren, filter, pompa, antena TV, fixture permanen — tanpa perabot.',
+        en: 'Included: kitchen set, built-in hob, hood, water tower, filter, pump, TV antenna, permanent fixtures — sold unfurnished.'
+      },
+      {
+        id: 'Survei langsung ke pemilik via WhatsApp (tanpa perantara); titik lokasi dibagikan saat koordinasi lanjutan.',
+        en: 'Viewing arranged directly with the owner via WhatsApp (no middleman); exact pin shared during follow-up.'
+      }
+    ],
     faq: [
       {
         question: { id: 'Di mana lokasi tepat rumah Kamarasan ini?', en: 'Where exactly is this Kamarasan house?' },
@@ -201,8 +271,8 @@ export const properties: Property[] = [
       {
         question: { id: 'Bagaimana kelengkapan dokumennya?', en: 'How complete are the documents?' },
         answer: {
-          id: 'SHM, PBG/IMB tersedia, dan PBB tertib. Kelengkapan ini memudahkan pengajuan KPR bank dan proses balik nama di notaris.',
-          en: 'Freehold title (SHM), PBG/IMB available, and PBB up to date. This completeness simplifies bank mortgage applications and the notary transfer process.'
+          id: 'SHM dan PBB tertib. Kelengkapan ini memudahkan pengajuan KPR bank dan proses balik nama di notaris.',
+          en: 'Freehold title (SHM) and PBB up to date. This completeness simplifies bank mortgage applications and the notary transfer process.'
         }
       },
       {

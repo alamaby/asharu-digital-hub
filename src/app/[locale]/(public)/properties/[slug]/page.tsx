@@ -162,7 +162,7 @@ export default async function PropertyDetailPage({
           <span className={statusChip}>
             {property.transactionType === 'sale' ? t('sale') : t('rent')}
           </span>
-          <span className="inline-flex items-center gap-1 text-sm text-ink-muted">
+          <span className="chip border border-line bg-surface text-ink">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             {property.location[locale]}
           </span>
@@ -281,6 +281,13 @@ export default async function PropertyDetailPage({
           <p className="mt-3 max-w-3xl leading-relaxed text-ink-muted">
             {property.locationGuide[locale]}
           </p>
+          {property.locationGuidePoints?.length ? (
+            <ul className="mt-3 max-w-3xl list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-ink-muted">
+              {property.locationGuidePoints.map((point) => (
+                <li key={point.en}>{point[locale]}</li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       ) : null}
 
@@ -356,6 +363,11 @@ export default async function PropertyDetailPage({
                 className="rounded-xl border border-line bg-surface p-4"
               >
                 <h3 className="text-base font-semibold text-primary">
+                  {highlight.emoji ? (
+                    <span aria-hidden="true" className="mr-1.5">
+                      {highlight.emoji}
+                    </span>
+                  ) : null}
                   {highlight.title[locale]}
                 </h3>
                 <p className="mt-1 text-sm leading-relaxed text-ink-muted">
@@ -419,6 +431,13 @@ export default async function PropertyDetailPage({
           <p className="mt-3 max-w-3xl leading-relaxed text-ink-muted">
             {property.buyingGuide[locale]}
           </p>
+          {property.buyingGuidePoints?.length ? (
+            <ul className="mt-3 max-w-3xl list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-ink-muted">
+              {property.buyingGuidePoints.map((point) => (
+                <li key={point.en}>{point[locale]}</li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       ) : null}
 

@@ -97,8 +97,8 @@ export function PropertyCard({ property, linkPosition }: PropertyCardProps) {
               {t('occupiedBadge')}
             </span>
           ) : null}
-          <span className="inline-flex items-center gap-1 text-sm text-ink-muted">
-            <MapPin className="size-3.5 shrink-0" aria-hidden />
+          <span className="chip border border-line bg-surface text-ink">
+            <MapPin className="size-3 shrink-0" aria-hidden />
             {property.location[locale]}
           </span>
         </div>
