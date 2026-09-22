@@ -50,7 +50,8 @@ export function CameraAngleBoard({ angles }: { angles: CameraAngleRow[] }) {
         onReorder={handleReorder}
         onSettled={handleSettled}
         renderItem={(id) => {
-          const a = angles.find((x) => x.slug === id)!;
+          const a = angles.find((x) => x.slug === id);
+          if (!a) return <p className="text-xs text-ink-muted">Memuat angle...</p>;
           const rowBusy = busy !== null;
           return (
             <div className="flex flex-wrap items-center justify-between gap-2">

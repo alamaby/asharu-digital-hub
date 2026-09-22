@@ -71,6 +71,21 @@ describe('mapConfigRow', () => {
     expect(cfg.ideaGenerationEnabled).toBe(true);
     expect(cfg.ideaProductSearch).toBe(false);
   });
+
+  it('kolom blackout: default 14 bila NULL/tak ada', () => {
+    const legacy = { ...base };
+    delete (legacy as Record<string, unknown>).product_repeat_blackout_days;
+    const cfg = mapConfigRow(legacy);
+    expect(cfg.productBlackoutDays).toBe(14);
+  });
+
+  it('kolom blackout: nilai DB dipakai dengan clamp 0–90', () => {
+    expect(mapConfigRow({ ...base, product_repeat_blackout_days: 30 }).productBlackoutDays).toBe(30);
+    expect(mapConfigRow({ ...base, product_repeat_blackout_days: null }).productBlackoutDays).toBe(14);
+    // Clamp nilai liar.
+    expect(mapConfigRow({ ...base, product_repeat_blackout_days: -5 }).productBlackoutDays).toBe(0);
+    expect(mapConfigRow({ ...base, product_repeat_blackout_days: 200 }).productBlackoutDays).toBe(90);
+  });
 });
 
 describe('resolveRunLocales', () => {

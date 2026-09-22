@@ -41,6 +41,8 @@ export interface AutomationConfig {
   minCandidates: number | null;
   /** Freshness hours: hanya produk dalam N jam terakhir; null = tak terbatas. */
   freshnessHours: number | null;
+  /** Product repeat blackout days: hari yang produk tidak boleh dipilih ulang (0 = nonaktif); default 14. */
+  productBlackoutDays: number;
 }
 
 interface AutomationConfigRow {
@@ -80,6 +82,8 @@ interface AutomationConfigRow {
   minimum_score?: number | null;
   minimum_candidates?: number | null;
   freshness_hours?: number | null;
+  // Kolom blackout (migrasi 20260922000003; opsional agar pre-migrasi termuat).
+  product_repeat_blackout_days?: number | null;
 }
 
 const NOTIFY_VALUES = new Set(['draft_ready', 'published', 'both', 'none']);
@@ -124,7 +128,9 @@ export function mapConfigRow(row: AutomationConfigRow): AutomationConfig {
     maxIterations: row.maximum_iterations ?? 1,
     minScore: row.minimum_score ?? null,
     minCandidates: row.minimum_candidates ?? null,
-    freshnessHours: row.freshness_hours ?? null
+    freshnessHours: row.freshness_hours ?? null,
+    // Blackout: clamp 0–90, default 14 jika NULL atau tidak ada di baris.
+    productBlackoutDays: Math.min(90, Math.max(0, row.product_repeat_blackout_days ?? 14))
   };
 }
 

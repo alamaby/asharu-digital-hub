@@ -31,7 +31,8 @@ const cfg = {
   notify_emails: [] as string[],
   email_from: 'Asharu <updates@alamaby.com>',
   email_reply_to: null,
-  last_run_at: null
+  last_run_at: null,
+  product_repeat_blackout_days: 14
 };
 
 const platformRows = [

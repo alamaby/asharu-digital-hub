@@ -44,6 +44,7 @@ function baseCfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
     minScore: null,
     minCandidates: null,
     freshnessHours: null,
+    productBlackoutDays: 14,
     ...over
   };
 }
@@ -85,8 +86,10 @@ function baseSlot(over: Partial<SlotRow> = {}): SlotRow {
     idea_product_search: null,
     email_from: null,
     email_reply_to: null,
+    product_repeat_blackout_days: null,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    ...over
   };
 }
 
@@ -128,6 +131,7 @@ describe('isSlotDue', () => {
       language: null, tone: null, audience: null, purpose: null, cta_style: null,
       target_reply_count: null, template_slug: null, idea_generation_enabled: null,
       idea_product_search: null, email_from: null, email_reply_to: null,
+      product_repeat_blackout_days: null,
       created_at: '', updated_at: ''
     };
     const now = new Date('2026-09-16T03:05:00Z'); // Rabu 10:05 WIB
@@ -162,6 +166,7 @@ describe('isSlotDue', () => {
       language: null, tone: null, audience: null, purpose: null, cta_style: null,
       target_reply_count: null, template_slug: null, idea_generation_enabled: null,
       idea_product_search: null, email_from: null, email_reply_to: null,
+      product_repeat_blackout_days: null,
       created_at: '', updated_at: ''
     };
     const now = new Date('2026-09-16T03:26:00Z'); // 10:26 WIB — dalam window 30 mnt dari 10:00
@@ -218,5 +223,17 @@ describe('mergeSlotParams', () => {
     const slot = baseSlot({ notify_emails: null });
     const merged = mergeSlotParams(cfg, slot);
     expect(merged.notifyEmails).toEqual(['admin@example.com']);
+  });
+
+  it('product_repeat_blackout_days NULL = warisi global', () => {
+    const slot = baseSlot({ product_repeat_blackout_days: null });
+    const merged = mergeSlotParams(cfg, slot);
+    expect(merged.productBlackoutDays).toBe(cfg.productBlackoutDays);
+  });
+
+  it('product_repeat_blackout_days override menggantikan global', () => {
+    const slot = baseSlot({ product_repeat_blackout_days: 7 });
+    const merged = mergeSlotParams(cfg, slot);
+    expect(merged.productBlackoutDays).toBe(7);
   });
 });

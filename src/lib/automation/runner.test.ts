@@ -36,6 +36,22 @@ function makeClient(tables: Record<string, Row[]>) {
         },
         lt: chain,
         gt: chain,
+        gte: (col: string, val: unknown) => {
+          rows = rows.filter((r) => {
+            const av = r[col] as number | string | null | undefined;
+            if (av == null) return false;
+            return av >= (val as number | string);
+          });
+          return builder;
+        },
+        lte: (col: string, val: unknown) => {
+          rows = rows.filter((r) => {
+            const av = r[col] as number | string | null | undefined;
+            if (av == null) return false;
+            return av <= (val as number | string);
+          });
+          return builder;
+        },
         order: chain,
         limit: chain,
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
@@ -286,6 +302,82 @@ describe('runAutomationTick (produk pool)', () => {
     // enrichSessionIdea tak menulis apa-apa → topic tetap null dari insert.
     const session = tables.content_research_sessions[0] as Row;
     expect(session.topic).toBeNull();
+  });
+
+  it('blackout: produk dalam jendela 14 hari di-exclude, fallback L1 picks lain', async () => {
+    // run p1 dan p2 7 hari lalu (masih dalam blackout 14 hari) → p3 harus dipilih.
+    const tables = {
+      automation_configs: [baseConfig({ product_pool_size: 3 })],
+      automation_runs: [
+        { id: 'r1', run_date: '2026-09-09', status: 'completed', product_id: 'p1', slot_key: 'default', session_id: 's1' },
+        { id: 'r2', run_date: '2026-09-10', status: 'completed', product_id: 'p2', slot_key: 'default', session_id: 's2' }
+      ],
+      affiliate_products: [
+        { id: 'p1', is_active: true, created_at: '2026-08-01T00:00:00Z' },
+        { id: 'p2', is_active: true, created_at: '2026-08-02T00:00:00Z' },
+        { id: 'p3', is_active: true, created_at: '2026-08-03T00:00:00Z' }
+      ],
+      content_research_sessions: [] as Row[],
+      content_research_session_products: [] as Row[]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:00:00Z'),
+      force: true
+    });
+    expect(res.ok).toBe(true);
+    // Run dibuat; mock insert menaruh baris terakhir di tabel.
+    const runs = tables.automation_runs as Row[];
+    const latest = runs[runs.length - 1];
+    expect(latest).toBeDefined();
+    // Produk yang dipilih TIDAK boleh p1 atau p2 (keduanya blacklisted 14 hari).
+    expect(['p1', 'p2'].includes(latest!.product_id as string)).toBe(false);
+  });
+
+  it('blackoutDays=0 → tanpa query gte, semua produk tersedia', async () => {
+    const tables = {
+      automation_configs: [baseConfig({ product_pool_size: 2, product_repeat_blackout_days: 0 })],
+      automation_runs: [
+        { id: 'r1', run_date: '2026-09-16', status: 'completed', product_id: 'p1', slot_key: 'default', session_id: 's1' }
+      ],
+      affiliate_products: [
+        { id: 'p1', is_active: true, created_at: '2026-08-01T00:00:00Z' },
+        { id: 'p2', is_active: true, created_at: '2026-08-02T00:00:00Z' }
+      ],
+      content_research_sessions: [] as Row[],
+      content_research_session_products: [] as Row[]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:00:00Z'),
+      force: true
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('semua pool blacklisted → fallback L2 (occupied only) lalu L3 (pool penuh)', async () => {
+    // Semua 2 produk ada di blackout + occupied hari ini → harus tetap berhasil pilih salah satunya (L3).
+    const tables = {
+      automation_configs: [baseConfig({ product_pool_size: 2 })],
+      automation_runs: [
+        { id: 'r1', run_date: '2026-09-16', status: 'developing', product_id: 'p1', slot_key: 'slot-a', session_id: 's1' },
+        { id: 'r2', run_date: '2026-09-09', status: 'completed', product_id: 'p1', slot_key: 'default', session_id: 's2' },
+        { id: 'r3', run_date: '2026-09-10', status: 'completed', product_id: 'p2', slot_key: 'default', session_id: 's3' }
+      ],
+      affiliate_products: [
+        { id: 'p1', is_active: true, created_at: '2026-08-01T00:00:00Z' },
+        { id: 'p2', is_active: true, created_at: '2026-08-02T00:00:00Z' }
+      ],
+      content_research_sessions: [] as Row[],
+      content_research_session_products: [] as Row[]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:00:00Z'),
+      force: true,
+      slotKey: 'slot-b'
+    });
+    expect(res.ok).toBe(true);
   });
 });
 

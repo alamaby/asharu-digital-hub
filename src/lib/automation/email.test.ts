@@ -54,6 +54,7 @@ function cfg(over: Partial<AutomationConfig> = {}): AutomationConfig {
       minScore: null,
       minCandidates: null,
       freshnessHours: null,
+      productBlackoutDays: 14,
       ...over
   };
 }

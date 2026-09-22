@@ -109,6 +109,7 @@ export async function updateAutomationConfig(formData: FormData): Promise<Automa
           str(formData, 'target_reply_count') === null ? null : num(formData, 'target_reply_count', 7),
         product_pool_size: num(formData, 'product_pool_size', 50),
         product_category: str(formData, 'product_category'),
+        product_repeat_blackout_days: num(formData, 'product_repeat_blackout_days', 14),
         idea_generation_enabled: bool(formData, 'idea_generation_enabled'),
         idea_product_search: bool(formData, 'idea_product_search'),
         require_cover: bool(formData, 'require_cover'),

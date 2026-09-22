@@ -6,7 +6,7 @@ import { publishArticleDraftCore } from '@/lib/articles/publish';
 import { loadAutomationConfig, resolveRecipients, resolveRunLocales, type AutomationConfig } from './config';
 import { defaultIdeaDeps, generateSessionIdea, type GeneratedIdea, type IdeaProduct } from '@/lib/research/idea';
 import { getResearchTemplateHint } from '@/lib/research/templates';
-import { isRunDue, localDateString, pickRandomProduct } from './scheduler';
+import { isRunDue, localDateString, pickRandomProduct, blackoutCutoff } from './scheduler';
 import { loadEnabledSlots, mergeSlotParams, isSlotDue } from './schedules';
 import { sendDraftReadyEmail, sendPublishedEmail, logAutomationEmail } from './email';
 import { reportError } from '@/lib/notifications/error-events';
@@ -284,9 +284,30 @@ async function createRun(
   const occupiedIds = ((occupied ?? []) as { product_id: string | null }[])
     .map((r) => r.product_id)
     .filter(Boolean) as string[];
-  const available = poolRows
-    .filter((p) => !occupiedIds.includes(p.id));
-  const chosen = pickRandomProduct(available.length > 0 ? available : poolRows);
+
+  // Blackout global: produk yang dipakai run manapun dalam N hari terakhir
+  // tidak dipilih ulang. Q global (semua slot) mencegah repeat lintas-slot
+  // dan lintas-hari sesui knob. Bila query gagal / days=0 → kosong (=tanpa ekslusi).
+  const blackoutDays = Math.max(0, Math.min(90, cfg.productBlackoutDays ?? 14));
+  let blackoutIds: string[] = [];
+  if (blackoutDays > 0) {
+    const cutoff = blackoutCutoff(runDate, blackoutDays);
+    const { data: recent } = await supabase
+      .from('automation_runs')
+      .select('product_id')
+      .gte('run_date', cutoff);
+    blackoutIds = ((recent ?? []) as { product_id: string | null }[])
+      .map((r) => r.product_id)
+      .filter(Boolean) as string[];
+  }
+
+  const occupiedSet = new Set(occupiedIds);
+  const blackoutSet = new Set(blackoutIds);
+  const l1 = poolRows.filter((p) => !occupiedSet.has(p.id) && !blackoutSet.has(p.id));
+  const l2 = poolRows.filter((p) => !occupiedSet.has(p.id));
+  const fallbackLevel = l1.length > 0 ? 0 : l2.length > 0 ? 1 : 2;
+  const effective = l1.length > 0 ? l1 : l2.length > 0 ? l2 : poolRows;
+  const chosen = pickRandomProduct(effective.length > 0 ? effective : poolRows);
   if (!chosen) return { error: 'tidak ada produk afiliasi aktif untuk dipilih' };
 
   const { data: session, error: sessionError } = await supabase
@@ -390,7 +411,7 @@ async function createRun(
       .eq('id', sessionId);
     return { error: `insert run: ${runError?.message ?? 'no id'}` };
   }
-  await log(supabase, sessionId, 'automation', 'info', `run ${runDate} slot=${slotKey} dibuat untuk produk ${chosen.id}`);
+  await log(supabase, sessionId, 'automation', 'info', `run ${runDate} slot=${slotKey} dibuat untuk produk ${chosen.id} (pool=${poolRows.length} occupied=${occupiedIds.length} blackout=${blackoutIds.length} fallback=${fallbackLevel})`);
   return run as AutomationRunRow;
 }
 
@@ -452,6 +473,7 @@ export async function runAutomationTick(
       idea_product_search: null,
       email_from: null,
       email_reply_to: null,
+      product_repeat_blackout_days: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }];

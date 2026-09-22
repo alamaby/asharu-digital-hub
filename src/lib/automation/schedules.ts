@@ -70,6 +70,8 @@ export interface SlotRow {
   idea_product_search: boolean | null;
   email_from: string | null;
   email_reply_to: string | null;
+  /** Fase 4: blackout override per-slot (NULL = warisi global). */
+  product_repeat_blackout_days: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,7 +167,8 @@ export function mergeSlotParams(global: AutomationConfig, slot: SlotRow): Automa
     maxIterations: pick(slot.maximum_iterations, global.maxIterations),
     minScore: pick(slot.minimum_score, global.minScore),
     minCandidates: pick(slot.minimum_candidates, global.minCandidates),
-    freshnessHours: pick(slot.freshness_hours, global.freshnessHours)
+    freshnessHours: pick(slot.freshness_hours, global.freshnessHours),
+    productBlackoutDays: pick(slot.product_repeat_blackout_days, global.productBlackoutDays)
   };
 }
 

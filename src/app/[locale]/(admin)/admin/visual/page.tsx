@@ -33,11 +33,15 @@ async function ImageProvidersSection() {
   }
   const counts = new Map<string, { models: number; keys: number }>();
   for (const p of provRows) {
-    const [{ count: mc }, { count: kc }] = await Promise.all([
-      supabase.from('image_models').select('*', { count: 'exact', head: true }).eq('provider_id', p.id),
-      supabase.from('image_provider_keys').select('*', { count: 'exact', head: true }).eq('provider_id', p.id)
-    ]);
-    counts.set(p.id, { models: mc ?? 0, keys: kc ?? 0 });
+    try {
+      const [{ count: mc }, { count: kc }] = await Promise.all([
+        supabase.from('image_models').select('*', { count: 'exact', head: true }).eq('provider_id', p.id),
+        supabase.from('image_provider_keys').select('*', { count: 'exact', head: true }).eq('provider_id', p.id)
+      ]);
+      counts.set(p.id, { models: mc ?? 0, keys: kc ?? 0 });
+    } catch {
+      counts.set(p.id, { models: 0, keys: 0 });
+    }
   }
   return (
     <ImageProviderBoard

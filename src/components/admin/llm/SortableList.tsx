@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -65,9 +65,12 @@ export function SortableList({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  if (ids.length !== items.length || ids.some((id, i) => id !== items[i]!.id)) {
-    setTimeout(() => setIds(items.map((i) => i.id)), 0);
-  }
+  useEffect(() => {
+    setIds((prev) => {
+      if (prev.length === items.length && prev.every((id, i) => id === items[i]!.id)) return prev;
+      return items.map((i) => i.id);
+    });
+  }, [items]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));

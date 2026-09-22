@@ -115,3 +115,16 @@ export function pickRandomProduct<T>(rows: T[], rng?: (n: number) => number): T 
   if (rows.length === 0) return null;
   return rows[pickRandomIndex(rows.length, rng)] ?? null;
 }
+
+/**
+ * Hitung cutoff tanggal untuk jendela blackout produk.
+ * `runDate` format YYYY-MM-DD pada zona waktu config.
+ * Mengembalikan string YYYY-MM-DD dari N hari sebelum runDate.
+ * Days negatif/float dinormalisasi dengan Math.floor dan dibatasi >= 0.
+ */
+export function blackoutCutoff(runDate: string, days: number): string {
+  const [y, m, d] = runDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  dt.setUTCDate(dt.getUTCDate() - Math.max(0, Math.floor(days)));
+  return dt.toISOString().slice(0, 10);
+}

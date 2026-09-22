@@ -161,6 +161,27 @@ describe('updateAutomationConfig', () => {
     expect(supabase.patched[0]?.idea_generation_enabled).toBe(true);
     expect(supabase.patched[0]?.idea_product_search).toBe(false);
   });
+
+  it('product_repeat_blackout_days tersimpan bila valid (30)', async () => {
+    const supabase = makeClient();
+    clientRef.current = supabase as never;
+    const fd = new FormData();
+    fd.append('platform_slugs', 'artikel');
+    fd.append('product_repeat_blackout_days', '30');
+    const res = await updateAutomationConfig(fd);
+    expect(res.ok).toBe(true);
+    expect(supabase.patched[0]?.product_repeat_blackout_days).toBe(30);
+  });
+
+  it('product_repeat_blackout_days default 14 bila kosong', async () => {
+    const supabase = makeClient();
+    clientRef.current = supabase as never;
+    const fd = new FormData();
+    fd.append('platform_slugs', 'artikel');
+    const res = await updateAutomationConfig(fd);
+    expect(res.ok).toBe(true);
+    expect(supabase.patched[0]?.product_repeat_blackout_days).toBe(14);
+  });
 });
 
 // --- Slot CRUD ---------------------------------------------------------------

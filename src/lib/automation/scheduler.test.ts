@@ -4,7 +4,8 @@ import {
   localDateString,
   localMinutes,
   pickRandomIndex,
-  pickRandomProduct
+  pickRandomProduct,
+  blackoutCutoff
 } from './scheduler';
 
 describe('localDateString / localMinutes', () => {
@@ -88,5 +89,27 @@ describe('pickRandomIndex / pickRandomProduct', () => {
       expect(idx).toBeGreaterThanOrEqual(0);
       expect(idx).toBeLessThan(10);
     }
+  });
+});
+
+describe('blackoutCutoff', () => {
+  it('hitung mundur 14 hari dari September', () => {
+    expect(blackoutCutoff('2026-09-22', 14)).toBe('2026-09-08');
+  });
+
+  it('melewati batas bulan ke belakang', () => {
+    expect(blackoutCutoff('2026-09-01', 14)).toBe('2026-08-18');
+  });
+
+  it('melewati batas tahun ke belakang', () => {
+    expect(blackoutCutoff('2026-01-05', 10)).toBe('2025-12-26');
+  });
+
+  it('days = 0 tidak mengubah tanggal', () => {
+    expect(blackoutCutoff('2026-09-22', 0)).toBe('2026-09-22');
+  });
+
+  it('days negatif dinormalisasi ke 0', () => {
+    expect(blackoutCutoff('2026-09-22', -5)).toBe('2026-09-22');
   });
 });

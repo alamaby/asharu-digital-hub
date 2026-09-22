@@ -50,7 +50,8 @@ export function SubjectBoard({ subjects }: { subjects: SubjectRow[] }) {
         onReorder={handleReorder}
         onSettled={handleSettled}
         renderItem={(id) => {
-          const s = subjects.find((x) => x.slug === id)!;
+          const s = subjects.find((x) => x.slug === id);
+          if (!s) return <p className="text-xs text-ink-muted">Memuat template...</p>;
           const rowBusy = busy !== null;
           return (
             <div className="flex flex-wrap items-center justify-between gap-2">

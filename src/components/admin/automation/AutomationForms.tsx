@@ -67,6 +67,7 @@ export interface ConfigFormData {
   target_reply_count: number | null;
   product_pool_size: number;
   product_category: string | null;
+  product_repeat_blackout_days: number;
   idea_generation_enabled: boolean;
   idea_product_search: boolean;
   require_cover: boolean;
@@ -230,6 +231,10 @@ export function AutomationConfigForm({
           <label className={labelCls}>
             Filter kategori (opsional)
             <input name="product_category" defaultValue={cfg.product_category ?? ''} placeholder="electronics" className={inputCls} />
+          </label>
+          <label className={labelCls}>
+            Blackout repeat produk (hari)
+            <input type="number" min={0} max={90} name="product_repeat_blackout_days" defaultValue={cfg.product_repeat_blackout_days} className={inputCls} />
           </label>
         </div>
 

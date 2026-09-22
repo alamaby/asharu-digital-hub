@@ -132,6 +132,7 @@ export async function runErrorDigestTick(
       notifyOn: 'none',
       notifyEmails: [],
       emailFrom: 'Asharu <notifikasi@asharu.id>',
+      productBlackoutDays: 14,
       emailReplyTo: null,
       maxIterations: 1,
       minScore: null,
