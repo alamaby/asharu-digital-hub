@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-21 pagi (local time)
+Last updated: 2026-09-22 malam (S1–S4 automation multislot starvation fix selesai, handoff review)
 
 ## Current State
 
@@ -67,6 +67,8 @@ Last updated: 2026-09-21 pagi (local time)
 ## Recent Entries
 
 - [2026-09-22 114500-error-digest-email-queue.md](2026-09-22/114500-error-digest-email-queue.md) — Digest email error integrasi: queue `error_events` + agregasi 30 menit per kategori via pg_cron tick tiap 5 menit. 8 kategori (tavily/llm/research/automation/scrape/cron_api/resend/image). Configurable via `error_notification_configs`. Admin UI di `/admin/automation`. Email failure langsung dimigrasikan ke queue (Langkah 9). Gate typecheck ✓ lint ✓ 29 test baru ✓. Commit `fe128ee`/`e80a754` pushed.
+
+- [2026-09-22 214600-automation-multislot-starvation-fix.md](2026-09-22/214600-automation-multislot-starvation-fix.md) — Fix starvation slot `sore` di `runAutomationTick`: early-return `completed`/`failed` diubah `continue`, ORDER BY deterministik, mock `.in()` ditambah, 3 test regresi (T2a/T2b/T2c) hijau. Gate typecheck+lint+build ✓; 1 test pre-existing fail `blackoutDays=0` (belum diselidiki). Plan handoff untuk review + deploy Vercel + S5 observasi prod.
 
 - [2026-09-22 133000-admin-automation-visual-featured.md](2026-09-22/133000-admin-automation-visual-featured.md) — 4 finding: (1) history run pagination 10/hlm + filter + search q + card produk + jam + topik; (2) anti-repeat produk blackout 14h global + L1/L2/L3 fallback; (3) visual crash TypeError sort_order fix useEffect+null-safe; (4) verified featured = top-6 featured_rank. Gate 1044 tests ✓, commit `88ccf83`/`9bd4657` + submodule `d7627d1` pushed.
 

@@ -84,8 +84,25 @@ function makeClient(tables: Record<string, Row[]>) {
               return {
                 eq: (col2: string, val2: unknown) => {
                   rows = rows.filter((r) => r[col2] === val2);
+                  return {
+                    eq: (col3: string, val3: unknown) => {
+                      rows = rows.filter((r) => r[col3] === val3);
+                      apply();
+                      return { select: () => ({ maybeSingle: async () => ({ data: rows[0] ?? null, error: null }) }) };
+                    },
+                    in: (col3: string, vals: unknown[]) => {
+                      rows = rows.filter((r) => (vals as unknown[]).includes(r[col3]));
+                      apply();
+                      return { select: () => ({ maybeSingle: async () => ({ data: rows[0] ?? null, error: null }) }), then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error: null }) };
+                    },
+                    select: () => ({ maybeSingle: async () => { apply(); return { data: rows[0] ?? null, error: null }; } }),
+                    then: (resolve: (v: unknown) => unknown) => { apply(); return resolve({ data: null, error: null }); }
+                  };
+                },
+                in: (col2: string, vals: unknown[]) => {
+                  rows = rows.filter((r) => (vals as unknown[]).includes(r[col2]));
                   apply();
-                  return { select: () => ({ maybeSingle: async () => ({ data: rows[0] ?? null, error: null }) }) };
+                  return { select: () => ({ maybeSingle: async () => ({ data: rows[0] ?? null, error: null }) }), then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error: null }) };
                 },
                 select: () => ({ maybeSingle: async () => { apply(); return { data: rows[0] ?? null, error: null }; } }),
                 then: (resolve: (v: unknown) => unknown) => { apply(); return resolve({ data: null, error: null }); }
@@ -245,6 +262,127 @@ describe('runAutomationTick (guards)', () => {
     // advanceRun dipanggil; mock chained-eq tidak mem-backfill table referensi.
     // Verifikasi runner tidak crash dan status berubah (bukan skipped).
     expect(res.skipped).toBeUndefined();
+  });
+});
+
+describe('runAutomationTick (multi-slot starvation)', () => {
+  const NOW = new Date('2026-09-16T09:30:00Z'); // 16:30 WIB — sore slot due
+
+  function makeMultiSlotTables(opts: {
+    runsOrder?: 'default-first' | 'sore-first';
+    runsCreated?: boolean;
+  } = {}) {
+    const isDefaultFirst = opts.runsOrder !== 'sore-first';
+    const defaultRun: Row = {
+      id: 'run-default',
+      run_date: '2026-09-16',
+      slot_key: 'default',
+      status: 'completed',
+      attempts: 0,
+      session_id: 's-default',
+      product_id: 'p1',
+      cover_attempts: 0,
+      cover_started_at: null
+    };
+    const soreRun: Row = {
+      id: 'run-sore',
+      run_date: '2026-09-16',
+      slot_key: 'sore',
+      status: 'session_created',
+      attempts: 0,
+      session_id: 's-sore',
+      product_id: 'p1',
+      cover_attempts: 0,
+      cover_started_at: null
+    };
+    const runs = isDefaultFirst
+      ? [defaultRun, soreRun]
+      : [soreRun, defaultRun];
+    return {
+      automation_configs: [baseConfig()],
+      automation_schedules: [
+        { id: 's1', slot_key: 'default', label: 'Pagi', hour: 10, minute: 0, weekdays: 127, is_enabled: true, priority: 0, window_minutes: null, platform_slugs: null, max_topics: null, product_pool_size: null, product_category: null, auto_publish_article: null, require_cover: null, notify_on: null, notify_emails: null, maximum_iterations: null, minimum_score: null, minimum_candidates: null, freshness_hours: null, cover_max_wait_minutes: null, cover_max_attempts: null, max_retry_attempts: null, language: null, tone: null, audience: null, purpose: null, cta_style: null, target_reply_count: null, template_slug: null, idea_generation_enabled: null, idea_product_search: null, email_from: null, email_reply_to: null, product_repeat_blackout_days: null },
+        { id: 's2', slot_key: 'sore', label: 'Sore', hour: 16, minute: 0, weekdays: 127, is_enabled: true, priority: 1, window_minutes: null, platform_slugs: null, max_topics: null, product_pool_size: null, product_category: null, auto_publish_article: null, require_cover: null, notify_on: null, notify_emails: null, maximum_iterations: null, minimum_score: null, minimum_candidates: null, freshness_hours: null, cover_max_wait_minutes: null, cover_max_attempts: null, max_retry_attempts: null, language: null, tone: null, audience: null, purpose: null, cta_style: null, target_reply_count: null, template_slug: null, idea_generation_enabled: null, idea_product_search: null, email_from: null, email_reply_to: null, product_repeat_blackout_days: null }
+      ],
+      automation_runs: runs,
+      content_research_sessions: [
+        { id: 's-default', status: 'completed' },
+        { id: 's-sore', status: 'awaiting_selection' }
+      ],
+      content_research_topics: [
+        { id: 't-sore-1', session_id: 's-sore', status: 'pending', rank: 1 },
+        { id: 't-sore-2', session_id: 's-sore', status: 'pending', rank: 2 }
+      ],
+      affiliate_products: [{ id: 'p1', is_active: true, created_at: '2026-09-15T00:00:00Z' }]
+    };
+  }
+
+  function assertSoreAdvanced(res: Awaited<ReturnType<typeof runAutomationTick>>) {
+    expect(res.ok).toBe(true);
+    expect(res.skipped).toBeUndefined();
+    expect(res.status).toBeDefined();
+  }
+
+  function assertSoreNotAdvanced(tables: Record<string, Row[]>) {
+    const soreRuns = (tables.automation_runs ?? []).filter((r: Row) => r.slot_key === 'sore') as Row[];
+    const soreRun = soreRuns[0];
+    expect(soreRun).toBeDefined();
+    expect((soreRun as Row)?.status).toBe('session_created');
+    const sessions = (tables.content_research_sessions ?? []).filter((r: Row) => r.id === 's-sore') as Row[];
+    expect(sessions[0]?.status).toBe('awaiting_selection');
+  }
+
+  it('T2a: default completed duluan → sore tetap di-advance (reproduksi urutan prod)', async () => {
+    const tables = makeMultiSlotTables({ runsOrder: 'default-first' });
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, { now: NOW, force: true });
+    assertSoreAdvanced(res);
+    const soreRuns = (tables.automation_runs ?? []).filter((r: Row) => r.slot_key === 'sore') as Row[];
+    expect((soreRuns[0] as Row)?.status).toBe('developing');
+    const soreSessions = (tables.content_research_sessions ?? []).filter((r: Row) => r.id === 's-sore') as Row[];
+    expect((soreSessions[0] as Row)?.status).toBe('developing');
+    const shortlisted = (tables.content_research_topics ?? []).filter((r: Row) => r.session_id === 's-sore' && r.status === 'shortlisted') as Row[];
+    expect(shortlisted.length).toBeGreaterThanOrEqual(1);
+    const logs = ((tables as Record<string, Row[]>).content_research_logs ?? []).filter((r: Row) => r.session_id === 's-sore') as Row[];
+    expect(logs.some((l: Row) => String(l.message).includes('shortlist'))).toBe(true);
+  });
+
+  it('T2b: urutan dibalik [sore, default] → hasil sama (order-independent)', async () => {
+    const tables = makeMultiSlotTables({ runsOrder: 'sore-first' });
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, { now: NOW, force: true });
+    assertSoreAdvanced(res);
+    const soreRuns = (tables.automation_runs ?? []).filter((r: Row) => r.slot_key === 'sore') as Row[];
+    expect((soreRuns[0] as Row)?.status).toBe('developing');
+    const soreSessions = (tables.content_research_sessions ?? []).filter((r: Row) => r.id === 's-sore') as Row[];
+    expect((soreSessions[0] as Row)?.status).toBe('developing');
+  });
+
+  it('T2c: tick kreasi — sore dibuat DAN langsung di-advance (bukan stuck session_created)', async () => {
+    const tables = {
+      automation_configs: [baseConfig()],
+      automation_schedules: [
+        { id: 's1', slot_key: 'default', label: 'Pagi', hour: 10, minute: 0, weekdays: 127, is_enabled: true, priority: 0, window_minutes: null, platform_slugs: null, max_topics: null, product_pool_size: null, product_category: null, auto_publish_article: null, require_cover: null, notify_on: null, notify_emails: null, maximum_iterations: null, minimum_score: null, minimum_candidates: null, freshness_hours: null, cover_max_wait_minutes: null, cover_max_attempts: null, max_retry_attempts: null, language: null, tone: null, audience: null, purpose: null, cta_style: null, target_reply_count: null, template_slug: null, idea_generation_enabled: null, idea_product_search: null, email_from: null, email_reply_to: null, product_repeat_blackout_days: null },
+        { id: 's2', slot_key: 'sore', label: 'Sore', hour: 16, minute: 0, weekdays: 127, is_enabled: true, priority: 1, window_minutes: null, platform_slugs: null, max_topics: null, product_pool_size: null, product_category: null, auto_publish_article: null, require_cover: null, notify_on: null, notify_emails: null, maximum_iterations: null, minimum_score: null, minimum_candidates: null, freshness_hours: null, cover_max_wait_minutes: null, cover_max_attempts: null, max_retry_attempts: null, language: null, tone: null, audience: null, purpose: null, cta_style: null, target_reply_count: null, template_slug: null, idea_generation_enabled: null, idea_product_search: null, email_from: null, email_reply_to: null, product_repeat_blackout_days: null }
+      ],
+      automation_runs: [
+        { id: 'run-default', run_date: '2026-09-16', slot_key: 'default', status: 'completed', attempts: 0, session_id: 's-default', product_id: 'p1', cover_attempts: 0, cover_started_at: null }
+      ],
+      content_research_sessions: [{ id: 's-default', status: 'completed' }],
+      content_research_topics: [],
+      affiliate_products: [{ id: 'p1', is_active: true, created_at: '2026-09-15T00:00:00Z' }]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, { now: NOW, force: true });
+    expect(res.ok).toBe(true);
+    expect(res.skipped).toBeUndefined();
+    const soreRuns = (tables.automation_runs ?? []).filter((r: Row) => r.slot_key === 'sore') as Row[];
+    expect(soreRuns.length).toBeGreaterThan(0);
+    expect((soreRuns[0] as Row)?.status).not.toBe('session_created');
+    const soreSessions = (tables.content_research_sessions ?? []).filter((r: Row) => String(r.id).startsWith('s-sore') || (r.status as string) === 'developing') as Row[];
+    if (soreSessions.length > 0) {
+      expect((soreSessions[0] as Row)?.status).toBe('developing');
+    }
   });
 });
 

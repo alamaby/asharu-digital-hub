@@ -488,7 +488,8 @@ export async function runAutomationTick(
   const { data: allRunsData } = await supabase
     .from('automation_runs')
     .select('*')
-    .eq('run_date', runDate);
+    .eq('run_date', runDate)
+    .order('slot_key', { ascending: true });
   // Fallback: bila mock/client mengembalikan bukan array, coba maybeSingle.
   const rawAll = allRunsData as unknown[] | null;
   const allRuns = Array.isArray(rawAll) ? rawAll : rawAll ? [rawAll] : [];
@@ -535,9 +536,8 @@ export async function runAutomationTick(
       // advanceRun modifies run in place via updateRun → ambil status terbaru.
       results.push({ slot_key: sk, status: run.status, advanced: advanced.changed });
     } else if (run.status === 'completed') {
-      if (!hadOpenRun && results.length === 0) {
-        return { ok: true, skipped: 'already_done', runDate, status: run.status };
-      }
+      // Terminal: lewati, keputusan already_done di akhir (multi-slot).
+      continue;
     } else if (run.status === 'failed') {
       // Retry: reset ke tahap aman sebelum advanceRun memprosesnya lagi.
       if (run.attempts < cfg.maxRetryAttempts) {
@@ -559,10 +559,8 @@ export async function runAutomationTick(
           continue;
         }
       }
-      // Attempts habis atau sesi failed → terminal.
-      if (!hadOpenRun && results.length === 0) {
-        return { ok: true, skipped: 'already_done', runDate, status: run.status };
-      }
+      // Attempts habis atau sesi failed → terminal (lewati).
+      continue;
     }
   }
   // Tambahkan hasil dari run yang baru dibuat (belum masuk existingRuns).
@@ -574,6 +572,17 @@ export async function runAutomationTick(
   // Bila force tapi semua slot gagal membuat run → kembalikan error (backward-compat).
   if (!hadOpenRun && results.length === 0 && opts.force) {
     return { ok: false, error: 'semua slot gagal membuat run hari ini', runDate };
+  }
+
+  // Semua run hari ini terminal (completed/failed), tidak ada yang dibuka → sudah selesai hari ini.
+  if (!hadOpenRun && results.length === 0 && created.length === 0) {
+    const terminalRuns = Object.values(existingRuns).filter(
+      (r) => r.status === 'completed' || r.status === 'failed'
+    );
+    if (terminalRuns.length > 0) {
+      terminalRuns.sort((a, b) => ((a.slot_key ?? 'default') as string).localeCompare(b.slot_key ?? 'default'));
+      return { ok: true, skipped: 'already_done', runDate, status: (terminalRuns[0] as AutomationRunRow)?.status ?? 'completed' };
+    }
   }
 
   // Check not_due bila tidak ada run & force bukan mode.
