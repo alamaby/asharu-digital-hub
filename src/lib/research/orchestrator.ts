@@ -6,6 +6,7 @@ import { runVerification } from './verification';
 import { runScoring } from './scoring';
 import { runDevelopment } from './development';
 import { getResearchTemplateHint } from './templates';
+import { reportError } from '@/lib/notifications/error-events';
 
 interface ResearchSessionRow {
   id: string;
@@ -254,6 +255,10 @@ export async function advanceStage(
       stage: session.status,
       level: 'error',
       message
+    });
+    await reportError(supabase, {
+      category: 'research', source: 'advanceStage', severity: 'error',
+      stage: session.status, message, sessionId
     });
     return { status: 'failed', advanced: false };
   }

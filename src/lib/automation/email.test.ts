@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   classifyResendError,
   sendDraftReadyEmail,
+  sendErrorDigestEmail,
   sendFailureEmail,
   sendPublishedEmail,
   sendViaResend,
-  type AutomationEmailInput
+  type AutomationEmailInput,
+  type ErrorDigestGroup
 } from './email';
 import type { AutomationConfig } from './config';
 
@@ -222,6 +224,70 @@ describe('sendViaResend code field', () => {
     const res = await sendViaResend('re_test', input, fetchImpl);
     expect(res.ok).toBe(true);
     expect(res.code).toBeUndefined();
+  });
+});
+
+describe('sendErrorDigestEmail', () => {
+  const digestCfg = cfg();
+  const groups: ErrorDigestGroup[] = [
+    {
+      category: 'tavily',
+      count: 2,
+      topMessages: [{ fingerprint: 'abc123def456', count: 2, sample: 'Tavily tidak mengembalikan hasil' }]
+    },
+    {
+      category: 'llm',
+      count: 1,
+      topMessages: [{ fingerprint: 'xyz789ghi012', count: 1, sample: 'All LLM providers failed' }]
+    }
+  ];
+  const input = {
+    recipients: ['admin@asharu.id'],
+    windowMinutes: 30,
+    groups,
+    totalEvents: 3,
+    siteUrl: 'https://asharu.id'
+  };
+
+  it('sukses mengirim email digest dengan payload yang benar', async () => {
+    const fetchImpl = mockFetch(200, JSON.stringify({ id: 'digest_1' }));
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(fetchImpl);
+    const mockClient = {
+      rpc: async () => ({ data: 're_key', error: null }),
+      from: vi.fn(() => ({ insert: vi.fn().mockResolvedValue({ data: null, error: null }) }))
+    } as never;
+    const res = await sendErrorDigestEmail(mockClient, digestCfg, { ...input, siteUrl: 'https://asharu.id' });
+    expect(res.ok).toBe(true);
+    expect(res.id).toBe('digest_1');
+    const call = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call?.[0]).toBe('https://api.resend.com/emails');
+    const payload = JSON.parse(call?.[1].body as string);
+    expect(payload.subject).toContain('30 menit');
+    expect(payload.subject).toContain('3 kejadian');
+    expect(payload.html).toContain('tavily');
+    expect(payload.html).toContain('llm');
+    spy.mockRestore();
+  });
+
+  it('groups kosong → skipped tanpa memanggil fetch', async () => {
+    const fetchImpl = mockFetch(200, '{}');
+    const mockClient = {
+      rpc: async () => ({ data: 're_key', error: null })
+    } as never;
+    const res = await sendErrorDigestEmail(mockClient, digestCfg, { ...input, groups: [] });
+    expect(res.ok).toBe(false);
+    expect(res.skipped).toBe(true);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('key hilang → skipped tanpa memanggil fetch Resend', async () => {
+    const noKeyClient = {
+      rpc: async () => ({ data: null, error: { message: 'not found' } })
+    } as never;
+    const res = await sendErrorDigestEmail(noKeyClient, digestCfg, input);
+    expect(res.ok).toBe(false);
+    expect(res.skipped).toBe(true);
+    expect(res.skippedReason).toBe('key_missing');
   });
 });
 

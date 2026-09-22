@@ -12,6 +12,7 @@ import {
   RetryRunForm
 } from '@/components/admin/automation/AutomationForms';
 import { SlotSection, type SlotRowData, type GlobalDefaults } from '@/components/admin/automation/SlotForms';
+import { ErrorDigestConfigTable } from '@/components/admin/automation/ErrorDigestForms';
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata({
@@ -80,7 +81,7 @@ interface RunRow {
 interface EmailLogRow {
   id: string;
   run_id: string | null;
-  moment: 'draft_ready' | 'published' | 'failure' | 'test';
+  moment: 'draft_ready' | 'published' | 'failure' | 'test' | 'error_digest';
   ok: boolean;
   skipped: boolean;
   resend_id: string | null;
@@ -245,7 +246,7 @@ export default async function AutomationAdminPage({
   const supabase = createSupabaseService();
   if (!supabase) throw new Error('Supabase not configured — set SUPABASE_SECRET_KEY');
 
-  const [{ data: config }, { data: runs }, { data: platforms }, { data: templates }, { data: emailLogs }, { data: slots }] =
+  const [{ data: config }, { data: runs }, { data: platforms }, { data: templates }, { data: emailLogs }, { data: slots }, { data: digestConfigs }] =
     await Promise.all([
       supabase.from('automation_configs').select('*').eq('id', 1).maybeSingle(),
       supabase
@@ -274,7 +275,11 @@ export default async function AutomationAdminPage({
         )
         .order('priority', { ascending: true })
         .order('hour', { ascending: true })
-        .order('minute', { ascending: true })
+        .order('minute', { ascending: true }),
+      supabase
+        .from('error_notification_configs')
+        .select('category, is_enabled, digest_window_minutes, notify_emails, last_digest_at')
+        .order('category')
     ]);
 
   const cfg = config as ConfigRow | null;
@@ -284,6 +289,7 @@ export default async function AutomationAdminPage({
   const emailLogMap = buildEmailLogMap(emailLogs as EmailLogRow[] | null);
   const slotRows = (slots as SlotRowData[] | null) ?? [];
   const globalDefaults = cfg ? toGlobalDefaults(cfg) : ({} as GlobalDefaults);
+  const digestConfigRows = (digestConfigs as Array<{ category: string; is_enabled: boolean; digest_window_minutes: number; notify_emails: string[] | null; last_digest_at: string | null }> | null) ?? [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -315,6 +321,18 @@ export default async function AutomationAdminPage({
         templates={templateRows}
         globalDefaults={globalDefaults}
       />
+
+      <h2 className="mt-8 text-lg font-semibold text-ink">Notifikasi error (digest)</h2>
+      {digestConfigRows.length === 0 ? (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Tabel config digest belum ada — jalankan migrasi `20260922000001_error_digest_queue.sql`.
+        </p>
+      ) : (
+        <ErrorDigestConfigTable rows={digestConfigRows} />
+      )}
+      <p className="mt-2 text-xs text-ink-muted">
+        Email failure langsung telah dimigrasikan ke digest (1 email per jendela).
+      </p>
 
       <h2 className="mt-8 text-lg font-semibold text-ink">Riwayat run (20 terbaru)</h2>
       <div className="mt-3 space-y-3">

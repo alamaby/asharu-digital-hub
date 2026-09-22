@@ -169,7 +169,7 @@ export async function logAutomationEmail(
     runId?: string | null;
     runDate?: string | null;
     slotKey?: string | null;
-    moment: 'draft_ready' | 'published' | 'failure' | 'test';
+    moment: 'draft_ready' | 'published' | 'failure' | 'test' | 'error_digest';
     recipients: string[];
     result: SendResult;
   }
@@ -285,6 +285,56 @@ export async function sendPublishedEmail(
   void logAutomationEmail(supabase, {
     moment: 'published',
     runDate: input.runDate,
+    recipients: input.recipients,
+    result
+  });
+  return result;
+}
+
+/** Grup agregasi event error per kategori untuk digest email. */
+export interface ErrorDigestGroup {
+  category: string;
+  count: number;
+  topMessages: Array<{ fingerprint: string; count: number; sample: string }>;
+}
+
+/** Email ringkasan error digest (best-effort). Tidak melempar. */
+export async function sendErrorDigestEmail(
+  supabase: SupabaseClient,
+  cfg: AutomationConfig,
+  input: { recipients: string[]; windowMinutes: number; groups: ErrorDigestGroup[]; totalEvents: number; siteUrl: string }
+): Promise<SendResult> {
+  if (input.groups.length === 0) {
+    return { ok: false, skipped: true, skippedReason: null, error: 'no digest groups' };
+  }
+  let shell: string;
+  try {
+    const sections = input.groups
+      .map((g) => {
+        const items = g.topMessages
+          .map((m) => `<li>[${escapeHtml(m.fingerprint)}] (${m.count}×) ${escapeHtml(m.sample)}</li>`)
+          .join('\n');
+        return `<h3>${escapeHtml(g.category)} (${g.count})</h3><ul>${items}</ul>`;
+      })
+      .join('\n');
+    shell = emailShell(
+      `Ringkasan error ${input.windowMinutes} menit terakhir (${input.totalEvents} kejadian)`,
+      [
+        `<p>Total <strong>${input.totalEvents}</strong> kejadian errorintegrasi dalam jendela <strong>${input.windowMinutes} menit</strong> terakhir.</p>`,
+        sections,
+        `<p><a href="${escapeHtml(`${input.siteUrl}/id/admin/automation`)}">Buka halaman automation</a></p>`
+      ].join('\n')
+    );
+  } catch (e) {
+    return { ok: false, error: `render error_digest gagal: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const result = await deliver(supabase, cfg, {
+    recipients: input.recipients,
+    subject: `[Asharu] Ringkasan error ${input.windowMinutes} menit terakhir (${input.totalEvents} kejadian)`,
+    html: shell
+  });
+  void logAutomationEmail(supabase, {
+    moment: 'error_digest',
     recipients: input.recipients,
     result
   });

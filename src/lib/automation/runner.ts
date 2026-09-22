@@ -8,7 +8,8 @@ import { defaultIdeaDeps, generateSessionIdea, type GeneratedIdea, type IdeaProd
 import { getResearchTemplateHint } from '@/lib/research/templates';
 import { isRunDue, localDateString, pickRandomProduct } from './scheduler';
 import { loadEnabledSlots, mergeSlotParams, isSlotDue } from './schedules';
-import { sendDraftReadyEmail, sendFailureEmail, sendPublishedEmail, logAutomationEmail } from './email';
+import { sendDraftReadyEmail, sendPublishedEmail, logAutomationEmail } from './email';
+import { reportError } from '@/lib/notifications/error-events';
 
 export type AutomationRunStatus =
   | 'session_created'
@@ -829,42 +830,25 @@ async function loadArticleLinks(
 
 async function notifyFailure(
   supabase: SupabaseClient,
-  cfg: AutomationConfig,
+  _cfg: AutomationConfig,
   run: AutomationRunRow,
   stage: string,
   error: string
 ): Promise<void> {
-  // Best-effort penuh: ini dipanggil dari jalur kegagalan, jadi ia tidak boleh
-  // menambah kegagalan baru (run sudah/akan ditandai failed oleh pemanggil).
+  // Queue-only: email dikirim via digest (lihat /api/notifications/error-digest).
+  // Failure email langsung dimigrasikan ke queue 2026-09-22 agar satu email
+  // rangkuman per jendela, bukan spam per kejadian.
+  void _cfg;
   try {
-    const recipients = await resolveRecipients(supabase, cfg);
-    const res = await sendFailureEmail(supabase, cfg, {
-      recipients,
-      runDate: run.run_date,
-      stage,
-      error,
-      siteUrl: env.siteUrl
+    await reportError(supabase, {
+      category: 'automation', source: 'notifyFailure', severity: 'error',
+      stage, message: error,
+      details: { run_date: run.run_date, slot_key: run.slot_key ?? null },
+      sessionId: run.session_id, runId: run.id
     });
-    if (!res.ok && !res.skipped) {
-      await log(supabase, run.session_id, 'automation', 'warn', `email failure gagal: ${res.error}`);
-    }
-    // Log selalu ditulis (termasuk skipped) agar badge UI menampilkan alasan.
-    void logAutomationEmail(supabase, {
-      runId: run.id,
-      runDate: run.run_date,
-      slotKey: run.slot_key ?? null,
-      moment: 'failure',
-      recipients,
-      result: res
-    });
-  } catch (e) {
-    await log(
-      supabase,
-      run.session_id,
-      'automation',
-      'warn',
-      `notifikasi failure error: ${e instanceof Error ? e.message : String(e)}`
-    );
+  } catch {
+    await log(supabase, run.session_id, 'automation', 'warn',
+      `queue error event gagal: ${error.slice(0, 200)}`);
   }
 }
 

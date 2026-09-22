@@ -299,12 +299,37 @@ async function main() {
     syncFailed = true;
   }
   if (syncFailed) {
+    try {
+      const reportClient = supabase;
+      if (reportClient) {
+        await reportClient.from('error_events').insert({
+          category: 'scrape',
+          source: 'db-sync',
+          severity: 'error',
+          message: `affiliate scrape sync gagal (upload gagal ${failedUploadIds.size} produk baru)`.slice(0, 2000),
+          details: { failed_uploads: failedUploadIds.size },
+          fingerprint: ''
+        });
+      }
+    } catch (e) { console.error('report error event gagal: ' + e.message); }
     console.error('DB sync did not complete — exiting non-zero so CI fails loudly.');
     process.exit(1);
   }
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err);
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const client = createClient(url, key, { auth: { persistSession: false } });
+      await client.from('error_events').insert({
+        category: 'scrape', source: 'main', severity: 'error',
+        message: String(err).slice(0, 2000), fingerprint: ''
+      }).catch(() => {});
+    }
+  } catch { /* swallow */ }
   process.exit(1);
 });

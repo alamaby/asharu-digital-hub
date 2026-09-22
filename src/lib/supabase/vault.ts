@@ -1,5 +1,6 @@
 import type { KeyRow, ModelRow } from '@/lib/llm/types';
 import { getServiceClient } from './service';
+import { reportError } from '@/lib/notifications/error-events';
 
 /**
  * Decrypt a Vault secret by id (service_role only).
@@ -85,7 +86,19 @@ export async function markKeyFailure(keyId: string): Promise<void> {
   const current = (data as any)?.failure_count ?? 0;
   const next = current + 1;
   const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) patch.is_active = false;
+  if (next > 5) {
+    patch.is_active = false;
+    try {
+      const svc = getServiceClient();
+      if (svc) {
+        await reportError(svc, {
+          category: 'llm', source: 'markKeyFailure', severity: 'warning',
+          message: `LLM provider key auto-disabled setelah ${next} kegagalan (key_id ${keyId.slice(0, 8)})`,
+          details: { key_id: keyId }
+        });
+      }
+    } catch { /* swallow */ }
+  }
   await supabase.from('llm_provider_keys').update(patch).eq('id', keyId);
 }
 
@@ -124,6 +137,18 @@ export async function markModelFailure(modelId: string): Promise<void> {
   const current = (data as any)?.failure_count ?? 0;
   const next = current + 1;
   const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) patch.is_active = false;
+  if (next > 5) {
+    patch.is_active = false;
+    try {
+      const svc = getServiceClient();
+      if (svc) {
+        await reportError(svc, {
+          category: 'llm', source: 'markModelFailure', severity: 'warning',
+          message: `LLM model auto-disabled setelah ${next} kegagalan (model_id ${modelId.slice(0, 8)})`,
+          details: { model_id: modelId }
+        });
+      }
+    } catch { /* swallow */ }
+  }
   await supabase.from('llm_models').update(patch).eq('id', modelId);
 }

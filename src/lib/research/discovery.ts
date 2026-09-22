@@ -5,6 +5,7 @@ import { getSearchProvider, type SearchResult } from './search';
 import { buildDiscoveryPrompt } from './prompts';
 import type { DiscoveryInput } from './prompts';
 import { runLLMCompletion } from '@/lib/llm/completion';
+import { reportError } from '@/lib/notifications/error-events';
 
 export interface DiscoveryTopicRow {
   topic: string;
@@ -157,7 +158,14 @@ export async function runDiscovery(
   input: DiscoveryInput,
   pinnedModelId?: string | null
 ): Promise<DiscoveryRunResult> {
-  const provider = await getSearchProvider(supabase);
+  let provider;
+  try {
+    provider = await getSearchProvider(supabase);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await reportError(supabase, { category: 'tavily', source: 'getSearchProvider', severity: 'error', stage: 'discovering', message, sessionId });
+    throw e;
+  }
   const queries = buildQueries(input);
   const timeRange =
     input.freshnessHours <= 24 ? 'day' : input.freshnessHours <= 168 ? 'week' : 'month';
@@ -257,9 +265,14 @@ export async function runDiscovery(
     message: `search complete: ${rawResults.length} raw, ${deduped.length} deduped, ${pastedResults.length} pasted, sent ${chunked.length} to LLM`
   });
   if (chunked.length === 0) {
-    throw new Error(
-      `Tavily tidak mengembalikan hasil (raw ${rawResults.length}, gagal ${failedQueries}/${queries.length}). Cek API key / kuota di log Search, lalu ulangi riset.`
-    );
+    const throwMsg = `Tavily tidak mengembalikan hasil (raw ${rawResults.length}, gagal ${failedQueries}/${queries.length}). Cek API key / kuota di log Search, lalu ulangi riset.`;
+    await reportError(supabase, {
+      category: 'tavily', source: 'discovery', severity: 'error', stage: 'discovering',
+      message: throwMsg,
+      details: { raw: rawResults.length, failed: failedQueries, total: queries.length },
+      sessionId
+    });
+    throw new Error(throwMsg);
   }
 
   let discoveryModel: { providerId: string | null; modelUuid: string | null } = { providerId: null, modelUuid: null };

@@ -9,6 +9,7 @@ import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
 import { fetchOrderedModels, markModelFailure, markModelUsage } from '@/lib/supabase/vault';
 import { capEffortForStage, isLengthCutoff, resolveModelParams, type ModelParams } from './model-config';
+import { reportError } from '@/lib/notifications/error-events';
 
 function providerFromRow(row: ProviderRow): LLMProvider {
   if (row.slug === 'gemini') return new GeminiProvider(row.base_url);
@@ -110,7 +111,9 @@ export async function runLLMCompletion(
     }
   }
   let lastError: unknown = null;
+  const triedProviders: string[] = [];
   for (const prov of providers) {
+    triedProviders.push(prov.slug);
     const pool = new KeyPool(prov);
     // DB-driven model order
     let candidateModels: { id: string; model_id: string; config: Record<string, unknown> | null }[] = [];
@@ -270,7 +273,15 @@ export async function runLLMCompletion(
       }
     }
   }
-  throw lastError ?? new Error('All LLM providers failed');
+  const finalError = lastError ?? new Error('All LLM providers failed');
+  const finalMsg = finalError instanceof Error ? finalError.message : String(finalError);
+  await reportError(supabase, {
+    category: 'llm', source: 'runLLMCompletion', severity: 'error',
+    stage: input.stage ?? null, message: finalMsg,
+    details: { providers: [...new Set(triedProviders)] },
+    sessionId: input.sessionId ?? null
+  });
+  throw finalError;
 }
 
 /**

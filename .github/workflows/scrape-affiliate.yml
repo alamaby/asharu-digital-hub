@@ -108,6 +108,19 @@ jobs:
           npm run typecheck
           npm run test
 
-      - name: Notify on failure
+      - name: Report failure to error digest
         if: failure()
-        run: echo "::error::Affiliate scrape failed. Check the run logs."
+        continue-on-error: true
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://asharu.id' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::CRON_SECRET not set — skipping error digest report"
+            exit 0
+          fi
+          curl -sS -X POST "$SITE_URL/api/notifications/report" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H 'Content-Type: application/json' \
+            -d "{\"category\":\"scrape\",\"source\":\"github-actions\",\"message\":\"Affiliate scrape workflow failed (run $GITHUB_RUN_ID)\"}" || true
+          echo "::error::Affiliate scrape failed. Check the run logs."
