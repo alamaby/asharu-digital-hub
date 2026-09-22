@@ -20,22 +20,22 @@ Menangani 4 finding terkonfirmasi tanpa desain ulang: (1) Riwayat run `admin/aut
 
 ## Tasks
 
-- [ ] S0 baseline gate hijau
-- [ ] S1 SortableList sync via useEffect
-- [ ] S2 SubjectBoard null-safe renderItem
-- [ ] S3 CameraAngleBoard null-safe renderItem
-- [ ] S4 hardening counts provider visual
-- [ ] S5 test visual (3 file)
-- [ ] S6 helper murni automation-runs-query + test
-- [ ] S7 automation page: query+pagination+filter+search
-- [ ] S8 automation page: render card/topik/jam
-- [ ] S9 migrasi 20260922000003 blackout columns
-- [ ] S10 config+schedule blackoutDays + test
-- [ ] S11 blackoutCutoff scheduler + test
-- [ ] S12 runner createRun exclusion+fallback+log + test
-- [ ] S13 knob admin blackout 0–90 + test
-- [ ] S14 verifikasi featured (tanpa kode)
-- [ ] S15 gate final + handoff
+- [x] S0 baseline gate hijau
+- [x] S1 SortableList sync via useEffect
+- [x] S2 SubjectBoard null-safe renderItem
+- [x] S3 CameraAngleBoard null-safe renderItem
+- [x] S4 hardening counts provider visual
+- [x] S5 test visual (3 file)
+- [x] S6 helper murni automation-runs-query + test
+- [x] S7 automation page: query+pagination+filter+search
+- [x] S8 automation page: render card/topik/jam
+- [x] S9 migrasi 20260922000003 blackout columns
+- [x] S10 config+schedule blackoutDays + test
+- [x] S11 blackoutCutoff scheduler + test
+- [x] S12 runner createRun exclusion+fallback+log + test
+- [x] S13 knob admin blackout 0–90 + test
+- [x] S14 verifikasi featured (tanpa kode)
+- [x] S15 gate final + handoff
 
 ## Risks
 
