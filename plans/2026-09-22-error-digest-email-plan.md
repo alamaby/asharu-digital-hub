@@ -39,21 +39,21 @@ Cakupan = semua 8 kategori; mekanisme = queue + digest; config = tabel khusus ba
 
 ## Tasks
 
-- [ ] Langkah 1 — Migrasi DB: `error_events` + `error_notification_configs` + seed 8 kategori
-- [ ] Langkah 2 — Migrasi DB: moment `error_digest` + pg_cron `asharu-error-digest`
-- [ ] Langkah 3 — Lib inti `src/lib/notifications/error-events.ts` + unit test
-- [ ] Langkah 4 — `sendErrorDigestEmail()` di `src/lib/automation/email.ts` + test
-- [ ] Langkah 5 — Lib digest `src/lib/notifications/error-digest.ts` + unit test
-- [ ] Langkah 6 — Instrumentasi Tavily (`discovery.ts`, 2 titik)
-- [ ] Langkah 7 — Instrumentasi LLM (`completion.ts` + `vault.ts`)
-- [ ] Langkah 8 — Instrumentasi riset (`orchestrator.ts` catch)
-- [ ] Langkah 9 — Migrasi `notifyFailure` runner → queue (perubahan perilaku, risiko tertinggi)
-- [ ] Langkah 10 — Instrumentasi API routes (`cron_api`, service-500 + handler-500)
-- [ ] Langkah 11 — Endpoint `POST /api/notifications/error-digest` + test
-- [ ] Langkah 12 — Endpoint `POST /api/notifications/report` + test
-- [ ] Langkah 13 — Admin UI tabel config + server actions + test
-- [ ] Langkah 14 — Wiring scrape (`scrape-affiliate.mjs` + workflow) + test
-- [ ] Langkah 15 — Gate penuh + checklist verifikasi akhir
+- [x] Langkah 1 — Migrasi DB: `error_events` + `error_notification_configs` + seed 8 kategori
+- [x] Langkah 2 — Migrasi DB: moment `error_digest` + pg_cron `asharu-error-digest`
+- [x] Langkah 3 — Lib inti `src/lib/notifications/error-events.ts` + unit test
+- [x] Langkah 4 — `sendErrorDigestEmail()` di `src/lib/automation/email.ts` + test
+- [x] Langkah 5 — Lib digest `src/lib/notifications/error-digest.ts` + unit test
+- [x] Langkah 6 — Instrumentasi Tavily (`discovery.ts`, 2 titik)
+- [x] Langkah 7 — Instrumentasi LLM (`completion.ts` + `vault.ts`)
+- [x] Langkah 8 — Instrumentasi riset (`orchestrator.ts` catch)
+- [x] Langkah 9 — Migrasi `notifyFailure` runner → queue (perubahan perilaku, risiko tertinggi)
+- [x] Langkah 10 — Instrumentasi API routes (`cron_api`, service-500 + handler-500)
+- [x] Langkah 11 — Endpoint `POST /api/notifications/error-digest` + test
+- [x] Langkah 12 — Endpoint `POST /api/notifications/report` + test
+- [x] Langkah 13 — Admin UI tabel config + server actions + test
+- [x] Langkah 14 — Wiring scrape (`scrape-affiliate.mjs` + workflow) + test
+- [x] Langkah 15 — Gate penuh + checklist verifikasi akhir
 
 ---
 
@@ -407,9 +407,9 @@ Cakupan = semua 8 kategori; mekanisme = queue + digest; config = tabel khusus ba
 - **R-H — Workflow scrape melaporkan via `SITE_URL` publik**: bila deploy Vercel tertunda setelah migrasi, endpoint 404 → `continue-on-error: true` + event dari script langsung (jalur `.mjs`, Langkah 14) tetap menutup celah untuk kegagalan sync; kegagalan verify-steps murni CI tetap hanya `::error::` sampai deploy live (jendela kecil, terdokumentasi).
 
 ## Progress Log
-
 - 2026-09-22 07:30:00 — Implementation plan disusun (read-only, Plan Mode): pemetaan existing selesai. Email failure langsung SUDAH ADA untuk automation/riset; celah = scrape/cron-auth/auto-disable key. Kuesioner user: semua integrasi, queue+digest, tabel khusus baru, window 30 menit.
-- 2026-09-22 — (TODO pelaksana) Update log ini per langkah: tandai Tasks [x], catat deviasi/blokir.
+- 2026-09-22 11:45:00 — Implementasi SELESAI seluruh 15 langkah. Gate typecheck ✓ lint (0 error) ✓ test baru 29 ✓. Dev applied via MCP albot-be. Prod applied via MCP asharu (`20260922000001` + `20260922000002`). Commit parent `fe128ee` + submodule `e80a754` push ke main both repos.
+- 2026-09-22 11:45:00 — Verifikasi manual tersisa (B7): (1) auto-disable vault trigger manual, (2) end-to-end digest via POST /api/notifications/report + tunggu ≤window+5mnt, (3) UI `/id/admin/automation` seksi digest, (4) dry-run scrape tetap jalan.
 
 ## Notes
 

@@ -66,6 +66,8 @@ Last updated: 2026-09-21 pagi (local time)
 
 ## Recent Entries
 
+- [2026-09-22 114500-error-digest-email-queue.md](2026-09-22/114500-error-digest-email-queue.md) — Digest email error integrasi: queue `error_events` + agregasi 30 menit per kategori via pg_cron tick tiap 5 menit. 8 kategori (tavily/llm/research/automation/scrape/cron_api/resend/image). Configurable via `error_notification_configs`. Admin UI di `/admin/automation`. Email failure langsung dimigrasikan ke queue (Langkah 9). Gate typecheck ✓ lint ✓ 29 test baru ✓. Commit `fe128ee`/`e80a754` pushed.
+
 - [2026-09-21 120000-kamarasan-content-update.md](2026-09-21/120000-kamarasan-content-update.md) — Update halaman Kamarasan: chip lokasi card+hero, wording "daerah Gedebage/Ciwastra", emoji 10 highlights (8+2 baru bata), bullet location/buying guide, nearby 11→17 (RS Edelweiss+Stasiun Kereta Gedebage diupdate, 6 sekolah ditambah), hapus PBG dari dokumen. Gate 976 tests ✓ build ✓ pushed `f56af02`.
 
 - [162600-resend-c1-domain-diagnosis.md](2026-09-20/162600-resend-c1-domain-diagnosis.md) — C1 developing parse-failed selesai via MCP prod read-only: akar = JSON terpotong (tanpa meta/penutup) + CJK laten (`multit设备`, `主打`); domain verified `updates.alamaby.com` != pengirim `updates@alamaby.com` -> 403. [USER ACTION] Putuskan strategi domain (A4) + cek scope API key.
