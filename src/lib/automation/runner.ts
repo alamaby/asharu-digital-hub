@@ -569,12 +569,8 @@ export async function runAutomationTick(
     results.push({ slot_key: c.slot_key, status: c.run.status, advanced: advanced.changed });
   }
 
-  // Bila force tapi semua slot gagal membuat run → kembalikan error (backward-compat).
-  if (!hadOpenRun && results.length === 0 && opts.force) {
-    return { ok: false, error: 'semua slot gagal membuat run hari ini', runDate };
-  }
-
   // Semua run hari ini terminal (completed/failed), tidak ada yang dibuka → sudah selesai hari ini.
+  // HARUS dicek SEBELUM cabang force-error di bawah: force + sudah-terminal = already_done (idempoten, perilaku pre-e3ade31).
   if (!hadOpenRun && results.length === 0 && created.length === 0) {
     const terminalRuns = Object.values(existingRuns).filter(
       (r) => r.status === 'completed' || r.status === 'failed'
@@ -583,6 +579,12 @@ export async function runAutomationTick(
       terminalRuns.sort((a, b) => ((a.slot_key ?? 'default') as string).localeCompare(b.slot_key ?? 'default'));
       return { ok: true, skipped: 'already_done', runDate, status: (terminalRuns[0] as AutomationRunRow)?.status ?? 'completed' };
     }
+  }
+
+  // Bila force tapi semua slot gagal membuat run → kembalikan error (backward-compat).
+  // Hanya tercapai bila tidak ada terminalRuns (sudah ditangani di atas).
+  if (!hadOpenRun && results.length === 0 && opts.force) {
+    return { ok: false, error: 'semua slot gagal membuat run hari ini', runDate };
   }
 
   // Check not_due bila tidak ada run & force bukan mode.

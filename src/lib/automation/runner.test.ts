@@ -473,6 +473,31 @@ describe('runAutomationTick (produk pool)', () => {
   });
 
   it('blackoutDays=0 → tanpa query gte, semua produk tersedia', async () => {
+    // blackout nonaktif: tanpa run hari ini → createRun harus sukses dan membuat 1 run.
+    const tables = {
+      automation_configs: [baseConfig({ product_pool_size: 2, product_repeat_blackout_days: 0 })],
+      automation_runs: [] as Row[],
+      affiliate_products: [
+        { id: 'p1', is_active: true, created_at: '2026-08-01T00:00:00Z' },
+        { id: 'p2', is_active: true, created_at: '2026-08-02T00:00:00Z' }
+      ],
+      content_research_sessions: [] as Row[],
+      content_research_session_products: [] as Row[]
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:00:00Z'),
+      force: true
+    });
+    expect(res.ok).toBe(true);
+    const runs = tables.automation_runs as Row[];
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ run_date: '2026-09-16' });
+  });
+
+  it('force + already terminal → already_done (regresi e3ade31/S1)', async () => {
+    // Fixture lama yang sebelumnya memaksa jalan ke force-error branch karena ordering salah.
+    // Setelah S1, force+terminal harus kembali ke already_done ok:true (tidak membuat duplikat).
     const tables = {
       automation_configs: [baseConfig({ product_pool_size: 2, product_repeat_blackout_days: 0 })],
       automation_runs: [
@@ -490,7 +515,8 @@ describe('runAutomationTick (produk pool)', () => {
       now: new Date('2026-09-16T03:00:00Z'),
       force: true
     });
-    expect(res.ok).toBe(true);
+    expect(res).toMatchObject({ ok: true, skipped: 'already_done', status: 'completed' });
+    expect(tables.automation_runs).toHaveLength(1);
   });
 
   it('semua pool blacklisted → fallback L2 (occupied only) lalu L3 (pool penuh)', async () => {
