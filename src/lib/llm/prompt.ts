@@ -432,7 +432,13 @@ export function parseArticleLang(raw: unknown): ArticleLangDraft | null {
  */
 export function debugArticleRejectReason(parsed: Record<string, unknown> | null): string {
   if (!parsed) return 'top-level JSON bukan objek';
+  const idRaw = parsed.id;
+  const enRaw = parsed.en;
+  const hasId = idRaw && typeof idRaw === 'object';
+  const hasEn = enRaw && typeof enRaw === 'object';
+  if (!hasId && !hasEn) return 'kedua bahasa null (butuh minimal satu bahasa terisi: id atau en)';
   for (const lang of ['id', 'en'] as const) {
+    if (lang === 'en' && !hasEn) continue;
     const art = parsed[lang];
     if (!art || typeof art !== 'object') continue;
     const r = art as Record<string, unknown>;

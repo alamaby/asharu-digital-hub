@@ -388,5 +388,16 @@ describe('debugArticleRejectReason', () => {
     const raw = { id: validLang(), en: null };
     expect(debugArticleRejectReason(raw)).toContain('semua field valid');
   });
+  it('kedua bahasa null → pesan "butuh minimal satu bahasa"', () => {
+    expect(debugArticleRejectReason({ id: null, en: null })).toContain('kedua bahasa null');
+    expect(debugArticleRejectReason({ id: null, en: null })).not.toContain('semua field valid');
+  });
+  it('hanya en null, id null → pesan "butuh minimal satu bahasa"', () => {
+    expect(debugArticleRejectReason({ id: null, en: null as unknown as ArticleLangDraft })).toContain('kedua bahasa null');
+  });
+  it('id null tapi en valid → tidak menyebut "kedua bahasa null"', () => {
+    const raw = { id: null, en: validLang() };
+    expect(debugArticleRejectReason(raw)).not.toContain('kedua bahasa null');
+  });
 });
 

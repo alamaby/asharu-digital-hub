@@ -14,6 +14,8 @@ import {
   type ParsedArticleDraft
 } from '@/lib/llm/prompt';
 import { runLLMCompletion } from '@/lib/llm/completion';
+import { ProviderRegistry } from '@/lib/llm/registry';
+import { fetchOrderedModels } from '@/lib/supabase/vault';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
 import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, auditThreadEmoji, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
 
@@ -850,11 +852,85 @@ async function generateAndInsertDraft(
 }
 
 /**
- * Generate draf ARTIKEL long-form (platform `artikel`, tujuan SEO).
- * Beda dari thread: tanpa audit panjang/emoji per-post; gate-nya jumlah
- * kata (lunak — di bawah minimum tetap disimpan + ditandai, publish
- * yang menolak) dan kelengkapan bahasa sesi.
+  * Generate draf ARTIKEL long-form (platform `artikel`, tujuan SEO).
+  * Beda dari thread: tanpa audit panjang/emoji per-post; gate-nya jumlah
+  * kata (lunak — di bawah minimum tetap disimpan + ditandai, publish
+  * yang menolak) dan kelengkapan bahasa sesi.
+  */
+/**
+ * Fallback lintas model/provider saat parse artikel gagal (null / CJK).
+ * Mencoba kandidat urut dari ProviderRegistry (priority ASC) lalu
+ * fetchOrderedModels tiap provider. maks MAX_CONTENT_FALLBACK attempt.
+ * Tidak memblame key — hanya mencoba kandidat berikutnya.
  */
+interface ContentFallbackResult {
+  llmResult: Awaited<ReturnType<typeof runLLMCompletion>> | null;
+  parsed: ParsedArticleDraft | null;
+  fallbackChain: Array<{ provider: string; model: string }>;
+}
+const MAX_CONTENT_FALLBACK = 2;
+export { tryNextModelOnContentReject, MAX_CONTENT_FALLBACK };
+export type { ContentFallbackResult };
+async function tryNextModelOnContentReject(
+  supabase: SupabaseClient,
+  sessionId: string,
+  topicId: string,
+  system: string,
+  user: string,
+  temperature: number,
+  maxTokens: number,
+  initialProviderId: string | null,
+  initialModelUuid: string | null,
+  required: Array<'id' | 'en'>
+): Promise<ContentFallbackResult> {
+  const chain: ContentFallbackResult['fallbackChain'] = [];
+  const registry = new ProviderRegistry();
+  const providers = await registry.listActive();
+  for (const prov of providers) {
+    let candidates: Array<{ id: string; model_id: string; config: Record<string, unknown> | null }> = [];
+    try {
+      const ordered = await fetchOrderedModels(prov.id);
+      candidates = ordered.map((m) => ({ id: m.id, model_id: m.model_id, config: m.config as Record<string, unknown> | null }));
+    } catch { /* provider tidak memiliki model aktif, lewati */ }
+    for (const cand of candidates) {
+      // Lewati model yang sama persis dengan initial attempt
+      if (cand.id === initialModelUuid) continue;
+      const result = await runLLMCompletion(supabase, {
+        requestId: null,
+        sessionId,
+        stage: 'developing',
+        modelUuid: cand.id,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ],
+        temperature,
+        maxTokens
+      }).catch(() => null);
+      if (!result) {
+        continue;
+      }
+      const p = parseArticleDraft(result.output.text);
+      if (p && required.every((l) => p[l])) {
+        chain.push({ provider: prov.slug, model: result.model });
+        return { llmResult: result, parsed: p, fallbackChain: chain };
+      }
+      // Content reject: catat warn log, coba kandidat berikutnya
+      const rawJson = repairArticleJson(result.output.text);
+      const rejectReason = rawJson ? debugArticleRejectReason(rawJson).trim().slice(0, 200) : '(parse null)';
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'warn',
+        message: `content fallback ${chain.length + 1}/${MAX_CONTENT_FALLBACK}: ${prov.slug}/${result.model} reject (${rejectReason}) → lanjut ke kandidat berikutnya`
+      }).then(() => undefined, () => undefined);
+      chain.push({ provider: prov.slug, model: result.model });
+      if (chain.length >= MAX_CONTENT_FALLBACK) break;
+    }
+    if (chain.length >= MAX_CONTENT_FALLBACK) break;
+  }
+  return { llmResult: null, parsed: null, fallbackChain: chain };
+}
 async function generateArticleAndInsertDraft(
   supabase: SupabaseClient,
   sessionId: string,
@@ -929,42 +1005,38 @@ async function generateArticleAndInsertDraft(
     p ? required.filter((l) => !p[l]) : [...required];
   let parsed = llmResult ? parseArticleDraft(llmResult.output.text) : null;
   if (!parsed || missingLangs(parsed).length > 0) {
-    const retry = await runLLMCompletion(supabase, {
-      requestId: null,
-      sessionId,
-      stage: 'developing',
-      providerId: devModel.providerId,
-      modelUuid: devModel.modelUuid,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: `${user}\n\nPENTING: output sebelumnya gagal diparse atau bahasa ${missingLangs(parsed).join('/')} kosong. Kembalikan JSON VALID sesuai shape, tanpa teks tambahan, dengan SEMUA bahasa wajib terisi penuh.` }
-      ],
-      temperature: 0.3,
-      maxTokens: 4000
-    }).catch(() => null);
-    parsed = retry ? parseArticleDraft(retry.output.text) : null;
-    if (!parsed || missingLangs(parsed).length > 0) {
-      // best-effort: coba deteksi alasan penolakan parser dari raw JSON (hanya untuk log).
-
-      const rawJson = repairArticleJson(retry?.output.text ?? llmResult?.output.text ?? '');
+    // Content-aware fallback: coba model/provider lain (maks 2), bukan ulang model yang sama.
+    // RCA db9d92e8: naraya agnes-2.5-flash 4x CJK → fallback ke Cloudflare yang sehat.
+    const fallback = await tryNextModelOnContentReject(
+      supabase, sessionId, topicId,
+      system, user,
+      0.7, 4000,
+      devModel.providerId, devModel.modelUuid,
+      required
+    );
+    if (fallback.llmResult) {
+      parsed = fallback.parsed;
+      activeLlm = fallback.llmResult;
+      await supabase.from('content_research_logs').insert({
+        session_id: sessionId,
+        stage: 'developing',
+        level: 'info',
+        message: `article topic ${topicId} fallback berhasil: ${fallback.fallbackChain.map((c) => `${c.provider}/${c.model}`).join(' → ')}`
+      });
+    } else {
+      // Semua kandidat gagal — catat reject reason dari raw output terakhir
+      const rawJson = repairArticleJson(llmResult?.output.text ?? '');
       const rejectReason = rawJson ? debugArticleRejectReason(rawJson).trim().slice(0, 200) : '(tidak bisa parse raw)';
       await supabase.from('content_research_logs').insert({
         session_id: sessionId,
         stage: 'developing',
         level: 'error',
-        message: `development LLM raw article topic ${topicId} (first 2000 chars, attempt 2, reject: ${rejectReason}): ${(retry?.output.text ?? llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
+        message: `development LLM raw article topic ${topicId} (reject: ${rejectReason}): ${(llmResult?.output.text ?? '(no output)').slice(0, 2000)}`
       });
       throw new Error(
         !parsed ? 'article parse failed' : `article language missing: ${missingLangs(parsed).join(',')}`
       );
     }
-    activeLlm = retry;
-    await supabase.from('content_research_logs').insert({
-      session_id: sessionId,
-      stage: 'developing',
-      level: 'info',
-      message: `article topic ${topicId} parsed on retry`
-    });
   }
   if (!activeLlm) throw new Error('article parse failed');
 
