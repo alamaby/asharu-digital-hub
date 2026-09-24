@@ -4,12 +4,20 @@ import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/require-user';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
-import type { EndpointTryRunRow, SaveEndpointTryRunInput, EndpointTryQuota } from './types';
+import type { EndpointKind, EndpointTryRunRow, SaveEndpointTryRunInput, EndpointTryQuota } from './types';
 
 function svc() {
   const supabase = createSupabaseService();
   if (!supabase) throw new Error('Supabase belum dikonfigurasi.');
   return supabase;
+}
+
+/** Pesan ramah bila tabel belum terpasang (PostgREST PGRST205 schema cache). */
+function friendlyTableMessage(raw: string): string {
+  if (raw.includes('endpoint_try_runs') && raw.toLowerCase().includes('schema cache')) {
+    return 'Riwayat coba belum tersedia — tabel endpoint_try_runs belum terpasang di database. Minta admin menjalankan migrasi 20260924000001.';
+  }
+  return raw;
 }
 
 export type EndpointTryActionResult<T = null> =
@@ -115,21 +123,26 @@ export async function saveEndpointTryRun(
       response_text: input.responseText,
       expires_at: expiresAt
     }).select('id').single();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(friendlyTableMessage(error.message));
     if (!data) throw new Error('Gagal menyimpan run — coba lagi.');
     revalidatePath('/lab/try');
     return { ok: true, data: { id: (data as { id: string }).id } };
   } catch (e) {
-    return fail(e);
+    const msg = e instanceof Error ? friendlyTableMessage(e.message) : String(e);
+    return { ok: false, error: msg };
   }
 }
 
 export interface ListOptions {
   page?: number;
   pageSize?: number;
+  dir?: 'asc' | 'desc';
+  providerKind?: EndpointKind | null;
+  modelQuery?: string | null;
+  status?: 'all' | 'ok' | 'error';
 }
 
-/** Riwayat miliknya sendiri (expired disaring via WHERE). */
+/** Riwayat miliknya sendiri (expired disaring via WHERE). Filter + sort DB-driven. */
 export async function listEndpointTryRuns(
   options?: ListOptions
 ): Promise<{ items: EndpointTryRunRow[]; total: number; page: number; pageSize: number; totalPages: number }> {
@@ -137,17 +150,25 @@ export async function listEndpointTryRuns(
   const supabase = svc();
   const page = Math.max(1, options?.page ?? 1);
   const pageSize = Math.min(50, Math.max(1, options?.pageSize ?? 10));
+  const ascending = options?.dir === 'asc';
+  const providerKind = options?.providerKind ?? null;
+  const modelQuery = (options?.modelQuery ?? '').trim() || null;
+  const status = options?.status ?? 'all';
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const now = new Date().toISOString();
-  const { data, error, count } = await supabase
+  let q = supabase
     .from('endpoint_try_runs')
     .select('*', { count: 'exact' })
     .eq('user_id', userId)
-    .gte('expires_at', now)
-    .order('created_at', { ascending: false })
-    .range(from, to);
-  if (error) throw new Error(error.message);
+    .gte('expires_at', now);
+  if (providerKind) q = q.eq('provider_kind', providerKind);
+  if (modelQuery) q = q.ilike('model', `%${modelQuery}%`);
+  if (status === 'ok') q = q.is('error', null);
+  if (status === 'error') q = q.not('error', 'is', null);
+  q = q.order('created_at', { ascending }).range(from, to);
+  const { data, error, count } = await q;
+  if (error) throw new Error(friendlyTableMessage(error.message));
   const rows = (data ?? []) as unknown as EndpointTryRunRow[];
   const total = count ?? 0;
   return {
@@ -174,11 +195,12 @@ export async function deleteEndpointTryRun(id: string): Promise<EndpointTryActio
     if (!r) throw new Error('Run tidak ditemukan.');
     if (r.user_id !== userId && !(await isAdmin())) throw new Error('Run tidak ditemukan.');
     const { error } = await supabase.from('endpoint_try_runs').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(friendlyTableMessage(error.message));
     revalidatePath('/lab/try');
     return { ok: true, data: null };
   } catch (e) {
-    return fail(e);
+    const msg = e instanceof Error ? friendlyTableMessage(e.message) : String(e);
+    return { ok: false, error: msg };
   }
 }
 
@@ -189,11 +211,12 @@ export async function getEndpointTryQuota(): Promise<EndpointTryQuota> {
   if (config.daily_limit == null) return { used: 0, limit: null, remaining: null };
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
-  const { count } = await svc()
+  const { count, error } = await svc()
     .from('endpoint_try_runs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .gte('created_at', dayStart.toISOString());
+  if (error) throw new Error(friendlyTableMessage((error as { message?: string })?.message ?? 'Gagal memuat kuota.'));
   const used = count ?? 0;
   return { used, limit: config.daily_limit, remaining: Math.max(0, config.daily_limit - used) };
 }
@@ -206,6 +229,6 @@ export async function cleanupExpiredEndpointTryRuns(): Promise<{ deletedRuns: nu
     .delete()
     .lt('expires_at', new Date().toISOString())
     .select('id');
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyTableMessage(error.message));
   return { deletedRuns: (data ?? []).length };
 }

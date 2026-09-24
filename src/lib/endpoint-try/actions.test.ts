@@ -40,11 +40,6 @@ const CONFIG = {
   default_max_tokens: 1000
 };
 
-function applyFilter(rows: Row[], eqCol: string | null, eqVal: unknown): Row[] {
-  if (eqCol === null) return rows;
-  return rows.filter((r) => r[eqCol] === eqVal);
-}
-
 function sortRows(rows: Row[], orderCol: string | null, ascending: boolean): Row[] {
   if (!orderCol) return rows;
   return [...rows].sort((a, b) => {
@@ -76,8 +71,7 @@ function makeClient(runs: Row[], config: typeof CONFIG = CONFIG) {
       let headOnly = false;
       let orderCol: string | null = null;
       let orderAsc = false;
-      let eqCol: string | null = null;
-      let eqVal: unknown = undefined;
+      const predicates: Array<(r: Row) => boolean> = [];
       let rangeFrom = 0;
       let rangeTo = 99999;
 
@@ -88,8 +82,20 @@ function makeClient(runs: Row[], config: typeof CONFIG = CONFIG) {
           return builder;
         },
         eq(col: string, val: unknown) {
-          eqCol = col;
-          eqVal = val;
+          predicates.push((r) => r[col] === val);
+          return builder;
+        },
+        ilike(col: string, pattern: string) {
+          const q = pattern.replace(/%/g, '').toLowerCase();
+          predicates.push((r) => String(r[col] ?? '').toLowerCase().includes(q));
+          return builder;
+        },
+        is(col: string, val: unknown) {
+          predicates.push((r) => r[col] === val);
+          return builder;
+        },
+        not(col: string, _op: string, val: unknown) {
+          predicates.push((r) => r[col] !== val);
           return builder;
         },
         gte() {
@@ -127,12 +133,14 @@ function makeClient(runs: Row[], config: typeof CONFIG = CONFIG) {
           return builder;
         },
         single: async () => {
-          const rows = sortRows(applyFilter(getTable(table), eqCol, eqVal), orderCol, orderAsc);
+          const filtered = getTable(table).filter((r) => predicates.every((p) => p(r)));
+          const rows = sortRows(filtered, orderCol, orderAsc);
           const sliced = rows.slice(rangeFrom, rangeTo + 1);
           return { data: sliced[0] ?? null, error: null };
         },
         maybeSingle: async () => {
-          const rows = sortRows(applyFilter(getTable(table), eqCol, eqVal), orderCol, orderAsc);
+          const filtered = getTable(table).filter((r) => predicates.every((p) => p(r)));
+          const rows = sortRows(filtered, orderCol, orderAsc);
           const sliced = rows.slice(rangeFrom, rangeTo + 1);
           return { data: sliced[0] ?? null, error: null };
         },
@@ -143,12 +151,13 @@ function makeClient(runs: Row[], config: typeof CONFIG = CONFIG) {
             count?: number;
           }) => Promise<unknown>
         ) => {
-          const rows = sortRows(applyFilter(getTable(table), eqCol, eqVal), orderCol, orderAsc);
+          const filtered = getTable(table).filter((r) => predicates.every((p) => p(r)));
+          const rows = sortRows(filtered, orderCol, orderAsc);
           const sliced = rows.slice(rangeFrom, rangeTo + 1);
           return onfulfilled({
             data: headOnly ? [] : sliced,
             error: null,
-            count: wantCount ? getTable(table).length : undefined
+            count: wantCount ? filtered.length : undefined
           });
         }
       };
@@ -233,6 +242,33 @@ describe('listEndpointTryRuns', () => {
     ]);
     const out = await listEndpointTryRuns({ page: 1, pageSize: 10 });
     expect(out.items.map((r) => r.id)).toEqual(['own']);
+  });
+
+  it('filter provider_kind + status + modelQuery', async () => {
+    resetDb([
+      { id: 'a', user_id: 'u1', provider_kind: 'openai', model: 'gpt-4o', error: null },
+      { id: 'b', user_id: 'u1', provider_kind: 'anthropic', model: 'claude-3', error: 'boom' },
+      { id: 'c', user_id: 'u1', provider_kind: 'openai', model: 'gpt-4o-mini', error: 'bad' }
+    ]);
+    const byKind = await listEndpointTryRuns({ providerKind: 'anthropic' });
+    expect(byKind.items.map((r) => r.id)).toEqual(['b']);
+    const okOnly = await listEndpointTryRuns({ status: 'ok' });
+    expect(okOnly.items.map((r) => r.id)).toEqual(['a']);
+    const errOnly = await listEndpointTryRuns({ status: 'error' });
+    expect(errOnly.items.map((r) => r.id).sort()).toEqual(['b', 'c']);
+    const byModel = await listEndpointTryRuns({ modelQuery: 'mini' });
+    expect(byModel.items.map((r) => r.id)).toEqual(['c']);
+  });
+
+  it('sorting asc vs desc', async () => {
+    resetDb([
+      { id: 'old', user_id: 'u1', created_at: '2026-01-01T00:00:00.000Z' },
+      { id: 'new', user_id: 'u1', created_at: '2026-02-01T00:00:00.000Z' }
+    ]);
+    const desc = await listEndpointTryRuns({ dir: 'desc' });
+    expect(desc.items.map((r) => r.id)).toEqual(['new', 'old']);
+    const asc = await listEndpointTryRuns({ dir: 'asc' });
+    expect(asc.items.map((r) => r.id)).toEqual(['old', 'new']);
   });
 
   it('owner lain gagal dihapus', async () => {

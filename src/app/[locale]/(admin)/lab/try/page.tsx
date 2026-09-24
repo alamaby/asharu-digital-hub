@@ -49,10 +49,20 @@ export default async function EndpointTryPage({ params }: PageProps) {
   let err: string | null = null;
   const timeZone = await getDisplayTimezone();
 
-  try {
-    [quota, history] = await Promise.all([getEndpointTryQuota(), listEndpointTryRuns({ page: 1, pageSize: 10 })]);
-  } catch (e) {
-    err = e instanceof Error ? e.message : String(e);
+  const [quotaRes, historyRes] = await Promise.allSettled([
+    getEndpointTryQuota(),
+    listEndpointTryRuns({ page: 1, pageSize: 10 })
+  ]);
+  if (quotaRes.status === 'fulfilled') {
+    quota = quotaRes.value;
+  } else {
+    err = quotaRes.reason instanceof Error ? quotaRes.reason.message : String(quotaRes.reason);
+  }
+  if (historyRes.status === 'fulfilled') {
+    history = historyRes.value;
+  } else {
+    const msg = historyRes.reason instanceof Error ? historyRes.reason.message : String(historyRes.reason);
+    err = err ? `${err} · ${msg}` : msg;
   }
 
   return (

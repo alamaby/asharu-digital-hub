@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import type { Locale } from '@/i18n/routing';
+import { formatDateTime } from '@/lib/utils/format';
 import {
   saveEndpointTryRun,
   listEndpointTryRuns
@@ -14,6 +16,8 @@ const LS_KEY_BASEURL = 'endpoint-try-baseUrl';
 const LS_KEY_KIND = 'endpoint-try-kind';
 const LS_KEY_MODEL = 'endpoint-try-model';
 
+const PAGE_SIZE = 10;
+
 interface Props {
   locale: string;
   timeZone: string;
@@ -22,8 +26,51 @@ interface Props {
   error: string | null;
 }
 
-export function EndpointTryPageClient({ locale, /* quota unused directly */ history, error }: Props) {
+interface TryHistoryFilters {
+  status: 'all' | 'ok' | 'error';
+  providerKind: '' | EndpointKind;
+  modelQuery: string;
+  sortDir: 'desc' | 'asc';
+}
+
+const DEFAULT_FILTERS: TryHistoryFilters = {
+  status: 'all',
+  providerKind: '',
+  modelQuery: '',
+  sortDir: 'desc'
+};
+
+function fmtInt(v: number | null | undefined): string {
+  return v === null || v === undefined ? '-' : v.toLocaleString();
+}
+
+function MetricBox({
+  label,
+  value,
+  accent
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-line px-1 py-1.5">
+      <dt className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</dt>
+      <dd className={`font-mono text-sm font-semibold ${accent ? 'text-primary' : 'text-ink'}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+const selectCls =
+  'w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary';
+
+export function EndpointTryPageClient({ locale, timeZone, quota, history, error }: Props) {
   const t = useTranslations('lab.try');
+  const tResult = useTranslations('lab.result');
+  const tHist = useTranslations('lab.history');
+  const tQuota = useTranslations('lab.quota');
   const [kind, setKind] = useState<EndpointKind>(() => {
     try {
       return (localStorage.getItem(LS_KEY_KIND) as EndpointKind | null) ?? 'openai';
@@ -36,6 +83,7 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
   });
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<Array<{ id: string; ownedBy: string | null }>>([]);
+  const [modelsLatencyMs, setModelsLatencyMs] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(() => {
     try { return localStorage.getItem(LS_KEY_MODEL) ?? ''; } catch { return ''; }
   });
@@ -45,9 +93,18 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
   const [maxTokens, setMaxTokens] = useState('');
   const [stream, setStream] = useState(false);
   const [result, setResult] = useState<EndpointChatResult | null>(null);
+  const [resultStreamed, setResultStreamed] = useState(false);
   const [notice, setNotice] = useState<string | null>(error);
   const [isPending, startTransition] = useTransition();
-  const [historyItems, setHistoryItems] = useState<EndpointTryRunRow[]>(history?.items ?? []);
+  const [isHistoryPending, startHistoryTransition] = useTransition();
+  const [pageData, setPageData] = useState<{
+    items: EndpointTryRunRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }>(history ?? { items: [], total: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 });
+  const [filters, setFilters] = useState<TryHistoryFilters>(DEFAULT_FILTERS);
   const abortRef = useRef<AbortController | null>(null);
 
   // Persist non-secret state to localStorage.
@@ -61,6 +118,36 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
 
   function clearNotice() {
     setNotice(null);
+  }
+
+  async function fetchPage(page: number, f: TryHistoryFilters) {
+    try {
+      const res = await listEndpointTryRuns({
+        page,
+        pageSize: PAGE_SIZE,
+        dir: f.sortDir,
+        providerKind: f.providerKind || null,
+        modelQuery: f.modelQuery || null,
+        status: f.status
+      });
+      setPageData(res);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : t('loadHistoryError'));
+    }
+  }
+
+  function fetchHistoryTransition(page: number, f: TryHistoryFilters) {
+    startHistoryTransition(async () => fetchPage(page, f));
+  }
+
+  function applyFilters(next: TryHistoryFilters) {
+    setFilters(next);
+    fetchHistoryTransition(1, next);
+  }
+
+  function goTo(page: number) {
+    const clamped = Math.min(Math.max(1, page), pageData.totalPages);
+    fetchHistoryTransition(clamped, filters);
   }
 
   async function loadModels() {
@@ -85,9 +172,11 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
         if (!res.ok || json.error) {
           setNotice(json.error ?? `HTTP ${res.status}`);
           setModels([]);
+          setModelsLatencyMs(null);
           return;
         }
         setModels(json.models ?? []);
+        setModelsLatencyMs(json.latencyMs ?? null);
         const first = json.models?.[0];
         if (first && !selectedModel) {
           setSelectedModel(first.id);
@@ -95,6 +184,7 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
       } catch (e) {
         setNotice(e instanceof Error ? e.message : 'Gagal memuat model.');
         setModels([]);
+        setModelsLatencyMs(null);
       }
     });
   }
@@ -102,6 +192,7 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
   async function sendChat(isStreamMode: boolean) {
     clearNotice();
     setResult(null);
+    setResultStreamed(false);
     if (!apiKey.trim()) {
       setNotice(t('keyMissing'));
       return;
@@ -133,6 +224,7 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
     };
 
     startTransition(async () => {
+      const startedAt = Date.now();
       try {
         if (isStreamMode) {
           // Streaming: baca SSE chunks via fetch + readable stream.
@@ -154,14 +246,13 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
           }
           const decoder = new TextDecoder();
           let textAccum = '';
-          const chunkTexts: string[] = [];
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             const str = decoder.decode(value, { stream: true });
-            chunkTexts.push(...parseSseChunks(str));
-            // Extract delta text from each chunk.
-            for (const c of chunkTexts) {
+            // Hanya proses chunk baru dari bacaan ini (hindari duplikasi).
+            const newChunks = parseSseChunks(str);
+            for (const c of newChunks) {
               const delta = kind === 'anthropic'
                 ? extractAnthropicStreamText(c)
                 : extractOpenAIStreamText(c);
@@ -171,13 +262,24 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
               text: textAccum,
               usage: null,
               finishReason: null,
-              latencyMs: 0,
+              latencyMs: Date.now() - startedAt,
               tokensPerSec: null
             });
+            setResultStreamed(true);
           }
           reader.releaseLock();
           abortRef.current = null;
-          await saveAndReset(payload, { text: textAccum, usage: null, finishReason: null, latencyMs: 0, tokensPerSec: null }, null);
+          const latencyMs = Date.now() - startedAt;
+          const finalResult: EndpointChatResult = {
+            text: textAccum,
+            usage: null,
+            finishReason: null,
+            latencyMs,
+            tokensPerSec: null
+          };
+          setResult(finalResult);
+          setResultStreamed(true);
+          await saveAndReset(payload, finalResult, null);
         } else {
           // Non-streaming.
           const res = await fetch('/api/endpoint-try/chat', {
@@ -200,6 +302,7 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
             tokensPerSec: json.tokensPerSec ?? null
           };
           setResult(chatResult);
+          setResultStreamed(false);
           await saveAndReset(payload, chatResult, null);
         }
       } catch (e) {
@@ -232,10 +335,12 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
         requestMessages: payload,
         responseText: result?.text ?? null
       };
-      await saveEndpointTryRun(input);
-      // Refresh history.
-      const fresh = await listEndpointTryRuns({ page: 1, pageSize: 10 });
-      setHistoryItems(fresh.items);
+      const saved = await saveEndpointTryRun(input);
+      if (!saved.ok) {
+        setNotice(saved.error);
+      }
+      // Refresh history halaman 1 dengan filter aktif.
+      await fetchPage(1, filters);
     } catch {
       // Silently ignore save errors — chat still worked.
     }
@@ -244,12 +349,35 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
   async function deleteRun(id: string) {
     if (!confirm(t('deleteConfirm'))) return;
     try {
-      await (await import('@/lib/endpoint-try/actions')).deleteEndpointTryRun(id);
-      setHistoryItems((prev) => prev.filter((r) => r.id !== id));
+      const mod = await import('@/lib/endpoint-try/actions');
+      const res = await mod.deleteEndpointTryRun(id);
+      if (!res.ok) {
+        setNotice(res.error);
+        return;
+      }
+      const next = await listEndpointTryRuns({
+        page: pageData.page,
+        pageSize: PAGE_SIZE,
+        dir: filters.sortDir,
+        providerKind: filters.providerKind || null,
+        modelQuery: filters.modelQuery || null,
+        status: filters.status
+      }).catch(() => null);
+      if (next && next.items.length === 0 && next.page > 1) {
+        fetchHistoryTransition(next.page - 1, filters);
+      } else if (next) {
+        setPageData(next);
+      }
     } catch {
       setNotice(t('loadHistoryError'));
     }
   }
+
+  const quotaLine = quota && quota.limit !== null && quota.limit !== undefined
+    ? tQuota('used', { used: quota.used, limit: quota.limit })
+    : quota
+      ? tQuota('unlimited')
+      : null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -266,6 +394,9 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
 
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-2 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
+      {quotaLine ? (
+        <p className="mt-2 text-sm text-ink-muted">{quotaLine}</p>
+      ) : null}
 
       {notice ? (
         <p role="alert" className="mt-4 text-sm text-red-600">
@@ -317,6 +448,11 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
             >
               {isPending ? t('testing') : t('testButton')}
             </button>
+            {modelsLatencyMs !== null ? (
+              <p className="mt-2 text-xs text-ink-muted">
+                {t('modelsLatency', { ms: modelsLatencyMs, count: models.length })}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -433,6 +569,14 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
             >
               {isPending ? t('sendingButton') : t('sendButton')}
             </button>
+            <button
+              onClick={() => sendChat(true)}
+              disabled={isPending || !apiKey.trim() || !prompt.trim()}
+              className="rounded-md border border-line px-4 py-2 text-sm text-ink transition-colors hover:bg-surface/50 disabled:opacity-50"
+              title={t('streamLabel')}
+            >
+              {t('sendStreamButton')}
+            </button>
             {isPending && (
               <button
                 onClick={() => { abortRef.current?.abort(); setNotice(null); }}
@@ -445,36 +589,98 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
         </div>
       </div>
 
-      {/* Section 4: Result */}
+      {/* Section 4: Result — metrik ala Lab Chat */}
       {result ? (
         <div className="mt-4 rounded-lg border border-line bg-surface p-6 shadow-card">
           <h2 className="mb-4 text-lg font-semibold text-ink">{t('resultSection')}</h2>
           <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-alt p-3 text-sm text-ink">
             {result.text}
           </pre>
+          <dl className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+            <MetricBox label={tResult('tokensIn')} value={fmtInt(result.usage?.promptTokens ?? null)} />
+            <MetricBox label={tResult('tokensOut')} value={fmtInt(result.usage?.completionTokens ?? null)} accent />
+            <MetricBox label={tResult('tokensTotal')} value={fmtInt(result.usage?.totalTokens ?? (result.usage ? (result.usage.promptTokens + result.usage.completionTokens) : null))} />
+            <MetricBox label={tResult('latency')} value={result.latencyMs === null ? '-' : `${result.latencyMs}ms`} />
+            <MetricBox label={tResult('speed')} value={result.tokensPerSec === null ? '-' : `${result.tokensPerSec}`} />
+            <MetricBox label={t('finishReasonLabel')} value={result.finishReason ?? '-'} />
+          </dl>
+          {resultStreamed || result.usage === null ? (
+            <p className="mt-1 text-[11px] text-ink-muted">{t('streamUsageNote')}</p>
+          ) : null}
           <details className="mt-3">
             <summary className="cursor-pointer text-sm text-ink-muted">{t('rawJsonLabel')}</summary>
             <pre className="mt-2 whitespace-pre-wrap break-words rounded-md bg-surface-alt p-3 text-xs text-ink-muted">
               {JSON.stringify(result, null, 2)}
             </pre>
           </details>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-ink-muted sm:grid-cols-4">
-            <div>{t('latencyLabel')}: {result.latencyMs} ms</div>
-            <div>{t('speedLabel')}: {result.tokensPerSec ?? '—'} tok/s</div>
-            <div>{t('usageLabel')}: {(result.usage?.promptTokens ?? 0) + (result.usage?.completionTokens ?? 0)} tok</div>
-            <div>{t('finishReasonLabel')}: {result.finishReason ?? '—'}</div>
-          </div>
         </div>
       ) : null}
 
-      {/* Section 5: History */}
+      {/* Section 5: History — pagination + sorting + filter */}
       <div className="mt-4 rounded-lg border border-line bg-surface p-6 shadow-card">
         <h2 className="mb-4 text-lg font-semibold text-ink">{t('historySection')}</h2>
-        {historyItems.length === 0 ? (
-          <p className="text-sm text-ink-muted">{t('historyEmpty')}</p>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block text-xs text-ink-muted">
+            {tHist('filterStatus')}
+            <select
+              value={filters.status}
+              onChange={(e) => applyFilters({ ...filters, status: e.target.value as TryHistoryFilters['status'] })}
+              className={selectCls}
+            >
+              <option value="all">{tHist('all')}</option>
+              <option value="ok">{tHist('ok')}</option>
+              <option value="error">{tHist('error')}</option>
+            </select>
+          </label>
+          <label className="block text-xs text-ink-muted">
+            {t('kindLabel')}
+            <select
+              value={filters.providerKind}
+              onChange={(e) => applyFilters({ ...filters, providerKind: e.target.value as TryHistoryFilters['providerKind'] })}
+              className={selectCls}
+            >
+              <option value="">{tHist('all')}</option>
+              <option value="openai">{t('kindOpenai')}</option>
+              <option value="anthropic">{t('kindAnthropic')}</option>
+            </select>
+          </label>
+          <label className="block text-xs text-ink-muted">
+            {tHist('filterModel')}
+            <input
+              type="text"
+              value={filters.modelQuery}
+              onChange={(e) => applyFilters({ ...filters, modelQuery: e.target.value })}
+              placeholder={t('modelSearchPlaceholder')}
+              className={selectCls}
+            />
+          </label>
+          <label className="block text-xs text-ink-muted">
+            {tHist('sortLabel')}
+            <select
+              value={filters.sortDir}
+              onChange={(e) => applyFilters({ ...filters, sortDir: e.target.value as 'desc' | 'asc' })}
+              className={selectCls}
+            >
+              <option value="desc">{tHist('sortNewest')}</option>
+              <option value="asc">{tHist('sortOldest')}</option>
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => applyFilters(DEFAULT_FILTERS)}
+          className="mt-2 text-xs text-primary hover:underline"
+        >
+          {tHist('clearFilters')}
+        </button>
+
+        {isHistoryPending ? (
+          <p className="mt-4 text-sm text-ink-muted">…</p>
+        ) : pageData.items.length === 0 ? (
+          <p className="mt-4 text-sm text-ink-muted">{tHist('noResults')}</p>
         ) : (
-          <div className="space-y-3">
-            {historyItems.map((run) => (
+          <div className="mt-4 space-y-3">
+            {pageData.items.map((run) => (
               <div key={run.id} className="rounded-md border border-line p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -487,11 +693,11 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
                     ) : run.error ? (
                       <p className="mt-1 line-clamp-2 text-sm text-red-600">{run.error}</p>
                     ) : null}
-                    <div className="mt-1 flex gap-3 text-xs text-ink-muted">
-                      {run.prompt_tokens != null && <span>{run.prompt_tokens} in</span>}
-                      {run.completion_tokens != null && <span>{run.completion_tokens} out</span>}
-                      {run.latency_ms != null && <span>{run.latency_ms} ms</span>}
-                      <span>{new Date(run.created_at).toLocaleString()}</span>
+                    <div className="mt-1 font-mono text-xs text-ink-muted">
+                      {run.latency_ms ?? '-'}ms · {run.tokens_per_sec ?? '-'} tok/s · p:{run.prompt_tokens ?? '-'} c:{run.completion_tokens ?? '-'} t:{run.total_tokens ?? '-'} · {run.finish_reason ?? '—'}
+                    </div>
+                    <div className="mt-1 text-xs text-ink-muted">
+                      {formatDateTime(run.created_at, locale as Locale, timeZone)}
                     </div>
                   </div>
                   <button
@@ -505,6 +711,30 @@ export function EndpointTryPageClient({ locale, /* quota unused directly */ hist
             ))}
           </div>
         )}
+
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-ink-muted">
+            {tHist('pageOf', { page: pageData.page, total: pageData.totalPages })} · {pageData.total}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => goTo(pageData.page - 1)}
+              disabled={pageData.page <= 1 || isHistoryPending}
+              className="rounded border border-line px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {tHist('prev')}
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(pageData.page + 1)}
+              disabled={pageData.page >= pageData.totalPages || isHistoryPending}
+              className="rounded border border-line px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {tHist('next')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

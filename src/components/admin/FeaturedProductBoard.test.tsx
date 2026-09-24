@@ -87,10 +87,10 @@ describe('FeaturedProductBoard — tombol busy', () => {
     // Deferred manual (bukan setTimeout): `await user.click()` juga menunggu
     // timer, jadi delay berbasis waktu bisa habis sebelum state busy terassert.
     // Resolve dikontrol eksplisit setelah assertion.
-    let release: (() => void) | null = null;
+    const releaseRef: { current: (() => void) | null } = { current: null };
     mock.mockImplementationOnce(
       () => new Promise((resolve) => {
-        release = () => resolve({ ok: true });
+        releaseRef.current = () => resolve({ ok: true });
       })
     );
     const items = [makeRow()];
@@ -102,7 +102,7 @@ describe('FeaturedProductBoard — tombol busy', () => {
       expect(btn).toHaveTextContent(/menyimpan/i);
     });
     // Lepaskan aksi supaya test tidak leaving pending promise.
-    release?.();
+    releaseRef.current?.();
     await waitFor(() => {
       expect(btn).toHaveAttribute('aria-busy', 'false');
     });

@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-24 21:55 WIB (Guard repair LLM threads + draft 0bcf2f6e siap dipulihkan)
+Last updated: 2026-09-24 22:45 WIB (Lab Try metrics + history + missing-table fix)
 
 ## Current State
 
@@ -68,6 +68,10 @@ Last updated: 2026-09-24 21:55 WIB (Guard repair LLM threads + draft 0bcf2f6e si
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-24 224500-lab-try-metrics-history-fix.md](2026-09-24/224500-lab-try-metrics-history-fix.md) — Fix `/lab/try`: migrasi `endpoint_try_runs` applied prod via MCP (tabel hilang = akar error schema cache) + pesan ramah + `Promise.allSettled`; metrik MetricBox ala Lab Chat + latensi List Model + latensi stream real + fix duplikasi teks stream; riwayat DB-driven (filter status/kind/model, sort, pagination). Gate typecheck ✓ 1152 tests ✓.
+
+- [2026-09-24 221636-scrape-workflow-isolation-plan.md](2026-09-24/221636-scrape-workflow-isolation-plan.md) — Plan detail untuk memisahkan full CI dari scrape workflow, menambah AST duplicate-key validator + `test:scrape`, membatasi production dispatch ke `main`, dan mengaktifkan required CI branch protection. Baseline run `35974520812`: scrape/DB/asset hijau, 15 test LabUi gagal karena duplicate top-level `lab`; fix `80958c8` sudah ada, belum ada post-fix run. Implementasi belum dimulai.
 
 - [2026-09-24 215000-threads-repair-guard-0bcf.md](2026-09-24/215000-threads-repair-guard-0bcf.md) — RCA draf threads `0bcf2f6e` kosong di review: repair emoji LLM mengembalikan kerangka `{"id":"main"}`/`{"id":"reply-N"}` dan kode lama menerimanya bulat-bulat, menimpa attempt-1 yang utuh. Fix: `isPlaceholderPostText`/`isPlaceholderThread`/`shouldAcceptRepairThread` di `thread.ts`, acceptance guard + prompt anti-skeleton di `development.ts`, duplicate-key `"id"` (+2) & skeleton ditolak di `parseThread`, sanitize CJK mid-word. 12 test baru; FeaturedProductBoard flaky test diperbaiki deterministik. Gate 1141/1141 + typecheck + lint + build hijau. S7: skrip `scripts/repair-thread-0bcf.mjs` siap (cetak SQL, tanpa eksekusi DB) — tinggal review + jalankan manual.
 
