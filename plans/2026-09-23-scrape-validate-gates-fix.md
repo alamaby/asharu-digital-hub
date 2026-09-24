@@ -233,7 +233,11 @@ Evidensi F1 (tidak perlu dicari ulang oleh implementer, tapi diverifikasi di S0/
 ## Progress Log
 
 - 2026-09-23 17:30:00 — Plan dibuat dari analisis run 35837142003 + validasi Supabase prod (256/256/6/0). Belum ada implementasi. Status: S0–S3 pending.
-- (Implementer mengisi di bawah dengan tanggal + hasil tiap langkah.)
+- 2026-09-23 15:56:00 WIB — S0 selesai: reproduksi 1 failed identik CI (`blackoutDays=0 → expected false to be true` di line 493).
+- 2026-09-23 15:56:36 WIB — S1 selesai: reorder branch `already_done` sebelum `force-error` di `runner.ts:572-586` (+2 komentar penjelas). Typecheck hijau. Diff: 1 file, +7/-5.
+- 2026-09-23 15:56:36 WIB — S2 selesai: fixture `blackoutDays=0` diubah ke `automation_runs=[]` + asersi jumlah run; tambah test regresi `force + already terminal → already_done`. `npx vitest run runner.test.ts` = 23/23 passed. Diff: 1 file, +27/-1.
+- 2026-09-23 15:59:23 WIB — S3 gate: typecheck ✅; runner.test.ts individual ✅ 23/23; lint ✅ 0 errors / 12 warnings (pre-existing no-unused-vars); Supabase prod ✅ `256/256/6/0`; automation_configs ✅ `enabled=true, blackout=14`. Full-suite `npm test` mencatat 1 flaky-failure di `FeaturedProductBoard.test.tsx` (pre-existing: lolos saat isolasi dan saat stash/without S1+S2) — bukan regresi dari S1/S2.
+- 2026-09-23 16:00:35 WIB — Serah balik. Dua file siap di-commit terpisah setelah persetujuan pemilik (lihat larangan eksplisit di plan).
 
 ## Notes
 
