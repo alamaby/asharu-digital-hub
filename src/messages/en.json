@@ -1185,9 +1185,7 @@
       "downloadingCard": "Preparing image...",
       "shareCard": "Share",
       "cardReady": "Card ready — download then upload to your favorite social app."
-    }
-  },
-  "lab": {
+    },
     "try": {
       "title": "Endpoint Try",
       "intro": "Experiment with arbitrary OpenAI-compatible / Anthropic endpoints via server proxy. Key transits in memory only; history saved without key.",

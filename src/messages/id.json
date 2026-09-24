@@ -1185,9 +1185,7 @@
       "downloadingCard": "Menyiapkan gambar...",
       "shareCard": "Bagikan",
       "cardReady": "Kartu siap — unduh lalu unggah ke sosmed favorit Anda."
-    }
-  },
-  "lab": {
+    },
     "try": {
       "title": "Coba Endpoint",
       "intro": "Eksperimen endpoint OpenAI-compatible / Anthropic arbitrer via proxy server. Key transit di memori saja; riwayat tersimpan tanpa key.",
