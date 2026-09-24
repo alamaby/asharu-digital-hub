@@ -14,10 +14,11 @@ concurrency:
 
 jobs:
   scrape:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Production
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -103,10 +104,10 @@ jobs:
             -H 'Content-Type: application/json' \
             -w '\nHTTP %{http_code}\n'
 
-      - name: Validate gates
+      - name: Validate scraper gates
         run: |
-          npm run typecheck
-          npm run test
+          npm run check:scraper
+          npm run test:scrape
 
       - name: Report failure to error digest
         if: failure()

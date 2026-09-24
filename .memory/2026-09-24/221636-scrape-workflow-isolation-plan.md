@@ -1,0 +1,11 @@
+# Scrape Workflow Isolation + i18n Guardrails Plan
+
+- **Task/problem:** Buat plan implementasi untuk mencegah source-code change yang tidak terkait (terutama duplicate i18n key) membuat workflow `Scrape affiliate products` merah.
+- **Evidence:** Run `35974520812` (commit `991013a`) scrape/asset/DB/cache steps hijau, tetapi `Validate gates` gagal pada 15 test `src/components/lab/LabUi.test.tsx` karena duplicate top-level `lab` di `src/messages/id.json` dan `en.json` menghapus namespace lama. `gh workflow list --all` hanya menunjukkan scrape workflow; branch `main` belum protected dan rulesets kosong.
+- **Key files:** `plans/2026-09-24-scrape-workflow-isolation-ci-i18n-guardrails.md`; baseline references `.github/workflows/scrape-affiliate.yml`, `package.json`, `src/messages/messages.test.ts`, `scripts/scrape-affiliate.mjs`, `scripts/lib/data-writer.mjs`, `scripts/lib/storage-uploader.mjs`.
+- **Decisions:** Pisahkan full application CI dari scraper-specific gate; tambahkan AST duplicate-key validator; tambahkan `validate:messages` dan `test:scrape`; batasi production workflow ke `main`; kurangi `contents` permission; lindungi `main` dengan required CI check; jangan gunakan `continue-on-error` untuk test/DB/Storage failures.
+- **Assumptions/risks:** Parser duplicate-key dependency dan test Storage mocks perlu diverifikasi; `test:scrape` harus mencakup dependency scraper agar tidak terlalu sempit; branch protection memerlukan permission/admin GitHub; manual production scrape menulis DB/Storage dan harus menunggu approval user.
+- **Blockers/unresolved:** Belum ada workflow run setelah fix `80958c8`; branch protection belum diaktifkan; implementasi plan belum dimulai.
+- **Verification performed/recommended:** `gh run view 35974520812 --log-failed`, `gh workflow list --all`, `gh api .../branches/main/protection`, `gh api .../rulesets`, dan local targeted test 3 files/44 tests lulus. Setelah implementasi: `npm ci`, `validate:messages`, `test:scrape`, `typecheck`, `lint`, full `test`, `build`, lalu approval untuk `gh workflow run scrape-affiliate.yml --ref main`.
+- **Commit proposal:** `ci: isolate scrape workflow from application quality gates`
+- **Related:** `plans/2026-09-23-scrape-validate-gates-fix.md`; project memory index di `.memory/README.md`.
