@@ -84,8 +84,15 @@ describe('FeaturedProductBoard — tombol busy', () => {
   it('tombol berubah jadi spinner + saving saat aksi berjalan', async () => {
     const user = userEvent.setup();
     const mock = vi.mocked(setProductFeatured);
-    // Delay sebentar supaya bisa assert state busy.
-    mock.mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 50)));
+    // Deferred manual (bukan setTimeout): `await user.click()` juga menunggu
+    // timer, jadi delay berbasis waktu bisa habis sebelum state busy terassert.
+    // Resolve dikontrol eksplisit setelah assertion.
+    let release: (() => void) | null = null;
+    mock.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        release = () => resolve({ ok: true });
+      })
+    );
     const items = [makeRow()];
     renderWithMessages(<FeaturedProductBoard items={items} curatedCount={0} page={1} totalPages={1} totalCount={1} q="" filter="all" />);
     const btn = screen.getByRole('button', { name: /featured/i });
@@ -93,6 +100,11 @@ describe('FeaturedProductBoard — tombol busy', () => {
     await waitFor(() => {
       expect(btn).toHaveAttribute('aria-busy', 'true');
       expect(btn).toHaveTextContent(/menyimpan/i);
+    });
+    // Lepaskan aksi supaya test tidak leaving pending promise.
+    release?.();
+    await waitFor(() => {
+      expect(btn).toHaveAttribute('aria-busy', 'false');
     });
   });
 

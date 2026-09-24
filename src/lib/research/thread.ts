@@ -76,7 +76,8 @@ export const threadSchema = z.object({
 const CJK_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g;
 
 export function sanitizeThreadText(s: string): string {
-  return s.replace(CJK_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
+  // 2026-09-24: CJK di tengah kata Latin dipisah spasi agar tidak tersambung (anti过thinking → anti thinking).
+  return s.replace(CJK_PATTERN, ' ').replace(/\s{2,}/g, ' ').trim();
 }
 
 function sanitizeThread(thread: ThreadGeneration): ThreadGeneration {
@@ -87,6 +88,51 @@ function sanitizeThread(thread: ThreadGeneration): ThreadGeneration {
       en: sanitizeThreadText(r.en)
     }))
   };
+}
+
+// Label post sebagai konten — insiden 2026-09-24: repair emoji `03:24:06`
+// mengembalikan "main"/"reply-N" sebagai isi field `id` dan menimpa thread bagus.
+const PLACEHOLDER_POST_RE = /^\s*(main|reply-\d+|\d+)\s*$/i;
+
+/** True bila teks hanya label post (mis. "main", "reply-3", "7"). String kosong BUKAN placeholder (ditangani skema). */
+export function isPlaceholderPostText(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return PLACEHOLDER_POST_RE.test(text);
+}
+
+type ThreadLike = { main: { id: string; en: string }; replies: { id: string; en: string }[] };
+
+function countNonEmptyFields(thread: ThreadLike | null | undefined): number {
+  if (!thread?.main) return 0;
+  const fields = [thread.main.id, thread.main.en, ...(thread.replies ?? []).flatMap((r) => [r?.id, r?.en])];
+  return fields.filter((f) => (f ?? '').trim().length > 0).length;
+}
+
+/** True bila thread berupa skeleton label (main.id placeholder ATAU ≥50% field placeholder). Null/undefined → false (jangan throw). */
+export function isPlaceholderThread(thread: ThreadLike | null | undefined): boolean {
+  if (!thread?.main) return false;
+  const fields = [thread.main.id, thread.main.en, ...(thread.replies ?? []).flatMap((r) => [r?.id, r?.en])];
+  if (fields.length === 0) return false;
+  if (isPlaceholderPostText(thread.main.id)) return true;
+  const bad = fields.filter((f) => isPlaceholderPostText(f ?? '')).length;
+  return bad / fields.length >= 0.5;
+}
+
+/**
+ * Guard penerimaan hasil repair LLM (emoji/length): tolak bila kandidat
+ * skeleton, kehilangan bahasa, atau placeholder-nya bukan tepat 1.
+ * Perbandingan jumlah emoji gap DILAKUKAN di caller development.ts
+ * (butuh `auditThreadEmoji` + batas platform); fungsi ini hanya guard kualitas konten.
+ */
+export function shouldAcceptRepairThread(
+  before: ThreadLike | null | undefined,
+  after: ThreadLike | null | undefined
+): boolean {
+  if (!before || !after) return false;
+  if (isPlaceholderThread(after)) return false;
+  if (countNonEmptyFields(after) < countNonEmptyFields(before)) return false;
+  if (countPlaceholdersInThread(after) !== 1) return false;
+  return true;
 }
 
 const PLACEHOLDER = '{{PRODUCT_URL}}';
@@ -226,6 +272,16 @@ export function normalizePlaceholder(thread: {
   };
 }
 
+/**
+ * Heuristik duplicate-key `"id"`: tolak bila kemunculan `"id":` melebihi
+ * jumlah post + 2. Ambang +2 menutup kasus insiden (7 post vs 14+ kemunculan)
+ * tanpa false positive bila kata `"id"` muncul sekali di dalam teks.
+ */
+function hasExcessIdKeys(trimmed: string, postCount: number): boolean {
+  const occurrences = trimmed.match(/"id"\s*:/g)?.length ?? 0;
+  return occurrences >= postCount + 2;
+}
+
 export function parseThread(text: string): ThreadGeneration | null {
   const trimmed = text.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
   let raw: unknown;
@@ -243,6 +299,11 @@ export function parseThread(text: string): ThreadGeneration | null {
   const parsed = threadSchema.safeParse(raw);
   if (!parsed.success) return null;
   const t = parsed.data;
+  // 2026-09-24: duplicate-key (id ganda per reply, kasus attempt-1 03:23:40)
+  // ditolak agar retry suhu 0.3 memproduksi JSON bersih; skeleton label
+  // (kasus repair 03:24:06) ditolak via isPlaceholderThread.
+  if (hasExcessIdKeys(trimmed, 1 + t.replies.length)) return null;
+  if (isPlaceholderThread(t)) return null;
   const normalized = normalizePlaceholder(t);
   if (countPlaceholdersInThread(normalized) !== 1) return null;
   return sanitizeThread(normalized);

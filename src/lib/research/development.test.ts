@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText, isPlaceholderPostText, isPlaceholderThread, shouldAcceptRepairThread } from './thread';
 import { classifyFixedProducts, countFixedProductDeferrals, estimatePendingPairsExact, FIXED_PRODUCT_DEFER_LIMIT, buildArticleMinimalThread, requiredArticleLangs } from './development';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
@@ -162,6 +162,160 @@ describe('parseThread', () => {
     expect(out!.main.id).toBe(`cek di sini ya ${P}`);
     expect(out!.main.en).toBe('tap here');
   });
+
+  it('returns null for duplicate "id" key per reply (insiden 2026-09-24 attempt-1 03:23:40)', () => {
+    const raw = JSON.stringify({
+      main: { id: `m id ${P}`, en: 'm en' },
+      replies: [
+        { id: 'r0 id', en: 'r0 en' },
+        { id: 'r1 id', en: 'r1 en' }
+      ]
+    }).replace('"r0 en"', '"r0 en","id":"teks Indonesia r0 yang cukup panjang agar valid"')
+      .replace('"r1 en"', '"r1 en","id":"teks Indonesia r1 yang cukup panjang agar valid"');
+    expect(parseThread(raw)).toBeNull();
+  });
+
+  it('returns null for skeleton label content (insiden 2026-09-24 repair 03:24:06)', () => {
+    const raw = JSON.stringify({
+      main: { id: 'main', en: `teks Inggris main yang cukup panjang agar valid di sini ${P}` },
+      replies: [
+        { id: 'reply-1', en: 'teks Inggris balasan pertama yang cukup panjang valid' },
+        { id: 'reply-2', en: 'teks Inggris balasan kedua yang cukup panjang valid' }
+      ]
+    });
+    expect(parseThread(raw)).toBeNull();
+  });
+
+  it('control: 7 replies bilingual valid tetap parse (guard tidak over-blocking)', () => {
+    const replies = Array.from({ length: 7 }, (_, i) => ({
+      id: `balasan Indonesia nomor ${i} dengan konten yang cukup panjang ${i === 3 ? P : ''}`,
+      en: `English reply number ${i} with long enough content here`
+    }));
+    const raw = JSON.stringify({
+      main: { id: 'main post Indonesia yang cukup panjang', en: 'main post English long enough here' },
+      replies
+    });
+    const out = parseThread(raw);
+    expect(out).not.toBeNull();
+    expect(out!.replies).toHaveLength(7);
+  });
+});
+
+describe('threadQualityGuard (insiden 2026-09-24: repair 03:24:06 menimpa 03:23:40)', () => {
+  function goodThread() {
+    // Meniru attempt-1 prod (8 gap emoji): main.id + 6 reply id + reply-0 en tanpa emoji.
+    return {
+      main: {
+        id: `Masalah pagi hari sebelum kerja dan rasa percaya diri di kantor ${P}`,
+        en: 'Morning struggle before work and confidence at the office every day 👔✨'
+      },
+      replies: Array.from({ length: 6 }, (_, i) => ({
+        id: `Isi balasan Indonesia nomor ${i + 1} yang cukup panjang agar valid`,
+        en: i === 0
+          ? `Reply number 1 English content long enough to be valid text`
+          : `Reply number ${i + 1} English content long enough to be valid text 👗✨`
+      }))
+    };
+  }
+
+  function incidentSkeleton() {
+    return {
+      main: { id: 'main', en: `Masalah pagi hari sebelum kerja dan rasa percaya diri ${P} 👔✨` },
+      replies: Array.from({ length: 6 }, (_, i) => ({
+        id: `reply-${i + 1}`,
+        en: `English reply number ${i + 1} content long enough to be valid 👗✨`
+      }))
+    };
+  }
+
+  it('isPlaceholderThread true untuk skeleton insiden; shouldAcceptRepairThread menolaknya', () => {
+    const good = goodThread();
+    const skeleton = incidentSkeleton();
+    expect(isPlaceholderThread(skeleton)).toBe(true);
+    expect(isPlaceholderThread(good)).toBe(false);
+    expect(shouldAcceptRepairThread(good, skeleton)).toBe(false);
+  });
+
+  it('shouldAcceptRepairThread false bila repair kehilangan satu bahasa', () => {
+    const good = goodThread();
+    const missingLang = {
+      main: { id: good.main.id, en: '' },
+      replies: good.replies.map((r) => ({ id: r.id, en: '' }))
+    };
+    expect(shouldAcceptRepairThread(good, missingLang)).toBe(false);
+  });
+
+  it('shouldAcceptRepairThread true untuk perbaikan valid (semua field utuh, 1 placeholder)', () => {
+    const good = goodThread();
+    const fixed = {
+      main: { id: `${good.main.id} 🎉`, en: `${good.main.en} 🎉` },
+      replies: good.replies.map((r) => ({ id: `${r.id} 🎉`, en: `${r.en} 🎉` }))
+    };
+    expect(shouldAcceptRepairThread(good, fixed)).toBe(true);
+  });
+
+  it('isPlaceholderPostText hanya true untuk label post', () => {
+    expect(isPlaceholderPostText('main')).toBe(true);
+    expect(isPlaceholderPostText('Main ')).toBe(true);
+    expect(isPlaceholderPostText('reply-3')).toBe(true);
+    expect(isPlaceholderPostText('7')).toBe(true);
+    expect(isPlaceholderPostText('Midi dress ceruti')).toBe(false);
+    expect(isPlaceholderPostText('')).toBe(false);
+  });
+
+  // Keputusan penerimaan repair emoji (mirror logika development.ts):
+  // terima = konten utuh (shouldAcceptRepairThread) DAN gap tak bertambah.
+  function emojiAccept(before: ReturnType<typeof goodThread>, after: typeof before): boolean {
+    return shouldAcceptRepairThread(before, after) && auditThreadEmoji(after).length <= auditThreadEmoji(before).length;
+  }
+
+  it('TOLAK repair skeleton insiden (gap 8→8 tapi konten placeholder)', () => {
+    const before = goodThread();
+    const after = incidentSkeleton();
+    expect(auditThreadEmoji(before).length).toBeGreaterThan(0);
+    expect(emojiAccept(before, after)).toBe(false);
+  });
+
+  it('TERIMA repair valid (gap 8→0, konten utuh)', () => {
+    const before = goodThread();
+    const after = {
+      main: { id: `${before.main.id} 🎉`, en: `${before.main.en} 🎉` },
+      replies: before.replies.map((r) => ({ id: `${r.id} 🎉`, en: `${r.en} 🎉` }))
+    };
+    expect(auditThreadEmoji(before).length).toBeGreaterThan(0);
+    expect(auditThreadEmoji(after).length).toBe(0);
+    expect(emojiAccept(before, after)).toBe(true);
+  });
+
+  // Keputusan penerimaan repair length (mirror logika development.ts):
+  // terima = konten utuh DAN issues tak bertambah. Skeleton pendek lolos
+  // audit panjang tapi wajib TOLAK via shouldAcceptRepairThread.
+  function lengthAccept(
+    before: ReturnType<typeof goodThread>,
+    after: typeof before,
+    maxChars: number | null
+  ): boolean {
+    return shouldAcceptRepairThread(before, after) && auditThreadLength(after, maxChars).length <= auditThreadLength(before, maxChars).length;
+  }
+
+  it('TOLAK repair skeleton insiden pada jalur length (pendek tapi placeholder)', () => {
+    const before = goodThread();
+    const after = incidentSkeleton();
+    expect(lengthAccept(before, after, 500)).toBe(false);
+  });
+
+  it('TERIMA pemendekan valid (tetap kalimat utuh, 1 placeholder, issues tak bertambah)', () => {
+    const before = {
+      main: { id: `Main post yang cukup panjang melebihi batas platform ${P} 🎉`, en: `Main post in English long enough to exceed the platform limit by a lot 🎉` },
+      replies: [{ id: 'Balasan pertama yang singkat tapi tetap kalimat utuh 🎉', en: 'First reply short but still a complete sentence here 🎉' }]
+    };
+    const after = {
+      main: { id: `Main post pendek ${P} 🎉`, en: 'Main post short now here 🎉' },
+      replies: [{ id: 'Balasan pertama singkat utuh 🎉', en: 'First reply short complete 🎉' }]
+    };
+    expect(auditThreadLength(before, 40).length).toBeGreaterThan(0);
+    expect(lengthAccept(before, after, 40)).toBe(true);
+  });
 });
 
 describe('repositionPlaceholder', () => {
@@ -304,6 +458,12 @@ describe('sanitizeThreadText', () => {
 
   it('handles empty string', () => {
     expect(sanitizeThreadText('')).toBe('');
+  });
+
+  it('2026-09-24: CJK di tengah kata Latin dipisah spasi (anti过thinking)', () => {
+    expect(sanitizeThreadText('anti过thinking ⏰')).toBe('anti thinking ⏰');
+    expect(sanitizeThreadText('halo 世界 test')).toBe('halo test');
+    expect(sanitizeThreadText('teks Latin biasa 123')).toBe('teks Latin biasa 123');
   });
 });
 

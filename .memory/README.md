@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-24 15:19 WIB (Endpoint Try tab Chat Lab selesai)
+Last updated: 2026-09-24 21:55 WIB (Guard repair LLM threads + draft 0bcf2f6e siap dipulihkan)
 
 ## Current State
 
@@ -36,6 +36,9 @@ Last updated: 2026-09-24 15:19 WIB (Endpoint Try tab Chat Lab selesai)
 
 ## Open Items / Blockers
 
+- [ ] **Pulihkan draf threads `0bcf2f6e` [USER ACTION]:** guard sudah terpasang (`fix(research)`), tapi datanya masih rusak. Jalankan `node scripts/repair-thread-0bcf.mjs` (hanya CETAK SQL, tidak menyentuh DB), review output, lalu eksekusi statement `UPDATE ... WHERE id='0bcf2f6e…' AND generated_thread->'main'->>'id'='main'` manual via Supabase SQL editor. Sesudah itu: cek `/id/konten/review/0bcf2f6e-cf39-4c21-83b4-0c1e6e4b0862` tab ID berisi Indonesia. Setelah update, `replies[0].en` masih beraksen Indonesia (artefak duplicate-key LLM) — opsional diedit manual.
+- [ ] **Deploy Vercel [USER ACTION]:** guard `shouldAcceptRepairThread` + `parseThread` hardening baru aktif setelah deploy. Verifikasi tidak ada draf threads baru ber-`id` placeholder setelah 1 run automation.
+
 - [ ] **Verifikasi live Chat Lab [USER ACTION]:** login → `/id/lab` submit 1–2 target → cek hasil side-by-side + history + stats; anon harus redirect `/masuk`. Opsional: cek cron `asharu-lab-cleanup` di Supabase Dashboard → Cron Jobs.
 - [ ] **Live verify token Cloudflare [USER ACTION]:** submit 1 target Cloudflare di `/id/lab` → kolom Masuk/Keluar/Total harus terisi (fix parse `usage`, `ac095c9`). Bila tetap `-`, laporkan agar diputuskan tahap B (pindah endpoint OpenAI-compatible).
 - [ ] **Verifikasi live highlight/detail/kartu [USER ACTION]:** kotak ★ + bar penuh di hasil & stats; buka `/id/lab/[id]` dari history (metrik + chart + log); tombol Unduh kartu 1080 + Bagikan.
@@ -65,6 +68,8 @@ Last updated: 2026-09-24 15:19 WIB (Endpoint Try tab Chat Lab selesai)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-24 215000-threads-repair-guard-0bcf.md](2026-09-24/215000-threads-repair-guard-0bcf.md) — RCA draf threads `0bcf2f6e` kosong di review: repair emoji LLM mengembalikan kerangka `{"id":"main"}`/`{"id":"reply-N"}` dan kode lama menerimanya bulat-bulat, menimpa attempt-1 yang utuh. Fix: `isPlaceholderPostText`/`isPlaceholderThread`/`shouldAcceptRepairThread` di `thread.ts`, acceptance guard + prompt anti-skeleton di `development.ts`, duplicate-key `"id"` (+2) & skeleton ditolak di `parseThread`, sanitize CJK mid-word. 12 test baru; FeaturedProductBoard flaky test diperbaiki deterministik. Gate 1141/1141 + typecheck + lint + build hijau. S7: skrip `scripts/repair-thread-0bcf.mjs` siap (cetak SQL, tanpa eksekusi DB) — tinggal review + jalankan manual.
 
 - [2026-09-24 151900-endpoint-try-lab-tab.md](2026-09-24/151900-endpoint-try-lab-tab.md) — Tab "Coba Endpoint" di Chat Lab (`/lab/try`): migrasi `endpoint_try_runs`, lib `src/lib/endpoint-try/*` (types, validation SSRF guard, adapters normalisasi OpenAI/Anthropic+SSE, actions CRUD), 2 proxy API (`/api/endpoint-try/models`, `/api/endpoint-try/chat`), halaman server + komponen klien `EndpointTryClient`, tab navigasi di `LabPageClient`, i18n id/en, extend cleanup `/api/lab/cleanup`. Rate limit 30/jam/IP. Gate 68 test baru ✓ typecheck ✓ lint ✓. Commit parent `991013a` + `9557b68`; submodule `12129c6` pushed.
 

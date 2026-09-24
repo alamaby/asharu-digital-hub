@@ -17,7 +17,7 @@ import { runLLMCompletion } from '@/lib/llm/completion';
 import { ProviderRegistry } from '@/lib/llm/registry';
 import { fetchOrderedModels } from '@/lib/supabase/vault';
 import { selectAffiliateWithRandomFallback, type SelectedAffiliate } from './affiliate';
-import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, auditThreadEmoji, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder } from './thread';
+import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadLength, auditThreadEmoji, type LengthIssue, parseThread, replacePlaceholders, repositionPlaceholder, shouldAcceptRepairThread } from './thread';
 
 interface ShortlistedTopic {
   id: string;
@@ -694,9 +694,12 @@ async function generateAndInsertDraft(
   // masih kosong → simpan + tandai (konsisten kebijakan over-limit).
   let emojiGaps = auditThreadEmoji(finalThread);
   if (emojiGaps.length > 0) {
+    // Format "Balasan N (bahasa ID/EN)" — jangan "post-N id" agar model tidak
+    // salah baca sebagai instruksi isi (insiden 2026-09-24: repair mengembalikan
+    // label "main"/"reply-N" sebagai konten). "Balasan 0" = main post, terima apa adanya.
     const gapDesc = emojiGaps
       .slice(0, 8)
-      .map((g) => `post-${g.post} ${g.lang}`)
+      .map((g) => `Balasan ${g.post} (bahasa ${g.lang === 'id' ? 'ID' : 'EN'})`)
       .join(', ');
     const retryEmoji = await runLLMCompletion(supabase, {
       requestId: null,
@@ -706,22 +709,37 @@ async function generateAndInsertDraft(
       modelUuid: devModel.modelUuid,
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: `${user}\n\nPENTING: post berikut TIDAK mengandung emoji: ${gapDesc}. Tulis ulang thread yang SAMA dengan tambahan 1-2 emoji relevan per post tersebut (jangan ganti kata dengan emoji, patuhi HARD LIMIT char), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
+        { role: 'user', content: `${user}\n\nPENTING: post berikut TIDAK mengandung emoji: ${gapDesc}. DILARANG mengembalikan label seperti "main", "reply-1", atau angka saja sebagai isi post — setiap field id dan en WAJIB kalimat lengkap (>20 karakter). Kembalikan SEMUA post (bukan hanya yang gap), dengan struktur JSON dan jumlah reply yang SAMA persis. Tulis ulang thread yang SAMA dengan tambahan 1-2 emoji relevan per post tersebut (jangan ganti kata dengan emoji, patuhi HARD LIMIT char), tanpa mengubah fakta/CTA/URL/struktur JSON.` }
       ],
       temperature: 0.3,
       maxTokens: 3200
     }).catch(() => null);
     const parsedEmoji = retryEmoji ? parseThread(retryEmoji.output.text) : null;
     if (parsedEmoji) {
-      let we = parsedEmoji;
+      // Quality guard 2026-09-24: terima repair hanya bila konten utuh dan
+      // gap tidak bertambah (kasus 0bcf2f6e: skeleton "main"/"reply-N" menimpa thread bagus).
+      let candidate = parsedEmoji;
+      let candidatePostIndex = resolvedPostIndex;
       if (affiliate) {
         const repositioned = repositionPlaceholder(parsedEmoji, 'middle');
-        we = repositioned.thread;
-        resolvedPostIndex = repositioned.postIndex;
+        candidate = repositioned.thread;
+        candidatePostIndex = repositioned.postIndex;
       }
-      finalThread = affiliate ? replacePlaceholders(we, affiliate.product.url) : we;
-      activeLlm = retryEmoji;
-      emojiGaps = auditThreadEmoji(finalThread);
+      const candidateFinal = affiliate ? replacePlaceholders(candidate, affiliate.product.url) : candidate;
+      const candidateGaps = auditThreadEmoji(candidateFinal);
+      if (shouldAcceptRepairThread(finalThread, candidateFinal) && candidateGaps.length <= emojiGaps.length) {
+        finalThread = candidateFinal;
+        resolvedPostIndex = candidatePostIndex;
+        activeLlm = retryEmoji;
+        emojiGaps = candidateGaps;
+      } else {
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'warn',
+          message: `topic ${topicId} × ${platform.slug}: emoji repair ditolak (quality guard, gaps ${emojiGaps.length}→${candidateGaps.length}) — pakai thread awal`
+        });
+      }
     }
   }
   const emojiMissing = emojiGaps.length > 0;
@@ -750,22 +768,37 @@ async function generateAndInsertDraft(
       modelUuid: devModel.modelUuid,
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: `${user}\n\nPENTING: post berikut MELEBIHI batas maksimum platform: ${overDesc}. Tulis ulang thread yang SAMA tetapi pendekkan post tersebut hingga ≤ batas. Aturan override untuk retry ini: HARD LIMIT MENANG atas target panjang — potong kalimat/napas per post (boleh 2 kalimat pendek), JANGAN korbankan fakta/CTA/nama produk/URL/emoji/struktur JSON. Tetap: 1 placeholder di reply yang sama dengan NAMA PRODUK.` }
+        { role: 'user', content: `${user}\n\nPENTING: post berikut MELEBIHI batas maksimum platform: ${overDesc}. DILARANG mengembalikan label seperti "main"/"reply-N" sebagai isi; setiap field WAJIB kalimat lengkap. Pertahankan jumlah reply dan struktur JSON yang sama persis. Tulis ulang thread yang SAMA tetapi pendekkan post tersebut hingga ≤ batas. Aturan override untuk retry ini: HARD LIMIT MENANG atas target panjang — potong kalimat/napas per post (boleh 2 kalimat pendek), JANGAN korbankan fakta/CTA/nama produk/URL/emoji/struktur JSON. Tetap: 1 placeholder di reply yang sama dengan NAMA PRODUK.` }
       ],
       temperature: 0.3,
       maxTokens: 3200
     }).catch(() => null);
     const parsedShort = retryShort ? parseThread(retryShort.output.text) : null;
     if (parsedShort) {
-      let ws = parsedShort;
+      // Quality guard 2026-09-24 (cermin repair emoji): tolak kandidat
+      // skeleton agar tidak menimpa thread bagus.
+      let shortCandidate = parsedShort;
+      let shortPostIndex = resolvedPostIndex;
       if (affiliate) {
         const repositioned = repositionPlaceholder(parsedShort, 'middle');
-        ws = repositioned.thread;
-        resolvedPostIndex = repositioned.postIndex;
+        shortCandidate = repositioned.thread;
+        shortPostIndex = repositioned.postIndex;
       }
-      finalThread = affiliate ? replacePlaceholders(ws, affiliate.product.url) : ws;
-      activeLlm = retryShort;
-      lengthIssues = auditThreadLength(finalThread, platform.maxChars);
+      const shortFinal = affiliate ? replacePlaceholders(shortCandidate, affiliate.product.url) : shortCandidate;
+      const candidateIssues = auditThreadLength(shortFinal, platform.maxChars);
+      if (shouldAcceptRepairThread(finalThread, shortFinal) && candidateIssues.length <= lengthIssues.length) {
+        finalThread = shortFinal;
+        resolvedPostIndex = shortPostIndex;
+        activeLlm = retryShort;
+        lengthIssues = candidateIssues;
+      } else {
+        await supabase.from('content_research_logs').insert({
+          session_id: sessionId,
+          stage: 'developing',
+          level: 'warn',
+          message: `topic ${topicId} × ${platform.slug}: length repair ditolak (quality guard, issues ${lengthIssues.length}→${candidateIssues.length}) — pakai thread awal`
+        });
+      }
     }
   }
   const overLimit = lengthIssues.length > 0;

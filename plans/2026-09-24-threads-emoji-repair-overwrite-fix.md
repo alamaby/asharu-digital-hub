@@ -26,15 +26,15 @@ Perbaiki akar masalah draf threads `0bcf2f6e-cf39-4c21-83b4-0c1e6e4b0862` yang t
 
 ## Tasks
 
-- [ ] S0 baseline
-- [ ] S1 guard murni di thread.ts
-- [ ] S2 guard repair emoji di development.ts
-- [ ] S3 guard repair length di development.ts
-- [ ] S4 prompt repair anti-skeleton
-- [ ] S5 parseThread: duplicate-key + placeholder
-- [ ] S6 sanitize CJK di tengah kata
+- [x] S0 baseline
+- [x] S1 guard murni di thread.ts
+- [x] S2 guard repair emoji di development.ts
+- [x] S3 guard repair length di development.ts
+- [x] S4 prompt repair anti-skeleton
+- [x] S5 parseThread: duplicate-key + placeholder
+- [x] S6 sanitize CJK di tengah kata
 - [ ] S7 perbaikan data draf 0bcf (prod, via manusia)
-- [ ] S8 gate penuh + verifikasi akhir
+- [x] S8 gate penuh + verifikasi akhir
 
 ## Implementation Steps
 
@@ -240,13 +240,22 @@ Perbaiki akar masalah draf threads `0bcf2f6e-cf39-4c21-83b4-0c1e6e4b0862` yang t
 - Heuristik duplicate-key false positive bila kata `"id"` di dalam teks → mitigasi ambang `+2` + komentar.
 - Perbaikan data salah sasaran → mitigasi klausa guard `AND main.id='main'` + review manusia + 0-row abort.
 - Konflik hunk S2/S3/S4 (satu fungsi) → urutan S2→S3→S4 dipatuhi; S1→S5→S6 untuk `thread.ts`.
-- Test suite penuh lama → jalankan targeted dulu, penuh di S8.
+- Test suite penuh lama → jalankan targeted dulu, penuh di S8. **Terbukti nyata:** 2 test flaky di luar scope. `FeaturedProductBoard.test.tsx` (racing `aria-busy`, sudah diperbaiki deterministik) dan `StudioUi.test.tsx` (lolos saat isolasi, gagal saat suite penuh — belum diperbaiki, follow-up).
+- Guard `hasExcessIdKeys` bisa false-positive bila teks mengandung literal `"id":` ≥2 kali → mitigasi ambang `+2` + test kontrol.
 
 ## Progress Log
 
 - 2026-09-24 10:30:00 — Plan dibuat dari temuan terverifikasi prod (draf 0bcf, log sesi 68c0fd0b, raw LLM 03:23:40 vs 03:24:06). Belum ada implementasi.
 - 2026-09-24 16:10:00 — S0 BASELINE MERAH → STOP per gate S0. Hasil: `npm run typecheck` ✓ exit 0; `npm run lint` ✓ 0 errors (12 warnings pre-existing); `npx vitest run src/lib/research/development.test.ts` ✓ 64/64; `npm test` ✗ exit 1: 1112 passed / 15 failed, SEMUA 15 di `src/components/lab/LabUi.test.tsx` (i18n key tak ter-resolve: `lab.history.*`/`lab.detail.*` tampil mentah, bukan teks ekspektasi). Pre-existing di HEAD `00b292e` (working tree bersih kecuali file `plans/*`, tanpa sentuhan `src/`). Tidak terkait scope thread/automation. Total test aktual 1127 (bukan ±915 di memory — memory stale). Menunggu keputusan user: (a) lanjut S1–S6 dengan baseline-scope hijau sebagai acuan + S8 tanpa `npm test` penuh, (b) perbaiki LabUi dulu (di luar scope plan ini), atau (c) stop.
 - 2026-09-24 16:40:00 — S0 UNBLOCKED oleh `plans/2026-09-24-lab-messages-duplicate-lab-key-fix.md` (S1–S5 hijau). Penyebab 15 failures: duplikat top-level key `"lab"` di `src/messages/id.json` + `en.json` (blok `try` Endpoint Try menimpa blok penuh saat parse) → digabung jadi 1 blok `lab` (12 keys). Verifikasi: messages 5/5 ✓ (3 lama + 2 guard baru); LabUi 16/16 ✓ (sebelumnya 1/16); `npm run typecheck` ✓ exit 0; `npm run lint` ✓ 0 errors (12 warnings pre-existing, tidak bertambah). Status S0 plan ini: `baseline-scoped-hijau` — S1–S6 boleh lanjut; S8 tetap wajib `npm test` penuh.
+- 2026-09-24 17:15:00 — S1 SELESAI. `thread.ts`: 3 fungsi baru (`isPlaceholderPostText`, `isPlaceholderThread`, `shouldAcceptRepairThread`) + `PLACEHOLDER_POST_RE`. Test `threadQualityGuard` 4 test baru (skeleton insiden ditolak, bahasa hilang ditolak, repair valid diterima, unit label). `development.test.ts` 68/68 ✓; typecheck ✓; lint ✓.
+- 2026-09-24 17:20:00 — S2 SELESAI. Guard repair emoji: kandidat dibangun ke variabel sementara (`candidateFinal`/`candidatePostIndex`), diterima hanya bila `shouldAcceptRepairThread(...) && candidateGaps.length <= emojiGaps.length`; ditolak → log warn persis `emoji repair ditolak (quality guard, gaps X→Y) — pakai thread awal`. 2 test keputusan baru (TOLAK skeleton, TERIMA gap→0). 70/70 ✓.
+- 2026-09-24 17:25:00 — S3 SELESAI. Guard repair length: cermin S2 (`candidateIssues <= lengthIssues`), log warn `length repair ditolak (quality guard, issues X→Y) — pakai thread awal`. 2 test keputusan baru. 72/72 ✓. Catatan: fixture `goodThread()` harus meniru gap emoji prod (8), bukan semua field ber-emoji.
+- 2026-09-24 17:30:00 — S4 SELESAI. Prompt repair dikeraskan: `gapDesc` → `Balasan N (bahasa ID/EN)`; 2 kalimat larangan label ditambahkan (grep `DILARANG mengembalikan label` = 2 match, development.ts:712 + :771). typecheck ✓; lint ✓.
+- 2026-09-24 21:15:00 — S5 SELESAI. `parseThread`: helper `hasExcessIdKeys` (ambang `postCount + 2`) + `isPlaceholderThread` menolak di pintu parse sebelum `normalizePlaceholder`. 3 test baru: duplicate-key → null, skeleton → null, kontrol 7-replies valid → non-null. Catatan proses: 2 edit keliru sempat merusak `parseThread` (sudah diperbaiki, terverifikasi via read + test). 75/75 ✓.
+- 2026-09-24 21:20:00 — S6 SELESAI. `sanitizeThreadText`: CJK replacement `''` → `' '` (`anti过thinking` → `anti thinking`); `CJK_PATTERN` tak disentuh. Test `anti过thinking`/`halo 世界 test`/tanpa-CJK. 76/76 ✓.
+- 2026-09-24 21:30:00 — S8 SELESAI. Gate penuh: `npm run typecheck` ✓ exit 0; `npm run lint` ✓ 0 errors (12 warnings pre-existing); `npm test` ✓ **1141/1141 pass** (114 files); `npm run build` ✓ sukses (93 routes). Selama gate ditemukan 2 masalah di luar scope: (1) `FeaturedProductBoard.test.tsx` flaky (`aria-busy` — `await user.click()` sudah menunggu 50ms setTimeout sehingga state busy hilang sebelum assert) → diperbaiki deterministik dengan deferred promise manual + assert `aria-busy=false` setelah release; (2) `StudioUi.test.tsx` 2 test flaky hanya di bawah beban suite penuh, lulus 31/31 saat isolasi — TIDAK diubah (tidak terkait scope; tercatat di Risks). S7 tetap pending (menunggu eksekusi manusia, OQ-1).
+- 2026-09-24 21:45:00 — S7 SIAP (menunggu eksekusi manusia). Snapshot via MCP read-only terverifikasi: draf masih `threads`/`needs_review`/`fecc3d55…`, `main_id='main'`, 6 replies `reply-1..6`, `affiliate_injections[0].post_index=4`, URL `https://s.shopee.co.id/5fommHcJr9`. Raw attempt-1 `llm_call_logs 03:23:40.552913+00` (len 4128) masih ada. Skrip `scripts/repair-thread-0bcf.mjs` dibuat (TIDAK mengeksekusi DB — hanya cetak SQL) dan berjalan sukses: rekonstruksi 1 main + 7 replies, semua field ≥20 char & bukan label, URL produk tepat 1x di `replies[3]` (post_index 4). **Koreksi dari asumsi plan:** raw attempt-1 punya 2 kemunculan `{{PRODUCT_URL}}` (reply-4 duplikat di `id` DAN `en`), bukan 1 — skrip mengikuti kebijakan repo `normalizePlaceholder` (simpan yang pertama: `replies[3].id`, `en` dihapus). SQL ready: `UPDATE ... WHERE id='0bcf2f6e…' AND generated_thread->'main'->>'id'='main'`. OQ-1 tetap terbuka untuk manusia.
 
 ## Notes
 
