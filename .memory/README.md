@@ -66,7 +66,7 @@ Last updated: 2026-09-24 15:19 WIB (Endpoint Try tab Chat Lab selesai)
 
 ## Recent Entries
 
-- [2026-09-22 114500-error-digest-email-queue.md](2026-09-22/114500-error-digest-email-queue.md) — Digest email error integrasi: queue `error_events` + agregasi 30 menit per kategori via pg_cron tick tiap 5 menit. 8 kategori (tavily/llm/research/automation/scrape/cron_api/resend/image). Configurable via `error_notification_configs`. Admin UI di `/admin/automation`. Email failure langsung dimigrasikan ke queue (Langkah 9). Gate typecheck ✓ lint ✓ 29 test baru ✓. Commit `fe128ee`/`e80a754` pushed.
+- [2026-09-24 151900-endpoint-try-lab-tab.md](2026-09-24/151900-endpoint-try-lab-tab.md) — Tab "Coba Endpoint" di Chat Lab (`/lab/try`): migrasi `endpoint_try_runs`, lib `src/lib/endpoint-try/*` (types, validation SSRF guard, adapters normalisasi OpenAI/Anthropic+SSE, actions CRUD), 2 proxy API (`/api/endpoint-try/models`, `/api/endpoint-try/chat`), halaman server + komponen klien `EndpointTryClient`, tab navigasi di `LabPageClient`, i18n id/en, extend cleanup `/api/lab/cleanup`. Rate limit 30/jam/IP. Gate 68 test baru ✓ typecheck ✓ lint ✓. Commit parent `991013a` + `9557b68`; submodule `12129c6` pushed.
 
 - [2026-09-22 214600-automation-multislot-starvation-fix.md](2026-09-22/214600-automation-multislot-starvation-fix.md) — Fix starvation slot `sore` di `runAutomationTick`: early-return `completed`/`failed` diubah `continue`, ORDER BY deterministik, mock `.in()` ditambah, 3 test regresi (T2a/T2b/T2c) hijau. Gate typecheck+lint+build ✓; 1 test pre-existing fail `blackoutDays=0` (belum diselidiki). Plan handoff untuk review + deploy Vercel + S5 observasi prod.
 
