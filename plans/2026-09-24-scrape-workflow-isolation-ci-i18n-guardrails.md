@@ -61,10 +61,10 @@ Mencegah perubahan source code yang tidak berkaitan dengan scraping—terutama r
 - [x] S5: Ganti `Validate gates` penuh pada `scrape-affiliate.yml` dengan scraper-specific gate.
 - [x] S6: Batasi production workflow ke `main`, ubah permission menjadi `contents: read`, dan pastikan tidak ada langkah push tersembunyi.
 - [x] S7: Tambahkan `.github/workflows/ci.yml` untuk `pull_request` dan `push` ke `main`.
-- [ ] S8: Aktifkan branch protection/ruleset `main` yang mewajibkan status check quality CI.
-- [ ] S9: Jalankan seluruh local gates dan validasi YAML/workflow.
+- [x] S8: Aktifkan branch protection/ruleset `main` yang mewajibkan status check quality CI.
+- [x] S9: Jalankan seluruh local gates dan validasi YAML/workflow.
 - [ ] S10: Trigger satu manual scrape run pada `main` setelah semua gate hijau dan konfirmasi user.
-- [ ] S11: Update memory/progress dan catat hasil verifikasi.
+- [x] S11: Update memory/progress dan catat hasil verifikasi.
 
 ## Detailed Implementation Design
 
@@ -293,6 +293,7 @@ Acceptance criteria run:
 
 - 2026-09-24 22:16:36 — Baseline selesai: run `35974520812` gagal pada full test gate akibat duplikasi key `lab`; scrape/DB/asset steps hijau. Main saat ini sudah memiliki `80958c8`, tetapi belum ada post-fix workflow run; `main` belum protected dan belum ada ruleset. Plan implementasi dibuat; belum ada kode atau workflow yang diubah oleh plan ini.
 - 2026-09-24 22:41:11 — Implementasi lokal S1-S7 selesai: `jsonc-parser` + validator duplicate-key, `validate:messages`, fixture tests, scraper syntax/test gate, `vitest.scrape.config.ts`, full CI workflow, dan scrape workflow isolation. `npm run validate:messages`, `npm run check:scraper`, `npm run test:scrape`, `npm test`, `npm run typecheck`, `npm run lint`, dan `npm run build` semuanya hijau (lint/build hanya warning pre-existing). S8 branch protection, S9 final remote workflow validation, dan S10 production run masih pending.
+- 2026-09-24 22:46:38 — S8-S11 selesai: commit `1fb448a` dipush, Quality CI run `36022241163` success, kedua workflow terdaftar, YAML kedua workflow tervalidasi, dan `main` sekarang mewajibkan check `Quality` dengan strict up-to-date branch, admin enforcement, serta melarang force-push/delete. S10 tetap pending karena manual scrape production menulis DB/Storage dan memerlukan persetujuan eksplisit user.
 
 ## Notes
 
