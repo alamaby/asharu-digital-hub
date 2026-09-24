@@ -22,17 +22,17 @@ Keputusan user yang sudah final (Q&A 2026-09-24): penempatan = tab baru di `/lab
 
 ## Tasks
 
-- [ ] Langkah 0 — Baseline gate (read-only, tanpa ubah kode)
-- [ ] Langkah 1 — Migrasi `endpoint_try_runs` (submodule `supabase/`)
-- [ ] Langkah 2 — `src/lib/endpoint-try/types.ts` (tipe baru)
-- [ ] Langkah 3 — `src/lib/endpoint-try/validation.ts` + test (zod + SSRF guard murni)
-- [ ] Langkah 4 — `src/lib/endpoint-try/adapters.ts` + test (normalisasi OpenAI/Anthropic + SSE parser)
-- [ ] Langkah 5 — `POST /api/endpoint-try/models` (proxy list model)
-- [ ] Langkah 6 — `POST /api/endpoint-try/chat` (proxy chat non-stream + stream)
-- [ ] Langkah 7 — `src/lib/endpoint-try/actions.ts` + test (riwayat DB tanpa key)
-- [ ] Langkah 8 — UI `/lab/try` + tab + i18n id/en + test komponen
-- [ ] Langkah 9 — Cleanup expired via `/api/lab/cleanup`
-- [ ] Langkah 10 — Gate final + commit submodule dulu + push
+- [x] Langkah 0 — Baseline gate (read-only, tanpa ubah kode)
+- [x] Langkah 1 — Migrasi `endpoint_try_runs` (submodule `supabase/`)
+- [x] Langkah 2 — `src/lib/endpoint-try/types.ts` (tipe baru)
+- [x] Langkah 3 — `src/lib/endpoint-try/validation.ts` + test (zod + SSRF guard murni)
+- [x] Langkah 4 — `src/lib/endpoint-try/adapters.ts` + test (normalisasi OpenAI/Anthropic + SSE parser)
+- [x] Langkah 5 — `POST /api/endpoint-try/models` (proxy list model)
+- [x] Langkah 6 — `POST /api/endpoint-try/chat` (proxy chat non-stream + streaming SSE)
+- [x] Langkah 7 — `src/lib/endpoint-try/actions.ts` + test (riwayat DB tanpa key)
+- [x] Langkah 8 — UI `/lab/try` + tab + i18n id/en
+- [x] Langkah 9 — Cleanup expired via `/api/lab/cleanup`
+- [x] Langkah 10 — Gate final + commit submodule dulu (`12129c6`) + push parent (`991013a`)
 
 ---
 
