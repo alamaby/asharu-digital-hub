@@ -294,6 +294,7 @@ Acceptance criteria run:
 - 2026-09-24 22:16:36 — Baseline selesai: run `35974520812` gagal pada full test gate akibat duplikasi key `lab`; scrape/DB/asset steps hijau. Main saat ini sudah memiliki `80958c8`, tetapi belum ada post-fix workflow run; `main` belum protected dan belum ada ruleset. Plan implementasi dibuat; belum ada kode atau workflow yang diubah oleh plan ini.
 - 2026-09-24 22:41:11 — Implementasi lokal S1-S7 selesai: `jsonc-parser` + validator duplicate-key, `validate:messages`, fixture tests, scraper syntax/test gate, `vitest.scrape.config.ts`, full CI workflow, dan scrape workflow isolation. `npm run validate:messages`, `npm run check:scraper`, `npm run test:scrape`, `npm test`, `npm run typecheck`, `npm run lint`, dan `npm run build` semuanya hijau (lint/build hanya warning pre-existing). S8 branch protection, S9 final remote workflow validation, dan S10 production run masih pending.
 - 2026-09-24 22:46:38 — S8-S11 selesai: commit `1fb448a` dipush, Quality CI run `36022241163` success, kedua workflow terdaftar, YAML kedua workflow tervalidasi, dan `main` sekarang mewajibkan check `Quality` dengan strict up-to-date branch, admin enforcement, serta melarang force-push/delete. S10 tetap pending karena manual scrape production menulis DB/Storage dan memerlukan persetujuan eksplisit user.
+- 2026-09-24 22:48:00 — User memilih menunggu run terjadwal; tidak dipicu manual production scrape. Validasi end-to-end scrape berikutnya dilakukan oleh cron `0 3 * * *` di `main`.
 
 ## Notes
 
