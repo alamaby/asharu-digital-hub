@@ -62,6 +62,10 @@ export const routing = defineRouting({
       id: '/lab/[batchId]',
       en: '/lab/[batchId]'
     },
+    '/lab/try': {
+      id: '/lab/try',
+      en: '/lab/try'
+    },
     '/konten/review': {
       id: '/konten/review',
       en: '/content/review'

@@ -72,6 +72,38 @@ export function LabPageClient({ locale, timeZone, options, quota, initialPage, s
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('title')}</h1>
       <p className="mt-2 text-base leading-relaxed text-ink-muted">{t('intro')}</p>
 
+      {/* Tab navigation */}
+      <nav aria-label={tNav('chatLab')} className="mt-6 border-b border-line">
+        <ul className="flex gap-0">
+          <li>
+            <Link
+              href={{ pathname: '/lab' }}
+              locale={locale as 'id' | 'en'}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                '/lab' === '/lab'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ink-muted hover:border-line hover:text-ink'
+              }`}
+            >
+              {t('tabCompare')}
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={{ pathname: '/lab/try' }}
+              locale={locale as 'id' | 'en'}
+              className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                '/lab/try' === '/lab/try'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ink-muted hover:border-line hover:text-ink'
+              }`}
+            >
+              {t('tabTry')}
+            </Link>
+          </li>
+        </ul>
+      </nav>
+
       {error ? (
         <p role="alert" className="mt-4 text-sm text-red-600">
           {error}
