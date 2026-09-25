@@ -17,6 +17,7 @@
   - Pin `llm_stage_defaults.image_prompt` → provider cloudflare / `@cf/aisingapore/gemma-sea-lion-v4-27b-it` (applied prod via MCP; soft waterfall tetap jalan bila pin gagal).
   - `src/lib/llm/fetch-timeout.ts` (baru) — `fetchWithTimeout` + `LLM_CALL_TIMEOUT_MS=90_000`, dipakai `providers/openai-compatible.ts`, `cloudflare.ts`, `gemini.ts` agar 1 provider lambat gagal cepat & waterfall lanjut (bukan menghabiskan budget 300s tick).
 - Key files: (lihat daftar di atas) + tests: `worker.test.ts` (3 test reaper), `runner.test.ts` (3 test ensureCover pending-exhausted), `fetch-timeout.test.ts` (4 test).
-- Verification: typecheck ✓, lint ✓ (0 error), **118 file / 1165 tests ✓**, prod terverifikasi end-to-end (cover render → artikel published).
+- Verification: typecheck ✓, lint ✓ (0 error), validate:messages ✓, build ✓, **118 file / 1165 tests ✓**, prod terverifikasi end-to-end (cover render → artikel published).
 - Catatan: `retryFailedImage` tetap tidak menyentuh pending yang masih claimable; guard 10 menit di reaper penting agar tidak bentrok dengan tick lain.
-- [USER ACTION] Deploy Vercel agar reaper + tombol Ulangi + timeout aktif di prod.
+- Shipped: commit `7ec7841` → PR #4 (squash-merged `d7726ae` ke `main`, branch dihapus) → CI Quality ✓ → Vercel Production deploy ✓. Verifikasi pasca-deploy via MCP: 0 baris `pending` macet (sisa 94 `failed` lama 12–14 Sep yang sudah punya tombol Ulangi + 426 `prompt_ready` = antrean normal user-driven).
+- Sisa opsional: 426 baris `prompt_ready` adalah desain (reasoning siap, menunggu user klik Generate) — bukan bug. `cover_max_wait_minutes` 60 di `automation_configs` bisa diturunkan bila ingin fail-fast lebih cepat pada incident provider berikutnya.
