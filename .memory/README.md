@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-24 22:46 WIB (Scrape workflow isolation + CI/i18n guardrails)
+Last updated: 2026-09-25 08:25 WIB (Endpoint Try upstream path prefix fix)
 
 ## Current State
 
@@ -68,6 +68,8 @@ Last updated: 2026-09-24 22:46 WIB (Scrape workflow isolation + CI/i18n guardrai
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-25 082500-endpoint-try-upstream-path-prefix.md](2026-09-25/082500-endpoint-try-upstream-path-prefix.md) — Fix proxy `/lab/try` buang path prefix: `joinUpstreamPath` pertahankan prefix (BlazeAPI `/paid/v1` → `/paid/v1/chat/completions`). Gate typecheck ✓ 1155 tests ✓.
 
 - [2026-09-24 224500-lab-try-metrics-history-fix.md](2026-09-24/224500-lab-try-metrics-history-fix.md) — Fix `/lab/try`: migrasi `endpoint_try_runs` applied prod via MCP (tabel hilang = akar error schema cache) + pesan ramah + `Promise.allSettled`; metrik MetricBox ala Lab Chat + latensi List Model + latensi stream real + fix duplikasi teks stream; riwayat DB-driven (filter status/kind/model, sort, pagination). Gate typecheck ✓ 1152 tests ✓.
 

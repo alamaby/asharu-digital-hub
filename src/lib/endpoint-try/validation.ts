@@ -132,6 +132,17 @@ export function assertAllowedBaseUrl(baseUrl: string): {
   };
 }
 
+/** Gabung base URL (prefix path dipertahankan) dengan suffix endpoint.
+ * Contoh: base `https://api.blazeapi.org/paid/v1` + `/chat/completions`
+ * → `https://api.blazeapi.org/paid/v1/chat/completions`.
+ * Bila base sudah diakhiri suffix yang sama, tidak digandakan. */
+export function joinUpstreamPath(base: string, suffix: string): string {
+  const withoutQuery = base.split(/[?#]/, 1)[0] ?? base;
+  const b = withoutQuery.replace(/\/+$/, '');
+  if (b.toLowerCase().endsWith(suffix.toLowerCase())) return b;
+  return `${b}${suffix}`;
+}
+
 /** Redaksi substring sensitif dari pesan error agar tidak bocor ke respon/client. */
 export function sanitizeErrorMessage(
   msg: string,
