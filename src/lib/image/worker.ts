@@ -12,7 +12,17 @@ import {
 import { buildImagePromptMessages, parseImagePrompt, validateImagePromptContradiction, mergeImageNegativePrompts, buildComposeReviewMessages, parseComposeReview } from './prompt';
 import type { ImageReasoning, ComposeAudit } from './prompt';
 import { fetchRemoteImage, uploadDraftImage } from './storage';
-import { ImageHttpError, bytesToBase64, clampImg2ImgStrength, modelRendersText, modelSupportsReference, resolveEffectiveAdvanced, stripNoTextClause } from './types';
+import {
+  IMAGE_MAX_ATTEMPTS,
+  IMAGE_STUCK_MINUTES,
+  ImageHttpError,
+  bytesToBase64,
+  clampImg2ImgStrength,
+  modelRendersText,
+  modelSupportsReference,
+  resolveEffectiveAdvanced,
+  stripNoTextClause
+} from './types';
 import type {
   DraftImageRow,
   ImageAspect,
@@ -20,7 +30,7 @@ import type {
   ImageProviderRow
 } from './types';
 
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = IMAGE_MAX_ATTEMPTS;
 
 interface DraftRow {
   id: string;
@@ -108,6 +118,37 @@ async function failImage(imageId: string, message: string): Promise<void> {
     .from('content_draft_images')
     .update({ status: 'failed', last_error: message.slice(0, 500), updated_at: new Date().toISOString() })
     .eq('id', imageId);
+}
+
+/**
+ * Reaper baris `pending` yang kehabisan attempts.
+ *
+ * Kasus 2d2a5b31: tick worker diklaim (attempts++) lalu invocation dibunuh
+ * (maxDuration) sebelum hasil apa pun tersimpan — status tetap `pending`,
+ * `last_error` NULL. Setelah attempts mencapai MAX, claim mensyaratkan
+ * `attempts < MAX` sehingga baris itu tak akan pernah diproses lagi dan UI
+ * hanya menampilkan "menunggu worker" selamanya. Reaper mengubahnya jadi
+ * `failed` + pesan jujur agar tombol Ulangi muncul dan automation tidak
+ * menunggu sia-sia.
+ *
+ * Guard `updated_at < now - IMAGE_STUCK_MINUTES`: baris yang baru saja diklaim
+ * tick lain tidak boleh ditandai (masih diproses).
+ */
+export async function reapStuckImages(): Promise<number> {
+  const supabase = getServiceClient();
+  const cutoff = new Date(Date.now() - IMAGE_STUCK_MINUTES * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from('content_draft_images')
+    .update({
+      status: 'failed',
+      last_error: `worker tick timeout/terputus — attempts habis (${MAX_ATTEMPTS}/${MAX_ATTEMPTS}), tekan Ulangi`,
+      updated_at: new Date().toISOString()
+    })
+    .eq('status', 'pending')
+    .gte('attempts', MAX_ATTEMPTS)
+    .lt('updated_at', cutoff)
+    .select('id');
+  return Array.isArray(data) ? data.length : 0;
 }
 
 async function loadDraftContext(draftId: string): Promise<{
@@ -293,6 +334,10 @@ async function defaultModel(providerId: string, preferredModelId?: string, needs
  * Kembalikan image id bila sukses, null bila tidak ada kerja / gagal jujur.
  */
 export async function processImageTick(): Promise<{ imageId: string | null; processed: number; error?: string }> {
+  // Reaper dulu: baris pending yang kehabisan attempts (tick sebelumnya
+  // terputus di tengah) dipulihkan jadi `failed` + pesan jujur agar bisa
+  // di-ulang user / di-requeue automation.
+  await reapStuckImages();
   // Dua jalur per tick agar Generate manual tak diblokir reasoning cover
   // auto (kasus e5866cc7: manual antre di belakang 20 cover). Generate
   // diproses dulu (prioritas user), lalu 1 reasoning bila ada.

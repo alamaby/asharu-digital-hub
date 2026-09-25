@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-25 08:25 WIB (Endpoint Try upstream path prefix fix)
+Last updated: 2026-09-25 20:15 WIB (Image stuck-pending reaper + LLM call timeout)
 
 ## Current State
 
@@ -37,6 +37,7 @@ Last updated: 2026-09-25 08:25 WIB (Endpoint Try upstream path prefix fix)
 ## Open Items / Blockers
 
 - [ ] **Pulihkan draf threads `0bcf2f6e` [USER ACTION]:** guard sudah terpasang (`fix(research)`), tapi datanya masih rusak. Jalankan `node scripts/repair-thread-0bcf.mjs` (hanya CETAK SQL, tidak menyentuh DB), review output, lalu eksekusi statement `UPDATE ... WHERE id='0bcf2f6e…' AND generated_thread->'main'->>'id'='main'` manual via Supabase SQL editor. Sesudah itu: cek `/id/konten/review/0bcf2f6e-cf39-4c21-83b4-0c1e6e4b0862` tab ID berisi Indonesia. Setelah update, `replies[0].en` masih beraksen Indonesia (artefak duplicate-key LLM) — opsional diedit manual.
+- [ ] **Deploy Vercel — reaper image macet + timeout LLM [USER ACTION]:** `reapStuckImages()` (pending attempts habis → `failed` + tombol Ulangi), `retryFailedImage` terima pending-exhausted, badge "Macet" di carousel, `ensureCover` requeue pending macet, dan `fetchWithTimeout` 90s di provider LLM baru aktif SETELAH deploy. Data prod sudah dipulihkan (row `546a8a47` → `selected`, artikel `9570ef9c` published); pin `llm_stage_defaults.image_prompt` → cloudflare gemma-sea-lion sudah applied via MCP. Setelah deploy: pantau `/id/konten/review` — tak boleh ada lagi baris "Antre" menggantung >10 menit tanpa aksi.
 - [ ] **Deploy Vercel [USER ACTION]:** guard `shouldAcceptRepairThread` + `parseThread` hardening baru aktif setelah deploy. Verifikasi tidak ada draf threads baru ber-`id` placeholder setelah 1 run automation.
 
 - [ ] **Verifikasi live Chat Lab [USER ACTION]:** login → `/id/lab` submit 1–2 target → cek hasil side-by-side + history + stats; anon harus redirect `/masuk`. Opsional: cek cron `asharu-lab-cleanup` di Supabase Dashboard → Cron Jobs.
@@ -68,6 +69,8 @@ Last updated: 2026-09-25 08:25 WIB (Endpoint Try upstream path prefix fix)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-25 201500-image-stuck-pending-reaper.md](2026-09-25/201500-image-stuck-pending-reaper.md) — RCA "visualisasi draf `2d2a5b31` tidak berhasil": baris cover `pending` + `attempts=3` macet permanen (claim mensyaratkan `attempts<3`, status bukan `failed` → UI tak punya tombol Ulangi) karena tick worker (maxDuration 300s) dibunuh saat waterfall LLM terdepan naraya/agnes menggantung 138–300s (fallback cloudflare sehat 3–20s). Fix A recovery prod (row → `selected`, draf `approved`, run `3189f7c5` pulih → artikel published). Fix B: `IMAGE_MAX_ATTEMPTS`/`isExhaustedPending` shared, `reapStuckImages()` di awal `processImageTick`, `retryFailedImage` terima pending-exhausted, badge "Macet" + tombol Ulangi di carousel, `ensureCover` requeue pending macet (anti tunggu 60 menit). Fix C: pin stage `image_prompt` → cloudflare gemma-sea-lion (applied prod) + `fetchWithTimeout` 90s di 3 provider LLM. Gate typecheck ✓ lint ✓ 1165 tests ✓. [USER ACTION] Deploy Vercel.
 
 - [2026-09-25 082500-endpoint-try-upstream-path-prefix.md](2026-09-25/082500-endpoint-try-upstream-path-prefix.md) — Fix proxy `/lab/try` buang path prefix: `joinUpstreamPath` pertahankan prefix (BlazeAPI `/paid/v1` → `/paid/v1/chat/completions`). Gate typecheck ✓ 1155 tests ✓.
 
