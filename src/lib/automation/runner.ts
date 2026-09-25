@@ -10,6 +10,7 @@ import { isRunDue, localDateString, pickRandomProduct, blackoutCutoff } from './
 import { loadEnabledSlots, mergeSlotParams, isSlotDue } from './schedules';
 import { sendDraftReadyEmail, sendPublishedEmail, logAutomationEmail } from './email';
 import { reportError } from '@/lib/notifications/error-events';
+import { IMAGE_MAX_ATTEMPTS } from '@/lib/image/types';
 
 export type AutomationRunStatus =
   | 'session_created'
@@ -956,6 +957,24 @@ async function ensureCover(
       .update({ status: 'pending', attempts: 0, last_error: null, updated_at: new Date().toISOString() })
       .eq('id', row.id);
     await updateRun(supabase, run.id, { cover_attempts: run.cover_attempts + 1 });
+    return 'waiting';
+  }
+
+  // Pending macet: attempts habis (claim worker mensyaratkan attempts < max)
+  // → tak akan pernah dirender lagi. Requeue selama budget masih ada agar
+  // automation tidak menunggu 60 menit sia-sia (kasus 2d2a5b31).
+  if (row.status === 'pending' && row.attempts >= IMAGE_MAX_ATTEMPTS) {
+    if (run.cover_attempts >= cfg.coverMaxAttempts) {
+      return failCover(supabase, cfg, run, `cover macet ${run.cover_attempts}x: ${row.last_error ?? 'attempts habis tanpa error'}`);
+    }
+    if (timedOut) return failCover(supabase, cfg, run, 'cover macet & melewati batas waktu');
+    await supabase
+      .from('content_draft_images')
+      .update({ status: 'pending', attempts: 0, last_error: null, updated_at: new Date().toISOString() })
+      .eq('id', row.id);
+    await updateRun(supabase, run.id, { cover_attempts: run.cover_attempts + 1 });
+    await log(supabase, run.session_id, 'automation', 'warn',
+      `cover macet (attempts habis) — requeue ${run.cover_attempts + 1}/${cfg.coverMaxAttempts}`);
     return 'waiting';
   }
 

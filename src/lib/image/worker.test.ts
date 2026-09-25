@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, unknown>;
-type Filter = { op: 'eq' | 'neq' | 'lt' | 'in'; col: string; val: unknown };
+type Filter = { op: 'eq' | 'neq' | 'lt' | 'gte' | 'in'; col: string; val: unknown };
 
 const { dbRef } = vi.hoisted(() => ({
   dbRef: { current: null as unknown as { images: Row[]; drafts: Row[]; providers: Row[]; models: Row[] } }
@@ -61,7 +61,7 @@ vi.mock('@/lib/image/storage', () => ({
   uploadDraftImage: vi.fn(async () => ({ storagePath: 'd/img.png', publicUrl: 'https://cdn.test/img.png' }))
 }));
 
-import { claimPendingImage, processImageTick } from './worker';
+import { claimPendingImage, processImageTick, reapStuckImages } from './worker';
 
 function matches(r: Row, filters: Filter[]): boolean {
   return filters.every(({ op, col, val }) => {
@@ -69,6 +69,7 @@ function matches(r: Row, filters: Filter[]): boolean {
     if (op === 'eq') return v === val;
     if (op === 'neq') return v !== val;
     if (op === 'lt') return (v as number) < (val as number);
+    if (op === 'gte') return (v as number) >= (val as number);
     if (op === 'in') return (val as unknown[]).includes(v);
     return true;
   });
@@ -91,6 +92,7 @@ function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models
     let countHead = false;
     let patch: Row | null = null;
     let inserted: Row[] = [];
+    let selectedAfterPatch = false;
     const applyView = (): Row[] => {
       let out = inserted.length > 0 ? inserted : rows.filter((r) => matches(r, filters));
       for (const o of orders) {
@@ -108,11 +110,13 @@ function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models
     const api: any = {
       select(_cols: string, opts?: { count?: string; head?: boolean }) {
         if (opts?.count === 'exact' && opts?.head) countHead = true;
+        if (patch) selectedAfterPatch = true;
         return api;
       },
       eq: (c: string, v: unknown) => { filters.push({ op: 'eq', col: c, val: v }); return api; },
       neq: (c: string, v: unknown) => { filters.push({ op: 'neq', col: c, val: v }); return api; },
       lt: (c: string, v: unknown) => { filters.push({ op: 'lt', col: c, val: v }); return api; },
+      gte: (c: string, v: unknown) => { filters.push({ op: 'gte', col: c, val: v }); return api; },
       in: (c: string, v: unknown) => { filters.push({ op: 'in', col: c, val: v }); return api; },
       order: (c: string, o?: { ascending?: boolean }) => { orders.push({ col: c, asc: o?.ascending !== false }); return api; },
       limit: (n: number) => { limitN = n; return api; },
@@ -143,8 +147,11 @@ function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models
         // `await builder` langsung: update tanpa select (failImage, demote,
         // set selected, content_drafts) maupun count head enqueue.
         if (patch) {
-          for (const t of rows.filter((r) => matches(r, filters))) Object.assign(t, patch);
-          res({ data: null, error: null });
+          const targets = rows.filter((r) => matches(r, filters));
+          for (const t of targets) Object.assign(t, patch);
+          // update().select() → kembalikan baris yang berubah (reaper butuh
+          // jumlah baris ter-update).
+          res({ data: selectedAfterPatch ? targets : null, error: null });
         } else if (countHead) res({ data: null, error: null, count: rows.filter((r) => matches(r, filters)).length });
         else res({ data: applyView(), error: null });
       }
@@ -218,6 +225,52 @@ describe('claimPendingImage lanes', () => {
     // attempts naik → lt(3) masih lolos, tapi excludeId menolaknya.
     const second = await claimPendingImage('generate', first?.id ?? null);
     expect(second).toBeNull();
+  });
+});
+
+describe('reapStuckImages', () => {
+  it('pending kehabisan attempts & lama → failed + pesan jujur', async () => {
+    seedDb([
+      image({
+        id: 'stuck',
+        image_prompt: 'a photo of a room',
+        attempts: 3,
+        updated_at: '2026-09-14T07:00:00Z'
+      })
+    ]);
+    const n = await reapStuckImages();
+    expect(n).toBe(1);
+    const row = dbRef.current.images.find((r) => r.id === 'stuck');
+    expect(row?.status).toBe('failed');
+    expect(String(row?.last_error)).toMatch(/attempts habis/);
+  });
+
+  it('pending attempts 3 tapi baru saja disentuh (masih diproses) → dibiarkan', async () => {
+    seedDb([
+      image({
+        id: 'fresh',
+        image_prompt: 'a photo of a room',
+        attempts: 3,
+        updated_at: new Date().toISOString()
+      })
+    ]);
+    const n = await reapStuckImages();
+    expect(n).toBe(0);
+    expect(dbRef.current.images[0]?.status).toBe('pending');
+  });
+
+  it('pending attempts < max → tidak disentuh', async () => {
+    seedDb([
+      image({
+        id: 'young',
+        image_prompt: 'a photo of a room',
+        attempts: 1,
+        updated_at: '2026-09-14T07:00:00Z'
+      })
+    ]);
+    const n = await reapStuckImages();
+    expect(n).toBe(0);
+    expect(dbRef.current.images[0]?.status).toBe('pending');
   });
 });
 

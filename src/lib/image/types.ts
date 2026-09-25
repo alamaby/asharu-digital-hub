@@ -75,6 +75,25 @@ export const IMG2IMG_MAX_NUM_STEPS = 20;
 export const IMG2IMG_MIN_DIMENSION = 256;
 export const IMG2IMG_MAX_DIMENSION = 2048;
 
+/**
+ * Batas klaim worker image sebelum baris `pending` dianggap macet.
+ * Dipakai server (claim + reaper) DAN client (badge "macet" + tombol Ulangi)
+ * agar keduanya sepakat kapan sebuah baris berhenti diproses.
+ */
+export const IMAGE_MAX_ATTEMPTS = 3;
+
+/** Baris pending dianggap macet bila tak tersentuh selama ini (menit). */
+export const IMAGE_STUCK_MINUTES = 10;
+
+/**
+ * True bila baris `pending` sudah kehabisan attempts: claim worker mensyaratkan
+ * `attempts < IMAGE_MAX_ATTEMPTS`, jadi baris seperti ini tidak akan pernah
+ * diproses lagi — UI harus menawarkan Ulangi, bukan "menunggu worker".
+ */
+export function isExhaustedPending(status: string, attempts: number | null | undefined): boolean {
+  return status === 'pending' && (attempts ?? 0) >= IMAGE_MAX_ATTEMPTS;
+}
+
 /** Batas upload referensi (5MB → b64 ~6.7MB, masih dalam timeout 60s). */
 export const REFERENCE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const REFERENCE_IMAGE_ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;

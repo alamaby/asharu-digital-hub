@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { REFERENCE_IMAGE_ALLOWED_MIME, REFERENCE_IMAGE_MAX_BYTES, clampImg2ImgStrength } from './types';
+import { REFERENCE_IMAGE_ALLOWED_MIME, REFERENCE_IMAGE_MAX_BYTES, clampImg2ImgStrength, isExhaustedPending } from './types';
 import { uploadDraftImage, uploadDraftReference } from './storage';
 import type { DraftImageRow } from './types';
 import { truncateImagePrompt } from './prompt';
@@ -300,9 +300,11 @@ export async function generatePostImage(
 }
 
 /**
- * Ulangi image yang failed (generik — mis. image_prompt no JSON): kembalikan ke
+ * Ulangi image yang gagal (generik — mis. image_prompt no JSON): kembalikan ke
  * antrean pending agar worker cron memproses ulang (attempts direset).
- * Hanya baris failed; baris aktif (pending/prompt_ready/ready/selected) ditolak
+ * Menerima baris `failed` DAN baris `pending` yang kehabisan attempts (macet
+ * karena tick terputus — reaper/claim tak akan menyentuhnya lagi). Baris aktif
+ * lain (prompt_ready/ready/selected, pending yang masih bisa diklaim) ditolak
  * agar tidak duplikat antrean.
  */
 export async function retryFailedImage(imageId: string): Promise<{ imageId: string }> {
@@ -310,17 +312,18 @@ export async function retryFailedImage(imageId: string): Promise<{ imageId: stri
   if (!imageId) throw new Error('imageId required');
   const { data: row } = await supabase
     .from('content_draft_images')
-    .select('id, status, draft_id')
+    .select('id, status, draft_id, attempts')
     .eq('id', imageId)
     .maybeSingle();
-  const r = row as { id: string; status: string; draft_id: string } | null;
+  const r = row as { id: string; status: string; draft_id: string; attempts: number } | null;
   if (!r) throw new Error('image not found');
-  if (r.status !== 'failed') throw new Error('hanya image failed yang bisa diulang');
+  const retryable = r.status === 'failed' || isExhaustedPending(r.status, r.attempts);
+  if (!retryable) throw new Error('hanya image failed/macet yang bisa diulang');
   const { error } = await supabase
     .from('content_draft_images')
     .update({ status: 'pending', attempts: 0, last_error: null, updated_at: new Date().toISOString() })
     .eq('id', imageId)
-    .eq('status', 'failed');
+    .in('status', ['failed', 'pending']);
   if (error) throw new Error(error.message);
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');

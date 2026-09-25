@@ -1,5 +1,6 @@
 import type { ChatInput, ChatOutput, LLMProvider, ProviderSlug } from '../types';
 import { LLMHttpError } from '../types';
+import { fetchWithTimeout } from '../fetch-timeout';
 
 export class OpenAICompatibleProvider implements LLMProvider {
   constructor(
@@ -22,7 +23,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       // Also include `extra_body` style for OpenRouter-compatible gateways
       (body as Record<string, unknown>).extra_body = { reasoning: { effort: input.reasoningEffort } };
     }
-    const res = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    const res = await fetchWithTimeout(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

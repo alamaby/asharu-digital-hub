@@ -1,5 +1,6 @@
 import type { ChatInput, ChatOutput, LLMProvider } from '../types';
 import { LLMHttpError } from '../types';
+import { fetchWithTimeout } from '../fetch-timeout';
 
 export class CloudflareProvider implements LLMProvider {
   readonly slug = 'cloudflare' as const;
@@ -19,7 +20,7 @@ export class CloudflareProvider implements LLMProvider {
     const url = this.baseUrl
       .replace('{account_id}', encodeURIComponent(this.accountId))
       .replace(/\/$/, '') + `/run/${input.model}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

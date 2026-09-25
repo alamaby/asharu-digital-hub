@@ -1,6 +1,7 @@
 import type { ChatInput, ChatOutput, LLMProvider } from '../types';
 import { LLMHttpError } from '../types';
 import { buildThinkingConfig } from '../model-config';
+import { fetchWithTimeout } from '../fetch-timeout';
 
 export class GeminiProvider implements LLMProvider {
   readonly slug = 'gemini' as const;
@@ -31,7 +32,7 @@ export class GeminiProvider implements LLMProvider {
       responseMimeType: 'application/json'
     };
     if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({

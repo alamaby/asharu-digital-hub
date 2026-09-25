@@ -610,6 +610,95 @@ describe('runAutomationTick (thin-content gate)', () => {
   });
 });
 
+describe('ensureCover (pending macet / attempts habis)', () => {
+  /** Run sudah di awaiting_cover dengan baris cover pending attempts habis. */
+  function stuckCoverTables(over: { attempts?: number; coverAttempts?: number } = {}) {
+    return {
+      automation_configs: [baseConfig({ notify_on: 'none' })],
+      automation_runs: [
+        {
+          id: 'run1',
+          run_date: '2026-09-16',
+          status: 'awaiting_cover',
+          attempts: 0,
+          session_id: 's1',
+          article_draft_id: 'd1',
+          cover_attempts: over.coverAttempts ?? 0,
+          // ensureCover menghitung timeout dari Date.now() asli → pakai waktu
+          // sekarang agar timedOut=false (yang diuji: cabang attempts habis).
+          cover_started_at: new Date().toISOString(),
+          draft_ready_notified_at: '2026-09-16T03:00:00Z',
+          published_at: null,
+          notified_at: null,
+          error_message: null
+        }
+      ],
+      content_research_sessions: [{ id: 's1', status: 'completed' }],
+      content_drafts: [
+        {
+          id: 'd1',
+          research_topic_id: 't1',
+          platform_slug: 'artikel',
+          llm_meta: { thin_content: false, word_count: { id: 910 } }
+        }
+      ],
+      content_draft_images: [
+        {
+          id: 'img1',
+          draft_id: 'd1',
+          post_index: 0,
+          status: 'pending',
+          attempts: over.attempts ?? 3,
+          last_error: null,
+          created_at: '2026-09-16T02:00:00Z'
+        }
+      ],
+      content_research_logs: []
+    };
+  }
+
+  it('pending attempts habis → requeue (attempts 0) + cover_attempts naik, tidak menunggu 60 menit', async () => {
+    const tables = stuckCoverTables();
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true });
+    const run = tables.automation_runs[0] as Record<string, unknown>;
+    // Masih menunggu render, bukan gagal.
+    expect(run.status).toBe('awaiting_cover');
+    expect(run.cover_attempts).toBe(1);
+    const img = tables.content_draft_images[0] as Record<string, unknown>;
+    expect(img.attempts).toBe(0);
+    expect(img.status).toBe('pending');
+  });
+
+  it('pending attempts habis & budget cover habis → failCover jujur', async () => {
+    const tables = stuckCoverTables({ coverAttempts: 3 });
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true });
+    const run = tables.automation_runs[0] as Record<string, unknown>;
+    expect(run.status).toBe('failed');
+    expect(String(run.error_message)).toMatch(/macet/);
+  });
+
+  it('pending masih punya attempts → tetap menunggu worker (tidak di-requeue)', async () => {
+    const tables = stuckCoverTables({ attempts: 1 });
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never, {
+      now: new Date('2026-09-16T03:05:00Z')
+    });
+    expect(res).toMatchObject({ ok: true });
+    const run = tables.automation_runs[0] as Record<string, unknown>;
+    expect(run.status).toBe('awaiting_cover');
+    expect(run.cover_attempts).toBe(0);
+    expect((tables.content_draft_images[0] as Record<string, unknown>).attempts).toBe(1);
+  });
+});
+
 describe('runAutomationTick (email observability + jujur notified_at)', () => {
   function basePublishedTable(overrides: Row = {}): Record<string, Row[]> {
     return {

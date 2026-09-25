@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DraftImageRow } from '@/lib/image/types';
+import { isExhaustedPending } from '@/lib/image/types';
 import { DEFAULT_TIMEZONE, formatDateTimeSeconds } from '@/lib/utils/format';
 import { requestedImageModelUuid } from '@/lib/image/requested-label';
 
@@ -60,6 +61,16 @@ function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string
     };
   }
   if (img.status === 'pending') {
+    // Macet = attempts habis: claim worker mensyaratkan attempts < max, jadi
+    // baris ini tak akan pernah diproses lagi — jangan tampilkan "menunggu".
+    if (isExhaustedPending(img.status, img.attempts)) {
+      return {
+        cls: 'border-red-300 bg-red-50 text-red-700',
+        text: img.last_error
+          ? `Macet — ${img.last_error}`
+          : 'Macet: percobaan worker habis (tick terputus). Tekan Ulangi untuk mengantre lagi.'
+      };
+    }
     return {
       cls: 'border-amber-300 bg-amber-50 text-amber-800',
       text: 'Masuk antrean — worker cron memproses ≤5 menit. Tekan Muat ulang untuk cek hasil.'
@@ -95,8 +106,12 @@ function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptio
   return `${model.provider_slug} · ${model.model_id} ${suffix}${styleSuffix}`;
 }
 /** Baris kedua timeline per status (selain "Masuk antrean"). Null = tak ada. */
-function stageLineFor(status: string, updatedAt: string): string | null {
-  if (status === 'pending') return 'Menunggu diproses worker…';
+function stageLineFor(status: string, updatedAt: string, attempts?: number | null): string | null {
+  if (status === 'pending') {
+    return isExhaustedPending(status, attempts)
+      ? 'Macet — percobaan worker habis.'
+      : 'Menunggu diproses worker…';
+  }
   if (status === 'prompt_ready') return `Draf prompt siap: ${updatedAt}`;
   if (status === 'ready' || status === 'selected') return `Selesai dibuat: ${updatedAt}`;
   if (status === 'failed') return `Terakhir dicoba: ${updatedAt}`;
@@ -252,7 +267,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
             const imageBroken = broken.has(img.id);
             const ph = placeholderFor(img, imageBroken);
             const hasImage = Boolean(img.public_url) && !imageBroken;
-            const stageLine = stageLineFor(img.status, fmtTime(img.updated_at));
+            const stageLine = stageLineFor(img.status, fmtTime(img.updated_at), img.attempts);
             return (
               <div
                 key={img.id}
@@ -276,9 +291,14 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                 )}
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${STATUS_BADGE[img.status] ?? 'bg-surface text-ink-muted'}`}>
-                    {IMAGE_STATUS_LABEL[img.status] ?? img.status}
-                  </span>
+                  {(() => {
+                    const stuck = isExhaustedPending(img.status, img.attempts);
+                    return (
+                      <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${stuck ? 'bg-red-100 text-red-800' : STATUS_BADGE[img.status] ?? 'bg-surface text-ink-muted'}`}>
+                        {stuck ? 'Macet' : IMAGE_STATUS_LABEL[img.status] ?? img.status}
+                      </span>
+                    );
+                  })()}
                   {img.id === selectedId ? (
                     <span className="rounded bg-emerald-600 px-1.5 py-0.5 font-medium text-white">Terpilih</span>
                   ) : null}
@@ -361,7 +381,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
                       Pilih
                     </button>
                   ) : null}
-                  {onRetry && img.status === 'failed' ? (
+                  {onRetry && (img.status === 'failed' || isExhaustedPending(img.status, img.attempts)) ? (
                     <button
                       type="button"
                       onClick={() => onRetry(img.id)}
