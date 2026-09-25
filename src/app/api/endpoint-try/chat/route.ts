@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/require-user';
 import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
-import { chatRequestSchema, assertAllowedBaseUrl, sanitizeErrorMessage } from '@/lib/endpoint-try/validation';
+import { chatRequestSchema, assertAllowedBaseUrl, joinUpstreamPath, sanitizeErrorMessage } from '@/lib/endpoint-try/validation';
 import {
   buildOpenAIChatBody,
   buildAnthropicChatBody,
@@ -55,11 +55,11 @@ export async function POST(request: Request) {
   }
   const { kind, baseUrl, apiKey, model, system, user: prompt, temperature, maxTokens, stream } = parsed.data;
 
-  // 5. SSRF guard.
-  let origin: string;
+  // 5. SSRF guard. Prefix path baseUrl dipertahankan (mis. /paid/v1).
+  let upstreamBase: string;
   try {
     const r = assertAllowedBaseUrl(baseUrl);
-    origin = r.origin;
+    upstreamBase = r.base;
   } catch (e) {
     const msg = sanitizeErrorMessage(e instanceof Error ? e.message : String(e), [apiKey]);
     void incrementRateLimit(ip, 'endpoint_try').catch(() => {});
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     let url: string;
     let body: Record<string, unknown>;
     if (kind === 'anthropic') {
-      url = `${origin}/messages`;
+      url = joinUpstreamPath(upstreamBase, '/messages');
       body = buildAnthropicChatBody({
         model,
         system: system ?? undefined,
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         stream
       });
     } else {
-      url = `${origin}/chat/completions`;
+      url = joinUpstreamPath(upstreamBase, '/chat/completions');
       const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
       if (system) messages.push({ role: 'system', content: system });
       messages.push({ role: 'user', content: prompt });

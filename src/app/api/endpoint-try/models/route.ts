@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/require-user';
 import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
-import { modelsRequestSchema, assertAllowedBaseUrl, sanitizeErrorMessage } from '@/lib/endpoint-try/validation';
+import { modelsRequestSchema, assertAllowedBaseUrl, joinUpstreamPath, sanitizeErrorMessage } from '@/lib/endpoint-try/validation';
 import { normalizeOpenAIModels, normalizeAnthropicModels } from '@/lib/endpoint-try/adapters';
 
 export const maxDuration = 30;
@@ -49,11 +49,11 @@ export async function POST(request: Request) {
   }
   const { kind, baseUrl, apiKey } = parsed.data;
 
-  // 5. SSRF guard.
-  let origin: string;
+  // 5. SSRF guard. Prefix path baseUrl dipertahankan (mis. /paid/v1).
+  let upstreamBase: string;
   try {
     const r = assertAllowedBaseUrl(baseUrl);
-    origin = r.origin;
+    upstreamBase = r.base;
   } catch (e) {
     const msg = sanitizeErrorMessage(e instanceof Error ? e.message : String(e), [apiKey]);
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     } else {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
-    res = await fetchWithTimeout(`${origin}/models`, { method: 'GET', headers }, 25000);
+    res = await fetchWithTimeout(joinUpstreamPath(upstreamBase, '/models'), { method: 'GET', headers }, 25000);
   } catch (e) {
     const msg = e instanceof DOMException && e.name === 'AbortError'
       ? 'Upstream timeout (25 detik).'

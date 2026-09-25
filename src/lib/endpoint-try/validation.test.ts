@@ -3,6 +3,7 @@ import {
   assertAllowedBaseUrl,
   chatRequestSchema,
   isBlockedHostname,
+  joinUpstreamPath,
   sanitizeErrorMessage
 } from './validation';
 import {
@@ -80,6 +81,30 @@ describe('validation — assertAllowedBaseUrl', () => {
     const r = assertAllowedBaseUrl('https://api.openai.com/v1/');
     expect(r.base).toBe('https://api.openai.com/v1');
     expect(r.origin).toBe('https://api.openai.com');
+  });
+});
+
+describe('validation — joinUpstreamPath', () => {
+  it('prefix path dipertahankan (kasus BlazeAPI /paid/v1)', () => {
+    expect(joinUpstreamPath('https://api.blazeapi.org/paid/v1', '/chat/completions')).toBe(
+      'https://api.blazeapi.org/paid/v1/chat/completions'
+    );
+    expect(joinUpstreamPath('https://api.blazeapi.org/paid/v1', '/models')).toBe(
+      'https://api.blazeapi.org/paid/v1/models'
+    );
+    expect(joinUpstreamPath('https://api.blazeapi.org/paid/v1', '/messages')).toBe(
+      'https://api.blazeapi.org/paid/v1/messages'
+    );
+  });
+  it('root path tetap seperti dulu', () => {
+    expect(joinUpstreamPath('https://api.openai.com/v1', '/chat/completions')).toBe(
+      'https://api.openai.com/v1/chat/completions'
+    );
+  });
+  it('suffix yang sudah ada tidak digandakan', () => {
+    expect(joinUpstreamPath('https://h.com/v1/chat/completions', '/chat/completions')).toBe(
+      'https://h.com/v1/chat/completions'
+    );
   });
 });
 
