@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-25 20:15 WIB (Image stuck-pending reaper + LLM call timeout)
+Last updated: 2026-09-25 20:45 WIB (Admin bypass branch protection main aktif)
 
 ## Current State
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-25 20:15 WIB (Image stuck-pending reaper + LLM call timeou
 10. Provider LLM DB-driven via `llm_providers.priority`; key pool round-robin + circuit breaker (`failure_count > 5` → nonaktif permanen, tanpa auto-recovery).
 11. Key LLM di Supabase Vault via RPC wrapper `public.vault_*` (SECURITY DEFINER, service_role only); seed via `scripts/seed-llm-keys.mjs`. Sama untuk Tavily: Vault `tavily_api_key` via RPC baru `vault_decrypt_secret_by_name` (by-name, bukan by-id); seed via `scripts/seed-tavily-key.mjs`.
 12. Cron processor berjalan di Supabase pg_cron tiap 5 menit (Vercel Hobby limit) → POST `https://asharu.id/api/content/process`; `vercel.json` crons kosong.
+12b. **Branch protection `main` (25 Sep):** classic protection tetap aktif (required check `Quality`, wajib PR, anti force-push, anti hapus branch) TAPI `enforce_admins=false` — admin/solo-dev boleh push langsung ke `main` (bypass PR + check). Alasan: repo single-owner, alur PR-only menambah friksi tanpa mitigasi risiko nyata. Jalur PR tetap tersedia & dipakai bila ingin CI gate. Cara ubah: `gh api -X DELETE repos/.../branches/main/protection/enforce_admins` (matikan bypass) / `-X POST` (aktifkan lagi).
 13. Katalog afiliasi **DB-only selesai** (15 Sep): scraper menulis ke Postgres `affiliate_products` + Storage bucket `affiliate-images` (240/240 URL Storage, 6 `is_featured`); halaman publik baca DB via `anonClient` + ISR 3600; file statis + 256 webp lokal dihapus. Workflow scrape **tidak lagi commit/push** (hapus race `fetch first`). Pelajaran insiden: `storage.exists()` objek-hilang = `{data:false,error:400}`, bukan reject — hanya `data===true` = hit. Lihat entry memori 2026-09-15.
 16. **Urutan katalog publik (16 Sep):** `/produk` + beranda mengurut `is_featured DESC, created_at DESC` (bukan `friendly_code ASC`) agar produk baru/featured tidak terkubur di balik paginasi klien 8 item. Purge cache on-demand via `POST /api/revalidate/products` (Bearer `CRON_SECRET`) + `revalidateAffiliateCatalog()`; dipanggil best-effort oleh workflow scrape karena penulis DB bukan Server Action.
 14. Admin membership = `profiles.is_admin` (single source of truth, 1 Sep 2026). `is_admin()` SQL baca profiles; `handle_new_user` default `is_admin=false`; middleware & review page lookup via profiles (tidak ada hardcoded email di kode). Admin baru di-elevate via `UPDATE profiles SET is_admin = true`. (P2 audit #12 ditutup.)
