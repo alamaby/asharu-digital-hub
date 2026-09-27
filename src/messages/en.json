@@ -1077,6 +1077,8 @@
       "targetLabel": "Target {n}",
       "providerLabel": "Provider",
       "modelLabel": "Model",
+      "effortLabel": "Reasoning effort",
+      "effortFollow": "Follow model",
       "addTarget": "Add target",
       "removeTarget": "Remove target {n}",
       "submit": "Run",

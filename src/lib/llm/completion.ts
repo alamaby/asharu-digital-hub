@@ -8,8 +8,28 @@ import { OpenAICompatibleProvider } from './providers/openai-compatible';
 import { GeminiProvider } from './providers/gemini';
 import { CloudflareProvider } from './providers/cloudflare';
 import { fetchOrderedModels, markModelFailure, markModelUsage } from '@/lib/supabase/vault';
-import { capEffortForStage, isLengthCutoff, resolveModelParams, type ModelParams } from './model-config';
+import { capEffortForStage, isLengthCutoff, resolveModelParams, type ModelParams, type ReasoningEffort } from './model-config';
 import { reportError } from '@/lib/notifications/error-events';
+
+/**
+ * Override reasoning effort per-request (Chat Lab per-target).
+ * 'off' = matikan seluruh reasoning; value effort = timpa reasoning_effort DB
+ * (thinking_level/thinking_budget eksplisit DB tetap menang, sesuai
+ * buildThinkingConfig); null/absen = ikut config model di DB.
+ */
+export type ReasoningOverride = 'off' | ReasoningEffort | null;
+
+export function applyReasoningOverride(params: ModelParams, override?: ReasoningOverride): ModelParams {
+  if (!override) return params;
+  if (override === 'off') {
+    const next: ModelParams = { ...params };
+    delete next.reasoningEffort;
+    delete next.thinkingBudget;
+    delete next.thinkingLevel;
+    return next;
+  }
+  return { ...params, reasoningEffort: override };
+}
 
 function providerFromRow(row: ProviderRow): LLMProvider {
   if (row.slug === 'gemini') return new GeminiProvider(row.base_url);
@@ -45,6 +65,8 @@ export interface LLMCompletionInput {
    * perbandingan antar target adil. Default false (jalur lama tak berubah).
    */
   strictPinned?: boolean;
+  /** Per-request reasoning effort override (Chat Lab per-target); null/absen = ikut config DB. */
+  reasoningOverride?: ReasoningOverride;
 }
 
 /**
@@ -125,7 +147,7 @@ export async function runLLMCompletion(
     }
 
     for (const mod of candidateModels) {
-      const params = capEffortForStage(resolveModelParams(mod.config), input.stage);
+      const params = applyReasoningOverride(capEffortForStage(resolveModelParams(mod.config), input.stage), input.reasoningOverride);
       try {
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
           const provider = providerFromRow(prov);
@@ -340,7 +362,7 @@ async function tryPinnedModel(
   const prov = providers.find((p) => p.id === targetProviderId);
   if (!prov) return null;
   const pool = new KeyPool(prov);
-  const params = capEffortForStage(resolveModelParams(model.config), input.stage);
+  const params = applyReasoningOverride(capEffortForStage(resolveModelParams(model.config), input.stage), input.reasoningOverride);
   try {
     const { result, keyRow } = await pool.withFallback(async (apiKey) => {
       const provider = providerFromRow(prov);
@@ -451,7 +473,7 @@ async function tryPinnedModelHint(  supabase: SupabaseClient,
   let resolvedModelId = input.modelHint!;
   if (model) {
     targetProviderId = model.provider_id;
-    hintParams = capEffortForStage(resolveModelParams(model.config), input.stage);
+    hintParams = applyReasoningOverride(capEffortForStage(resolveModelParams(model.config), input.stage), input.reasoningOverride);
     resolvedModelId = model.model_id;
   }
   const registry = new ProviderRegistry();

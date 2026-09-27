@@ -1,3 +1,5 @@
+import type { ReasoningEffort } from '@/lib/llm/model-config';
+
 /** Tipe domain Chat Lab: uji provider/model chat untuk user login. */
 
 export interface LabConfig {
@@ -18,10 +20,15 @@ export const DEFAULT_LAB_CONFIG: LabConfig = {
   default_max_tokens: 1000
 };
 
+/** Reasoning effort per-target. `null`/absen = ikut config model di DB. */
+export type LabEffort = 'off' | ReasoningEffort | null;
+
 /** Satu target komparasi: pin provider+model (UUID). Keduanya wajib bila target diisi. */
 export interface LabTarget {
   providerId: string;
   modelId: string;
+  /** Override reasoning effort untuk target ini (opional, default ikut config model). */
+  reasoningEffort?: LabEffort;
 }
 
 export interface LabBatchRow {
@@ -72,7 +79,14 @@ export interface LabBatchWithRuns {
 
 export interface LabOptions {
   providers: { id: string; slug: string; display_name: string }[];
-  models: { id: string; provider_id: string; model_id: string; display_name: string }[];
+  /** `config` = knob model (reasoning_effort dkk) agar UI bisa tampilkan default per-model. */
+  models: {
+    id: string;
+    provider_id: string;
+    model_id: string;
+    display_name: string;
+    config?: Record<string, unknown> | null;
+  }[];
   config: LabConfig;
 }
 

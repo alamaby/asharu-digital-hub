@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REASONING_EFFORTS } from '@/lib/llm/model-config';
 
 const uuid = z.string().uuid('ID tidak valid.');
 
@@ -33,7 +34,12 @@ export function labInputSchema(maxTargets = 3) {
       .array(
         z.object({
           providerId: uuid,
-          modelId: uuid
+          modelId: uuid,
+          /** Per-target reasoning effort; null = ikut config model di DB. */
+          reasoningEffort: z
+            .enum(['off', ...REASONING_EFFORTS] as const)
+            .nullable()
+            .default(null)
         })
       )
       .min(1, 'Pilih minimal 1 target model.')

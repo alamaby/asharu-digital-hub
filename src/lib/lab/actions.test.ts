@@ -11,7 +11,7 @@ const { clientRef, llmImpl, inserted } = vi.hoisted(() => ({
   clientRef: { current: null as unknown },
   inserted: { current: [] as Array<{ table: string; rows: unknown }> },
   llmImpl: {
-    current: async () => ({
+    current: (async () => ({
       output: {
         text: 'Halo dunia',
         usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
@@ -23,7 +23,7 @@ const { clientRef, llmImpl, inserted } = vi.hoisted(() => ({
       keyHash: 'abc123',
       latencyMs: 1000,
       fallback: false
-    })
+    })) as unknown as (...a: unknown[]) => Promise<unknown>
   }
 }));
 
@@ -243,6 +243,39 @@ describe('runChatLabBatch', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ error: expect.stringMatching(/strict/), response_text: null });
     expect(rows[1]).toMatchObject({ response_text: 'OK kedua' });
+  });
+
+  it('reasoning_effort per-target diteruskan sebagai override', async () => {
+    resetDb();
+    const seen: Array<string | null> = [];
+    llmImpl.current = async (_supabase: unknown, input?: unknown) => {
+      seen.push((input as { reasoningOverride?: string | null } | undefined)?.reasoningOverride ?? null);
+      return {
+        output: {
+          text: 'Halo dunia',
+          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          finishReason: 'stop',
+          thoughtTokens: null
+        },
+        providerSlug: 'naraya',
+        model: 'naraya/model-a',
+        keyHash: 'abc123',
+        latencyMs: 1000,
+        fallback: false
+      };
+    };
+    const res = await runChatLabBatch({
+      systemPrompt: null,
+      userPrompt: 'Prompt yang cukup panjang untuk lolos validasi.',
+      temperature: null,
+      maxTokens: null,
+      targets: [
+        { providerId: UUID_P1, modelId: UUID_M1, reasoningEffort: 'low' },
+        { providerId: UUID_P2, modelId: UUID_M2, reasoningEffort: null }
+      ]
+    });
+    expect(res.ok).toBe(true);
+    expect(seen).toEqual(['low', null]);
   });
 
   it('kuota harian habis ditolak jujur', async () => {

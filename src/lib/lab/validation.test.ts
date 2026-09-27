@@ -51,6 +51,40 @@ describe('labInputSchema', () => {
     expect(over.success).toBe(false);
   });
 
+  it('reasoning_effort default null (ikut config model) + nilai valid lolos', () => {
+    const absent = labInputSchema(3).safeParse({
+      systemPrompt: null,
+      userPrompt: 'Prompt yang cukup panjang untuk lolos.',
+      temperature: null,
+      maxTokens: null,
+      targets: [{ providerId: UUID_A, modelId: UUID_B }]
+    });
+    expect(absent.success).toBe(true);
+    if (absent.success) expect(absent.data.targets[0]!.reasoningEffort).toBeNull();
+    const maxed = labInputSchema(3).safeParse({
+      systemPrompt: null,
+      userPrompt: 'Prompt yang cukup panjang untuk lolos.',
+      temperature: null,
+      maxTokens: null,
+      targets: [
+        { providerId: UUID_A, modelId: UUID_B, reasoningEffort: 'max' },
+        { providerId: UUID_A, modelId: UUID_C, reasoningEffort: 'off' }
+      ]
+    });
+    expect(maxed.success).toBe(true);
+  });
+
+  it('menolak reasoning_effort tak dikenal', () => {
+    const bad = labInputSchema(3).safeParse({
+      systemPrompt: null,
+      userPrompt: 'Prompt yang cukup panjang untuk lolos.',
+      temperature: null,
+      maxTokens: null,
+      targets: [{ providerId: UUID_A, modelId: UUID_B, reasoningEffort: 'ultra' }]
+    });
+    expect(bad.success).toBe(false);
+  });
+
   it('menolak temperature/maxTokens di luar batas', () => {
     const bad = labInputSchema(3).safeParse({
       systemPrompt: null,

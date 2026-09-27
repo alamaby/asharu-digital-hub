@@ -66,7 +66,7 @@ export async function listLabOptions(): Promise<LabOptions> {
     supabase.from('llm_providers').select('id, slug, display_name').eq('is_active', true).order('priority'),
     supabase
       .from('llm_models')
-      .select('id, provider_id, model_id, display_name')
+      .select('id, provider_id, model_id, display_name, config')
       .eq('is_active', true)
       .order('priority')
   ]);
@@ -173,6 +173,7 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
         messages,
         temperature: temperature ?? undefined,
         maxTokens,
+        reasoningOverride: t.reasoningEffort ?? null,
         strictPinned: true
       });
       return { target: t, out };

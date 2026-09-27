@@ -1077,6 +1077,8 @@
       "targetLabel": "Target {n}",
       "providerLabel": "Provider",
       "modelLabel": "Model",
+      "effortLabel": "Reasoning effort",
+      "effortFollow": "Ikut model",
       "addTarget": "Tambah target",
       "removeTarget": "Hapus target {n}",
       "submit": "Jalankan",

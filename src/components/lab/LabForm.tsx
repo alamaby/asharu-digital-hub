@@ -19,9 +19,13 @@ interface Props {
   onComplete?: (batchId: string) => void;
 }
 
+/** Option effort di form: '' = ikut config model di DB; 'off' = matikan; nilai lain = override eksplisit. */
+type EffortOption = '' | 'off' | 'low' | 'medium' | 'high' | 'max';
+
 interface TargetSel {
   providerId: string;
   modelId: string;
+  effort: EffortOption;
 }
 
 const inputCls =
@@ -37,7 +41,7 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
   const [prompt, setPrompt] = useState('');
   const [temperature, setTemperature] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
-  const [targets, setTargets] = useState<TargetSel[]>([{ providerId: '', modelId: '' }]);
+  const [targets, setTargets] = useState<TargetSel[]>([{ providerId: '', modelId: '', effort: '' }]);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [lastReuseId, setLastReuseId] = useState<string | null>(null);
@@ -54,10 +58,10 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
     setPrompt(reuseBatch.batch.user_prompt);
     setTemperature(reuseBatch.batch.temperature !== null ? String(reuseBatch.batch.temperature) : '');
     setMaxTokens(reuseBatch.batch.max_tokens !== null ? String(reuseBatch.batch.max_tokens) : '');
-    const fromRuns = reuseBatch.runs
+    const fromRuns: TargetSel[] = reuseBatch.runs
       .filter((r) => r.provider_id && r.model_id)
-      .map((r) => ({ providerId: r.provider_id as string, modelId: r.model_id as string }));
-    setTargets(fromRuns.length > 0 ? fromRuns.slice(0, maxTargets) : [{ providerId: '', modelId: '' }]);
+      .map((r) => ({ providerId: r.provider_id as string, modelId: r.model_id as string, effort: '' }));
+    setTargets(fromRuns.length > 0 ? fromRuns.slice(0, maxTargets) : [{ providerId: '', modelId: '', effort: '' }]);
     setNotice(tForm('reused'));
   }, [reuseBatch, lastReuseId, maxTargets, tForm]);
 
@@ -99,7 +103,11 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
         userPrompt: prompt.trim(),
         temperature: tempNum !== null && Number.isFinite(tempNum) ? tempNum : null,
         maxTokens: maxNum !== null && Number.isFinite(maxNum) ? Math.floor(maxNum) : null,
-        targets: targets.map((x) => ({ providerId: x.providerId, modelId: x.modelId }))
+        targets: targets.map((x) => ({
+          providerId: x.providerId,
+          modelId: x.modelId,
+          reasoningEffort: x.effort === '' ? null : x.effort
+        }))
       });
       if (!res.ok) {
         setNotice(res.error);
@@ -180,7 +188,7 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
         <legend className="mb-2 text-sm font-medium text-ink">{tForm('targetHeading')}</legend>
         <div className="space-y-3">
           {targets.map((tg, i) => (
-            <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto]">
+            <div key={i} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
               <div>
                 <label htmlFor={`lab-prov-${i}`} className={labelCls}>
                   {tForm('targetLabel', { n: i + 1 })} · {tForm('providerLabel')}
@@ -214,6 +222,22 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
                   ))}
                 </select>
               </div>
+              <div>
+                <label htmlFor={`lab-effort-${i}`} className={labelCls}>{tForm('effortLabel')}</label>
+                <select
+                  id={`lab-effort-${i}`}
+                  value={tg.effort}
+                  onChange={(e) => setTarget(i, { effort: e.target.value as EffortOption })}
+                  className={inputCls}
+                >
+                  <option value="">{tForm('effortFollow')}</option>
+                  <option value="off">off</option>
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                  <option value="max">max</option>
+                </select>
+              </div>
               <div className="flex items-end">
                 {targets.length > 1 ? (
                   <button
@@ -232,7 +256,7 @@ export function LabForm({ options, quota, reuseBatch, onComplete }: Props) {
         {targets.length < maxTargets ? (
           <button
             type="button"
-            onClick={() => setTargets((prev) => [...prev, { providerId: '', modelId: '' }])}
+            onClick={() => setTargets((prev) => [...prev, { providerId: '', modelId: '', effort: '' }])}
             className="mt-2 rounded-md border border-line px-3 py-1.5 text-xs text-primary hover:underline"
           >
             + {tForm('addTarget')}
