@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-25 20:45 WIB (Admin bypass branch protection main aktif)
+Last updated: 2026-09-27 16:17 WIB (4 model Bynara reasoning + Lab effort per-target; migrasi prod applied)
 
 ## Current State
 
@@ -70,6 +70,8 @@ Last updated: 2026-09-25 20:45 WIB (Admin bypass branch protection main aktif)
 - [ ] Transisi dual-write → DB-only (rencana fase lanjut).
 
 ## Recent Entries
+
+- [2026-09-27 161750-bynara-reasoning-lab-effort.md](2026-09-27/161750-bynara-reasoning-lab-effort.md) — Tambah 4 model Bynara (`naraya`) reasoning max (`agnes-3-flash`, `longcat-2.5`, `space-bunny-alpha[-bynara]`, priority 300..330, migrasi prod applied via MCP) + Chat Lab: dropdown reasoning effort per-target (Ikut model/off/low/medium/high/max) via `reasoningOverride` di `runLLMCompletion` (`applyReasoningOverride`: off = matikan semua knob; effort value = timpa effort, thinking eksplisit DB tetap menang). Gate typecheck ✓ lint ✓ 1173 tests ✓. Submodule `e139a8d` + parent `3620097` pushed. [USER ACTION] Deploy Vercel + live verify 4 model baru di `/id/lab`.
 
 - [2026-09-25 201500-image-stuck-pending-reaper.md](2026-09-25/201500-image-stuck-pending-reaper.md) — RCA "visualisasi draf `2d2a5b31` tidak berhasil": baris cover `pending` + `attempts=3` macet permanen (claim mensyaratkan `attempts<3`, status bukan `failed` → UI tak punya tombol Ulangi) karena tick worker (maxDuration 300s) dibunuh saat waterfall LLM terdepan naraya/agnes menggantung 138–300s (fallback cloudflare sehat 3–20s). Fix A recovery prod (row → `selected`, draf `approved`, run `3189f7c5` pulih → artikel published). Fix B: `IMAGE_MAX_ATTEMPTS`/`isExhaustedPending` shared, `reapStuckImages()` di awal `processImageTick`, `retryFailedImage` terima pending-exhausted, badge "Macet" + tombol Ulangi di carousel, `ensureCover` requeue pending macet (anti tunggu 60 menit). Fix C: pin stage `image_prompt` → cloudflare gemma-sea-lion (applied prod) + `fetchWithTimeout` 90s di 3 provider LLM. Gate typecheck ✓ lint ✓ 1165 tests ✓ build ✓. Shipped PR #4 → `d7726ae` merged + Vercel Production ✓ (0 baris pending macet pasca-deploy).
 
