@@ -204,6 +204,8 @@ export async function sendDraftReadyEmail(
     productName: string;
     drafts: Array<{ platform: string; draftId: string }>;
     siteUrl: string;
+    /** Session riset opsional; bila terisi, tambahkan link "Buka halaman riset". */
+    researchSessionId?: string | null;
   }
 ): Promise<SendResult> {
   let rows: string;
@@ -222,6 +224,9 @@ export async function sendDraftReadyEmail(
       [
         `<p>Produk terpilih: <strong>${escapeHtml(input.productName)}</strong>.</p>`,
         `<ul>${rows}</ul>`,
+        ...(input.researchSessionId
+          ? [`<p><a href="${escapeHtml(`${input.siteUrl}/id/konten/riset/${input.researchSessionId}`)}">Buka halaman riset</a></p>`]
+          : []),
         `<p><a href="${escapeHtml(`${input.siteUrl}/id/konten/review`)}">Buka halaman review</a></p>`
       ].join('\n')
     );

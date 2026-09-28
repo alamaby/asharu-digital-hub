@@ -171,6 +171,49 @@ describe('sender publik selalu best-effort', () => {
     expect(res).toMatchObject({ ok: false, skipped: true, error: 'no recipients' });
   });
 
+  it('researchSessionId → HTML memuat link riset sebelum link review', async () => {
+    const fetchImpl = mockFetch(200, JSON.stringify({ id: 'm_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+    try {
+      // client yang bisa read Vault → resolveResendKey sukses (key dummy tak dipakai saat sendViaResend di-stub).
+      const goodClient = { rpc: async () => ({ data: 're_live_xxx', error: null }) } as never;
+      const res = await sendDraftReadyEmail(goodClient, cfg(), {
+        ...draftInput,
+        researchSessionId: 's-abc',
+        siteUrl: 'https://asharu.id'
+      });
+      expect(res.ok).toBe(true);
+      const call = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = JSON.parse(call?.[1].body as string);
+      const html = payload.html as string;
+      const risetPos = html.indexOf('/id/konten/riset/s-abc');
+      // "Buka halaman review" link — hindari false-positive dari draft detail (/id/konten/review/{id}).
+      const reviewPos = html.indexOf('Buka halaman review');
+      expect(risetPos).toBeGreaterThan(-1);
+      expect(reviewPos).toBeGreaterThan(-1);
+      expect(risetPos).toBeLessThan(reviewPos);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('tanpa researchSessionId → link riset absen, link review tetap ada', async () => {
+    const fetchImpl = mockFetch(200, JSON.stringify({ id: 'm_2' }));
+    vi.stubGlobal('fetch', fetchImpl);
+    try {
+      const goodClient = { rpc: async () => ({ data: 're_live_xxx', error: null }) } as never;
+      const res = await sendDraftReadyEmail(goodClient, cfg(), draftInput);
+      expect(res.ok).toBe(true);
+      const call = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = JSON.parse(call?.[1].body as string);
+      const html = payload.html as string;
+      expect(html).not.toContain('/id/konten/riset/');
+      expect(html).toContain('/id/konten/review');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('tidak ada key (RPC error biasa) → skipped', async () => {
     const noKeyClient = {
       rpc: async () => ({ data: null, error: { message: 'not found' } })

@@ -712,7 +712,8 @@ async function advanceRun(
           runDate: run.run_date,
           productName: await productLabel(supabase, run.product_id),
           drafts: drafts.map((d) => ({ platform: d.platform ?? '?', draftId: d.id })),
-          siteUrl: env.siteUrl
+          siteUrl: env.siteUrl,
+          researchSessionId: sessionId
         });
         if (!res.ok && !res.skipped) {
           await log(supabase, sessionId, 'automation', 'warn', `email draft_ready gagal: ${res.error}`);
