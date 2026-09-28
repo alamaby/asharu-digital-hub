@@ -136,6 +136,20 @@ describe('LabStats', () => {
     expect(screen.getByText('Bar penuh = terbaik; bar redup = bukan pemenang')).toBeDefined();
   });
 
+  it('chart per-run (token/latensi/kecepatan) collapsible + default collapsed', () => {
+    renderWithMessages(<LabStats initial={summary()} locale="id" />);
+    const labels = ['Token per run (masuk + keluar)', 'Latensi per run (ms)', 'Kecepatan per run (tok/s)'];
+    for (const label of labels) {
+      // [0] = <summary> (token juga punya caption sr-only dengan teks sama).
+      const el = screen.getAllByText(label)[0]!;
+      const box = el.closest('details');
+      expect(box).not.toBeNull();
+      expect(box!.hasAttribute('open')).toBe(false);
+    }
+    // KPI tetap tampil di luar collapsible (ranks kosong di summary() → rank table tak render).
+    expect(screen.getByText('Statistik 30 hari')).toBeDefined();
+  });
+
   it('tabel peringkat best-first + mahkota juara', () => {
     const s = summary();
     s.ranks = {

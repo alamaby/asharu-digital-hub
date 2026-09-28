@@ -158,59 +158,61 @@ export function LabStats({ initial, locale, refreshKey = 0 }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-line bg-surface p-3 sm:grid-cols-[1fr_auto]">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-ink">{t('tokensPerRun')}</p>
-          <ul className="mt-2 space-y-1.5">
-            {summary.byRun.map((c, i) => {
-              const inPct = ((c.prompt / maxTokens) * 100).toFixed(1);
-              const outPct = ((c.completion / maxTokens) * 100).toFixed(1);
-              const win = winners.tokens.includes(c.runId);
-              return (
-                <li key={i} className="text-[11px]">
-                  <p className={`truncate ${win ? 'font-semibold text-emerald-600' : 'text-ink-muted'}`} title={c.label}>
-                    {win ? '★ ' : ''}{c.label}{!c.ok ? ' · ERR' : ''}{c.fallback ? ' · fb' : ''}
-                  </p>
-                  <div
-                    className={`mt-0.5 flex h-2.5 w-full overflow-hidden rounded-full bg-muted ${win ? '' : 'opacity-40'}`}
-                    role="img"
-                    aria-label={`${c.label}: in ${c.prompt}, out ${c.completion}`}
-                  >
-                    <div className="h-full bg-primary" style={{ width: `${inPct}%` }} />
-                    <div className="h-full bg-primary/40" style={{ width: `${outPct}%` }} />
-                  </div>
-                  <p className="mt-0.5 font-mono text-[10px] text-ink-muted">
-                    {formatCompact(c.prompt, locale)} + {formatCompact(c.completion, locale)}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-          <table className="sr-only">
-            <caption>{t('tokensPerRun')}</caption>
-            <tbody>
-              {summary.byRun.map((c, i) => (
-                <tr key={i}>
-                  <td>{c.label}</td>
-                  <td>{c.prompt}</td>
-                  <td>{c.completion}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <details className="rounded-xl border border-line bg-surface p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-ink">{t('tokensPerRun')}</summary>
+        <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="min-w-0">
+            <ul className="space-y-1.5">
+              {summary.byRun.map((c, i) => {
+                const inPct = ((c.prompt / maxTokens) * 100).toFixed(1);
+                const outPct = ((c.completion / maxTokens) * 100).toFixed(1);
+                const win = winners.tokens.includes(c.runId);
+                return (
+                  <li key={i} className="text-[11px]">
+                    <p className={`truncate ${win ? 'font-semibold text-emerald-600' : 'text-ink-muted'}`} title={c.label}>
+                      {win ? '★ ' : ''}{c.label}{!c.ok ? ' · ERR' : ''}{c.fallback ? ' · fb' : ''}
+                    </p>
+                    <div
+                      className={`mt-0.5 flex h-2.5 w-full overflow-hidden rounded-full bg-muted ${win ? '' : 'opacity-40'}`}
+                      role="img"
+                      aria-label={`${c.label}: in ${c.prompt}, out ${c.completion}`}
+                    >
+                      <div className="h-full bg-primary" style={{ width: `${inPct}%` }} />
+                      <div className="h-full bg-primary/40" style={{ width: `${outPct}%` }} />
+                    </div>
+                    <p className="mt-0.5 font-mono text-[10px] text-ink-muted">
+                      {formatCompact(c.prompt, locale)} + {formatCompact(c.completion, locale)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+            <table className="sr-only">
+              <caption>{t('tokensPerRun')}</caption>
+              <tbody>
+                {summary.byRun.map((c, i) => (
+                  <tr key={i}>
+                    <td>{c.label}</td>
+                    <td>{c.prompt}</td>
+                    <td>{c.completion}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col items-center justify-start gap-1">
+            <p className="text-xs font-semibold text-ink">{t('statusTitle')}</p>
+            <Donut ok={summary.ok} err={summary.errors} label={`${t('statusTitle')}: ${summary.ok} ok, ${summary.errors} err`} />
+            <p className="text-[10px] text-ink-muted">
+              <span className="text-emerald-600">● {summary.ok}</span>{' '}
+              <span className="text-red-600">● {summary.errors}</span>
+            </p>
+          </div>
         </div>
-        <div className="flex flex-col items-center justify-start gap-1">
-          <p className="text-xs font-semibold text-ink">{t('statusTitle')}</p>
-          <Donut ok={summary.ok} err={summary.errors} label={`${t('statusTitle')}: ${summary.ok} ok, ${summary.errors} err`} />
-          <p className="text-[10px] text-ink-muted">
-            <span className="text-emerald-600">● {summary.ok}</span>{' '}
-            <span className="text-red-600">● {summary.errors}</span>
-          </p>
-        </div>
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-line bg-surface p-3">
-        <p className="text-xs font-semibold text-ink">{t('latencyPerRun')}</p>
+      <details className="rounded-xl border border-line bg-surface p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-ink">{t('latencyPerRun')}</summary>
         <ul className="mt-2 space-y-1.5">
           {summary.byRun.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[11px]">
@@ -226,10 +228,10 @@ export function LabStats({ initial, locale, refreshKey = 0 }: Props) {
             </li>
           ))}
         </ul>
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-line bg-surface p-3">
-        <p className="text-xs font-semibold text-ink">{t('speedPerRun')}</p>
+      <details className="rounded-xl border border-line bg-surface p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-ink">{t('speedPerRun')}</summary>
         <ul className="mt-2 space-y-1.5">
           {summary.byRun.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[11px]">
@@ -245,7 +247,7 @@ export function LabStats({ initial, locale, refreshKey = 0 }: Props) {
             </li>
           ))}
         </ul>
-      </div>
+      </details>
     </section>
   );
 }
