@@ -121,3 +121,77 @@ export function checkStudioQuota(
 export function quotaExceededMessage(limit: number): string {
   return `Kuota harian habis (${limit}/hari) — coba lagi besok. Histori 30 hari terakhir tetap bisa dilihat.`;
 }
+
+// ── Batch generate image (/studio/batch) ─────────────────────────────
+
+/** Batas hard ukuran file teks prompt batch (100KB). Tidak configurability di tabel. */
+export const BATCH_FILE_MAX_BYTES = 102400;
+
+// TODO(batch): override per-prompt (mis. [style:...]) ditunda V1 — seluruh batch
+// memakai satu set parameter shared, dan parser berikut murni pemisah blok.
+/**
+ * Pecah teks batch (paste atau file .txt/.md) jadi daftar prompt.
+ * Blok dipisah double newline (`\n\n` / `\r\n\r\n`, kosong antar-baris boleh);
+ * tiap blok di-trim, blok kosong dibuang. TIDAK memotong <10 char di sini
+ * (penolakan itu masuk `rejected` oleh `validateBatchPrompts` agar preview jujur).
+ */
+export function parseBatchPrompts(raw: string): string[] {
+  return raw
+    .split(/\r?\n\s*\r?\n/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+export interface BatchValidationResult {
+  valid: string[];
+  rejected: { index: number; reason: string }[];
+  /** Index -1 = penolakan level-batch (cosoong/over cap), bukan per-blok. */
+  batchRejected: string | null;
+}
+
+/**
+ * Validasi daftar prompt untuk batch: per-blok min 10 + maks config,
+ * cap batch dari tabel (`maxBatch`). Bila batch level ditolak (kosong / >cap),
+ * `valid=[]` + `batchRejected` diisi; per-blok `rejected` berisi alasan & nomor
+ * blok (untuk daftar tolak di form).
+ */
+export function validateBatchPrompts(
+  prompts: string[],
+  maxPromptLength: number,
+  maxBatch: number
+): BatchValidationResult {
+  if (prompts.length === 0) {
+    return { valid: [], rejected: [], batchRejected: 'Isi dulu minimal 1 prompt.' };
+  }
+  if (prompts.length > maxBatch) {
+    return {
+      valid: [],
+      rejected: [],
+      batchRejected: `Maksimal ${maxBatch} prompt per batch — hapus blok berlebih dulu.`
+    };
+  }
+  const valid: string[] = [];
+  const rejected: { index: number; reason: string }[] = [];
+  prompts.forEach((p, i) => {
+    if (p.length < 10) rejected.push({ index: i, reason: 'Prompt minimal 10 karakter.' });
+    else if (p.length > maxPromptLength) rejected.push({ index: i, reason: `Prompt maksimal ${maxPromptLength} karakter.` });
+    else valid.push(p);
+  });
+  return { valid, rejected, batchRejected: null };
+}
+
+/** Cek kuota N-baris sekaligus: `used + n <= limit`; limit null = unlimited. */
+export function checkStudioQuotaForBatch(
+  usedToday: number,
+  dailyLimit: number | null,
+  n: number
+): { allowed: boolean; remaining: number | null } {
+  if (dailyLimit === null || dailyLimit === undefined) return { allowed: true, remaining: null };
+  // remaining = sisa slot HARIA INI (limit - used) — tidak memotong n.
+  // Saat batch ditolak user masih tahu berapa slot yang bisa dipakai untuk
+  // batch berikutnya; saat lolos user tahu sisa setelah hari ini.
+  return {
+    allowed: usedToday + n <= dailyLimit,
+    remaining: Math.max(0, dailyLimit - usedToday)
+  };
+}

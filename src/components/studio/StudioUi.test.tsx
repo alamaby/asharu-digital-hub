@@ -79,6 +79,7 @@ function genRow(over: Partial<StudioGenerationRow> & { id: string }): StudioGene
     req_height: null,
     final_prompt: null,
     final_negative: null,
+    batch_id: null,
     expires_at: '2026-10-11T00:00:00Z',
     created_at: '2026-09-11T00:00:00Z',
     updated_at: '2026-09-11T00:00:00Z',

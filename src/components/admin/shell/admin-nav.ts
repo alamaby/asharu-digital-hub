@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Globe,
   Image,
+  Layers,
   LayoutDashboard,
   LogIn,
   MessagesSquare,
@@ -48,7 +49,8 @@ export const adminNavGroups: readonly AdminNavGroup[] = [
       { key: 'adminAutomation', pathname: '/admin/automation', icon: Workflow, adminOnly: true },
       { key: 'adminProduk', pathname: '/admin/produk', icon: ShoppingBag, adminOnly: true },
       { key: 'adminCron', pathname: '/admin/cron', icon: Timer, adminOnly: true },
-      { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false },
+      { key: 'studio', pathname: '/studio', icon: Image, adminOnly: false, exact: true },
+      { key: 'studioBatch', pathname: '/studio/batch', icon: Layers, adminOnly: false, exact: true },
       { key: 'chatLab', pathname: '/lab', icon: MessagesSquare, adminOnly: false },
     ]
   },

@@ -5,7 +5,10 @@ import {
   quotaExceededMessage,
   studioInputSchema,
   validateProviderModelLink,
-  validateReferenceModelLink
+  validateReferenceModelLink,
+  parseBatchPrompts,
+  validateBatchPrompts,
+  checkStudioQuotaForBatch
 } from './validation';
 
 describe('studio validation', () => {
@@ -93,5 +96,86 @@ describe('studio reference validation', () => {
     expect(validateReferenceModelLink('https://cdn.test/ref.jpg', 'm-img2img', models)).toBeNull();
     expect(validateReferenceModelLink(null, 'm-flux', models)).toBeNull();
     expect(validateReferenceModelLink('https://cdn.test/ref.jpg', null, models)).toBeNull();
+  });
+});
+
+describe('parseBatchPrompts — double-newline split', () => {
+  it('split \n\n: dua blok jadi dua item', () => {
+    const r = parseBatchPrompts('a lively cat portrait...\n\nsecond vivid street scene');
+    expect(r).toEqual(['a lively cat portrait...', 'second vivid street scene']);
+  });
+
+  it('blok spasian saja dibuang', () => {
+    const r = parseBatchPrompts('a lively cat portrait...\n\n   \n\nsecond vivid street scene');
+    expect(r).toEqual(['a lively cat portrait...', 'second vivid street scene']);
+  });
+
+  it('Windows \\r\\n\\r\\n tetap jadi dua item', () => {
+    const r = parseBatchPrompts('first\r\n\r\nsecond\r\n\r\nthird');
+    expect(r).toEqual(['first', 'second', 'third']);
+  });
+
+  it('blok kosong total = hasil kosong', () => {
+    const r = parseBatchPrompts('\n\n\n   \n');
+    expect(r).toHaveLength(0);
+  });
+});
+
+describe('validateBatchPrompts — cap per blok + cap batch', () => {
+  it('item <10 char → rejected dengan index & reason', () => {
+    const r = validateBatchPrompts(['pendek', 'satu kalimat yang cukup panjang di sini'], 500, 50);
+    expect(r.batchRejected).toBeNull();
+    expect(r.valid).toHaveLength(1);
+    expect(r.rejected).toEqual([{ index: 0, reason: 'Prompt minimal 10 karakter.' }]);
+  });
+
+  it('item > maxPromptLength → rejected', () => {
+    const tooLong = 'x'.repeat(51);
+    const r = validateBatchPrompts([tooLong], 50, 50);
+    expect(r.valid).toHaveLength(0);
+    expect(r.rejected[0]!.reason).toMatch(/maksimal 50 karakter/);
+  });
+
+  it('N > maxBatch → batch ditolak (valid kosong)', () => {
+    const items = Array.from({ length: 51 }, (_, i) => `prompt-${i + 1} yang valid sepanjang 15 karakter ok`.slice(0, 15));
+    const r = validateBatchPrompts(items, 500, 50);
+    expect(r.batchRejected).toMatch(/Maksimal 50 prompt/);
+    expect(r.valid).toHaveLength(0);
+    expect(r.rejected).toHaveLength(0);
+  });
+
+  it('happy path dua item lolos', () => {
+    const r = validateBatchPrompts(['dua kata cukup', 'lima belas karakter cukup'], 500, 50);
+    expect(r.valid).toHaveLength(2);
+    expect(r.rejected).toEqual([]);
+    expect(r.batchRejected).toBeNull();
+  });
+
+  it('empty array → batch ditolak kososng', () => {
+    const r = validateBatchPrompts([], 500, 50);
+    expect(r.batchRejected).toMatch(/Isi dulu minimal/);
+    expect(r.valid).toHaveLength(0);
+  });
+});
+
+describe('checkStudioQuotaForBatch — N-item check', () => {
+  it('limit null = unlimited', () => {
+    expect(checkStudioQuotaForBatch(999, null, 50)).toEqual({ allowed: true, remaining: null });
+  });
+
+  it('used+n <= limit = allowed; sisa dihitung', () => {
+    expect(checkStudioQuotaForBatch(19, 20, 1)).toEqual({ allowed: true, remaining: 1 });
+  });
+
+  it('used+n > limit = ditolak penuh; sisa tetap laporan', () => {
+    const r = checkStudioQuotaForBatch(19, 20, 2);
+    expect(r.allowed).toBe(false);
+    expect(r.remaining).toBe(1);
+  });
+
+  it('used=0, limit 20, n=20 = pas; n=21 = ditolak', () => {
+    // remaining selalu = limit - used (slot hari ini), tidak terpengaruh n
+    expect(checkStudioQuotaForBatch(0, 20, 20)).toEqual({ allowed: true, remaining: 20 });
+    expect(checkStudioQuotaForBatch(0, 20, 21).allowed).toBe(false);
   });
 });

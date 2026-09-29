@@ -50,6 +50,10 @@
       "title": "Image Studio | Asharu",
       "description": "Generate images by picking provider, model, style, and aspect ratio. History retained for 30 days."
     },
+    "studioBatch": {
+      "title": "Batch Image Studio | Asharu",
+      "description": "Batch generate image — paste or upload a text file with prompts, processed one by one through a FIFO queue. Retry failed batches, download all ready results as a ZIP."
+    },
     "lab": {
       "title": "Chat Lab | Asharu",
       "description": "Test chat LLM providers and models: compare responses, tokens, latency, and speed. History retained for 30 days."
@@ -90,6 +94,7 @@
     "adminProduk": "Products",
     "adminCron": "Cron",
     "studio": "Studio",
+    "studioBatch": "Studio Batch",
     "chatLab": "Chat Lab",
     "backToSite": "Back to site",
     "signIn": "Sign in",
@@ -1052,6 +1057,42 @@
       "dimensions": "Dimensions",
       "lastError": "Last error",
       "llmMeta": "Provider meta (llm_meta)"
+    },
+    "batch": {
+      "title": "Batch Studio",
+      "intro": "Mass-generate images. Paste or upload a text file; prompts are split by double-newline. One batch is enqueued at once; the worker processes them one-by-one FIFO.",
+      "form": {
+        "textLabel": "Batch prompts (double-newline between blocks)",
+        "textPlaceholder": "First prompt…\n\nSecond prompt…\n\nThird prompt…",
+        "fileUpload": "Or upload a .txt / .md file",
+        "fileTooBig": "File exceeds 100KB — trim it first.",
+        "fileBadType": "Only .txt or .md files are supported.",
+        "previewLabel": "Detected blocks",
+        "previewCount": "{count} prompts will be enqueued",
+        "rejectedBlocks": "{count} blocks rejected ({reason})",
+        "nameLabel": "Batch name (optional)",
+        "namePlaceholder": "e.g. Q4 new products",
+        "submit": "Enqueue Batch",
+        "submitting": "Enqueueing {count} prompts...",
+        "submitted": "{count} prompts queued — worker will process FIFO."
+      },
+      "history": {
+        "heading": "Recent Batches",
+        "empty": "No batches yet. Fill the form above then Enqueue.",
+        "progress": "{done}/{total}",
+        "retryFailed": "Retry Failed",
+        "retrying": "Retrying...",
+        "retried": "{count} failed items retried.",
+        "downloadAll": "Download All (.zip)",
+        "zipping": "Creating ZIP...",
+        "zipReady": "ZIP ready — {count} images, {skipped} skipped (fetch failed).",
+        "zipEmpty": "No ready images to download.",
+        "deleteBatch": "Delete Batch",
+        "deleteConfirm": "Sure you want to delete this batch? Child files and records will be removed.",
+        "cancelDelete": "Cancel",
+        "deleting": "Deleting...",
+        "deleted": "Batch and all results deleted."
+      }
     }
   },
   "lab": {

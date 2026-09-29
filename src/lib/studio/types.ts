@@ -24,6 +24,8 @@ export interface StudioConfig {
   max_prompt_length: number;
   allow_empty_prompt: boolean;
   polling_interval_sec: number;
+  /** Batas prompt per batch (`/studio/batch`). */
+  max_batch_prompts: number;
 }
 
 export const DEFAULT_STUDIO_CONFIG: StudioConfig = {
@@ -38,7 +40,8 @@ export const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   default_aspect_slug: '1:1',
   max_prompt_length: 500,
   allow_empty_prompt: false,
-  polling_interval_sec: 10
+  polling_interval_sec: 10,
+  max_batch_prompts: 50
 };
 
 export interface StudioGenerationRow {
@@ -65,6 +68,8 @@ export interface StudioGenerationRow {
   expires_at: string;
   created_at: string;
   updated_at: string;
+  /** Grup batch (`/studio/batch`) — NULL = generate single. */
+  batch_id: string | null;
   /** Kolom img2img (migrasi 20260912000001) — NULL = text-to-image biasa. */
   reference_storage_path: string | null;
   reference_public_url: string | null;
@@ -143,4 +148,21 @@ export interface StudioQuota {
   used: number;
   limit: number | null;
   remaining: number | null;
+}
+
+// TODO(batch): override per-prompt (mis. [style:...] per blok) — V1 shared saja.
+export interface StudioBatch {
+  id: string;
+  user_id: string;
+  name: string | null;
+  settings: Record<string, unknown>;
+  total: number;
+  created_at: string;
+}
+
+/** Batch dengan hitung anak (perhitungan dilakukan client-side per-baris). */
+export interface StudioBatchWithCounts extends StudioBatch {
+  pending: number;
+  ready: number;
+  failed: number;
 }

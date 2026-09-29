@@ -22,6 +22,7 @@ export interface NavItem {
     | 'adminProduk'
     | 'adminCron'
     | 'studio'
+    | 'studioBatch'
     | 'chatLab'
     | 'backToSite'
     | 'signIn';
@@ -47,6 +48,7 @@ export interface NavItem {
     | '/konten/review'
     | '/konten/review/[draftId]'
     | '/studio'
+    | '/studio/batch'
     | '/lab'
     | '/lab/[batchId]'
     | '/masuk';

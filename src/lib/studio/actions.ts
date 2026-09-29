@@ -16,9 +16,10 @@ import {
   type StudioListOptions,
   type StudioOptions,
   type StudioQuota,
-  type StudioEnhanceResult
+  type StudioEnhanceResult,
+  type StudioBatchWithCounts
 } from './types';
-import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink, validateReferenceModelLink } from './validation';
+import { buildStudioExpiry, checkStudioQuota, quotaExceededMessage, studioInputSchema, validateProviderModelLink, validateReferenceModelLink, checkStudioQuotaForBatch, validateBatchPrompts } from './validation';
 import { removeUserImage, uploadUserReference, resolveFreshReferenceStoragePath, assertFreshReferenceExists } from './storage';
 import {
   REFERENCE_IMAGE_ALLOWED_MIME,
@@ -596,4 +597,298 @@ export async function getStudioQuota(): Promise<StudioQuota> {
     .gte('created_at', dayStart.toISOString());
   const used = count ?? 0;
   return { used, limit: config.daily_limit, remaining: Math.max(0, (config.daily_limit ?? 0) - used) };
+}
+
+// ── Batch generate image (/studio/batch) ───────────────────────────────
+// V1: setting shared untuk seluruh batch; override per-prompt TIDAK
+// didukung (lihat TODO di types.ts). img2img juga TIDAK didukung batch V1.
+// Worker antrean FIFO yang sama dengan single tidak diubah: baris anak
+// `user_image_generations{status:'pending', batch_id}` diproses satu-per-satu.
+
+export interface EnqueueBatchInput {
+  /** Prompt sudah ter-split double-newline (caller: `parseBatchPrompts`). */
+  prompts: string[];
+  /** Nama batch opsional (max 120 char). */
+  batchName?: string | null;
+  /** Setting shared untuk seluruh prompt (schema sama dengan EnqueueStudioInput minus reference). */
+  negativePrompt?: string | null;
+  providerId?: string | null;
+  modelId?: string | null;
+  styleSlug?: string | null;
+  subjectSlug?: string | null;
+  cameraSlug?: string | null;
+  aspectSlug: string;
+  guidance?: number | null;
+  steps?: number | null;
+  seed?: number | null;
+  reqWidth?: number | null;
+  reqHeight?: number | null;
+}
+
+/** Clamp knob `max_batch_prompts` config: angka floor 1–50, bukan-angka → fallback. */
+function clampMaxBatch(raw: unknown, fallback = 50): number {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(50, Math.max(1, n));
+}
+
+/**
+ * Enqueue satu batch prompt sekaligus (shared setting untuk semua prompt).
+ * Tolak PENUH bila ada blok tak valid, N > cap, atau `usedToday + N > daily_limit`
+ * — tidak pernah partial-enqueue agar user tahu persis mana yang ditolak.
+ *
+ * Flow: requireUser → config live → `validateBatchPrompts` per-blok + cap
+ * → FK aktif (provider/model/aspect/style/subjek/camera) →
+ * `checkStudioQuotaForBatch(used, limit, N)` (N kali slot) →
+ * insert `studio_batches` (parent) → loop insert `user_image_generations`
+ * anak (`batch_id` di-set) → revalidate `/studio/batch` + `/studio`.
+ * Semua error sebagai `ok:false` (pola `StudioActionResult`), bukan throw.
+ */
+export async function enqueueStudioBatch(input: EnqueueBatchInput): Promise<StudioActionResult<{ batchId: string; enqueued: number }>> {
+  try {
+    return { ok: true, data: await enqueueStudioBatchImpl(input) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function enqueueStudioBatchImpl(input: EnqueueBatchInput): Promise<{ batchId: string; enqueued: number }> {
+  const { id: userId } = await requireUser();
+  const supabase = svc();
+  const config = await getStudioConfig();
+
+  const maxBatch = clampMaxBatch(config.max_batch_prompts);
+  const { valid, rejected, batchRejected } = validateBatchPrompts(input.prompts, config.max_prompt_length, maxBatch);
+  if (rejected.length > 0 || batchRejected) {
+    const n = rejected.length;
+    const detail = batchRejected ?? `${rejected[0]!.index} prompt tidak valid (${rejected[0]!.reason}).`;
+    throw new Error(`Batch ditolak: ${n > 0 ? `${n} prompt tidak valid — ` : ''}${detail}`);
+  }
+
+  // Validasi FK aktif (sekali jalan, tanpa secret) — pola single `enqueueStudioImageImpl`.
+  const [{ data: provs }, { data: mods }, { data: aspects }] = await Promise.all([
+    supabase.from('image_providers').select('id').eq('is_active', true),
+    supabase.from('image_models').select('id, provider_id, model_id, config').eq('is_active', true),
+    supabase.from('image_aspect_ratios').select('slug').eq('is_active', true)
+  ]);
+  const providerIds = new Set(((provs ?? []) as { id: string }[]).map((p) => p.id));
+  const modelRows = (mods ?? []) as { id: string; provider_id: string; model_id: string; config: Record<string, unknown> | null }[];
+  const aspectSlugs = new Set(((aspects ?? []) as { slug: string }[]).map((a) => a.slug));
+  if (input.providerId && !providerIds.has(input.providerId)) throw new Error('Provider tidak aktif — refresh pilihan.');
+  if (input.modelId && !modelRows.some((m) => m.id === input.modelId)) throw new Error('Model tidak aktif — refresh pilihan.');
+  const linkErr = validateProviderModelLink(input.providerId ?? null, input.modelId ?? null, modelRows);
+  if (linkErr) throw new Error(linkErr);
+  if (!aspectSlugs.has(input.aspectSlug)) throw new Error('Aspek rasio tidak aktif — refresh pilihan.');
+  if (input.styleSlug) {
+    const { data: st } = await supabase.from('image_style_presets').select('slug').eq('slug', input.styleSlug).eq('is_active', true).maybeSingle();
+    if (!st) throw new Error('Preset style tidak aktif — refresh pilihan.');
+  }
+  if (input.subjectSlug) {
+    const { data: sj } = await supabase.from('image_subject_templates').select('slug').eq('slug', input.subjectSlug).eq('is_active', true).maybeSingle();
+    if (!sj) throw new Error('Template subjek tidak aktif — refresh pilihan.');
+  }
+  if (input.cameraSlug) {
+    const { data: ca } = await supabase.from('image_camera_angles').select('slug').eq('slug', input.cameraSlug).eq('is_active', true).maybeSingle();
+    if (!ca) throw new Error('Camera angle tidak aktif — refresh pilihan.');
+  }
+
+  // Kuota harian: N slot sekaligus. Limit null = unlimited; `used + N <= limit`
+  // atau tolak penuh (tidak ada partial-enqueue).
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const { count } = await supabase
+    .from('user_image_generations')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', dayStart.toISOString());
+  const used = count ?? 0;
+  const quotaRes = checkStudioQuotaForBatch(used, config.daily_limit, valid.length);
+  if (!quotaRes.allowed) {
+    throw new Error(`Kuota kurang: butuh ${valid.length}, sisa ${quotaRes.remaining ?? 0} dari limit ${config.daily_limit}/hari.`);
+  }
+
+  const expiresAt = buildStudioExpiry(new Date(), config.retention_days);
+  const settings = {
+    negativePrompt: input.negativePrompt?.trim() || null,
+    providerId: input.providerId ?? null,
+    modelId: input.modelId ?? null,
+    styleSlug: input.styleSlug ?? null,
+    subjectSlug: input.subjectSlug ?? null,
+    cameraSlug: input.cameraSlug ?? null,
+    aspectSlug: input.aspectSlug,
+    guidance: input.guidance ?? null,
+    steps: input.steps ?? null,
+    seed: input.seed ?? null,
+    reqWidth: input.reqWidth ?? null,
+    reqHeight: input.reqHeight ?? null
+  };
+  const { data: createdBatch, error: batchErr } = await supabase
+    .from('studio_batches')
+    .insert({
+      user_id: userId,
+      name: input.batchName?.trim().slice(0, 120) || null,
+      settings,
+      total: valid.length
+    })
+    .select('id')
+    .single();
+  if (batchErr || !createdBatch) throw new Error(batchErr?.message ?? 'Gagal buat batch — coba lagi.');
+  const batchId = (createdBatch as { id: string }).id;
+
+  // Insert anak satu-per-satu agar `batch_id` tercatat; worker cron memproses
+  // antrean FIFO seperti baris single.
+  let inserted = 0;
+  for (const prompt of valid) {
+    const { data: child, error: childErr } = await supabase
+      .from('user_image_generations')
+      .insert({
+        user_id: userId,
+        image_prompt: prompt,
+        negative_prompt: settings.negativePrompt,
+        provider_id: settings.providerId,
+        model_id: settings.modelId,
+        style_slug: settings.styleSlug,
+        subject_slug: settings.subjectSlug,
+        camera_slug: settings.cameraSlug,
+        aspect_slug: input.aspectSlug,
+        batch_id: batchId,
+        guidance: settings.guidance,
+        steps: settings.steps,
+        seed: settings.seed,
+        req_width: settings.reqWidth,
+        req_height: settings.reqHeight,
+        expires_at: expiresAt
+      })
+      .select('id');
+    if (childErr) throw new Error(childErr.message ?? 'Gagal enqueue anak batch — coba lagi.');
+    inserted += 1;
+  }
+  revalidatePath('/studio/batch');
+  revalidatePath('/studio');
+  return { batchId, enqueued: inserted };
+}
+
+/** Daftar batch milik user (terbaru dulu, limit clamp 1–50 default 20). */
+export async function listStudioBatches(limit = 20): Promise<StudioBatchWithCounts[]> {
+  const { id: userId } = await requireUser();
+  const supabase = svc();
+  const clamped = Math.min(50, Math.max(1, limit));
+  const { data } = await supabase
+    .from('studio_batches')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(clamped);
+  const rows = (data ?? []) as unknown as Omit<StudioBatchWithCounts, 'pending' | 'ready' | 'failed'>[];
+  // N+1 diterima untuk V1 (cap 50); per-batch query status anak.
+  const result: StudioBatchWithCounts[] = [];
+  for (const b of rows) {
+    const { data: children } = await supabase
+      .from('user_image_generations')
+      .select('status')
+      .eq('batch_id', b.id);
+    let pending = 0;
+    let ready = 0;
+    let failed = 0;
+    for (const c of ((children ?? []) as { status: string }[])) {
+      if (c.status === 'pending') pending += 1;
+      else if (c.status === 'ready') ready += 1;
+      else if (c.status === 'failed') failed += 1;
+    }
+    result.push({ ...b, pending, ready, failed });
+  }
+  return result;
+}
+
+/** Baris anak milik satu batch milik user (urutan antrean = created ASC). */
+export async function listBatchImages(batchId: string): Promise<StudioGenerationRow[]> {
+  const { id: userId } = await requireUser();
+  const supabase = svc();
+  const { data: batch } = await supabase
+    .from('studio_batches')
+    .select('id')
+    .eq('id', batchId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!batch) throw new Error('Batch tidak ditemukan (atau bukan milik Anda).');
+  const { data, error } = await supabase
+    .from('user_image_generations')
+    .select('*')
+    .eq('batch_id', batchId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as StudioGenerationRow[];
+}
+
+/** Ulangi anak failed dalam satu batch seketika (status pending, attempts reset). */
+export async function retryFailedBatchImages(batchId: string): Promise<StudioActionResult<{ retried: number }>> {
+  try {
+    return { ok: true, data: await retryFailedBatchImagesImpl(batchId) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function retryFailedBatchImagesImpl(batchId: string): Promise<{ retried: number }> {
+  const { id: userId } = await requireUser();
+  const supabase = svc();
+  const { data: batch } = await supabase
+    .from('studio_batches')
+    .select('id')
+    .eq('id', batchId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!batch) throw new Error('Batch tidak ditemukan (atau bukan milik Anda).');
+  const { data: failed } = await supabase
+    .from('user_image_generations')
+    .select('id')
+    .eq('batch_id', batchId)
+    .eq('status', 'failed');
+  const retried = (failed ?? []).length;
+  if (retried > 0) {
+    const { error } = await supabase
+      .from('user_image_generations')
+      .update({ status: 'pending', attempts: 0, last_error: null, updated_at: new Date().toISOString() })
+      .eq('batch_id', batchId)
+      .eq('status', 'failed');
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath('/studio/batch');
+  revalidatePath('/studio');
+  return { retried };
+}
+
+/** Hapus satu batch beserta anak & file Storage-nya (parent cascade-kan baris). */
+export async function deleteStudioBatch(batchId: string): Promise<StudioActionResult> {
+  try {
+    await deleteStudioBatchImpl(batchId);
+    return { ok: true, data: null };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function deleteStudioBatchImpl(batchId: string): Promise<void> {
+  const { id: userId } = await requireUser();
+  const supabase = svc();
+  const { data: batch } = await supabase
+    .from('studio_batches')
+    .select('id')
+    .eq('id', batchId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!batch) throw new Error('Batch tidak ditemukan (atau bukan milik Anda).');
+  // Bersihkan file Storage anak (best-effort; baris DB ikut CASCADE saat parent dihapus).
+  const { data: children } = await supabase
+    .from('user_image_generations')
+    .select('storage_path')
+    .eq('batch_id', batchId);
+  for (const c of ((children ?? []) as { storage_path: string | null }[])) {
+    if (c.storage_path) await removeUserImage(c.storage_path).catch(() => {});
+  }
+  const { error } = await supabase.from('studio_batches').delete().eq('id', batchId).eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/studio/batch');
+  revalidatePath('/studio');
 }

@@ -80,6 +80,8 @@ describe('middleware auth guard', () => {
   const loginOnlyRoutes = [
     '/id/studio',
     '/en/studio',
+    '/id/studio/batch',
+    '/en/studio/batch',
     '/id/konten/baru',
     '/en/content/new'
   ];

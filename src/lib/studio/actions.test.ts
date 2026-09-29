@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, unknown>;
 
@@ -366,5 +366,174 @@ describe('validateImagePromptContradiction — requireNegative', () => {
         { requireNegative: true }
       ).ok
     ).toBe(true);
+  });
+});
+
+// ── Batch generate image (actions.test tambahan) ───────────────────────────
+// Pakai clientRef.top-level — tidak perlu vi.resetModules / vi.doMock.
+// Top-level mock sudah mengarah ke clientRef.current (line 16–17).
+
+/** Mock client per-table dengan insert ID unik untuk batch action test. */
+function makeBatchClient(tables: Record<string, Row[]>) {
+  let insertSeq = 0;
+  function nextId() {
+    insertSeq += 1;
+    return `new-${insertSeq}`;
+  }
+  return {
+    storage: {
+      from: () => ({
+        exists: async (path: string) => ({ data: storageRef.current.has(path), error: null })
+      })
+    },
+    from(table: string) {
+      let rows: Row[] = [...(tables[table] ?? [])];
+      const log: Array<{ op: string; col?: string; val?: unknown; ascending?: boolean }> = [];
+      const builder = {
+        select: () => builder,
+        eq: (col: string, val: unknown) => {
+          log.push({ op: 'eq', col, val });
+          rows = rows.filter((r) => r[col] === val);
+          return builder;
+        },
+        gte: (col: string, val: unknown) => {
+          log.push({ op: 'gte', col, val });
+          return builder;
+        },
+        order: (col: string, opts?: { ascending?: boolean }) => {
+          log.push({ op: 'order', col, ascending: opts?.ascending });
+          const asc = opts?.ascending ?? true;
+          rows = [...rows].sort((a, b) =>
+            String(a[col] ?? '') < String(b[col] ?? '') ? (asc ? -1 : 1) : asc ? 1 : -1
+          );
+          return builder;
+        },
+        limit: () => builder,
+        or: () => builder,
+        insert: (_patch: Record<string, unknown>) => builder,
+        single: async () => ({ data: { id: nextId() }, error: null }),
+        maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+        update: (patch: Record<string, unknown>) => {
+          log.push({ op: 'update', val: patch });
+          rows = rows.map((r) => {
+            if (!log.some((c) => c.op === 'eq' && r[c.col as string] === c.val)) return r;
+            return { ...r, ...patch };
+          });
+          return builder;
+        },
+        delete: () => {
+          log.push({ op: 'delete' });
+          return builder;
+        },
+        then: (onfulfilled: (v: { data: Row[]; error: null }) => unknown) =>
+          onfulfilled({ data: rows, error: null })
+      };
+      return builder;
+    }
+  };
+}
+
+/** Simple client untuk list-only tests (bukan insert/update). */
+function makeListClient(tables: Record<string, Row[]>) {
+  return {
+    storage: { from: () => ({ exists: async (_p: string) => ({ data: false, error: null }) }) },
+    from(table: string) {
+      let rows: Row[] = [...(tables[table] ?? [])];
+      const builder = {
+        select: () => builder,
+        eq: (col: string, val: unknown) => { rows = rows.filter((r) => r[col] === val); return builder; },
+        order: (col: string, opts?: { ascending?: boolean }) => {
+          const asc = opts?.ascending ?? true;
+          rows = [...rows].sort((a, b) => (asc ? 1 : -1) * String(a[col] ?? '').localeCompare(String(b[col] ?? '')));
+          return builder;
+        },
+        limit: () => builder,
+        single: async () => ({ data: null, error: null }),
+        maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+        then: (fn: (v: { data: Row[]; error: null }) => unknown) => fn({ data: rows, error: null })
+      };
+      return builder;
+    }
+  };
+}
+
+describe('enqueueStudioBatch — happy + penolakan', () => {
+  beforeEach(() => {
+    queryLog.current = [];
+  });
+
+  it('batch 2 prompt lolos, enqueue ke studio_batches + user_image_generations', async () => {
+    const configRow = { id: 1, retention_days: 30, daily_limit: 20, max_batch_prompts: 50, default_aspect_slug: '1:1', polling_interval_sec: 10 };
+    clientRef.current = makeBatchClient({
+      image_providers: [{ id: 'p1', is_active: true }],
+      image_models: [{ id: 'm1', provider_id: 'p1', model_id: 'flux', config: null, is_active: true }],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }],
+      image_style_presets: [],
+      image_subject_templates: [],
+      image_camera_angles: [],
+      image_studio_config: [configRow],
+      studio_batches: [],
+      user_image_generations: []
+    });
+    const { enqueueStudioBatch } = await import('./actions');
+    const res = await enqueueStudioBatch({
+      prompts: ['a cat sitting on a chair', 'a dog running in a park'],
+      batchName: 'test-batch',
+      aspectSlug: '1:1'
+    });
+    expect(res.ok).toBe(true);
+    expect((res as { ok: true; data: { batchId: string; enqueued: number } }).data.enqueued).toBe(2);
+  });
+
+  it('cap batch terlampaui → ditolak tanpa partial enqueue', async () => {
+    // max_batch_prompts = 1, tapi dikasih 2 prompt → harus ditolak.
+    const smallConfig = { id: 1, retention_days: 30, daily_limit: 20, max_batch_prompts: 1, default_aspect_slug: '1:1', polling_interval_sec: 10 };
+    clientRef.current = makeBatchClient({
+      image_providers: [],
+      image_models: [],
+      image_aspect_ratios: [{ slug: '1:1', is_active: true }],
+      image_style_presets: [],
+      image_subject_templates: [],
+      image_camera_angles: [],
+      image_studio_config: [smallConfig],
+      studio_batches: [],
+      user_image_generations: []
+    });
+    const { enqueueStudioBatch } = await import('./actions');
+    const prompts = ['aaaabbbbccccddddeeeeffffgggghhhhiiiijjjj', 'aaaabbbbccccddddeeeeffffgggghhhhiiiijjjj'];
+    const res = await enqueueStudioBatch({ prompts, aspectSlug: '1:1' });
+    expect(res.ok).toBe(false);
+    expect((res as { error: string }).error).toMatch(/Batch ditolak/);
+  });
+});
+
+describe('listStudioBatches', () => {
+  beforeEach(() => {
+    queryLog.current = [];
+  });
+
+  it('mengembalikan batch milik user diurutkan terbaru dulu + hitung anak', async () => {
+    const b1 = { id: 'b-old', user_id: 'u1', name: 'old', settings: {}, total: 2, created_at: '2026-09-10T00:00:00Z' };
+    const b2 = { id: 'b-new', user_id: 'u1', name: 'new', settings: {}, total: 1, created_at: '2026-09-11T00:00:00Z' };
+    const children: Record<string, unknown>[] = [
+      { id: 'c1', user_id: 'u1', batch_id: 'b-old', status: 'ready', created_at: '2026-09-10T01:00:00Z' },
+      { id: 'c2', user_id: 'u1', batch_id: 'b-old', status: 'failed', created_at: '2026-09-10T02:00:00Z' },
+      { id: 'c3', user_id: 'u1', batch_id: 'b-new', status: 'pending', created_at: '2026-09-11T01:00:00Z' }
+    ];
+    clientRef.current = makeListClient({
+      studio_batches: [b1, b2],
+      user_image_generations: children
+    });
+    const { listStudioBatches } = await import('./actions');
+    const result = await listStudioBatches();
+    expect(result).toHaveLength(2);
+    // Urutan descending by created_at: b-new dulu, lalu b-old
+    expect(result[0]?.id).toBe('b-new');
+    expect(result[0]?.pending).toBe(1);
+    expect(result[0]?.ready).toBe(0);
+    expect(result[0]?.failed).toBe(0);
+    expect(result[1]?.pending).toBe(0);
+    expect(result[1]?.ready).toBe(1);
+    expect(result[1]?.failed).toBe(1);
   });
 });

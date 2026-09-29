@@ -50,6 +50,10 @@
       "title": "Studio Gambar | Asharu",
       "description": "Generate gambar dengan pilih provider, model, style, dan aspek rasio. Histori tersimpan 30 hari."
     },
+    "studioBatch": {
+      "title": "Batch Studio Gambar | Asharu",
+      "description": "Batch generate image — paste atau upload file teks berisi prompt, satu per satu melalui antrean FIFO. Retry gagal sebatch, unduh semua hasil siap sebagai ZIP."
+    },
     "lab": {
       "title": "Chat Lab | Asharu",
       "description": "Uji provider dan model chat LLM: bandingkan respons, token, latensi, dan kecepatan. Histori tersimpan 30 hari."
@@ -90,6 +94,7 @@
     "adminProduk": "Produk",
     "adminCron": "Cron",
     "studio": "Studio",
+    "studioBatch": "Studio Batch",
     "chatLab": "Chat Lab",
     "backToSite": "Kembali ke situs",
     "signIn": "Masuk",
@@ -1052,6 +1057,42 @@
       "dimensions": "Dimensi",
       "lastError": "Error terakhir",
       "llmMeta": "Meta provider (llm_meta)"
+    },
+    "batch": {
+      "title": "Studio Batch",
+      "intro": "Generate gambar secara massal. Paste atau upload file teks; prompt dipisah double-newline. Satu batch di-enqueue sekaligus; worker memproses satu-per-satu FIFO.",
+      "form": {
+        "textLabel": "Prompt batch (double-newline antar blok)",
+        "textPlaceholder": "Prompt pertama…\n\nPrompt kedua…\n\nPrompt ketiga…",
+        "fileUpload": "Atau upload file .txt / .md",
+        "fileTooBig": "File melebihi 100KB — potong dulu.",
+        "fileBadType": "Hanya file .txt atau .md yang didukung.",
+        "previewLabel": "Blok terdeteksi",
+        "previewCount": "{count} prompt akan di-enqueue",
+        "rejectedBlocks": "{count} blok ditolak ({reason})",
+        "nameLabel": "Nama batch (opsional)",
+        "namePlaceholder": "Cth: produk baru Q4",
+        "submit": "Enqueue Batch",
+        "submitting": "Meng-enqueue {count} prompt...",
+        "submitted": "{count} prompt masuk antrean — worker proses FIFO."
+      },
+      "history": {
+        "heading": "Batch Terkini",
+        "empty": "Belum ada batch. Isi form di atas lalu Enqueue.",
+        "progress": "{done}/{total}",
+        "retryFailed": "Ulangi Gagal",
+        "retrying": "Menggulang...",
+        "retried": "{count} item gagal diulang.",
+        "downloadAll": "Unduh Semua (.zip)",
+        "zipping": "Membuat ZIP...",
+        "zipReady": "ZIP selesai — {count} gambar, {skipped} dilewati (gagal di-fetch).",
+        "zipEmpty": "Tidak ada gambar siap untuk diunduh.",
+        "deleteBatch": "Hapus Batch",
+        "deleteConfirm": "Yakin hapus batch ini? File dan catatan anak ikut terhapus.",
+        "cancelDelete": "Batal",
+        "deleting": "Menghapus...",
+        "deleted": "Batch dan seluruh hasilnya dihapus."
+      }
     }
   },
   "lab": {
