@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-28 11:15 WIB (email draf riset + link riset sebelum review; commit 81a8792)
+Last updated: 2026-09-29 17:00 WIB (batch preview UX opsi A; belum commit)
 
 ## Current State
 
@@ -71,6 +71,8 @@ Last updated: 2026-09-28 11:15 WIB (email draf riset + link riset sebelum review
 
 ## Recent Entries
 
+- [2026-09-29 170000-batch-preview-ux.md](2026-09-29/170000-batch-preview-ux.md) — Opsi A: preview "{count} blok dari {lines} baris", tolak sebut nomor blok + panjang char, hint split, helper `countBatchLines` + 4 test. Gate 1198 ✓ build ✓. Belum commit.
+- [2026-09-29 114300-studio-batch-migration-applied.md](2026-09-29/114300-studio-batch-migration-applied.md) — Migrasi `20260929000001_studio_batch` applied prod via MCP (`studio_batch`, `20260929044323`): tabel `studio_batches` + knob `max_batch_prompts=50` + `batch_id` + 2 index + 4 policy RLS terverifikasi. [USER ACTION] Naikkan `daily_limit` ≥50 sebelum uji batch-50.
 - [2026-09-28 104904-lab-stats-collapsible.md](2026-09-28/104904-lab-stats-collapsible.md)
 - [2026-09-28 111500-email-research-link.md](2026-09-28/111500-email-research-link.md) — Input `sendDraftReadyEmail` ditambah field opsional `researchSessionId`; body HTML menyisipkan link `Buka halaman riset` (/id/konten/riset/{id}) di atas link `Buka halaman review`. Runner (`runner.ts:710`) meneruskan `sessionId`. Test +2. Gate typecheck ✓ lint ✓ 1176 tests ✓. Pushed `81a8792`. — 3 chart per-run LabStats (token/latensi/kecepatan) jadi `<details>` native default-collapsed (summary = judul existing, sr-only table ikut). KPI/RangeTabs/rank table tetap tampil. Gate 1174 tests ✓, commit `4419c1d` pushed.
 - [2026-09-27 161750-bynara-reasoning-lab-effort.md](2026-09-27/161750-bynara-reasoning-lab-effort.md) — Tambah 4 model Bynara (`naraya`) reasoning max (`agnes-3-flash`, `longcat-2.5`, `space-bunny-alpha[-bynara]`, priority 300..330, migrasi prod applied via MCP) + Chat Lab: dropdown reasoning effort per-target (Ikut model/off/low/medium/high/max) via `reasoningOverride` di `runLLMCompletion` (`applyReasoningOverride`: off = matikan semua knob; effort value = timpa effort, thinking eksplisit DB tetap menang). Gate typecheck ✓ lint ✓ 1173 tests ✓. Submodule `e139a8d` + parent `3620097` pushed. [USER ACTION] Deploy Vercel + live verify 4 model baru di `/id/lab`.

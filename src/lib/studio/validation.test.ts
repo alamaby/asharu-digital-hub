@@ -8,7 +8,8 @@ import {
   validateReferenceModelLink,
   parseBatchPrompts,
   validateBatchPrompts,
-  checkStudioQuotaForBatch
+  checkStudioQuotaForBatch,
+  countBatchLines
 } from './validation';
 
 describe('studio validation', () => {
@@ -177,5 +178,24 @@ describe('checkStudioQuotaForBatch — N-item check', () => {
     // remaining selalu = limit - used (slot hari ini), tidak terpengaruh n
     expect(checkStudioQuotaForBatch(0, 20, 20)).toEqual({ allowed: true, remaining: 20 });
     expect(checkStudioQuotaForBatch(0, 20, 21).allowed).toBe(false);
+  });
+});
+
+describe('countBatchLines — preview "X blok dari Y baris"', () => {
+  it('teks kosong = 0 baris', () => {
+    expect(countBatchLines('')).toBe(0);
+  });
+
+  it('satu baris tanpa newline = 1', () => {
+    expect(countBatchLines('satu prompt utuh')).toBe(1);
+  });
+
+  it('newline tunggal menambah baris; baris kosong ikut dihitung', () => {
+    expect(countBatchLines('a\nb')).toBe(2);
+    expect(countBatchLines('a\n\nb')).toBe(3);
+  });
+
+  it('toleran CRLF Windows', () => {
+    expect(countBatchLines('a\r\nb\r\nc')).toBe(3);
   });
 });

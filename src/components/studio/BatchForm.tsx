@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { enqueueStudioBatch, type EnqueueBatchInput } from '@/lib/studio/actions';
 import type { StudioOptions } from '@/lib/studio/types';
-import { parseBatchPrompts, validateBatchPrompts } from '@/lib/studio/validation';
+import { countBatchLines, parseBatchPrompts, validateBatchPrompts } from '@/lib/studio/validation';
 
 interface Props {
   options: StudioOptions | null;
@@ -83,7 +83,9 @@ export function BatchForm({ options, onEnqueued }: Props) {
       if (batchRejected) {
         setNotice(batchRejected);
       } else if (rej.length > 0 && rej[0]) {
-        setNotice(`${rej[0].index} prompt tidak valid (${rej[0].reason}).`);
+        const first = rej[0];
+        const firstLen = prompts[first.index]?.length ?? 0;
+        setNotice(tForm('rejectedItem', { n: first.index + 1, len: firstLen, reason: first.reason }));
       }
       return;
     }
@@ -140,6 +142,7 @@ export function BatchForm({ options, onEnqueued }: Props) {
           onChange={(e) => onRawChange(e.target.value)}
           aria-describedby="batch-preview"
         />
+        <p className="mt-1 text-xs text-ink-muted">{tForm('splitHint')}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -153,12 +156,23 @@ export function BatchForm({ options, onEnqueued }: Props) {
         <input ref={fileRef} type="file" accept=".txt,.md" className="hidden" onChange={onFileUpload} />
         {parsedCount !== null && (
           <span id="batch-preview" role="status" className="text-sm text-ink-muted">
-            {tForm('previewCount', { count: parsedCount })}
+            {tForm('previewCount', { count: parsedCount, lines: countBatchLines(raw) })}
           </span>
         )}
         {rejected.length > 0 && (
           <span role="alert" className="text-sm text-red-600">
-            {tForm('rejectedBlocks', { count: rejected.length, reason: rejected.map((r) => r.reason).join('; ') })}
+            {tForm('rejectedBlocks', {
+              count: rejected.length,
+              reason: rejected
+                .map((r) =>
+                  tForm('rejectedItem', {
+                    n: r.index + 1,
+                    len: parseBatchPrompts(raw)[r.index]?.length ?? 0,
+                    reason: r.reason
+                  })
+                )
+                .join('; ')
+            })}
           </span>
         )}
       </div>

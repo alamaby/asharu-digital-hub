@@ -142,6 +142,15 @@ export function parseBatchPrompts(raw: string): string[] {
     .filter((s) => s.length > 0);
 }
 
+/**
+ * Hitung baris tampilan untuk preview form ("X blok dari Y baris").
+ * Murni hitung `\n` (toleran `\r\n`); teks kosong = 0 baris.
+ */
+export function countBatchLines(raw: string): number {
+  if (raw === '') return 0;
+  return raw.split('\n').length;
+}
+
 export interface BatchValidationResult {
   valid: string[];
   rejected: { index: number; reason: string }[];
