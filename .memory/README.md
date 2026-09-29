@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-09-29 17:00 WIB (batch preview UX opsi A; belum commit)
+Last updated: 2026-09-29 17:15 WIB (batch overflow highlight opsi C; belum commit)
 
 ## Current State
 
@@ -71,6 +71,7 @@ Last updated: 2026-09-29 17:00 WIB (batch preview UX opsi A; belum commit)
 
 ## Recent Entries
 
+- [2026-09-29 171500-batch-overflow-highlight.md](2026-09-29/171500-batch-overflow-highlight.md) — Opsi C: rincian blok ditolak, overflow >max length ditandai merah, ambang ikut config. Gate 1198 ✓ build ✓. Belum commit.
 - [2026-09-29 170000-batch-preview-ux.md](2026-09-29/170000-batch-preview-ux.md) — Opsi A: preview "{count} blok dari {lines} baris", tolak sebut nomor blok + panjang char, hint split, helper `countBatchLines` + 4 test. Gate 1198 ✓ build ✓. Belum commit.
 - [2026-09-29 114300-studio-batch-migration-applied.md](2026-09-29/114300-studio-batch-migration-applied.md) — Migrasi `20260929000001_studio_batch` applied prod via MCP (`studio_batch`, `20260929044323`): tabel `studio_batches` + knob `max_batch_prompts=50` + `batch_id` + 2 index + 4 policy RLS terverifikasi. [USER ACTION] Naikkan `daily_limit` ≥50 sebelum uji batch-50.
 - [2026-09-28 104904-lab-stats-collapsible.md](2026-09-28/104904-lab-stats-collapsible.md)

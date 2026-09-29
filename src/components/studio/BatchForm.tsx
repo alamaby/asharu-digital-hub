@@ -126,6 +126,9 @@ export function BatchForm({ options, onEnqueued }: Props) {
     });
   }
 
+  const maxPromptLen = options?.config.max_prompt_length ?? 500;
+  const previewPrompts = parseBatchPrompts(raw);
+
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
@@ -167,7 +170,7 @@ export function BatchForm({ options, onEnqueued }: Props) {
                 .map((r) =>
                   tForm('rejectedItem', {
                     n: r.index + 1,
-                    len: parseBatchPrompts(raw)[r.index]?.length ?? 0,
+                    len: previewPrompts[r.index]?.length ?? 0,
                     reason: r.reason
                   })
                 )
@@ -176,6 +179,37 @@ export function BatchForm({ options, onEnqueued }: Props) {
           </span>
         )}
       </div>
+
+      {rejected.length > 0 && (
+        <div>
+          <p className="mb-1 text-sm font-medium text-ink">{tForm('overflowHeading')}</p>
+          <ol className="space-y-2">
+            {rejected.map((r) => {
+              const text = previewPrompts[r.index] ?? '';
+              return (
+                <li
+                  key={r.index}
+                  className="rounded-md border border-line bg-surface p-2 text-sm"
+                >
+                  <p className="font-medium text-ink">
+                    {tForm('rejectedItem', {
+                      n: r.index + 1,
+                      len: text.length,
+                      reason: r.reason
+                    })}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-xs text-ink-muted">
+                    {text.slice(0, maxPromptLen)}
+                    <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                      {text.slice(maxPromptLen)}
+                    </span>
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>

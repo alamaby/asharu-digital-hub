@@ -53,6 +53,7 @@ Keputusan user yang mengunci desain (tidak boleh diubah diam-diam):
 - 2026-09-29 11:22:00 — S0–S7 selesai, S8 selesai setelah 2 kali perbaikan gate: (a) build failed karena `export function clampMaxBatch` di modul `'use server'` → menjadi non-export lokal; (b) batch action tests pakai `vi.hoisted` di dalam describe menghasilkan konflik `Identifier 'clientRef2' has already been declared` → dirapikan pakai `clientRef.current` top-level + tambah `beforeEach` ke import vitest + koreksi assertion test cap (cap=1, bukan cap=3 yang < jumlah prompt). Gate final: typecheck green, lint 0 error (warning lama saja), test 1194/119 file hijau, build sukses.
 - 2026-09-29 11:43:00 — Migrasi `20260929000001_studio_batch` applied prod via MCP (`studio_batch`, `20260929044323`); verifikasi tabel/kolom/index/policy hijau.
 - 2026-09-29 17:00:00 — Follow-up opsi A (UX preview batch): `BatchForm` tampilkan "{count} blok dari {lines} baris", daftar tolak sebut nomor blok 1-based + panjang karakter (`rejectedItem`), hint `splitHint`, notice submit ikut format sama (perbaiki hardcoded ID + index 0-based). Helper murni `countBatchLines` + 4 test. Gate: typecheck ✓ lint 0 error ✓ 1198 tests ✓ messages ✓ build ✓.
+- 2026-09-29 17:15:00 — Opsi C: daftar rincian blok ditolak di `BatchForm` — tiap blok tampil full text dengan karakter > `max_prompt_length` (ikut config, bukan hardcode) ditandai merah (`bg-red-100/dark:red-900/30`, konvensi `BatchHistory`). Key baru `overflowHeading` id/en. Gate: typecheck ✓ lint 0 error ✓ 1198 tests ✓ messages ✓ build ✓.
 
 ---
 

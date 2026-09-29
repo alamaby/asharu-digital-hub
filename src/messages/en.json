@@ -1072,6 +1072,7 @@
         "previewCount": "{count} blocks from {lines} lines",
         "rejectedBlocks": "{count} blocks rejected ({reason})",
         "rejectedItem": "Block {n} ({len} chars): {reason}",
+        "overflowHeading": "Rejected block details (overflow marked red):",
         "nameLabel": "Batch name (optional)",
         "namePlaceholder": "e.g. Q4 new products",
         "submit": "Enqueue Batch",

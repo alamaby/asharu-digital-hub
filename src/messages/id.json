@@ -1072,6 +1072,7 @@
         "previewCount": "{count} blok dari {lines} baris",
         "rejectedBlocks": "{count} blok ditolak ({reason})",
         "rejectedItem": "Blok {n} ({len} karakter): {reason}",
+        "overflowHeading": "Rincian blok ditolak (kelebihan ditandai merah):",
         "nameLabel": "Nama batch (opsional)",
         "namePlaceholder": "Cth: produk baru Q4",
         "submit": "Enqueue Batch",
