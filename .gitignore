@@ -33,5 +33,9 @@ yarn-error.log*
 /.zcode
 /.openchamber
 
+# threads poster (local, manual runs)
+/scripts/threads-poster/auth.json
+/scripts/threads-poster/reports/
+
 .vercel
 .env*

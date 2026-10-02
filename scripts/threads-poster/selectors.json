@@ -1,0 +1,18 @@
+{
+  "verified": false,
+  "notes": "CANDIDATE locators — belum diverifikasi. Jalankan `npm run threads:probe` (login manual) supaya nilai di bawah diganti dengan yang terverifikasi, lalu `verified` jadi true.",
+  "homeUrl": "https://www.threads.com/",
+  "postUrlPattern": "^https://www\\.threads\\.com/@[^/]+/post/[^/]+$",
+  "composeOpen": "role:button[name=/new post|buat post/i]",
+  "composeText": "role:textbox[name=/^(post|balas)$/i]",
+  "imageInput": "css:input[type=file]",
+  "locationField": null,
+  "topicField": null,
+  "submitButton": "role:button[name=/^(post|balas|bagikan)$/i]",
+  "replyButton": "role:button[name=/reply|balas/i]",
+  "capabilities": {
+    "location": false,
+    "topic": false,
+    "image": false
+  }
+}

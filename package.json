@@ -13,6 +13,9 @@
     "test:watch": "vitest",
     "validate:messages": "node scripts/validate-messages.mjs",
     "check:scraper": "node scripts/check-scraper.mjs",
+    "threads:auth": "node scripts/threads-poster/auth.mjs",
+    "threads:probe": "node scripts/threads-poster/probe.mjs",
+    "threads:post": "node scripts/threads-poster/thread.mjs",
     "test:scrape": "vitest run --config vitest.scrape.config.ts",
     "scrape:affiliate": "node scripts/scrape-affiliate.mjs",
     "scrape:affiliate:dry-run": "node scripts/scrape-affiliate.mjs --dry-run"
@@ -50,6 +53,7 @@
     "eslint-config-next": "^15.1.0",
     "jsdom": "^26.0.0",
     "jsonc-parser": "^3.3.1",
+    "playwright": "^1.63.0",
     "postcss": "^8.4.49",
     "sharp": "^0.35.3",
     "tailwindcss": "^4.3.3",

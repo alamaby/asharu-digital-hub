@@ -1,0 +1,13 @@
+{
+  "text": "contoh post utama",
+  "image": null,
+  "location": null,
+  "topic": null,
+  "delays": {
+    "action": { "minSec": 4, "maxSec": 12 },
+    "publish": { "minSec": 300, "maxSec": 600 }
+  },
+  "replies": [
+    { "text": "contoh reply 1", "image": null }
+  ]
+}
