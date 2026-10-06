@@ -1,0 +1,8 @@
+﻿@keyframes drawline{to{stroke-dashoffset:0}}
+.flow-anim .edge{stroke-dasharray:6 6}
+.flow-anim.play .edge{animation:drawline 1.2s linear forwards}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.pulse{animation:pulse 2.4s ease-in-out infinite}
+.reveal{opacity:0;transform:translateY(.6rem);transition:opacity .5s ease,transform .5s ease}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}.flow-anim .edge{stroke-dasharray:none}}

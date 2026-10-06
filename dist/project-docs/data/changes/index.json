@@ -1,0 +1,158 @@
+﻿{
+  "generated": "2026-10-06",
+  "total": 9,
+  "changes": [
+    {
+      "id": "2026-10-02-threads-playwright-poster",
+      "date": "2026-10-02",
+      "datetime": "2026-10-02 11:41:48",
+      "version": "v0.1.0",
+      "title": "Poster Threads manual via Playwright / Manual Threads poster via Playwright",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "threads",
+        "playwright",
+        "scripts",
+        "ops"
+      ],
+      "url": "changes/2026/10/threads-playwright-poster.html",
+      "summary": "ID: Tooling scripts/threads-poster baru: login interaktif, job JSON, dry-run headed, posting dengan delay manusiawi, dan report JSON. / EN: New scripts/threads-poster tooling: interactive login, JSON jobs, headed dry-run, human-like delayed posting, and JSON reports."
+    },
+    {
+      "id": "2026-09-29-studio-batch-overflow-highlight",
+      "date": "2026-09-29",
+      "datetime": "2026-09-29 20:07:13",
+      "version": "v0.1.0",
+      "title": "Highlight karakter over-limit per blok batch ditolak / Over-limit character highlight per rejected batch block",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "studio",
+        "batch",
+        "ux",
+        "i18n"
+      ],
+      "url": "changes/2026/09/studio-batch-overflow-highlight.html",
+      "summary": "ID: Rincian blok ditolak menampilkan full text tiap blok dengan karakter di atas max_prompt_length ditandai merah. / EN: Rejected-block details show each block's full text with characters above max_prompt_length marked red."
+    },
+    {
+      "id": "2026-09-29-studio-batch-preview-counts",
+      "date": "2026-09-29",
+      "datetime": "2026-09-29 17:00:41",
+      "version": "v0.1.0",
+      "title": "Preview batch: hitungan blok-vs-baris + detail tolak per-blok / Batch preview: block-vs-line counts plus per-block reject detail",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "studio",
+        "batch",
+        "ux",
+        "i18n"
+      ],
+      "url": "changes/2026/09/studio-batch-preview-counts.html",
+      "summary": "ID: Preview BatchForm menampilkan '{count} blok dari {lines} baris' dan tiap blok ditolak menyebut nomor blok 1-based + panjang karakter + hint split. / EN: The BatchForm preview shows '{count} blocks from {lines} lines' and each rejected block names its 1-based block number plus character length plus a split hint."
+    },
+    {
+      "id": "2026-09-29-studio-batch-route",
+      "date": "2026-09-29",
+      "datetime": "2026-09-29 11:26:38",
+      "version": "v0.1.0",
+      "title": "Rute /studio/batch: enqueue/list/retry/delete + unduh ZIP / /studio/batch route: enqueue/list/retry/delete plus ZIP download",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "studio",
+        "batch",
+        "admin",
+        "i18n",
+        "supabase"
+      ],
+      "url": "changes/2026/09/studio-batch-route.html",
+      "summary": "ID: Rute admin baru /studio/batch untuk generate batch hingga 50 prompt: validasi, antrean, riwayat, retry, hapus, unduh ZIP. / EN: New admin route /studio/batch for batch generation of up to 50 prompts: validation, queueing, history, retry, delete, ZIP download."
+    },
+    {
+      "id": "2026-09-28-automation-email-research-link",
+      "date": "2026-09-28",
+      "datetime": "2026-09-28 11:14:30",
+      "version": "v0.1.0",
+      "title": "Link Buka halaman riset di email draf riset / Open-research-page link in research-draft email",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "automation",
+        "email",
+        "research"
+      ],
+      "url": "changes/2026/09/automation-email-research-link.html",
+      "summary": "ID: Email Draf riset siap direview kini menyisipkan link Buka halaman riset (/id/konten/riset/{id}) di atas link review. / EN: The research-draft-ready email now inserts an Open research page link (/id/konten/riset/{id}) above the review link."
+    },
+    {
+      "id": "2026-09-28-lab-stats-collapsible",
+      "date": "2026-09-28",
+      "datetime": "2026-09-28 10:48:44",
+      "version": "v0.1.0",
+      "title": "Statistik per-run Lab jadi collapsible default tertutup / Lab per-run stats collapsible, default collapsed",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "lab",
+        "ui",
+        "a11y"
+      ],
+      "url": "changes/2026/09/lab-stats-collapsible.html",
+      "summary": "ID: 3 chart per-run LabStats (token/latensi/kecepatan) dibungkus details native default-collapsed; KPI dan tabel peringkat tetap tampil. / EN: The 3 LabStats per-run charts (tokens/latency/speed) are wrapped in native collapsed-by-default details; KPI and ranking tables stay visible."
+    },
+    {
+      "id": "2026-09-27-lab-reasoning-effort-bynara",
+      "date": "2026-09-27",
+      "datetime": "2026-09-27 16:17:17",
+      "version": "v0.1.0",
+      "title": "Picker reasoning effort per-target + 4 model Bynara / Per-target reasoning-effort picker plus 4 Bynara models",
+      "category": "feat",
+      "status": "released",
+      "components": [
+        "lab",
+        "llm",
+        "bynara",
+        "i18n"
+      ],
+      "url": "changes/2026/09/lab-reasoning-effort-bynara.html",
+      "summary": "ID: Chat Lab mendapat dropdown reasoning effort per-target dan 4 model Bynara reasoning max baru (priority 300-330). / EN: Chat Lab gained a per-target reasoning-effort dropdown and 4 new Bynara reasoning-max models (priority 300-330)."
+    },
+    {
+      "id": "2026-09-25-image-stuck-pending-reaper",
+      "date": "2026-09-25",
+      "datetime": "2026-09-25 20:34:05",
+      "version": "v0.1.0",
+      "title": "Reaper pending macet + retry dari UI + timeout LLM per-call / Stuck-pending reaper plus UI retry plus per-call LLM timeout",
+      "category": "fix",
+      "status": "released",
+      "components": [
+        "image",
+        "worker",
+        "automation",
+        "llm",
+        "ui"
+      ],
+      "url": "changes/2026/09/image-stuck-pending-reaper.html",
+      "summary": "ID: Baris cover pending yang kehabisan attempts kini dipanen jadi failed dengan pesan jujur, bisa diulang dari UI, dan waterfall LLM dibatasi timeout 90 dtk per call. / EN: Pending cover rows with exhausted attempts are now reaped to failed with an honest message, retryable from UI, and the LLM waterfall is capped by a 90s per-call timeout."
+    },
+    {
+      "id": "2026-09-25-endpoint-try-path-prefix",
+      "date": "2026-09-25",
+      "datetime": "2026-09-25 09:18:09",
+      "version": "v0.1.0",
+      "title": "Pertahankan path prefix base URL di proxy endpoint-try / Keep base-URL path prefix in endpoint-try proxy",
+      "category": "fix",
+      "status": "released",
+      "components": [
+        "lab",
+        "endpoint-try",
+        "proxy"
+      ],
+      "url": "changes/2026/09/endpoint-try-path-prefix.html",
+      "summary": "ID: Proxy /lab/try kini mempertahankan path prefix upstream (mis. /paid/v1) saat join URL. / EN: The /lab/try proxy now preserves the upstream path prefix (e.g. /paid/v1) when joining URLs."
+    }
+  ]
+}

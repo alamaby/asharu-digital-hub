@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-27-lab-reasoning-effort-bynara",
+  "date": "2026-09-27",
+  "time": "16:17:17",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Picker reasoning effort per-target + 4 model Bynara / Per-target reasoning-effort picker plus 4 Bynara models",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: Chat Lab mendapat dropdown reasoning effort per-target dan 4 model Bynara reasoning max baru (priority 300-330). / EN: Chat Lab gained a per-target reasoning-effort dropdown and 4 new Bynara reasoning-max models (priority 300-330).",
+  "problem_before": "ID: Effort reasoning hanya global; model reasoning baru Bynara (agnes-3-flash, longcat-2.5, space-bunny-alpha) belum tersedia di Lab. / EN: Reasoning effort was global-only; new Bynara reasoning models (agnes-3-flash, longcat-2.5, space-bunny-alpha) were not yet available in Lab.",
+  "solution": "ID: Field reasoningOverride di runLLMCompletion via applyReasoningOverride (off mematikan semua knob; nilai effort menimpa effort, thinking eksplisit DB tetap menang); migrasi tambah 4 model naraya priority 300-330 applied prod via MCP. / EN: Added a reasoningOverride field in runLLMCompletion via applyReasoningOverride (off disables all knobs; an effort value overrides effort, explicit DB thinking still wins); migration adding 4 naraya models at priority 300-330 applied to prod via MCP.",
+  "reason": "ID: Uji adil antar model reasoning butuh kontrol effort per-target dalam satu run. / EN: Fair comparison across reasoning models needs per-target effort control within one run.",
+  "files_affected": ["src/components/lab/LabForm.tsx", "src/lib/lab/actions.ts", "src/lib/lab/actions.test.ts", "src/lib/lab/types.ts", "src/lib/lab/validation.ts", "src/lib/lab/validation.test.ts", "src/lib/llm/completion.ts", "src/lib/llm/completion.test.ts", "src/messages/id.json", "src/messages/en.json", "supabase"],
+  "user_impact": "ID: Tiap target Lab bisa diset Ikut model/off/low/medium/high/max sebelum submit. / EN: Each Lab target can be set to follow-model/off/low/medium/high/max before submit.",
+  "tech_impact": "ID: Kontrak completion + validasi Lab berubah; migrasi DB model LLM (submodule e139a8d). / EN: Lab completion contract plus validation changed; LLM model DB migration (submodule e139a8d).",
+  "validation": {
+    "build": "not-verified: build outcome not recorded for 3620097",
+    "test": "1173 tests passed (per project memory 2026-09-27)",
+    "lint": "typecheck passed, eslint passed (per project memory 2026-09-27)"
+  },
+  "risks": ["ID: Kombinasi effort + thinking eksplisit bisa membingungkan bila keduanya diset. / EN: Combined effort plus explicit thinking can confuse when both are set."],
+  "breaking_changes": [],
+  "migration_notes": "ID: Migrasi model LLM wajib applied di prod sebelum 4 model dipakai. / EN: The LLM model migration must be applied in prod before using the 4 models.",
+  "commits": ["3620097cec8d54514c80fa7bb2c02cb2b20b0a1f"],
+  "next_steps": ["ID: Deploy Vercel + live verify 4 model baru di /id/lab. / EN: Deploy to Vercel plus live-verify the 4 new models in /id/lab."],
+  "components": ["lab", "llm", "bynara", "i18n"]
+}

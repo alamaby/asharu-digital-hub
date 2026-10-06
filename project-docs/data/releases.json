@@ -1,0 +1,12 @@
+﻿{
+  "latest": "v0.1.0",
+  "releases": [
+    {
+      "version": "v0.1.0",
+      "date": "2026-10-02",
+      "status": "released",
+      "notes": "ID: Kumpulan 9 perubahan terverifikasi Sep-Okt 2026 dari git log main: Studio batch, Chat Lab, email automation, image reaper, endpoint-try, Threads poster. / EN: Batch of 9 verified Sep-Oct 2026 changes from main git log: Studio batch, Chat Lab, automation email, image reaper, endpoint-try, Threads poster.",
+      "changes": ["2026-09-25-endpoint-try-path-prefix", "2026-09-25-image-stuck-pending-reaper", "2026-09-27-lab-reasoning-effort-bynara", "2026-09-28-lab-stats-collapsible", "2026-09-28-automation-email-research-link", "2026-09-29-studio-batch-route", "2026-09-29-studio-batch-preview-counts", "2026-09-29-studio-batch-overflow-highlight", "2026-10-02-threads-playwright-poster"]
+    }
+  ]
+}

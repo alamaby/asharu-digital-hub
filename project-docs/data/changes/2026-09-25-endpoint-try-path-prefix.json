@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-25-endpoint-try-path-prefix",
+  "date": "2026-09-25",
+  "time": "09:18:09",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Pertahankan path prefix base URL di proxy endpoint-try / Keep base-URL path prefix in endpoint-try proxy",
+  "category": "fix",
+  "status": "released",
+  "summary": "ID: Proxy /lab/try kini mempertahankan path prefix upstream (mis. /paid/v1) saat join URL. / EN: The /lab/try proxy now preserves the upstream path prefix (e.g. /paid/v1) when joining URLs.",
+  "problem_before": "ID: Proxy membuang path prefix base URL sehingga request ke provider ber-prefix (mis. BlazeAPI /paid/v1) salah alamat ke /chat/completions. / EN: The proxy dropped the base-URL path prefix, so requests to prefixed providers (e.g. BlazeAPI /paid/v1) hit the wrong address at /chat/completions.",
+  "solution": "ID: Fungsi joinUpstreamPath diperbaiki agar menggabungkan prefix upstream dengan path chat/models tujuan. / EN: Fixed the joinUpstreamPath helper to join the upstream prefix with the target chat/models path.",
+  "reason": "ID: Provider custom ber-prefix tidak dapat dipakai dari tab Coba Endpoint tanpa fix ini. / EN: Prefixed custom providers were unusable from the Try Endpoint tab without this fix.",
+  "files_affected": ["src/app/api/endpoint-try/chat/route.ts", "src/app/api/endpoint-try/models/route.ts", "src/lib/endpoint-try/validation.ts", "src/lib/endpoint-try/validation.test.ts", ".memory/2026-09-25/082500-endpoint-try-upstream-path-prefix.md", ".memory/README.md"],
+  "user_impact": "ID: Pengujian endpoint custom ber-prefix di /lab/try kini mencapai path yang benar. / EN: Testing prefixed custom endpoints in /lab/try now reaches the correct path.",
+  "tech_impact": "ID: Perubahan lokal pada konstruksi URL proxy endpoint-try; tanpa perubahan skema DB. / EN: Local change to endpoint-try proxy URL construction; no DB schema change.",
+  "validation": {
+    "build": "not-verified: build outcome not recorded for c53f867",
+    "test": "1155 tests passed (per project memory 2026-09-25)",
+    "lint": "typecheck passed; eslint not-verified for c53f867"
+  },
+  "risks": ["ID: Join path dengan trailing/leading slash ganda pada base URL tak umum. / EN: Double-slash joins on unusual base URLs."],
+  "breaking_changes": [],
+  "migration_notes": "None",
+  "commits": ["c53f86724f7cb2ddd113a64c1e6088a36aabfc86"],
+  "next_steps": ["ID: Verifikasi live 1 endpoint ber-prefix dari /lab/try. / EN: Live-verify one prefixed endpoint from /lab/try."],
+  "components": ["lab", "endpoint-try", "proxy"]
+}

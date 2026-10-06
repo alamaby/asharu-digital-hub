@@ -1,0 +1,8 @@
+{
+  "brand": "Project Docs",
+  "name": "My Project",
+  "description": "Lifecycle documentation and verified change tracker for this project.",
+  "docs_version": "1.0.0",
+  "repository_root": ".",
+  "stack": ["powershell", "html", "css", "javascript"]
+}

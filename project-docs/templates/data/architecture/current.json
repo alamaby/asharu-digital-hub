@@ -1,0 +1,18 @@
+{
+  "version": "v0.1.0",
+  "components": [
+    {
+      "name": "core",
+      "role": "Primary application logic and business rules."
+    },
+    {
+      "name": "project-docs",
+      "role": "Lifecycle tracking and static documentation site generator."
+    }
+  ],
+  "edges": [
+    ["core", "project-docs"]
+  ],
+  "external_binaries": ["powershell / pwsh"],
+  "pipeline": ["Source Code", "Build-ProjectDocs.ps1", "dist/project-docs"]
+}

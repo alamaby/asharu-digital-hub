@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-28-lab-stats-collapsible",
+  "date": "2026-09-28",
+  "time": "10:48:44",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Statistik per-run Lab jadi collapsible default tertutup / Lab per-run stats collapsible, default collapsed",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: 3 chart per-run LabStats (token/latensi/kecepatan) dibungkus details native default-collapsed; KPI dan tabel peringkat tetap tampil. / EN: The 3 LabStats per-run charts (tokens/latency/speed) are wrapped in native collapsed-by-default details; KPI and ranking tables stay visible.",
+  "problem_before": "ID: Tiga chart per-run selalu terbuka membuat halaman /lab panjang dan berisik atas request user. / EN: The three per-run charts were always open, making the /lab page long and noisy, per user request.",
+  "solution": "ID: Bungkus 3 blok chart (tokensPerRun, latencyPerRun, speedPerRun) dengan <details> native tanpa atribut open; summary memakai judul chart existing; tabel sr-only ikut di dalam. / EN: Wrapped the 3 chart blocks in native details without the open attribute; summary reuses existing chart titles; the sr-only table moves inside.",
+  "reason": "ID: Halaman hasil lebih ringkas; pola details native sudah dipakai di LabCompareGrid dan LabHistory, DOM tetap ada saat closed (aman screen reader, test existing tak patah). / EN: Shorter results page; the native details pattern already exists in LabCompareGrid and LabHistory, DOM stays present when closed (screen-reader safe, existing tests unbroken).",
+  "files_affected": ["src/components/lab/LabStats.tsx", "src/components/lab/LabUi.test.tsx"],
+  "user_impact": "ID: Chart per-run tertutup default, klik judul untuk membuka; tanpa key i18n baru. / EN: Per-run charts collapsed by default, click a title to open; no new i18n keys.",
+  "tech_impact": "ID: Perubahan komponen klien saja; pilihan buka/tutup tidak persisten antar reload (native details). / EN: Client-component change only; open/closed choice does not persist across reloads (native details).",
+  "validation": {
+    "build": "not-verified: build outcome not recorded for 4419c1d",
+    "test": "1174/1174 tests passed (per project memory 2026-09-28)",
+    "lint": "typecheck passed, eslint 0 errors with 12 pre-existing warnings (per project memory 2026-09-28)"
+  },
+  "risks": ["ID: Test memakai closest('details') karena getAllByRole('details') tak cocok di versi testing-library dipakai. / EN: Tests use closest('details') because getAllByRole('details') does not match in the testing-library version used."],
+  "breaking_changes": [],
+  "migration_notes": "None",
+  "commits": ["4419c1d8158aa611f3d218e0706bb3155f159cf8"],
+  "next_steps": ["ID: Verifikasi live di /id/lab (chart tertutup, KPI tampil). / EN: Live-verify in /id/lab (charts closed, KPIs visible)."],
+  "components": ["lab", "ui", "a11y"]
+}

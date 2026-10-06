@@ -18,7 +18,10 @@ const eslintConfig = [
       'out/**',
       'build/**',
       'coverage/**',
-      'next-env.d.ts'
+      'next-env.d.ts',
+      // Generated/static docs are not application code (own CSS/JS, build dist copy).
+      'project-docs/**',
+      'dist/**'
     ]
   }
 ];

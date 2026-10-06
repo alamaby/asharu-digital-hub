@@ -1,0 +1,33 @@
+{
+  "id": "2026-01-01-initial-setup",
+  "date": "2026-01-01",
+  "time": "00:00:00",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Initial documentation baseline setup",
+  "category": "docs",
+  "status": "released",
+  "summary": "Initialized project documentation structure with data-driven static generator.",
+  "problem_before": "No structured lifecycle documentation or verified changelog existed.",
+  "solution": "Added project-docs static site generator, baseline architecture, and release tracking.",
+  "reason": "Establish transparent, verified lifecycle documentation for contributors and users.",
+  "files_affected": [
+    "project-docs/data/project.json",
+    "project-docs/tools/Build-ProjectDocs.ps1"
+  ],
+  "user_impact": "Documentation website available for browsing architecture and change history.",
+  "tech_impact": "Zero external dependencies; builds directly with PowerShell 5.1 / 7+.",
+  "validation": {
+    "build": "Build-ProjectDocs.ps1 exits with code 0",
+    "test": "Internal link validation passed",
+    "lint": "Verified UTF-8 with BOM and valid JSON"
+  },
+  "risks": [],
+  "breaking_changes": [],
+  "migration_notes": "None required.",
+  "commits": ["0000000000000000000000000000000000000000"],
+  "next_steps": [
+    "Record upcoming feature changes as granular JSON entries."
+  ],
+  "components": ["docs"]
+}

@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-10-02-threads-playwright-poster",
+  "date": "2026-10-02",
+  "time": "11:41:48",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Poster Threads manual via Playwright / Manual Threads poster via Playwright",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: Tooling scripts/threads-poster baru: login interaktif, job JSON, dry-run headed, posting dengan delay manusiawi, dan report JSON. / EN: New scripts/threads-poster tooling: interactive login, JSON jobs, headed dry-run, human-like delayed posting, and JSON reports.",
+  "problem_before": "ID: Belum ada cara manual tepercaya untuk memposting thread (main + reply) ke Threads dari repo ini. / EN: There was no trusted manual way to post threads (main plus replies) to Threads from this repo.",
+  "solution": "ID: Modul auth/probe/thread/job/delays/locators/report/selectors + job contoh + RUNBOOK + script npm threads:auth/probe/post; auth.json + reports/ di-gitignore; E2E bertahap (dry-run, fast 1 reply, headless, full-speed) dengan fallback headed bila kena challenge. / EN: New auth/probe/thread/job/delays/locators/report/selectors modules plus an example job plus RUNBOOK plus threads:auth/probe/post npm scripts; auth.json plus reports/ gitignored; staged E2E (dry-run, fast 1-reply, headless, full-speed) with headed fallback on challenges.",
+  "reason": "ID: Posting manual terkontrol (bukan bot terjadwal) untuk distribusi konten Threads dengan jeda aman. / EN: Controlled manual posting (not a scheduled bot) for Threads content distribution with safe delays.",
+  "files_affected": ["scripts/threads-poster/auth.mjs", "scripts/threads-poster/probe.mjs", "scripts/threads-poster/thread.mjs", "scripts/threads-poster/job.mjs", "scripts/threads-poster/job.test.mjs", "scripts/threads-poster/delays.mjs", "scripts/threads-poster/delays.test.mjs", "scripts/threads-poster/locators.mjs", "scripts/threads-poster/locators.test.mjs", "scripts/threads-poster/report.mjs", "scripts/threads-poster/report.test.mjs", "scripts/threads-poster/selectors.json", "scripts/threads-poster/job.example.json", "scripts/threads-poster/RUNBOOK.md", "package.json", "package-lock.json", ".gitignore", "plans/2026-10-02-threads-playwright-poster-implementation-plan.md"],
+  "user_impact": "ID: Operator bisa posting thread via CLI dengan dry-run aman sebelum posting nyata. / EN: Operators can post threads via CLI with a safe dry-run before real posting.",
+  "tech_impact": "ID: Dependensi dev Playwright baru; kredensial hanya lokal (auth.json gitignore); file .mjs tak ikut typecheck. / EN: New Playwright dev dependency; credentials stay local (gitignored auth.json); .mjs files are excluded from typecheck.",
+  "validation": {
+    "build": "not-verified: build outcome not recorded for 7e0cfc2",
+    "test": "1234 tests passed, baseline 1198 plus 36 new (per plan Progress Log 2026-10-02 08:35)",
+    "lint": "typecheck 0 errors, eslint 0 errors (per plan Progress Log 2026-10-02 08:35)"
+  },
+  "risks": ["ID: Selector Threads bisa berubah sewaktu-waktu; login challenge memaksa mode headed. / EN: Threads selectors can change at any time; login challenges force headed mode.", "ID: Post uji wajib dihapus setelah verifikasi E2E. / EN: Test posts must be deleted after E2E verification."],
+  "breaking_changes": [],
+  "migration_notes": "ID: Jalankan npm run threads:auth sekali untuk membuat auth.json lokal sebelum posting. / EN: Run npm run threads:auth once to create the local auth.json before posting.",
+  "commits": ["7e0cfc24dff5b1be7de30060908227e8bf07501d"],
+  "next_steps": ["ID: Verifikasi E2E bertahap S9 + hapus post uji. / EN: Staged S9 E2E verification plus test-post cleanup."],
+  "components": ["threads", "playwright", "scripts", "ops"]
+}

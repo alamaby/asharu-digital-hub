@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-28-automation-email-research-link",
+  "date": "2026-09-28",
+  "time": "11:14:30",
+  "seq": 2,
+  "version": "v0.1.0",
+  "title": "Link Buka halaman riset di email draf riset / Open-research-page link in research-draft email",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: Email Draf riset siap direview kini menyisipkan link Buka halaman riset (/id/konten/riset/{id}) di atas link review. / EN: The research-draft-ready email now inserts an Open research page link (/id/konten/riset/{id}) above the review link.",
+  "problem_before": "ID: Email hanya menautkan halaman review; penerima tak bisa lompat langsung ke halaman riset sesi terkait. / EN: The email only linked the review page; recipients could not jump straight to the related session research page.",
+  "solution": "ID: Input sendDraftReadyEmail tambah field opsional researchSessionId; body HTML sisipkan paragraf tautan riset sebelum paragraf review; runner meneruskan sessionId yang sudah ada di scope. / EN: Added an optional researchSessionId field to the sendDraftReadyEmail input; the HTML body inserts the research link paragraph before the review paragraph; the runner passes the already-in-scope sessionId.",
+  "reason": "ID: Mempercepat navigasi admin dari notifikasi email ke konteks riset penuh. / EN: Speeds admin navigation from the email notification to full research context.",
+  "files_affected": ["src/lib/automation/email.ts", "src/lib/automation/runner.ts", "src/lib/automation/email.test.ts"],
+  "user_impact": "ID: Email memuat 2 link berurutan: riset lalu review; email test tanpa sessionId tetap valid (link riset absen). / EN: Emails carry 2 ordered links: research then review; test emails without a sessionId stay valid (research link absent).",
+  "tech_impact": "ID: Field opsional sehingga pemanggil lama (email test automation) tak perlu diubah. / EN: Optional field so existing callers (automation test email) need no change.",
+  "validation": {
+    "build": "not-verified: build outcome not recorded for 81a8792",
+    "test": "1176/1176 tests passed with 2 new tests (per project memory 2026-09-28)",
+    "lint": "typecheck passed, eslint 0 errors with 12 pre-existing warnings (per project memory 2026-09-28)"
+  },
+  "risks": ["ID: URL memakai path /id (Indonesia); varian /en tidak ditautkan. / EN: URL uses the /id (Indonesian) path; the /en variant is not linked."],
+  "breaking_changes": [],
+  "migration_notes": "None",
+  "commits": ["81a87922b00499ac3ad3200a8e9dd13fc31ed5c9"],
+  "next_steps": ["ID: Deploy Vercel agar tampil di prod. / EN: Deploy to Vercel to show in prod."],
+  "components": ["automation", "email", "research"]
+}

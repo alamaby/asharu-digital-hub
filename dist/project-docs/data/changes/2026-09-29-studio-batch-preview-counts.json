@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-29-studio-batch-preview-counts",
+  "date": "2026-09-29",
+  "time": "17:00:41",
+  "seq": 2,
+  "version": "v0.1.0",
+  "title": "Preview batch: hitungan blok-vs-baris + detail tolak per-blok / Batch preview: block-vs-line counts plus per-block reject detail",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: Preview BatchForm menampilkan '{count} blok dari {lines} baris' dan tiap blok ditolak menyebut nomor blok 1-based + panjang karakter + hint split. / EN: The BatchForm preview shows '{count} blocks from {lines} lines' and each rejected block names its 1-based block number plus character length plus a split hint.",
+  "problem_before": "ID: Preview tak menjelaskan pemisahan blok vs baris; pesan tolak tak menyebut blok mana yang bermasalah. / EN: The preview did not explain block-vs-line splitting; rejection messages did not say which block was problematic.",
+  "solution": "ID: Helper murni countBatchLines + tipe rejectedItem (nomor blok 1-based, panjang char); notice submit ikut format sama; perbaiki hardcoded ID + index 0-based. / EN: Pure countBatchLines helper plus a rejectedItem type (1-based block number, char length); the submit notice follows the same format; fixed hardcoded IDs plus 0-based indexes.",
+  "reason": "ID: Diagnosis input batch 50-blok butuh penunjuk posisi yang tepat. / EN: Diagnosing 50-block batch input needs precise position pointers.",
+  "files_affected": ["src/components/studio/BatchForm.tsx", "src/lib/studio/validation.ts", "src/lib/studio/validation.test.ts", "src/messages/id.json", "src/messages/en.json", "plans/2026-09-29-studio-batch-generate-plan.md", ".memory/2026-09-29/170000-batch-preview-ux.md", ".memory/2026-09-29/114300-studio-batch-migration-applied.md", ".memory/README.md"],
+  "user_impact": "ID: Pengguna tahu persis blok mana ditolak dan mengapa, plus saran split. / EN: Users know exactly which block was rejected and why, plus split advice.",
+  "tech_impact": "ID: Helper validasi murni + 4 test baru; tanpa perubahan API/DB. / EN: Pure validation helper plus 4 new tests; no API/DB change.",
+  "validation": {
+    "build": "Next build passed (per plan Progress Log 2026-09-29 17:00)",
+    "test": "1198 tests passed (per plan Progress Log 2026-09-29 17:00)",
+    "lint": "typecheck passed, eslint 0 errors; message catalogs valid (per plan Progress Log 2026-09-29 17:00)"
+  },
+  "risks": ["ID: Tidak ada risiko operasional teridentifikasi. / EN: No operational risks identified."],
+  "breaking_changes": [],
+  "migration_notes": "None",
+  "commits": ["538355b6374ae900e707baa48ac734f721f8664f"],
+  "next_steps": ["ID: Lanjut opsi C (highlight overflow) — sudah masuk commit 125a5a4. / EN: Continue with option C (overflow highlight) — already in commit 125a5a4."],
+  "components": ["studio", "batch", "ux", "i18n"]
+}

@@ -1,0 +1,12 @@
+{
+  "latest": "v0.1.0",
+  "releases": [
+    {
+      "version": "v0.1.0",
+      "date": "2026-01-01",
+      "status": "released",
+      "notes": "Initial documented release baseline.",
+      "changes": ["2026-01-01-initial-setup"]
+    }
+  ]
+}

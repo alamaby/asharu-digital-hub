@@ -1,0 +1,28 @@
+﻿{
+  "id": "2026-09-29-studio-batch-route",
+  "date": "2026-09-29",
+  "time": "11:26:38",
+  "seq": 1,
+  "version": "v0.1.0",
+  "title": "Rute /studio/batch: enqueue/list/retry/delete + unduh ZIP / /studio/batch route: enqueue/list/retry/delete plus ZIP download",
+  "category": "feat",
+  "status": "released",
+  "summary": "ID: Rute admin baru /studio/batch untuk generate batch hingga 50 prompt: validasi, antrean, riwayat, retry, hapus, unduh ZIP. / EN: New admin route /studio/batch for batch generation of up to 50 prompts: validation, queueing, history, retry, delete, ZIP download.",
+  "problem_before": "ID: Studio hanya melayani 1 prompt per generate; kebutuhan volume (50 varian) tak terlayani. / EN: Studio served 1 prompt per generation; volume needs (50 variants) were unserved.",
+  "solution": "ID: Server action enqueueStudioBatch/listBatchImages/retryFailedBatchImages/deleteStudioBatch + tabel studio_batches (migrasi 20260929000001 applied prod via MCP) + BatchForm/BatchHistory/BatchPageClient + item sidebar studioBatch + i18n id/en + ZIP via JSZip dynamic import. / EN: New enqueueStudioBatch/listBatchImages/retryFailedBatchImages/deleteStudioBatch server actions plus the studio_batches table (migration 20260929000001 applied to prod via MCP) plus BatchForm/BatchHistory/BatchPageClient plus a studioBatch sidebar item plus id/en i18n plus ZIP via dynamic JSZip import.",
+  "reason": "ID: Batch mempercepat produksi varian visual dengan tetap menghormati kuota harian dan cap 50 prompt. / EN: Batching speeds visual-variant production while respecting the daily quota and the 50-prompt cap.",
+  "files_affected": ["src/app/[locale]/(admin)/studio/batch/page.tsx", "src/components/studio/BatchForm.tsx", "src/components/studio/BatchHistory.tsx", "src/components/studio/BatchPageClient.tsx", "src/components/studio/StudioUi.test.tsx", "src/components/admin/shell/admin-nav.ts", "src/config/navigation.ts", "src/i18n/routing.ts", "src/lib/studio/actions.ts", "src/lib/studio/actions.test.ts", "src/lib/studio/types.ts", "src/lib/studio/validation.ts", "src/lib/studio/validation.test.ts", "src/messages/id.json", "src/messages/en.json", "src/middleware.test.ts", "package.json", "package-lock.json", "plans/2026-09-29-studio-batch-generate-plan.md", "supabase"],
+  "user_impact": "ID: Admin bisa enqueue banyak prompt sekaligus, pantau progres per batch, unduh semua (.zip). / EN: Admins can enqueue many prompts at once, track per-batch progress, and download all (.zip).",
+  "tech_impact": "ID: Tabel studio_batches + knob max_batch_prompts=50 + kolom batch_id + 2 index + 4 policy RLS; Batch V1 tak mendukung gambar referensi (img2img). / EN: New studio_batches table plus max_batch_prompts=50 knob plus batch_id column plus 2 indexes plus 4 RLS policies; Batch V1 does not support reference images (img2img).",
+  "validation": {
+    "build": "Next build passed with /studio/batch route rendered (per plan Progress Log 2026-09-29)",
+    "test": "1194 tests passed across 119 files (per plan Progress Log 2026-09-29)",
+    "lint": "typecheck 0 errors, eslint 0 errors (per plan Progress Log 2026-09-29)"
+  },
+  "risks": ["ID: Perlu naikkan daily_limit minimal 50 sebelum uji batch-50. / EN: The daily_limit must be raised to at least 50 before a batch-50 test."],
+  "breaking_changes": [],
+  "migration_notes": "ID: Migrasi 20260929000001_studio_batch wajib applied (sudah applied prod via MCP 2026-09-29). / EN: Migration 20260929000001_studio_batch must be applied (already applied to prod via MCP on 2026-09-29).",
+  "commits": ["8368e5b554be953ef755ab4193740694125af5c0"],
+  "next_steps": ["ID: Naikkan daily_limit lalu uji batch-50 live. / EN: Raise daily_limit then live-test batch-50."],
+  "components": ["studio", "batch", "admin", "i18n", "supabase"]
+}

@@ -1,0 +1,8 @@
+﻿{
+  "brand": "Asharu",
+  "name": "Asharu Digital Hub",
+  "description": "ID: Toko online, media sosial, produk afiliasi, dan properti dalam satu tempat (asharu.id) — dokumentasi lifecycle dan pelacak perubahan terverifikasi. / EN: Online store, social media, affiliate products, and property in one hub (asharu.id) — lifecycle documentation and verified change tracker.",
+  "docs_version": "1.0.0",
+  "repository_root": ".",
+  "stack": ["next.js 15", "react 19", "typescript strict", "tailwind css 4.3", "next-intl v4", "zod", "supabase postgres+rls", "supabase vault", "pg_cron", "resend", "playwright", "powershell", "html", "css", "javascript"]
+}
