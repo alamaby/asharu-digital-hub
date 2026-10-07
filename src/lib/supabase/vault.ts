@@ -1,5 +1,10 @@
 import type { KeyRow, ModelRow } from '@/lib/llm/types';
 import { getServiceClient } from './service';
+import {
+  DEFAULT_FAILURE_THRESHOLD,
+  incrementFailureCounter,
+  incrementUsageCounter
+} from './counters';
 import { reportError } from '@/lib/notifications/error-events';
 
 /**
@@ -59,47 +64,20 @@ export async function fetchOrderedKeys(providerId: string): Promise<KeyRow[]> {
 }
 
 export async function markKeyUsage(keyId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('llm_provider_keys')
-    .select('usage_count')
-    .eq('id', keyId)
-    .single();
-  if (error) throw new Error(`markKeyUsage select: ${error.message}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.usage_count ?? 0;
-  const { error: updError } = await supabase
-    .from('llm_provider_keys')
-    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() } as unknown as Record<string, unknown>)
-    .eq('id', keyId);
-  if (updError) throw new Error(`markKeyUsage update: ${updError.message}`);
+  await incrementUsageCounter('llm_provider_keys', keyId);
 }
 
 export async function markKeyFailure(keyId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data } = await supabase
-    .from('llm_provider_keys')
-    .select('failure_count')
-    .eq('id', keyId)
-    .single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.failure_count ?? 0;
-  const next = current + 1;
-  const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) {
-    patch.is_active = false;
+  const next = await incrementFailureCounter('llm_provider_keys', keyId);
+  if (next > DEFAULT_FAILURE_THRESHOLD) {
     try {
-      const svc = getServiceClient();
-      if (svc) {
-        await reportError(svc, {
-          category: 'llm', source: 'markKeyFailure', severity: 'warning',
-          message: `LLM provider key auto-disabled setelah ${next} kegagalan (key_id ${keyId.slice(0, 8)})`,
-          details: { key_id: keyId }
-        });
-      }
+      await reportError(getServiceClient(), {
+        category: 'llm', source: 'markKeyFailure', severity: 'warning',
+        message: `LLM provider key auto-disabled setelah ${next} kegagalan (key_id ${keyId.slice(0, 8)})`,
+        details: { key_id: keyId }
+      });
     } catch { /* swallow */ }
   }
-  await supabase.from('llm_provider_keys').update(patch).eq('id', keyId);
 }
 
 export async function fetchOrderedModels(providerId: string): Promise<ModelRow[]> {
@@ -118,37 +96,18 @@ export async function fetchOrderedModels(providerId: string): Promise<ModelRow[]
 }
 
 export async function markModelUsage(modelId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data, error } = await supabase.from('llm_models').select('usage_count').eq('id', modelId).single();
-  if (error) throw new Error(`markModelUsage select: ${error.message}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.usage_count ?? 0;
-  const { error: updError } = await supabase
-    .from('llm_models')
-    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() } as unknown as Record<string, unknown>)
-    .eq('id', modelId);
-  if (updError) throw new Error(`markModelUsage update: ${updError.message}`);
+  await incrementUsageCounter('llm_models', modelId);
 }
 
 export async function markModelFailure(modelId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data } = await supabase.from('llm_models').select('failure_count').eq('id', modelId).single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.failure_count ?? 0;
-  const next = current + 1;
-  const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) {
-    patch.is_active = false;
+  const next = await incrementFailureCounter('llm_models', modelId);
+  if (next > DEFAULT_FAILURE_THRESHOLD) {
     try {
-      const svc = getServiceClient();
-      if (svc) {
-        await reportError(svc, {
-          category: 'llm', source: 'markModelFailure', severity: 'warning',
-          message: `LLM model auto-disabled setelah ${next} kegagalan (model_id ${modelId.slice(0, 8)})`,
-          details: { model_id: modelId }
-        });
-      }
+      await reportError(getServiceClient(), {
+        category: 'llm', source: 'markModelFailure', severity: 'warning',
+        message: `LLM model auto-disabled setelah ${next} kegagalan (model_id ${modelId.slice(0, 8)})`,
+        details: { model_id: modelId }
+      });
     } catch { /* swallow */ }
   }
-  await supabase.from('llm_models').update(patch).eq('id', modelId);
 }

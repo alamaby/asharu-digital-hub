@@ -67,6 +67,80 @@ export interface LLMCompletionInput {
   strictPinned?: boolean;
   /** Per-request reasoning effort override (Chat Lab per-target); null/absen = ikut config DB. */
   reasoningOverride?: ReasoningOverride;
+  /**
+   * Batas total waktu (ms) untuk SELURUH waterfall, bukan per request.
+   * Default `DEFAULT_LLM_DEADLINE_MS`. Tiap provider×model×key dibatasi
+   * `fetchWithTimeout` 90s, jadi tanpa deadline total N percobaan dapat
+   * melewati maxDuration function (gejala "worker menggantung 138–300s").
+   */
+  deadlineMs?: number;
+}
+
+/**
+ * Batas total default: di bawah `maxDuration = 300` milik route worker supaya
+ * masih ada waktu untuk menulis log + reportError sebelum function dibunuh.
+ */
+export const DEFAULT_LLM_DEADLINE_MS = 240_000;
+
+interface LlmCallLogEntry {
+  requestId?: string | null;
+  sessionId?: string | null;
+  providerSlug: string;
+  providerId: string;
+  modelId: string;
+  keyHash?: string | null;
+  keyId?: string | null;
+  stage?: string | null;
+  messages: ChatInput['messages'];
+  responseText?: string | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  finishReason?: string | null;
+  responseTruncated?: boolean;
+  thoughtTokens?: number | null;
+  isFallback?: boolean;
+  latencyMs?: number | null;
+  httpStatus?: number | null;
+  errorMessage?: string | null;
+}
+
+/**
+ * Satu-satunya tempat menulis `llm_call_logs`.
+ *
+ * Sebelumnya payload yang sama disalin 4× di dalam `runLLMCompletion` (dan 4×
+ * lagi di jalur pinned), sehingga penambahan kolom mudah tertinggal di salah
+ * satu salinan. Kegagalan insert tidak pernah menggagalkan pemanggil — log
+ * audit tidak boleh menjatuhkan pipeline konten.
+ */
+async function logLlmCall(supabase: SupabaseClient, entry: LlmCallLogEntry): Promise<void> {
+  const { error: logError } = await supabase
+    .from('llm_call_logs')
+    .insert({
+      request_id: entry.requestId ?? null,
+      session_id: entry.sessionId ?? null,
+      provider_slug: entry.providerSlug,
+      provider_id: entry.providerId,
+      model_id: entry.modelId,
+      key_hash: entry.keyHash ?? null,
+      key_id: entry.keyId ?? null,
+      stage: entry.stage ?? null,
+      request_messages: entry.messages as unknown as Record<string, unknown>,
+      response_text: entry.responseText == null ? null : entry.responseText.slice(0, 8000),
+      prompt_tokens: entry.promptTokens ?? null,
+      completion_tokens: entry.completionTokens ?? null,
+      total_tokens: entry.totalTokens ?? null,
+      finish_reason: entry.finishReason ?? null,
+      response_truncated: entry.responseTruncated ?? false,
+      thought_tokens: entry.thoughtTokens ?? null,
+      is_fallback: entry.isFallback ?? false,
+      latency_ms: entry.latencyMs ?? null,
+      http_status: entry.httpStatus ?? null,
+      error: entry.errorMessage == null ? null : entry.errorMessage.slice(0, 2000)
+    } as unknown as Record<string, unknown>);
+  if (logError) {
+    console.error(`[llm] call log insert failed (${entry.stage ?? '-'}): ${logError.message}`);
+  }
 }
 
 /**
@@ -82,6 +156,7 @@ export async function runLLMCompletion(
   supabase: SupabaseClient,
   input: LLMCompletionInput
 ): Promise<{ output: ChatOutput; providerSlug: string; model: string; keyHash: string; latencyMs: number; fallback?: boolean }> {
+  const deadlineAt = Date.now() + (input.deadlineMs ?? DEFAULT_LLM_DEADLINE_MS);
   const registry = new ProviderRegistry();
   const providers = await registry.listActive();
   if (providers.length === 0) {
@@ -133,8 +208,9 @@ export async function runLLMCompletion(
     }
   }
   let lastError: unknown = null;
+  let deadlineHit = false;
   const triedProviders: string[] = [];
-  for (const prov of providers) {
+  outer: for (const prov of providers) {
     triedProviders.push(prov.slug);
     const pool = new KeyPool(prov);
     // DB-driven model order
@@ -147,6 +223,15 @@ export async function runLLMCompletion(
     }
 
     for (const mod of candidateModels) {
+      // Deadline total: hentikan waterfall alih-alih membiarkan function
+      // dibunuh di tengah attempt (output setengah jadi + log tak lengkap).
+      if (Date.now() >= deadlineAt) {
+        deadlineHit = true;
+        lastError = new Error(
+          `LLM deadline ${input.deadlineMs ?? DEFAULT_LLM_DEADLINE_MS}ms tercapai sebelum attempt berikutnya (provider ${prov.slug}, model ${mod.model_id})`
+        );
+        break outer;
+      }
       const params = applyReasoningOverride(capEffortForStage(resolveModelParams(mod.config), input.stage), input.reasoningOverride);
       try {
         const { result, keyRow } = await pool.withFallback(async (apiKey) => {
@@ -166,30 +251,28 @@ export async function runLLMCompletion(
         // waterfall lanjut ke model berikutnya.
         if (!result.text || result.text.trim().length === 0) {
           const emptyMsg = `LLM returned empty response (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason ?? 'unknown'}, latency ${result.latencyMs}ms)`;
-          await supabase
-            .from('llm_call_logs')
-            .insert({
-              request_id: input.requestId ?? null,
-              session_id: input.sessionId ?? null,
-              provider_slug: prov.slug,
-              provider_id: prov.id,
-              model_id: result.model,
-              key_hash: keyRow.key_hash,
-              key_id: keyRow.id,
-              stage: input.stage ?? null,
-              request_messages: input.messages as unknown as Record<string, unknown>,
-              response_text: (result.rawPreview ?? '').slice(0, 8000),
-              prompt_tokens: result.usage?.promptTokens ?? null,
-              completion_tokens: result.usage?.completionTokens ?? null,
-              total_tokens: result.usage?.totalTokens ?? null,
-              finish_reason: result.finishReason ?? null,
-              response_truncated: isLengthCutoff(result.finishReason),
-              thought_tokens: result.thoughtTokens ?? null,
-              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
-              latency_ms: result.latencyMs,
-              http_status: 200,
-              error: emptyMsg.slice(0, 2000)
-            } as unknown as Record<string, unknown>);
+          await logLlmCall(supabase, {
+            requestId: input.requestId,
+            sessionId: input.sessionId,
+            providerSlug: prov.slug,
+            providerId: prov.id,
+            modelId: result.model,
+            keyHash: keyRow.key_hash,
+            keyId: keyRow.id,
+            stage: input.stage,
+            messages: input.messages,
+            responseText: result.rawPreview ?? '',
+            promptTokens: result.usage?.promptTokens,
+            completionTokens: result.usage?.completionTokens,
+            totalTokens: result.usage?.totalTokens,
+            finishReason: result.finishReason,
+            responseTruncated: isLengthCutoff(result.finishReason),
+            thoughtTokens: result.thoughtTokens,
+            isFallback: Boolean(input.modelUuid ?? input.modelHint),
+            latencyMs: result.latencyMs,
+            httpStatus: 200,
+            errorMessage: emptyMsg
+          });
           if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
             await markModelFailure(mod.id).catch(() => undefined);
           }
@@ -202,30 +285,28 @@ export async function runLLMCompletion(
         // berikutnya, bukan sukses diam-diam.
         if (isLengthCutoff(result.finishReason)) {
           const truncMsg = `LLM output terpotong limit (provider ${prov.slug}, model ${result.model}, finish=${result.finishReason}, completion ${result.usage?.completionTokens ?? '?'} tokens, latency ${result.latencyMs}ms)`;
-          await supabase
-            .from('llm_call_logs')
-            .insert({
-              request_id: input.requestId ?? null,
-              session_id: input.sessionId ?? null,
-              provider_slug: prov.slug,
-              provider_id: prov.id,
-              model_id: result.model,
-              key_hash: keyRow.key_hash,
-              key_id: keyRow.id,
-              stage: input.stage ?? null,
-              request_messages: input.messages as unknown as Record<string, unknown>,
-              response_text: result.text.slice(0, 8000),
-              prompt_tokens: result.usage?.promptTokens ?? null,
-              completion_tokens: result.usage?.completionTokens ?? null,
-              total_tokens: result.usage?.totalTokens ?? null,
-              finish_reason: result.finishReason ?? null,
-              response_truncated: true,
-              thought_tokens: result.thoughtTokens ?? null,
-              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
-              latency_ms: result.latencyMs,
-              http_status: 200,
-              error: truncMsg.slice(0, 2000)
-            } as unknown as Record<string, unknown>);
+          await logLlmCall(supabase, {
+            requestId: input.requestId,
+            sessionId: input.sessionId,
+            providerSlug: prov.slug,
+            providerId: prov.id,
+            modelId: result.model,
+            keyHash: keyRow.key_hash,
+            keyId: keyRow.id,
+            stage: input.stage,
+            messages: input.messages,
+            responseText: result.text,
+            promptTokens: result.usage?.promptTokens,
+            completionTokens: result.usage?.completionTokens,
+            totalTokens: result.usage?.totalTokens,
+            finishReason: result.finishReason,
+            responseTruncated: true,
+            thoughtTokens: result.thoughtTokens,
+            isFallback: Boolean(input.modelUuid ?? input.modelHint),
+            latencyMs: result.latencyMs,
+            httpStatus: 200,
+            errorMessage: truncMsg
+          });
           if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
             await markModelFailure(mod.id).catch(() => undefined);
           }
@@ -236,34 +317,27 @@ export async function runLLMCompletion(
         if (mod.id !== '__hint__' && mod.id !== '__fallback__') {
           await markModelUsage(mod.id).catch(() => undefined);
         }
-        {
-          const { error: logError } = await supabase
-            .from('llm_call_logs')
-            .insert({
-              request_id: input.requestId ?? null,
-              session_id: input.sessionId ?? null,
-              provider_slug: prov.slug,
-              provider_id: prov.id,
-              model_id: result.model,
-              key_hash: keyRow.key_hash,
-              key_id: keyRow.id,
-              stage: input.stage ?? null,
-              request_messages: input.messages as unknown as Record<string, unknown>,
-              response_text: result.text.slice(0, 8000),
-              prompt_tokens: result.usage?.promptTokens ?? null,
-              completion_tokens: result.usage?.completionTokens ?? null,
-              total_tokens: result.usage?.totalTokens ?? null,
-              finish_reason: result.finishReason ?? null,
-              response_truncated: isLengthCutoff(result.finishReason),
-              thought_tokens: result.thoughtTokens ?? null,
-              is_fallback: Boolean(input.modelUuid ?? input.modelHint),
-              latency_ms: result.latencyMs,
-              http_status: 200
-            } as unknown as Record<string, unknown>);
-          if (logError) {
-            console.error(`[llm] call log insert failed (${input.stage ?? '-'}): ${logError.message}`);
-          }
-        }
+        await logLlmCall(supabase, {
+          requestId: input.requestId,
+          sessionId: input.sessionId,
+          providerSlug: prov.slug,
+          providerId: prov.id,
+          modelId: result.model,
+          keyHash: keyRow.key_hash,
+          keyId: keyRow.id,
+          stage: input.stage,
+          messages: input.messages,
+          responseText: result.text,
+          promptTokens: result.usage?.promptTokens,
+          completionTokens: result.usage?.completionTokens,
+          totalTokens: result.usage?.totalTokens,
+          finishReason: result.finishReason,
+          responseTruncated: isLengthCutoff(result.finishReason),
+          thoughtTokens: result.thoughtTokens,
+          isFallback: Boolean(input.modelUuid ?? input.modelHint),
+          latencyMs: result.latencyMs,
+          httpStatus: 200
+        });
         return {
           output,
           providerSlug: prov.slug,
@@ -275,22 +349,17 @@ export async function runLLMCompletion(
       } catch (e) {
         lastError = e;
         const msg = e instanceof Error ? e.message : String(e);
-        const { error: logError } = await supabase
-          .from('llm_call_logs')
-          .insert({
-            request_id: input.requestId ?? null,
-            session_id: input.sessionId ?? null,
-            provider_slug: prov.slug,
-            provider_id: prov.id,
-            model_id: mod.model_id,
-            stage: input.stage ?? null,
-            request_messages: input.messages as unknown as Record<string, unknown>,
-            error: msg.slice(0, 2000),
-            http_status: e instanceof LLMHttpError ? e.status : null
-          } as unknown as Record<string, unknown>);
-        if (logError) {
-          console.error(`[llm] error log insert failed (${input.stage ?? '-'}): ${logError.message}`);
-        }
+        await logLlmCall(supabase, {
+          requestId: input.requestId,
+          sessionId: input.sessionId,
+          providerSlug: prov.slug,
+          providerId: prov.id,
+          modelId: mod.model_id,
+          stage: input.stage,
+          messages: input.messages,
+          errorMessage: msg,
+          httpStatus: e instanceof LLMHttpError ? e.status : null
+        });
         // Continue to next model in same provider
       }
     }
@@ -300,7 +369,7 @@ export async function runLLMCompletion(
   await reportError(supabase, {
     category: 'llm', source: 'runLLMCompletion', severity: 'error',
     stage: input.stage ?? null, message: finalMsg,
-    details: { providers: [...new Set(triedProviders)] },
+    details: { providers: [...new Set(triedProviders)], deadlineExceeded: deadlineHit },
     sessionId: input.sessionId ?? null
   });
   throw finalError;

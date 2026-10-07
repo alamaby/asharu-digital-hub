@@ -10,14 +10,18 @@ const isProd = process.env.NODE_ENV === 'production';
 // Hostname Storage penuh (bukan wildcard): hanya proyek Supabase sendiri yang
 // boleh jadi sumber <img>. Diambil dari NEXT_PUBLIC_SUPABASE_URL agar otomatis
 // ikut berubah bila project ref ganti; fallback ke ref production saat env kosong.
-function supabaseImageHost(): string {
+function supabaseImageHostname(): string {
   try {
     const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname;
-    if (/^[a-z0-9-]+\.supabase\.co$/.test(host)) return `https://${host}`;
+    if (/^[a-z0-9-]+\.supabase\.co$/.test(host)) return host;
   } catch {
     // env belum diisi (dev awal) — pakai ref production.
   }
-  return 'https://hljjmmejmirqikmbaryl.supabase.co';
+  return 'hljjmmejmirqikmbaryl.supabase.co';
+}
+
+function supabaseImageHost(): string {
+  return `https://${supabaseImageHostname()}`;
 }
 
 const contentSecurityPolicy = [
@@ -73,11 +77,15 @@ const nextConfig: NextConfig = {
   // Allow <Image/> to optimize Supabase public Storage URLs (affiliate-images
   // bucket). CSP img-src already permits the Supabase host — this only enables
   // the Next.js optimizer for it. See M1.3 / M3 DB-only migration.
+  // Hostname di-pin ke proyek sendiri (bukan `*.supabase.co`): wildcard akan
+  // membuat optimizer Next.js bisa dipakai sebagai proxy untuk objek publik
+  // project Supabase siapa pun — sekaligus menyalahi CSP `img-src` yang sudah
+  // membatasi ke host ini.
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
+        hostname: supabaseImageHostname(),
         pathname: '/storage/v1/object/public/**'
       }
     ]

@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { safeInternalPath } from '@/lib/utils/safe-url';
+
+const DEFAULT_NEXT = '/id/konten/review';
+
+/**
+ * Tukar `code` (PKCE/OAuth) menjadi sesi lalu redirect.
+ *
+ * Guard: kredensial route ini adalah parameter `code` sekali-pakai yang
+ * divalidasi Supabase — belum ada sesi untuk dicek di sini (route inilah yang
+ * membuatnya). Karena itu `next` WAJIB dibatasi ke origin sendiri; tanpa itu
+ * endpoint ini jadi open redirect untuk phishing.
+ */
+function resolveSameOrigin(nextPath: string, requestUrl: URL): URL {
+  const target = new URL(nextPath, requestUrl);
+  if (target.origin !== requestUrl.origin) return new URL(DEFAULT_NEXT, requestUrl);
+  return target;
+}
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const next = url.searchParams.get('next') ?? '/id/konten/review';
+  const next = safeInternalPath(url.searchParams.get('next'), DEFAULT_NEXT);
 
   if (!code) {
     return NextResponse.redirect(new URL('/id/masuk', request.url));
@@ -18,7 +35,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/id/masuk', request.url));
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const response = NextResponse.redirect(resolveSameOrigin(next, url));
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {

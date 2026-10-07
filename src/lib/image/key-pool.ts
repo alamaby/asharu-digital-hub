@@ -1,4 +1,5 @@
 import { getServiceClient } from '@/lib/supabase/service';
+import { incrementFailureCounter, incrementUsageCounter } from '@/lib/supabase/counters';
 import { ImageHttpError } from './types';
 import type { ImageKeyRow, ImageProviderRow } from './types';
 
@@ -72,36 +73,24 @@ export async function fetchOrderedImageKeys(providerId: string): Promise<ImageKe
   throw new Error(`fetchOrderedImageKeys: ${first.error.message}`);
 }
 
+/**
+ * Bookkeeping key image — BEST-EFFORT (tidak pernah melempar).
+ *
+ * Sebelumnya `markImageKeyUsage` melempar saat update gagal; karena dipanggil
+ * di dalam `withFallback` setelah generasi sukses, error itu dianggap sebagai
+ * kegagalan key sehingga pool mencoba key/provider berikutnya — padahal gambar
+ * sudah jadi. Sekarang kegagalan statistik hanya dicatat.
+ */
 export async function markImageKeyUsage(keyId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data, error } = await supabase
-    .from('image_provider_keys')
-    .select('usage_count')
-    .eq('id', keyId)
-    .single();
-  if (error) throw new Error(`markImageKeyUsage select: ${error.message}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.usage_count ?? 0;
-  const { error: updError } = await supabase
-    .from('image_provider_keys')
-    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() })
-    .eq('id', keyId);
-  if (updError) throw new Error(`markImageKeyUsage update: ${updError.message}`);
+  await incrementUsageCounter('image_provider_keys', keyId).catch((e: unknown) => {
+    console.error(`markImageKeyUsage(${keyId}): ${e instanceof Error ? e.message : String(e)}`);
+  });
 }
 
 export async function markImageKeyFailure(keyId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data } = await supabase
-    .from('image_provider_keys')
-    .select('failure_count')
-    .eq('id', keyId)
-    .single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.failure_count ?? 0;
-  const next = current + 1;
-  const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) patch.is_active = false;
-  await supabase.from('image_provider_keys').update(patch).eq('id', keyId);
+  await incrementFailureCounter('image_provider_keys', keyId).catch((e: unknown) => {
+    console.error(`markImageKeyFailure(${keyId}): ${e instanceof Error ? e.message : String(e)}`);
+  });
 }
 
 export class ImageKeyPool {

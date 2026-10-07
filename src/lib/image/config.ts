@@ -1,5 +1,6 @@
 import 'server-only';
 import { getServiceClient } from '@/lib/supabase/service';
+import { incrementFailureCounter, incrementUsageCounter } from '@/lib/supabase/counters';
 import { modelSupportsReference } from './types';
 import type {
   ImageAspect,
@@ -216,24 +217,19 @@ export async function isPerReplyMode(options: {
   };
 }
 
+/**
+ * Bookkeeping model image — sengaja best-effort (tidak melempar). Pemanggilnya
+ * ada di jalur sukses/gagal generasi: kegagalan statistik TIDAK boleh membuat
+ * gambar yang sudah jadi ditandai gagal, atau menggandakan generasi.
+ */
 export async function markImageModelUsage(modelId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data } = await supabase.from('image_models').select('usage_count').eq('id', modelId).single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.usage_count ?? 0;
-  await supabase
-    .from('image_models')
-    .update({ usage_count: current + 1, last_used_at: new Date().toISOString() })
-    .eq('id', modelId);
+  await incrementUsageCounter('image_models', modelId).catch((e: unknown) => {
+    console.error(`markImageModelUsage(${modelId}): ${e instanceof Error ? e.message : String(e)}`);
+  });
 }
 
 export async function markImageModelFailure(modelId: string): Promise<void> {
-  const supabase = getServiceClient();
-  const { data } = await supabase.from('image_models').select('failure_count').eq('id', modelId).single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const current = (data as any)?.failure_count ?? 0;
-  const next = current + 1;
-  const patch: Record<string, unknown> = { failure_count: next };
-  if (next > 5) patch.is_active = false;
-  await supabase.from('image_models').update(patch).eq('id', modelId);
+  await incrementFailureCounter('image_models', modelId).catch((e: unknown) => {
+    console.error(`markImageModelFailure(${modelId}): ${e instanceof Error ? e.message : String(e)}`);
+  });
 }

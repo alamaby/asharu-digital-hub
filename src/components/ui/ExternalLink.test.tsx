@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { ExternalLink } from './ExternalLink';
 
@@ -34,10 +34,16 @@ describe('ExternalLink', () => {
     expect(anchor).not.toHaveAttribute('rel');
   });
 
-  it.each(['javascript:alert(1)', 'http://insecure.example', 'data:text/html,x'])(
-    'refuses unsafe target %s',
+  it.each(['javascript:alert(1)', 'http://insecure.example', 'data:text/html,x', ''])(
+    'menurunkan tautan tidak aman %s menjadi teks (bukan throw saat render)',
     (href) => {
-      expect(() => render(<ExternalLink href={href}>x</ExternalLink>)).toThrow();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { container, getByText } = render(<ExternalLink href={href}>x</ExternalLink>);
+
+      expect(container.querySelector('a')).toBeNull();
+      expect(getByText('x').tagName).toBe('SPAN');
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('href tidak aman'));
+      errorSpy.mockRestore();
     }
   );
 });

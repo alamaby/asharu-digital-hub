@@ -17,7 +17,12 @@ export function ExternalLink({
   ...rest
 }: ExternalLinkProps) {
   if (!isSafeExternalUrl(href)) {
-    throw new Error(`Unsafe link target: "${href}"`);
+    // JANGAN melempar saat render: satu nilai URL buruk dari DB (mis. `http://`
+    // hasil scraping, atau string kosong) akan menjatuhkan seluruh halaman
+    // publik menjadi 500. Turunkan ke teks biasa dan catat supaya tetap
+    // terlihat di log — keamanan tetap terjaga (tidak ada anchor dibuat).
+    console.error(`ExternalLink: href tidak aman, dirender sebagai teks: "${href}"`);
+    return <span className={rest.className}>{children}</span>;
   }
 
   const isNewTab = href.startsWith('https://');
