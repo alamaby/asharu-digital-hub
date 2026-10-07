@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-07 12:15 WIB (review menyeluruh → hardening P0/P1/P2; 3 migrasi baru belum di-apply ke prod)
+Last updated: 2026-10-07 16:36 WIB (3 migrasi atomik 7 Okt APPLIED prod; total 80)
 
 ## Current State
 
@@ -37,7 +37,7 @@ Last updated: 2026-10-07 12:15 WIB (review menyeluruh → hardening P0/P1/P2; 3 
 
 ## Open Items / Blockers
 
-- [ ] **[USER ACTION] Apply 3 migrasi baru ke prod (7 Okt):** `20261007000001_atomic_rate_limit.sql` (RPC `consume_rate_limit` + `cleanup_expired_rate_limits`), `20261007000002_social_queue_claim_guard.sql` (`claimed_at` + index reaper), `20261007000003_atomic_counters.sql` (counter usage/failure atomik). Tanpa migrasi ini semua jalur tetap fail-safe tapi perbaikannya belum aktif: rate limit kembali ke perilaku lama (fail-open), reaper melewati baris legacy, counter tetap non-atomik.
+- [x] **Apply 3 migrasi baru ke prod SELESAI (7 Okt 16:36):** `atomic_rate_limit` (`20261007093539`, RPC `consume_rate_limit` + `cleanup_expired_rate_limits`), `social_queue_claim_guard` (`20261007093545`, `claimed_at` + index reaper), `atomic_counters` (`20261007093613`, counter usage/failure atomik). Terverifikasi: 4 function + kolom + index ada, tanpa finding security baru. Apply #3 sempat gagal sekali (GRANT signature `text,uuid` → dikoreksi `text,uuid,int`, rollback penuh, retry sukses).
 - [ ] **Verifikasi durasi function pasca-deploy:** entri `functions` untuk `/api/content/process` di `vercel.json` dihapus (route mendeklarasikan `maxDuration = 300`). Pastikan tidak ada function yang dibunuh di 60s pada tick riset/automation setelah deploy (cek log function).
 - [ ] **[KEPUTUSAN USER] `/konten/baru` login-only vs anon:** middleware whitelist (11 Sep) tidak memasukkan `/konten/baru` ke rute publik → wajib login, tetapi komentar `(admin)/layout.tsx` masih menyebut "tetap publik" dan `createResearchSession` masih mendukung anon + honeypot + rate limit. Samakan dokumentasi dengan perilaku, atau buka kembali akses anon (butuh keputusan).
 - [ ] **Race poster Threads belum diuji live:** fix klaim (`raced` bila 0 baris) sudah ditest dengan klien fake + test route. Verifikasi lanjutan (opsional): amati `social_post_logs` tidak pernah punya dua baris `post_index` sama untuk satu `queue_id` setelah beberapa hari berjalan.
@@ -76,6 +76,7 @@ Last updated: 2026-10-07 12:15 WIB (review menyeluruh → hardening P0/P1/P2; 3 
 
 ## Recent Entries
 
+- [2026-10-07 163600-apply-3-migrasi-prod-atomic.md](2026-10-07/163600-apply-3-migrasi-prod-atomic.md) — Apply 3 migrasi atomik ke prod via MCP (`atomic_rate_limit`/`social_queue_claim_guard`/`atomic_counters`, total 80). Pre-check read-only bersih; apply #3 retry sekali (GRANT signature). Post-verify: 4 function + `claimed_at` + index ada, advisors tanpa finding baru.
 - [2026-10-07 121500-review-hardening-p0-p1-p2.md](2026-10-07/121500-review-hardening-p0-p1-p2.md) — Review menyeluruh + implementasi plan P0/P1/P2: klaim antrean poster Threads diverifikasi (`select('id')` → `raced`) + reaper `claimed_at`, rate limit atomik via RPC (`consume_rate_limit`) + IP tepercaya + cleanup cron, konflik `maxDuration` `vercel.json` dihapus, satu pintu service client (`tryServiceClient`), counter atomik via RPC (4 tabel), `logLlmCall()` + deadline total waterfall LLM 240s, ekstraksi `route-guards.ts` + 2 test invariant (guard route API, klasifikasi halaman `(admin)`), open redirect `/api/auth/callback` ditutup (`safeInternalPath`), `images.remotePatterns` di-pin, `ExternalLink` non-throwing, lint 0 warning (`--max-warnings=0`), coverage `src/lib` + threshold, dependabot + `test:scrape`/`test:coverage` di CI. Gate typecheck ✓ lint ✓ 1326 test ✓ scrape 16 ✓ coverage ✓ build ✓. Wave 1 `1ae3183` (submodule `42c0ec7`) pushed. [USER ACTION] apply 3 migrasi prod + cek durasi function pasca-deploy.
 - [2026-10-06 162000-project-docs-init-backfill.md](2026-10-06/162000-project-docs-init-backfill.md) — Scaffold `project-docs/` + 9 entri 21-key bilingual dari git log main (25 Sep–2 Okt) + `releases.json` v0.1.0 + `dist/project-docs/` (link-check 0 broken). Seed template generik dihapus. Gate typecheck ✓ lint ✓ 1234 tests ✓. Belum commit.
 - [2026-09-29 171500-batch-overflow-highlight.md](2026-09-29/171500-batch-overflow-highlight.md) — Opsi C: rincian blok ditolak, overflow >max length ditandai merah, ambang ikut config. Gate 1198 ✓ build ✓. Belum commit.
