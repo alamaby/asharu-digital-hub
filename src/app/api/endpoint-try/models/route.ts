@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/require-user';
-import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
+import { consumeRateLimit, getClientIp } from '@/lib/content/rate-limit';
 import { modelsRequestSchema, assertAllowedBaseUrl, joinUpstreamPath, sanitizeErrorMessage } from '@/lib/endpoint-try/validation';
 import { normalizeOpenAIModels, normalizeAnthropicModels } from '@/lib/endpoint-try/adapters';
 
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: msg.slice(0, 300) }, { status: 401 });
   }
 
-  // 2. Rate limit: 30 requests/hour per IP.
+  // 2. Rate limit: 30 requests/hour per IP (atomik — satu slot per request).
   const ip = getClientIp(request.headers);
-  const rl = await checkRateLimit(ip, 'endpoint_try', 30);
+  const rl = await consumeRateLimit(ip, 'endpoint_try', 30);
   if (!rl.allowed) {
     return NextResponse.json({ ok: false, error: 'Terlalu banyak permintaan — coba lagi nanti.' }, { status: 429 });
   }
@@ -75,7 +75,6 @@ export async function POST(request: Request) {
     const msg = e instanceof DOMException && e.name === 'AbortError'
       ? 'Upstream timeout (25 detik).'
       : sanitizeErrorMessage(e instanceof Error ? e.message : String(e), [apiKey]);
-    void incrementRateLimit(ip, 'endpoint_try').catch(() => {});
     return NextResponse.json({ ok: false, error: msg }, { status: 502 });
   }
 
@@ -88,7 +87,6 @@ export async function POST(request: Request) {
       /* ignore */
     }
     const msg = sanitizeErrorMessage(`Upstream ${res.status}: ${text}`, [apiKey]);
-    void incrementRateLimit(ip, 'endpoint_try').catch(() => {});
     return NextResponse.json({ ok: false, error: msg }, { status: 502 });
   }
 
@@ -97,7 +95,6 @@ export async function POST(request: Request) {
   try {
     json = await res.json();
   } catch {
-    void incrementRateLimit(ip, 'endpoint_try').catch(() => {});
     return NextResponse.json({ ok: false, error: 'Upstream mengembalikan respons bukan JSON.' }, { status: 502 });
   }
 
@@ -110,6 +107,5 @@ export async function POST(request: Request) {
     models = normalizeOpenAIModels(json);
   }
 
-  await incrementRateLimit(ip, 'endpoint_try').catch(() => {});
   return NextResponse.json({ ok: true, models, latencyMs });
 }

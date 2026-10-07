@@ -13,22 +13,13 @@ import {
   publishThreadChain,
   refreshLongLivedToken
 } from '@/lib/social/threads';
+import {
+  MAX_QUEUE_ATTEMPTS,
+  claimDueQueueItem,
+  reapStaleClaims
+} from '@/lib/social/queue';
 
 export const maxDuration = 300;
-
-const MAX_ATTEMPTS = 5;
-
-interface QueueItem {
-  id: string;
-  draft_id: string;
-  platform_slug: string;
-  account_id: string | null;
-  lang: 'id' | 'en';
-  status: string;
-  attempts: number;
-  image_url: string | null;
-  image_urls: Record<string, string> | null;
-}
 
 function isRetryable(message: string): boolean {
   return /429|rate|timeout|5\d\d|fetch failed|network/i.test(message);
@@ -154,33 +145,28 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'threads publishing quota exhausted (250/24h)' }, { status: 429 });
   }
 
-  // Klaim 1 antrean jatuh tempo (idempoten, race-safe via status guard).
-  const { data: due } = await supabase
-    .from('social_post_queue')
-    .select('id, draft_id, platform_slug, account_id, lang, status, attempts, image_url, image_urls')
-    .eq('platform_slug', 'threads')
-    .eq('status', 'queued')
-    .lte('scheduled_at', new Date().toISOString())
-    .order('scheduled_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  const item = due as unknown as QueueItem | null;
-  if (!item) return NextResponse.json({ idle: true });
-
-  if (item.attempts >= MAX_ATTEMPTS) {
-    await supabase
-      .from('social_post_queue')
-      .update({ status: 'failed', last_error: `max attempts (${MAX_ATTEMPTS})` })
-      .eq('id', item.id);
-    return NextResponse.json({ error: 'max attempts', queueId: item.id }, { status: 500 });
+  // 0. Reaper: klaim basi dari tick yang mati di tengah dikembalikan ke antrean.
+  // Best-effort — kegagalan reaper tidak boleh menggagalkan tick yang sehat.
+  const reap = await reapStaleClaims(supabase);
+  if (reap.errors.length > 0) {
+    console.error(`[social/post] reaper gagal: ${reap.errors.join('; ')}`);
   }
 
-  const { error: claimError } = await supabase
-    .from('social_post_queue')
-    .update({ status: 'posting', attempts: item.attempts + 1 })
-    .eq('id', item.id)
-    .eq('status', 'queued');
-  if (claimError) return NextResponse.json({ idle: true, raced: true });
+  // Klaim 1 antrean jatuh tempo (idempoten, race-safe). Klaim DIVERIFIKASI
+  // lewat `select('id')`: bila invocation lain menang, update mengenai 0 baris
+  // TANPA error — tanpa cek ini dua tick yang tumpang tindih akan mem-publish
+  // thread yang sama dua kali.
+  const claim = await claimDueQueueItem(supabase);
+  if (claim.outcome === 'idle') {
+    return NextResponse.json({ idle: true, requeued: reap.requeued });
+  }
+  if (claim.outcome === 'raced') {
+    return NextResponse.json({ idle: true, raced: true });
+  }
+  if (claim.outcome === 'exhausted') {
+    return NextResponse.json({ error: 'max attempts', queueId: claim.item.id }, { status: 500 });
+  }
+  const item = claim.item;
 
   const { data: draft } = await supabase
     .from('content_drafts')
@@ -192,7 +178,7 @@ async function handle(request: NextRequest) {
   if (!thread) {
     await supabase
       .from('social_post_queue')
-      .update({ status: 'failed', last_error: 'draft/thread missing' })
+      .update({ status: 'failed', claimed_at: null, last_error: 'draft/thread missing' })
       .eq('id', item.id);
     return NextResponse.json({ error: 'draft/thread missing' }, { status: 500 });
   }
@@ -200,7 +186,7 @@ async function handle(request: NextRequest) {
   if (texts.length === 0) {
     await supabase
       .from('social_post_queue')
-      .update({ status: 'failed', last_error: 'empty thread texts' })
+      .update({ status: 'failed', claimed_at: null, last_error: 'empty thread texts' })
       .eq('id', item.id);
     return NextResponse.json({ error: 'empty thread texts' }, { status: 500 });
   }
@@ -257,7 +243,7 @@ async function handle(request: NextRequest) {
   if (startIndex >= texts.length) {
     await supabase
       .from('social_post_queue')
-      .update({ status: 'posted', posted_at: new Date().toISOString() })
+      .update({ status: 'posted', posted_at: new Date().toISOString(), claimed_at: null })
       .eq('id', item.id);
     return NextResponse.json({ posted: true, resumed: true, queueId: item.id });
   }
@@ -291,6 +277,7 @@ async function handle(request: NextRequest) {
         posted_url: lastMediaId
           ? `https://www.threads.com/@${account.handle.replace(/^@/, '')}/post/${lastMediaId}`
           : null,
+        claimed_at: null,
         last_error: null
       })
       .eq('id', item.id);
@@ -305,15 +292,16 @@ async function handle(request: NextRequest) {
       error_code: message.slice(0, 300)
     });
     // Retryable (429/5xx) → kembali queued untuk tick berikutnya; permanen → failed.
-    if (isRetryable(message) && item.attempts + 1 < MAX_ATTEMPTS) {
+    // `item.attempts` sudah termasuk klaim ini (dinaikkan saat klaim).
+    if (isRetryable(message) && item.attempts < MAX_QUEUE_ATTEMPTS) {
       await supabase
         .from('social_post_queue')
-        .update({ status: 'queued', last_error: message.slice(0, 500) })
+        .update({ status: 'queued', claimed_at: null, last_error: message.slice(0, 500) })
         .eq('id', item.id);
     } else {
       await supabase
         .from('social_post_queue')
-        .update({ status: 'failed', last_error: message.slice(0, 500) })
+        .update({ status: 'failed', claimed_at: null, last_error: message.slice(0, 500) })
         .eq('id', item.id);
     }
     return NextResponse.json({ error: message, queueId: item.id }, { status: 502 });

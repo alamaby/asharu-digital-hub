@@ -48,8 +48,7 @@ vi.mock('@/lib/llm/completion', () => ({
 }));
 
 vi.mock('@/lib/content/rate-limit', () => ({
-  checkRateLimit: vi.fn(async () => ({ allowed: true, count: 0 })),
-  incrementRateLimit: vi.fn(async () => {}),
+  consumeRateLimit: vi.fn(async () => ({ allowed: true, count: 1 })),
   getClientIp: vi.fn(() => '1.2.3.4')
 }));
 

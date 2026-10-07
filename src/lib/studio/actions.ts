@@ -8,7 +8,7 @@ import { getServiceClient } from '@/lib/supabase/service';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { resolveStageModel } from '@/lib/llm/stage-defaults';
 import { buildStudioEnhanceMessages, parseImagePrompt, validateImagePromptContradiction } from '@/lib/image/prompt';
-import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
+import { consumeRateLimit, getClientIp } from '@/lib/content/rate-limit';
 import {
   DEFAULT_STUDIO_CONFIG,
   type StudioConfig,
@@ -434,7 +434,7 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
   // Rate limit 30/jam (bucket sendiri: enhance_studio_prompt).
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
-  const { allowed, count } = await checkRateLimit(ip, 'enhance_studio_prompt', 30);
+  const { allowed, count } = await consumeRateLimit(ip, 'enhance_studio_prompt', 30);
   if (!allowed) throw new Error(`rate_limit:${count} — enhance 30/jam`);
 
   const { system, user } = buildStudioEnhanceMessages({
@@ -492,8 +492,6 @@ async function enhanceStudioPromptImpl(input: EnhanceStudioInput): Promise<Studi
   const activeSlugs = (rows: { slug: string }[], slug: string | null | undefined) =>
     slug && rows.some((r) => r.slug === slug) ? slug : null;
   const parsed = chosen.parsed;
-
-  await incrementRateLimit(ip, 'enhance_studio_prompt').catch(() => {});
 
   return {
     image_prompt: parsed.image_prompt,

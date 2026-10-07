@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
 import { env } from '@/lib/env';
+import { tryServiceClient } from '@/lib/supabase/service';
 
 /** SSR client for the current user (respects RLS via anon key + cookies). */
 export async function createSupabaseServer() {
@@ -25,11 +25,11 @@ export async function createSupabaseServer() {
   });
 }
 
-/** Service-role client — bypasses RLS. Only call from trusted server contexts. */
+/**
+ * Service-role client — bypasses RLS. Only call from trusted server contexts.
+ * Returns null when credentials are absent (page renders with the feature off).
+ * Delegates to `tryServiceClient()` so credential/env logic lives in one place.
+ */
 export function createSupabaseService() {
-  const key = env.supabaseSecretKey ?? env.supabaseServiceRoleKey;
-  if (!key) return null;
-  return createClient(env.supabaseUrl!, key, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
+  return tryServiceClient();
 }

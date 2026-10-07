@@ -179,11 +179,11 @@ export async function expandArticleDraft(
   // Halaman review admin-only, tapi action tetap dijaga bila dipanggil di luar.
   const { headers } = await import('next/headers');
   const hdrs = await headers();
-  const { getClientIp, checkRateLimit, incrementRateLimit } = await import('@/lib/content/rate-limit');
+  const { getClientIp, consumeRateLimit } = await import('@/lib/content/rate-limit');
   const ip = getClientIp(hdrs);
   const isAdminUser = await isAdmin().catch(() => false);
   if (!isAdminUser) {
-    const { allowed, count } = await checkRateLimit(ip, 'expand_article', 10);
+    const { allowed, count } = await consumeRateLimit(ip, 'expand_article', 10);
     if (!allowed) return { success: false, error: `rate_limit:${count} — expand 10/jam` };
   }
 
@@ -330,8 +330,6 @@ export async function expandArticleDraft(
     })
     .eq('id', draftId);
   if (updateError) return { success: false, error: updateError.message };
-
-  if (!isAdminUser) await incrementRateLimit(ip, 'expand_article').catch(() => {});
 
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');

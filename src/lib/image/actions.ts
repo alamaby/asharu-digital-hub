@@ -495,11 +495,11 @@ export async function enhanceImagePrompt(
   // Rate limit 30/jam — admin bypass
   const { headers } = await import('next/headers');
   const hdrs = await headers();
-  const { getClientIp, checkRateLimit, incrementRateLimit } = await import('@/lib/content/rate-limit');
+  const { getClientIp, consumeRateLimit } = await import('@/lib/content/rate-limit');
   const ip = getClientIp(hdrs);
   const isAdminUser = await isAdmin().catch(() => false);
   if (!isAdminUser) {
-    const { allowed, count } = await checkRateLimit(ip, 'enhance_image_prompt', 30);
+    const { allowed, count } = await consumeRateLimit(ip, 'enhance_image_prompt', 30);
     if (!allowed) throw new Error(`rate_limit:${count} — enhance 30/jam`);
   }
 
@@ -630,8 +630,6 @@ export async function enhanceImagePrompt(
   const activeSlugs = (rows: { slug: string }[], slug: string | null | undefined) =>
     slug && rows.some((r) => r.slug === slug) ? slug : null;
   const parsed = chosen.parsed;
-
-  if (!isAdminUser) await incrementRateLimit(ip, 'enhance_image_prompt').catch(() => {});
 
   return {
     image_prompt: parsed.image_prompt,

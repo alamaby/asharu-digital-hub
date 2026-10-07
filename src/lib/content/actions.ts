@@ -3,8 +3,9 @@
 import { z } from 'zod';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { checkRateLimit, getClientIp, incrementRateLimit } from './rate-limit';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { consumeRateLimit, getClientIp } from './rate-limit';
+import { getServiceClient } from '@/lib/supabase/service';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { extractUrls } from '@/lib/utils/urls';
 import { RESEARCH_TEMPLATE_SLUGS, getResearchTemplateHint } from '@/lib/research/templates';
@@ -35,13 +36,6 @@ export interface ActionResult {
   sessionId?: string;
 }
 
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase service credentials missing (set SUPABASE_SECRET_KEY)');
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 export async function createContentRequest(formData: FormData): Promise<ActionResult> {
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
 
@@ -67,10 +61,11 @@ export async function createContentRequest(formData: FormData): Promise<ActionRe
     return { success: false, fieldErrors, error: 'validation' };
   }
 
-  // Rate limit
+  // Rate limit 5/jam/IP — atomik (konsumsi 1 slot per request, termasuk yang
+  // nanti gagal validasi).
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
-  const { allowed, count } = await checkRateLimit(ip);
+  const { allowed, count } = await consumeRateLimit(ip);
   if (!allowed) {
     return { success: false, error: `rate_limit:${count}` };
   }
@@ -101,7 +96,6 @@ export async function createContentRequest(formData: FormData): Promise<ActionRe
     return { success: false, error: error.message };
   }
 
-  await incrementRateLimit(ip);
   return { success: true };
 }
 
@@ -208,7 +202,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
 
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
-  const { allowed, count } = await checkRateLimit(ip);
+  const { allowed, count } = await consumeRateLimit(ip);
   if (!allowed) {
     return { success: false, error: `rate_limit:${count}` };
   }
@@ -377,7 +371,6 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     }
   }
 
-  await incrementRateLimit(ip);
   return { success: true, sessionId };
 }
 
@@ -423,7 +416,7 @@ export async function generateIdea(formData: FormData): Promise<GenerateIdeaResu
   }
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
-  const { allowed, count } = await checkRateLimit(ip, 'generate_idea', 30);
+  const { allowed, count } = await consumeRateLimit(ip, 'generate_idea', 30);
   if (!allowed) {
     return { success: false, error: `rate_limit:${count}` };
   }
@@ -619,7 +612,6 @@ Aturan: topic harus 10-500 char, spesifik (hindari pola generik "tips X terbaik"
     excludedCategories: typeof parsed.excludedCategories === 'string' ? String(parsed.excludedCategories) : Array.isArray(parsed.excludedCategories) ? (parsed.excludedCategories as string[]).join(', ') : undefined
   };
 
-  await incrementRateLimit(ip, 'generate_idea').catch(() => {});
   return { success: true, idea };
 }
 
@@ -1299,7 +1291,7 @@ export async function regenerateAffiliateInsertion(
     const supabase = await assertAdmin();
     const hdrs = await headers();
     const ip = getClientIp(hdrs);
-    const { allowed, count } = await checkRateLimit(ip, 'regen_affiliate', 20);
+    const { allowed, count } = await consumeRateLimit(ip, 'regen_affiliate', 20);
     if (!allowed) return { success: false, error: `rate_limit:${count}` };
 
     const { data: product, error: prodError } = await supabase
@@ -1595,7 +1587,6 @@ export async function regenerateAffiliateInsertion(
       .eq('id', draftId);
     if (updateError) return { success: false, error: updateError.message };
 
-    await incrementRateLimit(ip, 'regen_affiliate').catch(() => undefined);
     const didFallback = Boolean((llmResult as { fallback?: boolean }).fallback);
     // P0-2: use resolved session id for log; skip if null to avoid FK violation
     if (resolvedSessionId) {

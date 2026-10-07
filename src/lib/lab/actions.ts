@@ -8,7 +8,7 @@ import { createSupabaseService } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/supabase/service';
 import { runLLMCompletion } from '@/lib/llm/completion';
 import { isLengthCutoff } from '@/lib/llm/model-config';
-import { checkRateLimit, getClientIp, incrementRateLimit } from '@/lib/content/rate-limit';
+import { consumeRateLimit, getClientIp } from '@/lib/content/rate-limit';
 import {
   DEFAULT_LAB_CONFIG,
   type LabBatchPage,
@@ -140,7 +140,7 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
   // Rate limit 30/jam (bucket sendiri: chat_lab) + kuota harian per user.
   const hdrs = await headers();
   const ip = getClientIp(hdrs);
-  const { allowed, count } = await checkRateLimit(ip, 'chat_lab', 30);
+  const { allowed, count } = await consumeRateLimit(ip, 'chat_lab', 30);
   if (!allowed) throw new Error(`rate_limit:${count} — chat lab 30/jam`);
   if (config.daily_limit !== null) {
     const dayStart = new Date();
@@ -259,7 +259,6 @@ async function runChatLabBatchImpl(input: RunLabBatchInput): Promise<{ batchId: 
   const { error: runsError } = await supabase.from('chat_lab_runs').insert(runRows);
   if (runsError) throw new Error(runsError.message);
 
-  await incrementRateLimit(ip, 'chat_lab').catch(() => {});
   revalidatePath('/lab');
   return { batchId };
 }
