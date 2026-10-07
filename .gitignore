@@ -32,6 +32,7 @@ yarn-error.log*
 # external tooling metadata
 /.zcode
 /.openchamber
+/.freebuff/
 
 # threads poster (local, manual runs)
 /scripts/threads-poster/auth.json
