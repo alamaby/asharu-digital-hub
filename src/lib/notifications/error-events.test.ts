@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildFingerprint, reportError, reportCronApiError, type ErrorEventInput } from './error-events';
+import { buildFingerprint, reportError, reportCronApiError } from './error-events';
 
 function makeMockClient(inserted: unknown[][] = []): { from: ReturnType<typeof vi.fn> } {
   return {

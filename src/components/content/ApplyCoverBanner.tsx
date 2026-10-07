@@ -52,12 +52,17 @@ export function ApplyCoverBanner({
   }
 
   const liveHref = localizedPathname('/artikel/[slug]', locale as 'id' | 'en', { slug });
+  // Thumbnail 80px dari URL Storage draft/live: sengaja <img> biasa (bukan
+  // next/image) supaya satu URL tak terduga dari DB tidak menggagalkan render
+  // halaman review — konvensi sama dengan ArticleCard.
   const draftThumb = draftUrl ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
     <img src={draftUrl} alt="cover draf" className="size-20 rounded-lg border border-line object-cover" loading="lazy" />
   ) : (
     <div className="size-20 rounded-lg border-2 border-dashed border-line bg-surface" aria-label="tanpa cover" />
   );
   const liveThumb = liveUrl ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
     <img src={liveUrl} alt="cover live" className="size-20 rounded-lg border border-line object-cover" loading="lazy" />
   ) : (
     <div className="size-20 rounded-lg border-2 border-dashed border-line bg-surface" aria-label="tanpa cover" />

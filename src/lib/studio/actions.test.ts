@@ -410,7 +410,7 @@ function makeBatchClient(tables: Record<string, Row[]>) {
         },
         limit: () => builder,
         or: () => builder,
-        insert: (_patch: Record<string, unknown>) => builder,
+        insert: () => builder,
         single: async () => ({ data: { id: nextId() }, error: null }),
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
         update: (patch: Record<string, unknown>) => {
@@ -436,7 +436,7 @@ function makeBatchClient(tables: Record<string, Row[]>) {
 /** Simple client untuk list-only tests (bukan insert/update). */
 function makeListClient(tables: Record<string, Row[]>) {
   return {
-    storage: { from: () => ({ exists: async (_p: string) => ({ data: false, error: null }) }) },
+    storage: { from: () => ({ exists: async () => ({ data: false, error: null }) }) },
     from(table: string) {
       let rows: Row[] = [...(tables[table] ?? [])];
       const builder = {

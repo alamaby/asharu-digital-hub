@@ -6,7 +6,7 @@ import { publishArticleDraftCore } from '@/lib/articles/publish';
 import { loadAutomationConfig, resolveRecipients, resolveRunLocales, type AutomationConfig } from './config';
 import { defaultIdeaDeps, generateSessionIdea, type GeneratedIdea, type IdeaProduct } from '@/lib/research/idea';
 import { getResearchTemplateHint } from '@/lib/research/templates';
-import { isRunDue, localDateString, pickRandomProduct, blackoutCutoff } from './scheduler';
+import { localDateString, pickRandomProduct, blackoutCutoff } from './scheduler';
 import { loadEnabledSlots, mergeSlotParams, isSlotDue } from './schedules';
 import { sendDraftReadyEmail, sendPublishedEmail, logAutomationEmail } from './email';
 import { reportError } from '@/lib/notifications/error-events';

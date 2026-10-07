@@ -9,14 +9,13 @@ import { listStudioBatches, listBatchImages, retryFailedBatchImages, deleteStudi
 
 interface Props {
   locale: Locale;
-  timeZone: string;
   options: StudioOptions | null;
   /** Data RSC awal (tidak di-poll saat kosong); parent kirim key naik tiap enqueue. */
   batches: StudioBatchWithCounts[];
   refreshKey?: number;
 }
 
-export function BatchHistory({ locale, timeZone: _timeZone, options, batches: initialBatches, refreshKey }: Props) {
+export function BatchHistory({ locale, options, batches: initialBatches, refreshKey }: Props) {
   const t = useTranslations('studio.batch.history');
   const tHistory = t;
   const [batches, setBatches] = useState(initialBatches);

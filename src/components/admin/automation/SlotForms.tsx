@@ -160,13 +160,9 @@ const NOTIFY_OPTIONS = [
 
 // --- SlotCreateForm ---------------------------------------------------------
 
-export function SlotCreateForm({
-  platformRows
-}: {
-  platformRows: PlatformRow[];
-}) {
+export function SlotCreateForm() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const { notice, run } = useNotice();
   async function handleCreate(fd: FormData): Promise<void> {
     const ok = await run(
@@ -795,7 +791,7 @@ export function SlotSection({
         Maks 4 slot aktif; window default 60 mnt. Slot <code>default</code> dibuat otomatis dari konfigurasi lama.
       </p>
       <div className="mt-4 space-y-3">
-        <SlotCreateForm platformRows={platforms} />
+        <SlotCreateForm />
         {slots.length === 0 ? (
           <p className="py-3 text-sm text-ink-muted">
             Belum ada slot — migrasi <code>20260920000002</code> belum dijalankan.

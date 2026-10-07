@@ -285,10 +285,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
             slug={publishedArticles[0]?.slug ?? ''}
             publishedLocaleCount={publishedArticles.length}
           />
-          <PublishedArticleEditor
-            articles={publishedArticles}
-            draftId={draftId}
-          />
+          <PublishedArticleEditor articles={publishedArticles} />
         </>
       ) : null}
     </div>

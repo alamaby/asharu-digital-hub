@@ -737,7 +737,7 @@ async function enqueueStudioBatchImpl(input: EnqueueBatchInput): Promise<{ batch
   // antrean FIFO seperti baris single.
   let inserted = 0;
   for (const prompt of valid) {
-    const { data: child, error: childErr } = await supabase
+    const { error: childErr } = await supabase
       .from('user_image_generations')
       .insert({
         user_id: userId,

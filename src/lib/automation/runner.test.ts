@@ -323,15 +323,6 @@ describe('runAutomationTick (multi-slot starvation)', () => {
     expect(res.status).toBeDefined();
   }
 
-  function assertSoreNotAdvanced(tables: Record<string, Row[]>) {
-    const soreRuns = (tables.automation_runs ?? []).filter((r: Row) => r.slot_key === 'sore') as Row[];
-    const soreRun = soreRuns[0];
-    expect(soreRun).toBeDefined();
-    expect((soreRun as Row)?.status).toBe('session_created');
-    const sessions = (tables.content_research_sessions ?? []).filter((r: Row) => r.id === 's-sore') as Row[];
-    expect(sessions[0]?.status).toBe('awaiting_selection');
-  }
-
   it('T2a: default completed duluan → sore tetap di-advance (reproduksi urutan prod)', async () => {
     const tables = makeMultiSlotTables({ runsOrder: 'default-first' });
     const supabase = makeClient(tables);

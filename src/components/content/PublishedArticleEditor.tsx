@@ -12,9 +12,8 @@ export interface PublishedArticleRow {
   cover_image_url: string | null;
 }
 
-export function PublishedArticleEditor({ articles, draftId }: {
+export function PublishedArticleEditor({ articles }: {
   articles: PublishedArticleRow[];
-  draftId: string;
 }) {
   const t = useTranslations('content.review');
   const router = useRouter();
@@ -22,14 +21,6 @@ export function PublishedArticleEditor({ articles, draftId }: {
   const [saving, setSaving] = useState<string | null>(null);
   const [savingOk, setSavingOk] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
-
-  const editForm = useState(() => {
-    const f: Record<string, { title: string; excerpt: string; slug: string }> = {};
-    for (const a of articles) {
-      f[a.id] = { title: '', excerpt: '', slug: '' };
-    }
-    return f;
-  });
 
   // Initialize form fields once when articles change
   const [formData, setFormData] = useState<Record<string, { title: string; excerpt: string; slug: string }>>(() => {

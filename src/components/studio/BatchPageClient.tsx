@@ -64,7 +64,6 @@ export function BatchPageClient({ locale, options, quota, batches, error }: Prop
 
       <BatchHistory
         locale={locale}
-        timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
         options={options}
         batches={batches}
         refreshKey={refreshKey}

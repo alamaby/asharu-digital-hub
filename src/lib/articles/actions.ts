@@ -395,7 +395,7 @@ export async function updateArticleDraft(
   }
 
   // 2. Bangun object parsial untuk validasi parseArticleLang
-  const { parseArticleLang, clampArticleExcerpt, countArticleWords, findCjkHit } = await import('@/lib/llm/prompt');
+  const { parseArticleLang, countArticleWords, findCjkHit } = await import('@/lib/llm/prompt');
   const { locale } = patch;
   const existing = d.article_draft[locale];
   if (!existing) {
