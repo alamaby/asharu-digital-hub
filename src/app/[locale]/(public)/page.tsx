@@ -78,6 +78,30 @@ export default async function HomePage({ params }: HomePageProps) {
       </section>
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        {/* B0. Digital Hub promo */}
+        <section
+          id="digital-hub"
+          aria-labelledby="digital-hub-promo-heading"
+          className="scroll-mt-24 py-10"
+        >
+          <div className="rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+            <SectionHeading
+              id="digital-hub-promo-heading"
+              title={tHome('digitalHub.heading')}
+              description={tHome('digitalHub.description')}
+            />
+            <div className="mt-5">
+              <Link
+                href="/digital-hub"
+                className="btn-primary"
+              >
+                {tHome('digitalHub.cta')}
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* C. Featured affiliate products */}
         <section
           id="affiliate-products"

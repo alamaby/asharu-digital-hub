@@ -150,6 +150,11 @@
     "contact": {
       "heading": "Contact Us",
       "description": "Questions about a product or property? Reach us through one of these channels."
+    },
+    "digitalHub": {
+      "heading": "Asharu Digital Hub for SMEs",
+      "description": "An AI-assisted workspace to research ideas, compose content, review quality, prepare publication, and build a digital portfolio from business activity.",
+      "cta": "View Digital Hub"
     }
   },
   "shops": {

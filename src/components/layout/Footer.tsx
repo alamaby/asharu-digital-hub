@@ -15,6 +15,7 @@ export function Footer({ showAnalyticsPrefs }: FooterProps) {
 
   const navLinks = [
     { href: '/', label: tNav('home') },
+    { href: '/digital-hub', label: tNav('digitalHub') },
     { href: '/products', label: tNav('products') },
     { href: '/properties', label: tNav('properties') },
     { href: '/artikel', label: tNav('articles') },

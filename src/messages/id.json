@@ -150,6 +150,11 @@
     "contact": {
       "heading": "Hubungi Kami",
       "description": "Ada pertanyaan tentang produk atau properti? Hubungi kami melalui kanal berikut."
+    },
+    "digitalHub": {
+      "heading": "Asharu Digital Hub untuk UMKM",
+      "description": "Workspace berbantuan AI untuk riset ide, susun konten, tinjau kualitas, siapkan publikasi, dan bangun portofolio digital dari aktivitas usaha.",
+      "cta": "Lihat Digital Hub"
     }
   },
   "shops": {
