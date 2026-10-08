@@ -26,6 +26,10 @@ export const routing = defineRouting({
       id: '/tentang',
       en: '/about'
     },
+    '/digital-hub': {
+      id: '/digital-hub',
+      en: '/digital-hub'
+    },
     '/artikel': {
       id: '/artikel',
       en: '/articles'

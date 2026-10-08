@@ -4,6 +4,10 @@
 
 Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko online, media sosial, etalase produk afiliasi, dan listing properti — static-first, aksesibel, aman, dan hemat resource. Tanpa database, tanpa CMS berbayar, tanpa server terus-menerus.
 
+## Produk: Asharu Digital Hub untuk UMKM
+
+Workspace operasi konten + portofolio digital berbantuan AI untuk UMKM Indonesia: **Riset → Susun → Tinjau → Publikasikan → Portofolio**. Pembeda: pipa Content-to-Portfolio (aktivitas usaha menjadi konten siap terbit lalu entri portofolio). Halaman publik: `/id/digital-hub` ↔ `/en/digital-hub` (status: prototipe + daftar tunggu pilot, tanpa klaim terbit otomatis). Detail: `docs/product-brief.md`, `docs/architecture.md`, `docs/ai-safety.md`, `docs/privacy-and-data-flow.md`, `docs/claude-startups-readiness.md`, `docs/product-gap-analysis.md`.
+
 ---
 
 ## Daftar Isi

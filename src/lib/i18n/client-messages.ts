@@ -14,6 +14,7 @@ export const CLIENT_MESSAGE_NAMESPACES = [
   'categories',
   'consent',
   'content',
+  'digitalHub',
   'header',
   'nav',
   'notFound',

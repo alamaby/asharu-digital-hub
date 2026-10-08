@@ -9,6 +9,7 @@ export interface NavItem {
     | 'products'
     | 'properties'
     | 'articles'
+    | 'digitalHub'
     | 'about'
     | 'adminDashboard'
     | 'adminKonten'
@@ -34,6 +35,7 @@ export interface NavItem {
     | '/artikel'
     | '/artikel/[slug]'
     | '/about'
+    | '/digital-hub'
     | '/admin'
     | '/admin/konten'
     | '/admin/riset'
@@ -60,6 +62,7 @@ export interface NavItem {
 
 export const mainNavItems: readonly NavItem[] = [
   { key: 'home', pathname: '/' },
+  { key: 'digitalHub', pathname: '/digital-hub' },
   { key: 'stores', pathname: '/', hash: 'online-stores', isAnchor: true },
   { key: 'products', pathname: '/products' },
   { key: 'properties', pathname: '/properties' },

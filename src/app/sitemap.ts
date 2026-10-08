@@ -13,6 +13,7 @@ interface SitemapEntry {
 
 const staticPaths: SitemapEntry[] = [
   { path: '/' },
+  { path: '/digital-hub' },
   { path: '/products' },
   { path: '/properties' },
   { path: '/artikel' },

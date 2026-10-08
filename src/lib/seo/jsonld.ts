@@ -267,4 +267,37 @@ export function faqSchema(  faq: NonNullable<Property['faq']>,
   };
 }
 
+/**
+ * Truthful SoftwareApplication markup for Asharu Digital Hub.
+ * No ratings, offers, or user counts — the product is a prototype.
+ */
+export function digitalHubSoftwareSchema(locale: Locale): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Asharu Digital Hub',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: `${env.siteUrl}${localizedPathname('/digital-hub', locale)}`,
+    inLanguage: locale === 'id' ? 'id-ID' : 'en-US',
+    description:
+      locale === 'id'
+        ? 'Workspace konten dan portofolio berbantuan AI untuk UMKM Indonesia.'
+        : 'AI-assisted content and portfolio workspace for Indonesian SMEs.'
+  };
+}
+
+/** Simple FAQPage from visible Q&A pairs. */
+export function simpleFaqSchema(faq: { q: string; a: string }[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a }
+    }))
+  };
+}
+
 export const defaultLocale = routing.defaultLocale;

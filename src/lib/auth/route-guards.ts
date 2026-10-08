@@ -21,6 +21,7 @@ export const PUBLIC_INTERNAL_PATHS: readonly string[] = [
   '/properties',
   '/artikel',
   '/about',
+  '/digital-hub',
   '/privacy-policy',
   '/affiliate-disclosure',
   '/masuk',

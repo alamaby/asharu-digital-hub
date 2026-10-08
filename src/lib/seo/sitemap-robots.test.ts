@@ -16,6 +16,8 @@ describe('sitemap', () => {
     expect(urls).toContain('https://asharu.id/en/articles');
     expect(urls).toContain('https://asharu.id/id/tentang');
     expect(urls).toContain('https://asharu.id/en/about');
+    expect(urls).toContain('https://asharu.id/id/digital-hub');
+    expect(urls).toContain('https://asharu.id/en/digital-hub');
     expect(urls).toContain('https://asharu.id/id/kebijakan-privasi');
     expect(urls).toContain('https://asharu.id/id/disclosure-afiliasi');
   });
