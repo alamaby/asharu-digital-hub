@@ -154,7 +154,8 @@
     "digitalHub": {
       "heading": "Asharu Digital Hub untuk UMKM",
       "description": "Workspace berbantuan AI untuk riset ide, susun konten, tinjau kualitas, siapkan publikasi, dan bangun portofolio digital dari aktivitas usaha.",
-      "cta": "Lihat Digital Hub"
+      "cta": "Lihat Digital Hub",
+      "repoCta": "Lihat Kode di GitHub"
     }
   },
   "shops": {
@@ -1394,6 +1395,7 @@
     "existingHeading": "Sudah berjalan di repo ini",
     "existingBody": "Mesin riset, draf multikanal, tinjauan admin, antrean terjadwal, dan lab model sudah berfungsi di area internal dan menjadi fondasi workspace ini.",
     "existingCta": "Lihat cara kerja internal (butuh akses)",
+    "repoCta": "Lihat Kode di GitHub",
     "backHome": "Kembali ke beranda"
   }
 }

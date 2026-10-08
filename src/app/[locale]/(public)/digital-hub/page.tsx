@@ -15,6 +15,7 @@ import { localizedPathname } from '@/lib/seo/paths';
 import { env } from '@/lib/env';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { JsonLd } from '@/components/ui/JsonLd';
+import { GithubRepoLink } from '@/components/ui/GithubRepoLink';
 import { WaitlistForm } from '@/components/digital-hub/WaitlistForm';
 
 interface PageProps {
@@ -40,6 +41,7 @@ export default async function DigitalHubPage({ params }: PageProps) {
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: 'digitalHub' });
+  const tA11y = await getTranslations({ locale, namespace: 'a11y' });
   const pageUrl = `${env.siteUrl}${localizedPathname('/digital-hub', locale)}`;
   const homeUrl = `${env.siteUrl}${localizedPathname('/', locale)}`;
 
@@ -94,6 +96,7 @@ export default async function DigitalHubPage({ params }: PageProps) {
             <a href="#cara-kerja" className="btn-secondary">
               {t('secondaryCta')}
             </a>
+            <GithubRepoLink cta={t('repoCta')} newTabLabel={tA11y('newTab')} />
           </div>
           <p className="mt-4 max-w-2xl text-sm text-ink-muted">{t('heroNote')}</p>
           <div className="mt-4 max-w-2xl rounded-xl border border-line bg-surface p-4">
@@ -183,6 +186,13 @@ export default async function DigitalHubPage({ params }: PageProps) {
           <div className="mt-6 rounded-xl border border-line bg-surface p-4">
             <h3 className="text-base font-semibold text-ink">{t('existingHeading')}</h3>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">{t('existingBody')}</p>
+            <p className="mt-3">
+              <GithubRepoLink
+                cta={t('repoCta')}
+                newTabLabel={tA11y('newTab')}
+                variant="inline"
+              />
+            </p>
           </div>
         </section>
 

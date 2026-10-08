@@ -154,7 +154,8 @@
     "digitalHub": {
       "heading": "Asharu Digital Hub for SMEs",
       "description": "An AI-assisted workspace to research ideas, compose content, review quality, prepare publication, and build a digital portfolio from business activity.",
-      "cta": "View Digital Hub"
+      "cta": "View Digital Hub",
+      "repoCta": "View Source on GitHub"
     }
   },
   "shops": {
@@ -1394,6 +1395,7 @@
     "existingHeading": "Already working in this repo",
     "existingBody": "The research engine, multi-channel drafts, admin review, scheduled queue, and model lab already run in the internal area and form the workspace foundation.",
     "existingCta": "See internal workflow (access required)",
+    "repoCta": "View Source on GitHub",
     "backHome": "Back to homepage"
   }
 }

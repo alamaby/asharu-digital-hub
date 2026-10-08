@@ -17,6 +17,7 @@ import { ShopCard } from '@/components/home/ShopCard';
 import { SocialLinksGrid } from '@/components/home/SocialLinksGrid';
 import { AffiliateDisclosure } from '@/components/home/AffiliateDisclosure';
 import { ContactCTA } from '@/components/home/ContactCTA';
+import { GithubRepoLink } from '@/components/ui/GithubRepoLink';
 import { ProductCarousel } from '@/components/cards/ProductCarousel';
 import { PropertyBrowser } from '@/components/cards/PropertyBrowser';
 import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
@@ -46,6 +47,7 @@ export default async function HomePage({ params }: HomePageProps) {
 
   const tHero = await getTranslations({ locale, namespace: 'hero' });
   const tHome = await getTranslations({ locale, namespace: 'home' });
+  const tA11y = await getTranslations({ locale, namespace: 'a11y' });
 
   const featuredProducts = await getFeaturedProductsDB(6);
   const featuredProperties = getFeaturedProperties(6);
@@ -90,7 +92,7 @@ export default async function HomePage({ params }: HomePageProps) {
               title={tHome('digitalHub.heading')}
               description={tHome('digitalHub.description')}
             />
-            <div className="mt-5">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="/digital-hub"
                 className="btn-primary"
@@ -98,6 +100,10 @@ export default async function HomePage({ params }: HomePageProps) {
                 {tHome('digitalHub.cta')}
                 <ArrowRight className="size-4" aria-hidden />
               </Link>
+              <GithubRepoLink
+                cta={tHome('digitalHub.repoCta')}
+                newTabLabel={tA11y('newTab')}
+              />
             </div>
           </div>
         </section>
