@@ -504,7 +504,7 @@
       "save": "Simpan",
       "approve": "Setujui",
       "reject": "Tolak",
-      "approveQueueNote": "Menyetujui akan menjadwalkan posting otomatis.",
+      "approveQueueNote": "Menyetujui akan memasukkan draf ke antrean posting internal (diproses worker bila aktif).",
       "approveQueued": "Disetujui — terjadwal {when}.",
       "approveNoQueue": "Disetujui (auto-queue nonaktif).",
       "queueBadge": "Antrean: {status} · {when}",

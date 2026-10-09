@@ -307,7 +307,7 @@
     "principle3Title": "Transactions on official platforms",
     "principle3Body": "This site processes no payments. Purchases and negotiations happen on official marketplaces or through our official contact.",
     "contactHeading": "Contact",
-    "contactBody": "For questions, data corrections, or partnerships, please use the contact channels listed on the homepage."
+    "contactBody": "For questions, data corrections, or collaboration inquiries, please use the contact channels listed on the homepage."
   },
   "privacyPage": {
     "heading": "Privacy Policy",
@@ -504,7 +504,7 @@
       "save": "Save",
       "approve": "Approve",
       "reject": "Reject",
-      "approveQueueNote": "Approving will schedule auto-posting.",
+      "approveQueueNote": "Approving adds the draft to the internal posting queue (processed by the worker when enabled).",
       "approveQueued": "Approved — scheduled {when}.",
       "approveNoQueue": "Approved (auto-queue off).",
       "queueBadge": "Queue: {status} · {when}",

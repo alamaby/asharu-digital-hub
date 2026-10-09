@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-09 12:55 WIB (Rapikan repo publik, web, OG image, dan apply pack Claude Startups; baseline 1344 tests ✓, build 122 pages ✓)
+Last updated: 2026-10-09 13:28 WIB (Perbaikan temuan review O1-O3 Claude Startups: copy queue/contact aman, warning metadataBase 0, gate 1344 tests ✓)
 
 ## Current State
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-09 12:55 WIB (Rapikan repo publik, web, OG image, dan appl
 
 ## Recent Entries
 
+- [2026-10-09 132800-perbaikan-temuan-review-claude-startups.md](2026-10-09/132800-perbaikan-temuan-review-claude-startups.md) — Tutup temuan O1–O3: copy queue & contact aman, warning metadataBase root bersih, gate hijau.
 - [2026-10-09 125500-rapikan-repo-web-claude-startups.md](2026-10-09/125500-rapikan-repo-web-claude-startups.md) — Rapikan repo publik, web, GitHub metadata, route OG image, dan apply-pack Claude Startups. Gate typecheck ✓ lint ✓ 1344 tests ✓ build 122 pages ✓.
 - [2026-10-08 110000-digital-hub-product-presence.md](2026-10-08/110000-digital-hub-product-presence.md) — Public `/digital-hub` (id/en SSG) + honest waitlist + AI boundary/schemas/approval gate + 7 docs + README. Gate typecheck ✓ lint ✓ 1341 tests ✓ build 122 pages ✓. Belum commit.
 - [2026-10-07 163600-apply-3-migrasi-prod-atomic.md](2026-10-07/163600-apply-3-migrasi-prod-atomic.md) — Apply 3 migrasi atomik ke prod via MCP (`atomic_rate_limit`/`social_queue_claim_guard`/`atomic_counters`, total 80). Pre-check read-only bersih; apply #3 retry sekali (GRANT signature). Post-verify: 4 function + `claimed_at` + index ada, advisors tanpa finding baru.
