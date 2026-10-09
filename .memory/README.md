@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-08 11:00 WIB (/digital-hub public route + docs + gates 1341 tests, build 122 pages; belum commit)
+Last updated: 2026-10-09 12:55 WIB (Rapikan repo publik, web, OG image, dan apply pack Claude Startups; baseline 1344 tests ✓, build 122 pages ✓)
 
 ## Current State
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-08 11:00 WIB (/digital-hub public route + docs + gates 134
 
 ## Recent Entries
 
+- [2026-10-09 125500-rapikan-repo-web-claude-startups.md](2026-10-09/125500-rapikan-repo-web-claude-startups.md) — Rapikan repo publik, web, GitHub metadata, route OG image, dan apply-pack Claude Startups. Gate typecheck ✓ lint ✓ 1344 tests ✓ build 122 pages ✓.
 - [2026-10-08 110000-digital-hub-product-presence.md](2026-10-08/110000-digital-hub-product-presence.md) — Public `/digital-hub` (id/en SSG) + honest waitlist + AI boundary/schemas/approval gate + 7 docs + README. Gate typecheck ✓ lint ✓ 1341 tests ✓ build 122 pages ✓. Belum commit.
 - [2026-10-07 163600-apply-3-migrasi-prod-atomic.md](2026-10-07/163600-apply-3-migrasi-prod-atomic.md) — Apply 3 migrasi atomik ke prod via MCP (`atomic_rate_limit`/`social_queue_claim_guard`/`atomic_counters`, total 80). Pre-check read-only bersih; apply #3 retry sekali (GRANT signature). Post-verify: 4 function + `claimed_at` + index ada, advisors tanpa finding baru.
 - [2026-10-07 121500-review-hardening-p0-p1-p2.md](2026-10-07/121500-review-hardening-p0-p1-p2.md) — Review menyeluruh + implementasi plan P0/P1/P2: klaim antrean poster Threads diverifikasi (`select('id')` → `raced`) + reaper `claimed_at`, rate limit atomik via RPC (`consume_rate_limit`) + IP tepercaya + cleanup cron, konflik `maxDuration` `vercel.json` dihapus, satu pintu service client (`tryServiceClient`), counter atomik via RPC (4 tabel), `logLlmCall()` + deadline total waterfall LLM 240s, ekstraksi `route-guards.ts` + 2 test invariant (guard route API, klasifikasi halaman `(admin)`), open redirect `/api/auth/callback` ditutup (`safeInternalPath`), `images.remotePatterns` di-pin, `ExternalLink` non-throwing, lint 0 warning (`--max-warnings=0`), coverage `src/lib` + threshold, dependabot + `test:scrape`/`test:coverage` di CI. Gate typecheck ✓ lint ✓ 1326 test ✓ scrape 16 ✓ coverage ✓ build ✓. Wave 1 `1ae3183` (submodule `42c0ec7`) pushed. [USER ACTION] apply 3 migrasi prod + cek durasi function pasca-deploy.

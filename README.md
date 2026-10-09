@@ -6,7 +6,9 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 
 ## Produk: Asharu Digital Hub untuk UMKM
 
-Workspace operasi konten + portofolio digital berbantuan AI untuk UMKM Indonesia: **Riset → Susun → Tinjau → Publikasikan → Portofolio**. Pembeda: pipa Content-to-Portfolio (aktivitas usaha menjadi konten siap terbit lalu entri portofolio). Halaman publik: `/id/digital-hub` ↔ `/en/digital-hub` (status: prototipe + daftar tunggu pilot, tanpa klaim terbit otomatis). Detail: `docs/product-brief.md`, `docs/architecture.md`, `docs/ai-safety.md`, `docs/privacy-and-data-flow.md`, `docs/claude-startups-readiness.md`, `docs/product-gap-analysis.md`.
+> **Status:** `Prototipe · Daftar tunggu pilot`
+
+Workspace operasi konten + portofolio digital berbantuan AI untuk UMKM Indonesia: **Riset → Susun → Tinjau → Publikasikan → Portofolio**. Pembeda: pipa Content-to-Portfolio (aktivitas usaha menjadi konten siap terbit lalu entri portofolio). Halaman publik live: [`https://asharu.id/id/digital-hub`](https://asharu.id/id/digital-hub) ↔ [`https://asharu.id/en/digital-hub`](https://asharu.id/en/digital-hub) (status: prototipe + daftar tunggu pilot, tanpa klaim terbit otomatis). Kesiapan program Claude: [`docs/claude-startups-readiness.md`](docs/claude-startups-readiness.md). Detail: [`docs/product-brief.md`](docs/product-brief.md), [`docs/architecture.md`](docs/architecture.md), [`docs/ai-safety.md`](docs/ai-safety.md), [`docs/privacy-and-data-flow.md`](docs/privacy-and-data-flow.md), [`docs/product-gap-analysis.md`](docs/product-gap-analysis.md).
 
 ---
 
@@ -241,7 +243,7 @@ Pemeriksaan manual yang direkomendasikan sebelum launch: responsif 320/375/768/1
 - [ ] GA4 Measurement ID terpasang + DebugView/Realtime menerima 7 event (termasuk click_math_app)
 - [ ] Lighthouse (mobile): Performance ≥90, A11y ≥95, Best Practices ≥95, SEO ≥95
 - [ ] Tidak ada error console di production build
-- [ ] Commit pertama dibuat (repo saat ini masih tanpa riwayat commit)
+- [x] Riwayat commit aktif (termasuk public presence dan open-source Digital Hub)
 
 ---
 
