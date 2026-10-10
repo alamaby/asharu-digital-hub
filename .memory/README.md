@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-10 22:08 WIB (Diagram Pipeline Riset: Mermaid di README + konektor panah flow homepage, gate 1345 tests ✓, build 130 pages ✓)
+Last updated: 2026-10-10 22:44 WIB (Kartu Contoh Hasil Pipeline Sintetis di Homepage, gate 1345 tests ✓, build 130 pages ✓)
 
 ## Current State
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-10 22:08 WIB (Diagram Pipeline Riset: Mermaid di README + 
 
 ## Recent Entries
 
+- [2026-10-10 224400-contoh-hasil-pipeline-homepage.md](2026-10-10/224400-contoh-hasil-pipeline-homepage.md) — Kartu contoh alur pipeline sintetis di seksi `#mesin-riset` homepage (brief → draf → review → siap terbit), chrome bilingual, data verbatim. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-10 220800-diagram-pipeline-riset-mermaid-dan-konektor.md](2026-10-10/220800-diagram-pipeline-riset-mermaid-dan-konektor.md) — Diagram flowchart Mermaid 6 tahap riset di README + panah konektor dekoratif aria-hidden antar kartu pipeline di homepage. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-10 190500-verifikasi-perusahaan-homepage-claude-startups.md](2026-10-10/190500-verifikasi-perusahaan-homepage-claude-startups.md) — Verifikasi identitas perusahaan perorangan (Tentang, JSON-LD Organization, footer), homepage product-first (hero baru, seksi pipeline 6-langkah + keluaran artikel nyata), MIT LICENSE, dan link README. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-09 132800-perbaikan-temuan-review-claude-startups.md](2026-10-09/132800-perbaikan-temuan-review-claude-startups.md) — Tutup temuan O1–O3: copy queue & contact aman, warning metadataBase root bersih, gate hijau.

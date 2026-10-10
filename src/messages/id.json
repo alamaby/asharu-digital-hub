@@ -157,6 +157,26 @@
       "cta": "Lihat Digital Hub",
       "repoCta": "Lihat Kode di GitHub"
     },
+    "sample": {
+      "heading": "Contoh alur: brief → draf → review → siap terbit",
+      "description": "Simulasi ujung-ke-ujung memakai data contoh sintetis — bukan data pelanggan nyata.",
+      "syntheticNote": "Data contoh sintetis",
+      "stageBrief": "Brief konten",
+      "stageDraft": "Draf",
+      "stageReview": "Review",
+      "stageReady": "Siap terbit",
+      "briefFacts": "Fakta pendukung",
+      "briefEvidence": "Bukti yang dibutuhkan",
+      "draftStatus": "Status draf",
+      "reviewFindings": "Temuan",
+      "reviewRecommendation": "Rekomendasi",
+      "readyMode": "Mode terbit",
+      "readyApprover": "Disetujui oleh",
+      "noFindings": "Tidak ada temuan.",
+      "severityCritical": "Kritis",
+      "severityMajor": "Mayor",
+      "severityMinor": "Minor"
+    },
     "pipeline": {
       "heading": "Mesin Riset & Publikasi Konten",
       "description": "Bagaimana alur kerja otomasi riset mengubah data dan tren menjadi draf terstruktur dengan kontrol kualitas manusia.",

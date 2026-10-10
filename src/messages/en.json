@@ -157,6 +157,26 @@
       "cta": "View Digital Hub",
       "repoCta": "View Source on GitHub"
     },
+    "sample": {
+      "heading": "Sample flow: brief → draft → review → ready",
+      "description": "End-to-end simulation using synthetic sample data — not real customer data.",
+      "syntheticNote": "Synthetic sample data (in Indonesian)",
+      "stageBrief": "Content brief",
+      "stageDraft": "Draft",
+      "stageReview": "Review",
+      "stageReady": "Ready to publish",
+      "briefFacts": "Supporting facts",
+      "briefEvidence": "Required evidence",
+      "draftStatus": "Draft status",
+      "reviewFindings": "Findings",
+      "reviewRecommendation": "Recommendation",
+      "readyMode": "Publish mode",
+      "readyApprover": "Approved by",
+      "noFindings": "No findings.",
+      "severityCritical": "Critical",
+      "severityMajor": "Major",
+      "severityMinor": "Minor"
+    },
     "pipeline": {
       "heading": "Research & Content Engine",
       "description": "How our automated research pipeline turns trends and data into structured drafts with human quality control.",

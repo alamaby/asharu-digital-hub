@@ -23,6 +23,7 @@ import { GithubRepoLink } from '@/components/ui/GithubRepoLink';
 import { ProductCarousel } from '@/components/cards/ProductCarousel';
 import { PropertyBrowser } from '@/components/cards/PropertyBrowser';
 import { TrackedExternalLink } from '@/components/ui/TrackedExternalLink';
+import { SampleFlowCard } from '@/components/digital-hub/SampleFlowCard';
 import { mathAppConfig } from '@/data/math-app';
 
 interface HomePageProps {
@@ -162,6 +163,8 @@ export default async function HomePage({ params }: HomePageProps) {
               ))}
             </ol>
           </div>
+
+          <SampleFlowCard />
 
           {latestArticles.length > 0 ? (
             <div className="mt-8 rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">

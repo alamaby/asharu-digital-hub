@@ -164,9 +164,16 @@ Tidak ada blocker terbuka. Satu hal dipertimbangkan dan DIPUTUSKAN eksplisit: da
 
 ## 5. Handoff checklist (executor baca dulu)
 
-- [ ] W0 hijau sebelum menyentuh apa pun.
-- [ ] Hanya 4 file pada W4; jangan sentuh `.env*`, secret, key ke chat/file; jangan tambah dependensi; jangan buat file test.
-- [ ] 18 key exact W1 — bila tergoda menambah/mengubah copy, BERHENTI (di luar scope).
-- [ ] Kode W2 ditempel verbatim — bila `typecheck` menolak field fixture, artinya fixture berubah: BERHENTI dan laporkan (jangan adaptasi diam-diam).
-- [ ] Update `## Progress Log` di file ini per langkah; tasks `- [x]`.
-- [ ] Gate-final AGENTS.md berlaku penuh; verlassen satu commit + push (W4).
+- [x] W0 hijau sebelum menyentuh apa pun.
+- [x] Hanya 4 file pada W4; jangan sentuh `.env*`, secret, key ke chat/file; jangan tambah dependensi; jangan buat file test.
+- [x] 18 key exact W1 — bila tergoda menambah/mengubah copy, BERHENTI (di luar scope).
+- [x] Kode W2 ditempel verbatim — bila `typecheck` menolak field fixture, artinya fixture berubah: BERHENTI dan laporkan (jangan adaptasi diam-diam).
+- [x] Update `## Progress Log` di file ini per langkah; tasks `- [x]`.
+- [x] Gate-final AGENTS.md berlaku penuh; satu commit + push (W4).
+
+## Progress Log
+- 2026-10-10 22:42:00 — W0 verifikasi baseline git & grep selesai, tree bersih.
+- 2026-10-10 22:42:16 — W1 18 key i18n ditambahkan ke id.json dan en.json, validate:messages PASS.
+- 2026-10-10 22:42:52 — W2 SampleFlowCard.tsx dibuat, typecheck PASS.
+- 2026-10-10 22:43:09 — W3 import & sisipan komponen di page.tsx selesai.
+- 2026-10-10 22:44:00 — W4 persiapan eksekusi gate penuh & commit/push.
