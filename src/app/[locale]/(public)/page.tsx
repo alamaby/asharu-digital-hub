@@ -137,7 +137,7 @@ export default async function HomePage({ params }: HomePageProps) {
                   { num: '05', key: 'pipeline.step5' },
                   { num: '06', key: 'pipeline.step6' }
                 ] as const
-              ).map(({ num, key }) => (
+              ).map(({ num, key }, index, steps) => (
                 <li
                   key={num}
                   className="rounded-xl border border-line bg-surface/50 p-4"
@@ -148,6 +148,16 @@ export default async function HomePage({ params }: HomePageProps) {
                   <p className="mt-3 text-sm leading-relaxed text-ink-muted">
                     {tHome(key)}
                   </p>
+                  {index < steps.length - 1 ? (
+                    <span aria-hidden="true" className="mt-3 flex justify-center text-primary/50 lg:hidden">
+                      <ArrowDown className="size-5" aria-hidden />
+                    </span>
+                  ) : null}
+                  {index < steps.length - 1 ? (
+                    <span aria-hidden="true" className="mt-3 hidden justify-end pr-1 text-primary/50 lg:flex">
+                      <ArrowRight className="size-5" aria-hidden />
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ol>

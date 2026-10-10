@@ -102,8 +102,16 @@ Tidak ada blocker terbuka. Dua hal yang dipertimbangkan dan DIPUTUSKAN eksplisit
 
 ## 5. Handoff checklist (executor baca dulu)
 
-- [ ] D0 hijau sebelum menyentuh apa pun.
-- [ ] Hanya 2 file diubah; jangan sentuh `.env*`, secret, key ke chat/file; jangan tambah dependensi.
-- [ ] Nol key i18n baru — bila tergoda menambah copy, BERHENTI (di luar scope).
-- [ ] Update `## Progress Log` di file ini per langkah; tasks `- [x]`.
-- [ ] Gate-final AGENTS.md berlaku penuh; verlassen satu commit + push (D3).
+- [x] D0 hijau sebelum menyentuh apa pun.
+- [x] Hanya 2 file diubah; jangan sentuh `.env*`, secret, key ke chat/file; jangan tambah dependensi.
+- [x] Nol key i18n baru — bila tergoda menambah copy, BERHENTI (di luar scope).
+- [x] Update `## Progress Log` di file ini per langkah; tasks `- [x]`.
+- [x] Gate-final AGENTS.md berlaku penuh; verlassen satu commit + push (D3).
+
+## Progress Log
+
+- 2026-10-10 22:08:00 — D0, D1, D2, D3 selesai:
+  - D0: Baseline verified bersih di HEAD `00a9d5b`.
+  - D1: Blok diagram flowchart Mermaid 6 tahap riset ditambahkan ke `README.md`.
+  - D2: Panah konektor flow dekoratif (`ArrowDown` untuk mobile, `ArrowRight` untuk desktop lg) ditambahkan di antara kartu pipeline pada `src/app/[locale]/(public)/page.tsx`.
+  - D3: Full gate lolos (`validate:messages`, `typecheck`, `lint` 0 warning, `test` 135 files / 1345 tests, `build` 100%, scan secret bersih). Siap commit & push.

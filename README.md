@@ -12,6 +12,15 @@ Workspace operasi konten + portofolio digital berbantuan AI untuk UMKM Indonesia
 
 Asharu.id — usaha perorangan, Bandung, Indonesia · didirikan Maret 2023 oleh Alam Aby Bashit · kontak halo@asharu.id · live https://asharu.id/id/digital-hub.
 
+```mermaid
+flowchart LR
+    A[Riset multi-sumber<br/>Tavily] --> B[Verifikasi<br/>temp 0,2 · JSON]
+    B --> C[Skor<br/>8 kriteria bobot]
+    C --> D[Draf bilingual<br/>ID + EN]
+    D --> E[Review manusia<br/>approve / reject]
+    E --> F[Terbit<br/>ekspor + jadwal]
+```
+
 ---
 
 ## Daftar Isi
