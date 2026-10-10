@@ -50,6 +50,7 @@ export default async function HomePage({ params }: HomePageProps) {
   const tHero = await getTranslations({ locale, namespace: 'hero' });
   const tHome = await getTranslations({ locale, namespace: 'home' });
   const tA11y = await getTranslations({ locale, namespace: 'a11y' });
+  const tArticles = await getTranslations({ locale, namespace: 'articles' });
 
   const featuredProducts = await getFeaturedProductsDB(6);
   const featuredProperties = getFeaturedProperties(6);
@@ -201,7 +202,7 @@ export default async function HomePage({ params }: HomePageProps) {
                           href={href as never}
                           className="min-h-touch inline-flex items-center font-medium text-primary hover:underline"
                         >
-                          {locale === 'id' ? 'Baca selengkapnya' : 'Read more'} →
+                          {tArticles('readMore')} →
                         </Link>
                       </div>
                     </li>
