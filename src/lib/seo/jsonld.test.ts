@@ -48,6 +48,13 @@ describe('JSON-LD builders', () => {
     expect(String(org.logo)).toMatch(/^https:\/\/asharu\.id\//);
   });
 
+  it('organization exposes foundingDate, email, and address', () => {
+    const schema = organizationSchema();
+    expect(schema.foundingDate).toBe('2023-03');
+    expect(schema.email).toBe('halo@asharu.id');
+    expect((schema.address as Record<string, unknown>).addressLocality).toBe('Bandung');
+  });
+
   it('product ItemList uses external product URLs only (no fake offers)', () => {
     const list = productListSchema(fixtureProducts.slice(0, 2), 'id');
     const items = list.itemListElement as Array<Record<string, unknown>>;

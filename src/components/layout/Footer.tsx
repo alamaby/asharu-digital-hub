@@ -104,6 +104,9 @@ export function Footer({ showAnalyticsPrefs }: FooterProps) {
         <p className="mx-auto max-w-6xl px-4 text-xs text-ink-muted sm:px-6">
           {t('rights', { year: new Date().getFullYear() })}
         </p>
+        <p className="mx-auto mt-1 max-w-6xl px-4 text-xs text-ink-muted sm:px-6">
+          {t('company')}
+        </p>
       </div>
     </footer>
   );

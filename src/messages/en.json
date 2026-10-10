@@ -2,8 +2,8 @@
   "meta": {
     "tagline": "Everything you need, in one place.",
     "home": {
-      "title": "Asharu | Shops, Curated Products, Social Media & Properties",
-      "description": "Discover online shops, curated affiliate products, social channels, and properties for sale or rent through the Asharu digital hub."
+      "title": "Asharu.id — Digital Hub & Content Workspace for SMBs",
+      "description": "Asharu.id — a Bandung sole proprietorship (2023) — building an AI workspace for research, drafting, review, publishing, and portfolios for small businesses."
     },
     "products": {
       "title": "Curated Affiliate Products | Asharu",
@@ -110,11 +110,11 @@
     "digitalHub": "Digital Hub"
   },
   "hero": {
-    "title": "Everything you need, in one place.",
-    "tagline": "Asharu · asharu.id",
-    "description": "Asharu is a digital hub connecting you with our online shops, curated affiliate products, social channels, and properties for sale or rent.",
-    "primaryCta": "Explore Now",
-    "secondaryCta": "View Properties"
+    "title": "Turn daily business activity into trusted content and portfolio.",
+    "tagline": "Asharu Digital Hub · for Indonesian Small Businesses",
+    "description": "Asharu.id — a Bandung sole proprietorship (2023) — building an AI workspace for research, drafting, review, publishing, and portfolios for small businesses. Plus stores, curated affiliates, and verified properties.",
+    "primaryCta": "Explore the Digital Hub",
+    "secondaryCta": "How the Engine Works"
   },
   "home": {
     "stores": {
@@ -156,6 +156,22 @@
       "description": "An AI-assisted workspace to research ideas, compose content, review quality, prepare publication, and build a digital portfolio from business activity.",
       "cta": "View Digital Hub",
       "repoCta": "View Source on GitHub"
+    },
+    "pipeline": {
+      "heading": "Research & Content Engine",
+      "description": "How our automated research pipeline turns trends and data into structured drafts with human quality control.",
+      "step1": "Multi-source research: Gathering facts, trends, and supporting data from credible sources.",
+      "step2": "Verification: Checking information accuracy and filtering out unsupported claims.",
+      "step3": "Scoring: Evaluating topic viability based on relevance and value for readers.",
+      "step4": "Bilingual drafting: Generating high-quality content drafts in Indonesian and English.",
+      "step5": "Human review: Editors inspect, refine, and provide final approval.",
+      "step6": "Publishing: Approved content is prepared for web and catalog publication.",
+      "label": "How our internal engine works"
+    },
+    "output": {
+      "heading": "Real pipeline output",
+      "description": "Informative articles produced through verified research and approved by human reviewers.",
+      "viewAll": "View all articles"
     }
   },
   "shops": {
@@ -296,6 +312,8 @@
   "aboutPage": {
     "heading": "About Asharu",
     "lead": "Asharu (asharu.id) is a digital hub that consolidates all of our online channels: shops, curated affiliate products, social media, and properties.",
+    "companyHeading": "About the company",
+    "companyBody": "Asharu.id is a sole proprietorship founded by Alam Aby Bashit in Bandung, Indonesia, in March 2023. We build Asharu Digital Hub — an AI-assisted content operations and digital portfolio workspace for Indonesian small businesses. Contact: halo@asharu.id.",
     "purposeHeading": "Why does Asharu exist?",
     "purposeBody": "Instead of scattering information across many platforms, we centralise everything under one memorable address. Looking for our shop? It's here. Want curated product picks? Here. Searching for a property? Also here.",
     "principlesHeading": "Our principles",
@@ -352,7 +370,8 @@
     "disclosureLink": "Affiliate Disclosure",
     "mathLink": "Learn Math",
     "consentSettings": "Analytics preferences",
-    "rights": "© {year} Asharu · asharu.id"
+    "rights": "© {year} Asharu · asharu.id",
+    "company": "Asharu.id · Sole proprietorship, Bandung, Indonesia · Founded March 2023"
   },
   "notFound": {
     "heading": "Page not found",

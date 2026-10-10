@@ -101,10 +101,10 @@ describe('message catalogs', () => {
     const idHome = id.meta?.home as { title: string };
     const enHome = en.meta?.home as { title: string };
     expect(idHome.title).toBe(
-      'Asharu | Toko, Produk Pilihan, Media Sosial & Properti'
+      'Asharu.id — Digital Hub & Workspace Konten untuk UMKM'
     );
     expect(enHome.title).toBe(
-      'Asharu | Shops, Curated Products, Social Media & Properties'
+      'Asharu.id — Digital Hub & Content Workspace for SMBs'
     );
   });
 });

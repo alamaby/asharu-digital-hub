@@ -38,6 +38,9 @@ export default async function AboutPage({ params }: AboutPageProps) {
       </h1>
       <p className="mt-4 text-lg leading-relaxed text-ink-muted">{t('lead')}</p>
 
+      <h2 className="mt-8 text-xl font-semibold text-ink">{t('companyHeading')}</h2>
+      <p className="mt-2 leading-relaxed text-ink-muted">{t('companyBody')}</p>
+
       <h2 className="mt-8 text-xl font-semibold text-ink">{t('purposeHeading')}</h2>
       <p className="mt-2 leading-relaxed text-ink-muted">{t('purposeBody')}</p>
 

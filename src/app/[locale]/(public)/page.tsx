@@ -11,6 +11,8 @@ import { getVisibleShopLinks } from '@/data/shop-links';
 import { getSocialLinks } from '@/data/social-links';
 import { getFeaturedProductsDB } from '@/lib/affiliate/public';
 import { getFeaturedProperties } from '@/data/properties';
+import { getPublishedArticles } from '@/lib/articles/public';
+import type { ArticleLocale } from '@/lib/articles/types';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { JsonLd } from '@/components/ui/JsonLd';
 import { ShopCard } from '@/components/home/ShopCard';
@@ -51,6 +53,7 @@ export default async function HomePage({ params }: HomePageProps) {
 
   const featuredProducts = await getFeaturedProductsDB(6);
   const featuredProperties = getFeaturedProperties(6);
+  const latestArticles = await getPublishedArticles(locale as ArticleLocale, 3);
 
   return (
     <>
@@ -67,14 +70,14 @@ export default async function HomePage({ params }: HomePageProps) {
             {tHero('description')}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href="#affiliate-products" className="btn-primary">
+            <Link href="/digital-hub" className="btn-primary">
               {tHero('primaryCta')}
-              <ArrowDown className="size-4" aria-hidden />
-            </a>
-            <Link href="/properties" className="btn-secondary">
-              {tHero('secondaryCta')}
               <ArrowRight className="size-4" aria-hidden />
             </Link>
+            <a href="#mesin-riset" className="btn-secondary">
+              {tHero('secondaryCta')}
+              <ArrowDown className="size-4" aria-hidden />
+            </a>
           </div>
         </div>
       </section>
@@ -106,6 +109,107 @@ export default async function HomePage({ params }: HomePageProps) {
               />
             </div>
           </div>
+        </section>
+
+        {/* Pipeline & Output section */}
+        <section
+          id="mesin-riset"
+          aria-labelledby="mesin-riset-heading"
+          className="scroll-mt-24 py-10"
+        >
+          <div className="rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+            <div className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              {tHome('pipeline.label')}
+            </div>
+            <SectionHeading
+              id="mesin-riset-heading"
+              title={tHome('pipeline.heading')}
+              description={tHome('pipeline.description')}
+            />
+            <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(
+                [
+                  { num: '01', key: 'pipeline.step1' },
+                  { num: '02', key: 'pipeline.step2' },
+                  { num: '03', key: 'pipeline.step3' },
+                  { num: '04', key: 'pipeline.step4' },
+                  { num: '05', key: 'pipeline.step5' },
+                  { num: '06', key: 'pipeline.step6' }
+                ] as const
+              ).map(({ num, key }) => (
+                <li
+                  key={num}
+                  className="rounded-xl border border-line bg-surface/50 p-4"
+                >
+                  <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                    {num}
+                  </span>
+                  <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+                    {tHome(key)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {latestArticles.length > 0 ? (
+            <div className="mt-8 rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <SectionHeading
+                    id="output-articles-heading"
+                    title={tHome('output.heading')}
+                    description={tHome('output.description')}
+                  />
+                </div>
+                <Link
+                  href="/artikel"
+                  className="btn-secondary min-h-touch inline-flex items-center text-sm"
+                >
+                  {tHome('output.viewAll')}
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </div>
+
+              <ul className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {latestArticles.map((article) => {
+                  const href = { pathname: '/artikel/[slug]' as const, params: { slug: article.slug } };
+                  const dateStr = article.published_at
+                    ? new Date(article.published_at).toLocaleDateString(
+                        locale === 'id' ? 'id-ID' : 'en-US',
+                        { day: 'numeric', month: 'long', year: 'numeric' }
+                      )
+                    : null;
+                  return (
+                    <li
+                      key={article.id}
+                      className="flex flex-col justify-between rounded-xl border border-line bg-surface p-5 shadow-card transition hover:border-primary"
+                    >
+                      <div>
+                        <h3 className="text-base font-semibold leading-snug text-ink">
+                          <Link href={href as never} className="hover:text-primary">
+                            {article.title}
+                          </Link>
+                        </h3>
+                        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink-muted">
+                          {article.excerpt}
+                        </p>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-3 text-xs text-ink-muted">
+                        {dateStr ? <time>{dateStr}</time> : <span />}
+                        <Link
+                          href={href as never}
+                          className="min-h-touch inline-flex items-center font-medium text-primary hover:underline"
+                        >
+                          {locale === 'id' ? 'Baca selengkapnya' : 'Read more'} →
+                        </Link>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
         </section>
 
         {/* C. Featured affiliate products */}

@@ -28,6 +28,14 @@ export function organizationSchema(): Record<string, unknown> {
     name: siteConfig.name,
     url: env.siteUrl,
     logo: `${env.siteUrl}/icon.svg`,
+    foundingDate: '2023-03',
+    email: 'halo@asharu.id',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Bandung',
+      addressRegion: 'Jawa Barat',
+      addressCountry: 'ID'
+    },
     sameAs: getSocialLinks().map((link) => link.url)
   };
 }

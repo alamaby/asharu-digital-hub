@@ -2,8 +2,8 @@
   "meta": {
     "tagline": "Semua yang Anda cari, dalam satu tempat.",
     "home": {
-      "title": "Asharu | Toko, Produk Pilihan, Media Sosial & Properti",
-      "description": "Temukan toko online, produk afiliasi pilihan, kanal media sosial, serta properti dijual dan disewakan melalui digital hub Asharu."
+      "title": "Asharu.id — Digital Hub & Workspace Konten untuk UMKM",
+      "description": "Asharu.id — usaha perorangan Bandung (2023) — membangun workspace AI untuk riset, draf, review, publikasi, dan portofolio UMKM."
     },
     "products": {
       "title": "Produk Afiliasi Pilihan | Asharu",
@@ -110,11 +110,11 @@
     "digitalHub": "Digital Hub"
   },
   "hero": {
-    "title": "Semua yang Anda cari, dalam satu tempat.",
-    "tagline": "Asharu · asharu.id",
-    "description": "Asharu adalah pusat digital yang menghubungkan Anda dengan toko online, produk afiliasi pilihan, kanal media sosial, serta properti yang dijual dan disewakan.",
-    "primaryCta": "Jelajahi Sekarang",
-    "secondaryCta": "Lihat Properti"
+    "title": "Ubah aktivitas usaha menjadi konten dan portofolio terpercaya.",
+    "tagline": "Asharu Digital Hub · untuk UMKM Indonesia",
+    "description": "Asharu.id — usaha perorangan Bandung (2023) — membangun workspace AI untuk riset, draf, review, publikasi, dan portofolio UMKM. Plus toko, kurasi afiliasi, dan properti terverifikasi.",
+    "primaryCta": "Lihat Digital Hub",
+    "secondaryCta": "Cara Kerja Mesin"
   },
   "home": {
     "stores": {
@@ -156,6 +156,22 @@
       "description": "Workspace berbantuan AI untuk riset ide, susun konten, tinjau kualitas, siapkan publikasi, dan bangun portofolio digital dari aktivitas usaha.",
       "cta": "Lihat Digital Hub",
       "repoCta": "Lihat Kode di GitHub"
+    },
+    "pipeline": {
+      "heading": "Mesin Riset & Publikasi Konten",
+      "description": "Bagaimana alur kerja otomasi riset mengubah data dan tren menjadi draf terstruktur dengan kontrol kualitas manusia.",
+      "step1": "Riset multi-sumber: Mengumpulkan fakta, tren, dan data pendukung dari sumber terpercaya.",
+      "step2": "Verifikasi: Memeriksa akurasi informasi dan memfilter klaim yang tidak berdasar.",
+      "step3": "Skor: Menilai kelayakan topik berdasarkan relevansi dan nilai manfaat bagi pembaca.",
+      "step4": "Draf bilingual: Menyusun kerangka dan draf konten berkualitas dalam bahasa Indonesia dan Inggris.",
+      "step5": "Review manusia: Editor memeriksa, mengoreksi, dan memberikan persetujuan akhir.",
+      "step6": "Terbit: Konten yang disetujui disiapkan untuk publikasi ke web dan katalog.",
+      "label": "Cara kerja internal"
+    },
+    "output": {
+      "heading": "Contoh keluaran nyata dari pipeline",
+      "description": "Artikel informatif hasil riset terverifikasi yang telah disetujui kurator manusia.",
+      "viewAll": "Lihat semua artikel"
     }
   },
   "shops": {
@@ -296,6 +312,8 @@
   "aboutPage": {
     "heading": "Tentang Asharu",
     "lead": "Asharu (asharu.id) adalah pusat digital yang mengonsolidasikan seluruh kanal online kami: toko, produk afiliasi pilihan, media sosial, dan properti.",
+    "companyHeading": "Tentang perusahaan",
+    "companyBody": "Asharu.id adalah usaha perorangan yang didirikan oleh Alam Aby Bashit di Bandung, Indonesia, pada Maret 2023. Kami membangun Asharu Digital Hub — workspace operasi konten dan portofolio digital berbantuan AI untuk UMKM Indonesia. Kontak: halo@asharu.id.",
     "purposeHeading": "Untuk apa Asharu ada?",
     "purposeBody": "Alih-alih menyebarkan informasi di banyak platform, kami memusatkan semuanya di satu alamat yang mudah diingat. Anda mencari toko? Ada di sini. Ingin melihat kurasi produk? Ada di sini. Sedang mencari properti? Juga di sini.",
     "principlesHeading": "Prinsip kami",
@@ -352,7 +370,8 @@
     "disclosureLink": "Disclosure Afiliasi",
     "mathLink": "Belajar Matematika",
     "consentSettings": "Preferensi analytics",
-    "rights": "© {year} Asharu · asharu.id"
+    "rights": "© {year} Asharu · asharu.id",
+    "company": "Asharu.id · Usaha perorangan, Bandung, Indonesia · Didirikan Maret 2023"
   },
   "notFound": {
     "heading": "Halaman tidak ditemukan",
