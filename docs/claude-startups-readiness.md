@@ -29,6 +29,8 @@ Current state: boundary and schemas exist (`src/lib/digital-hub/services.ts`, `s
 > Our initial target customers are Indonesian micro and small businesses that actively sell products or services through social media but do not have a dedicated content or marketing team.
 >
 > Initial segments include home-based product businesses, local service providers, culinary businesses, creative businesses, property agents, independent professionals, and small online merchants. These businesses need affordable assistance with content planning and production, but they also need a structured way to document completed work and build credibility with prospective customers.
+>
+> Legal entity: Asharu.id is an Indonesian sole proprietorship founded by Alam Aby Bashit in Bandung, West Java, in March 2023. Verified identity is visible on-site at [/id/tentang](/id/tentang) and via JSON-LD Organization schema.
 
 ## D. Six-month use of Claude API credits
 

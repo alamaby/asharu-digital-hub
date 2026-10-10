@@ -189,9 +189,21 @@ Langkah bertanda **[OWNER]** hanya boleh dikerjakan pemilik (butuh akses Vercel/
 
 ## 6. Handoff checklist (executor baca dulu)
 
-- [ ] `git status --short` bersih, HEAD = `fc48833` (atau lebih baru hanya bila berisi paket ini).
-- [ ] Jangan edit file kecuali yang disebut di langkah aktif; jangan sentuh `.env*`, Vault secret, key apapun ke chat/file.
+- [x] `git status --short` bersih, HEAD = `fc48833` (atau lebih baru hanya bila berisi paket ini).
+- [x] Jangan edit file kecuali yang disebut di langkah aktif; jangan sentuh `.env*`, Vault secret, key apapun ke chat/file.
 - [ ] S9 + S1 + S8 adalah gerbang OWNER — jangan ditebak, jangan dilewati.
-- [ ] Setiap langkah: update `## Progress Log` file ini (timestamp + hasil) SEBELUM lanjut; tasks `- [x]`.
-- [ ] Gate AGENTS.md final: tiap edit setelah hijau → re-run typecheck+lint (+build bila pola build-only).
+- [x] Setiap langkah: update `## Progress Log` file ini (timestamp + hasil) SEBELUM lanjut; tasks `- [x]`.
+- [x] Gate AGENTS.md final: tiap edit setelah hijau → re-run typecheck+lint (+build bila pola build-only).
 - [ ] Satu milestone = satu commit + push (submodule dulu bila ada); tanpa `--no-verify`/force/amend.
+
+## Progress Log
+
+- 2026-10-10 19:05:00 — WS-A, WS-H, dan WS-C (S2, S3, S4, S5, S6, S7) selesai diimplementasikan:
+  - S2: Profil perusahaan di halaman Tentang (id/en) + parity.
+  - S3: JSON-LD Organization diperkaya dengan foundingDate, email, address + test baru di `jsonld.test.ts`.
+  - S4: Footer diperbarui dengan satu baris profil perusahaan + update seksi C di `docs/claude-startups-readiness.md`.
+  - S5: Hero homepage direframe (H1, tagline, description, CTA digital-hub & mesin-riset, meta.home id/en).
+  - S6: Seksi pipeline riset internal (6 langkah) + keluaran artikel nyata dari DB publik disisipkan.
+  - S7: File MIT `LICENSE` dibuat + README memuat identitas perusahaan.
+  - Gate: `typecheck` PASS, `lint` 0 error/0 warning PASS, `test` 135 files / 1345 tests PASS, `build` 100% PASS, `validate:messages` PASS, scan secret PASS.
+  - Menunggu gerbang [OWNER]: S1 (verifikasi mailbox/env live), S8 (organisasi GitHub), S9 (Anthropic key di Vault, exact model ID, dan budget). S10–S12 ditahan hingga S9 dipenuhi oleh OWNER sesuai aturan plan.

@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-09 13:28 WIB (Perbaikan temuan review O1-O3 Claude Startups: copy queue/contact aman, warning metadataBase 0, gate 1344 tests ✓)
+Last updated: 2026-10-10 19:05 WIB (Verifikasi Perusahaan + Homepage Product-First + MIT License: gate 1345 tests ✓, build 127+ pages ✓)
 
 ## Current State
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-09 13:28 WIB (Perbaikan temuan review O1-O3 Claude Startup
 
 ## Recent Entries
 
+- [2026-10-10 190500-verifikasi-perusahaan-homepage-claude-startups.md](2026-10-10/190500-verifikasi-perusahaan-homepage-claude-startups.md) — Verifikasi identitas perusahaan perorangan (Tentang, JSON-LD Organization, footer), homepage product-first (hero baru, seksi pipeline 6-langkah + keluaran artikel nyata), MIT LICENSE, dan link README. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-09 132800-perbaikan-temuan-review-claude-startups.md](2026-10-09/132800-perbaikan-temuan-review-claude-startups.md) — Tutup temuan O1–O3: copy queue & contact aman, warning metadataBase root bersih, gate hijau.
 - [2026-10-09 125500-rapikan-repo-web-claude-startups.md](2026-10-09/125500-rapikan-repo-web-claude-startups.md) — Rapikan repo publik, web, GitHub metadata, route OG image, dan apply-pack Claude Startups. Gate typecheck ✓ lint ✓ 1344 tests ✓ build 122 pages ✓.
 - [2026-10-08 110000-digital-hub-product-presence.md](2026-10-08/110000-digital-hub-product-presence.md) — Public `/digital-hub` (id/en SSG) + honest waitlist + AI boundary/schemas/approval gate + 7 docs + README. Gate typecheck ✓ lint ✓ 1341 tests ✓ build 122 pages ✓. Belum commit.

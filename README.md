@@ -10,6 +10,8 @@ Production-ready bilingual (ID/EN) digital hub yang mengonsolidasikan toko onlin
 
 Workspace operasi konten + portofolio digital berbantuan AI untuk UMKM Indonesia: **Riset → Susun → Tinjau → Publikasikan → Portofolio**. Pembeda: pipa Content-to-Portfolio (aktivitas usaha menjadi konten siap terbit lalu entri portofolio). Halaman publik live: [`https://asharu.id/id/digital-hub`](https://asharu.id/id/digital-hub) ↔ [`https://asharu.id/en/digital-hub`](https://asharu.id/en/digital-hub) (status: prototipe + daftar tunggu pilot, tanpa klaim terbit otomatis). Kesiapan program Claude: [`docs/claude-startups-readiness.md`](docs/claude-startups-readiness.md). Detail: [`docs/product-brief.md`](docs/product-brief.md), [`docs/architecture.md`](docs/architecture.md), [`docs/ai-safety.md`](docs/ai-safety.md), [`docs/privacy-and-data-flow.md`](docs/privacy-and-data-flow.md), [`docs/product-gap-analysis.md`](docs/product-gap-analysis.md).
 
+Asharu.id — usaha perorangan, Bandung, Indonesia · didirikan Maret 2023 oleh Alam Aby Bashit · kontak halo@asharu.id · live https://asharu.id/id/digital-hub.
+
 ---
 
 ## Daftar Isi
