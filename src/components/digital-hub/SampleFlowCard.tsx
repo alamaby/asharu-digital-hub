@@ -49,6 +49,7 @@ export function SampleFlowCard() {
         </li>
         <li className="rounded-xl border border-line bg-surface/50 p-4">
           <h3 className="text-base font-semibold text-primary">{t('sample.stageReview')}</h3>
+          <p className="mt-1 text-sm font-medium text-ink">{t('sample.reviewFindings')}</p>
           {findingRows.length > 0 ? (
             <ul className="mt-1 space-y-1">
               {findingRows.map((row) => (
