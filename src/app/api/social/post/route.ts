@@ -84,6 +84,21 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'threads_user_id not set — finish Fase 0 OAuth' }, { status: 500 });
   }
 
+  // Daily cap guard (configurable, default 25 < 250 kuota Meta).
+  // Dicek SEBELUM klaim agar tick saat cap tercapai tidak menghabiskan
+  // 1 attempt antrean (klaim dibayar mahal: attempts+1 + status posting).
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const { count: postedToday } = await supabase
+    .from('social_post_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('platform_slug', 'threads')
+    .eq('status', 'posted')
+    .gte('posted_at', dayStart.toISOString());
+  if ((postedToday ?? 0) >= config.daily_cap) {
+    return NextResponse.json({ skipped: `daily cap reached (${config.daily_cap})` });
+  }
+
   // 0. Reaper: klaim basi dari tick yang mati di tengah dikembalikan ke antrean.
   // Best-effort — kegagalan reaper tidak boleh menggagalkan tick yang sehat.
   const reap = await reapStaleClaims(supabase);
@@ -119,6 +134,12 @@ async function handle(request: NextRequest) {
   );
   let token = (tokenError ? null : (tokenData as string | null));
   if (!token) {
+    // Klaim sudah dimenangkan di atas — kembalikan ke antrean agar tidak
+    // nyangkut `posting` sampai reaper 15 menit.
+    await supabase
+      .from('social_post_queue')
+      .update({ status: 'queued', claimed_at: null, last_error: 'threads token not in Vault — run seed-threads-token' })
+      .eq('id', item.id);
     return NextResponse.json({ error: 'threads token not in Vault — run seed-threads-token' }, { status: 500 });
   }
 
@@ -148,25 +169,17 @@ async function handle(request: NextRequest) {
     }
   }
 
-  // Daily cap guard (configurable, default 25 < 250 kuota Meta).
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const { count: postedToday } = await supabase
-    .from('social_post_queue')
-    .select('id', { count: 'exact', head: true })
-    .eq('platform_slug', 'threads')
-    .eq('status', 'posted')
-    .gte('posted_at', dayStart.toISOString());
-  if ((postedToday ?? 0) >= config.daily_cap) {
-    return NextResponse.json({ skipped: `daily cap reached (${config.daily_cap})` });
-  }
-
   // Quota pre-check (best-effort, tidak fatal bila API tak merespons).
   const { quotaUsage } = await fetchPublishingLimit(fetch, {
     threadsUserId: account.threads_user_id,
     token
   }).catch(() => ({ quotaUsage: null as number | null }));
   if (quotaUsage !== null && quotaUsage >= 250) {
+    // Kembalikan klaim agar tick berikut bisa retry setelah kuota reset.
+    await supabase
+      .from('social_post_queue')
+      .update({ status: 'queued', claimed_at: null, last_error: 'threads publishing quota exhausted (250/24h)' })
+      .eq('id', item.id);
     return NextResponse.json({ error: 'threads publishing quota exhausted (250/24h)' }, { status: 429 });
   }
 
