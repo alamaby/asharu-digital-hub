@@ -4,7 +4,7 @@ type Row = Record<string, unknown>;
 type Filter = { op: 'eq' | 'neq' | 'lt' | 'gte' | 'in'; col: string; val: unknown };
 
 const { dbRef } = vi.hoisted(() => ({
-  dbRef: { current: null as unknown as { images: Row[]; drafts: Row[]; providers: Row[]; models: Row[] } }
+  dbRef: { current: null as unknown as { images: Row[]; drafts: Row[]; providers: Row[]; models: Row[]; queryCount?: { selects: number } } }
 }));
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -61,7 +61,8 @@ vi.mock('@/lib/image/storage', () => ({
   uploadDraftImage: vi.fn(async () => ({ storagePath: 'd/img.png', publicUrl: 'https://cdn.test/img.png' }))
 }));
 
-import { claimPendingImage, processImageTick, reapStuckImages } from './worker';
+import { claimPendingImage, enqueueNextMissingImage, processImageTick, reapStuckImages } from './worker';
+import { runLLMCompletion } from '@/lib/llm/completion';
 
 function matches(r: Row, filters: Filter[]): boolean {
   return filters.every(({ op, col, val }) => {
@@ -76,7 +77,7 @@ function matches(r: Row, filters: Filter[]): boolean {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models: Row[] }): any {
+function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models: Row[]; queryCount?: { selects: number } }): any {
   const tableRows = (t: string): Row[] =>
     t === 'content_draft_images' ? db.images
     : t === 'content_drafts' ? db.drafts
@@ -109,6 +110,7 @@ function makeClient(db: { images: Row[]; drafts: Row[]; providers: Row[]; models
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const api: any = {
       select(_cols: string, opts?: { count?: string; head?: boolean }) {
+        if (db.queryCount && inserted.length === 0) db.queryCount.selects += 1;
         if (opts?.count === 'exact' && opts?.head) countHead = true;
         if (patch) selectedAfterPatch = true;
         return api;
@@ -295,6 +297,10 @@ describe('processImageTick', () => {
     expect(res.processed).toBe(1);
     expect(res.imageId).toBe('auto');
     expect(dbRef.current.images[0]?.status).toBe('prompt_ready');
+    expect(runLLMCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ deadlineMs: 90_000 })
+    );
   });
 
   it('idle bila tak ada kerja dan tak ada draf tanpa cover', async () => {
@@ -304,3 +310,64 @@ describe('processImageTick', () => {
     expect(res).toEqual({ imageId: null, processed: 0 });
   });
 });
+
+describe('enqueueNextMissingImage', () => {
+  it('enqueue skips drafts with cover', async () => {
+    dbRef.current = {
+      images: [
+        image({ id: 'img-a', draft_id: 'draft-a', post_index: 0, status: 'prompt_ready' })
+      ],
+      drafts: [
+        { id: 'draft-a', status: 'needs_review', created_at: '2026-09-14T01:00:00Z' },
+        { id: 'draft-b', status: 'needs_review', created_at: '2026-09-14T02:00:00Z' }
+      ],
+      providers: [],
+      models: []
+    };
+    const createdId = await enqueueNextMissingImage();
+    expect(createdId).toBeTruthy();
+    const created = dbRef.current.images.find((img) => img.id === createdId);
+    expect(created).toBeDefined();
+    expect(created?.draft_id).toBe('draft-b');
+    expect(created?.post_index).toBe(0);
+  });
+
+  it('enqueue returns null when all covered', async () => {
+    dbRef.current = {
+      images: [
+        image({ id: 'img-a', draft_id: 'draft-a', post_index: 0, status: 'prompt_ready' }),
+        image({ id: 'img-b', draft_id: 'draft-b', post_index: 0, status: 'prompt_ready' })
+      ],
+      drafts: [
+        { id: 'draft-a', status: 'needs_review', created_at: '2026-09-14T01:00:00Z' },
+        { id: 'draft-b', status: 'needs_review', created_at: '2026-09-14T02:00:00Z' }
+      ],
+      providers: [],
+      models: []
+    };
+    const initialCount = dbRef.current.images.length;
+    const res = await enqueueNextMissingImage();
+    expect(res).toBeNull();
+    expect(dbRef.current.images.length).toBe(initialCount);
+  });
+
+  it('enqueue uses 2 queries max', async () => {
+    const queryCount = { selects: 0 };
+    dbRef.current = {
+      images: [
+        image({ id: 'img-a', draft_id: 'draft-a', post_index: 0, status: 'prompt_ready' })
+      ],
+      drafts: [
+        { id: 'draft-a', status: 'needs_review', created_at: '2026-09-14T01:00:00Z' },
+        { id: 'draft-b', status: 'needs_review', created_at: '2026-09-14T02:00:00Z' },
+        { id: 'draft-c', status: 'needs_review', created_at: '2026-09-14T03:00:00Z' }
+      ],
+      providers: [],
+      models: [],
+      queryCount
+    };
+    await enqueueNextMissingImage();
+    expect(queryCount.selects).toBeLessThanOrEqual(2);
+  });
+});
+

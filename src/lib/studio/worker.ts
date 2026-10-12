@@ -306,6 +306,7 @@ export async function processOneStudioImage(): Promise<{ imageId: string | null;
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
           temperature: 0.3,
           maxTokens: 800,
+          deadlineMs: 90_000,
         });
         const parsed = parseComposeStudio(llmOut.output.text);
         composed = parsed.final_prompt;

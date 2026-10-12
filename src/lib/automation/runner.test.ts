@@ -763,4 +763,17 @@ describe('runAutomationTick (email observability + jujur notified_at)', () => {
     const logs = tables.automation_email_log as Row[];
     expect(logs.length).toBeGreaterThan(0);
   });
+
+  it('disabled fast-path returns same shape saat automation_configs null', async () => {
+    const tables: Record<string, Row[]> = {
+      automation_configs: []
+    };
+    const supabase = makeClient(tables);
+    const res = await runAutomationTick(supabase as never);
+    expect(res).toEqual({
+      ok: true,
+      skipped: 'disabled',
+      error: 'config automation belum ada'
+    });
+  });
 });

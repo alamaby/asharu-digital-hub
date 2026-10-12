@@ -57,23 +57,23 @@ export async function enqueueNextMissingImage(): Promise<string | null> {
     .in('status', ['needs_review', 'approved'])
     .order('created_at', { ascending: true })
     .limit(20);
-  const rows = (drafts ?? []) as { id: string }[];
-  for (const d of rows) {
-    const { count } = await supabase
-      .from('content_draft_images')
-      .select('id', { count: 'exact', head: true })
-      .eq('draft_id', d.id)
-      .eq('post_index', 0);
-    if ((count ?? 0) === 0) {
-      const { data: created, error } = await supabase
-        .from('content_draft_images')
-        .insert({ draft_id: d.id, post_index: 0, image_prompt: '', provider_slug: '', model_id: '' })
-        .select('id')
-        .single();
-      if (!error && created) return (created as { id: string }).id;
-    }
-  }
-  return null;
+  const ids = ((drafts ?? []) as { id: string }[]).map((d) => d.id);
+  if (ids.length === 0) return null;
+  const { data: existing } = await supabase
+    .from('content_draft_images')
+    .select('draft_id')
+    .eq('post_index', 0)
+    .in('draft_id', ids);
+  const hasCover = new Set(((existing ?? []) as { draft_id: string }[]).map((r) => r.draft_id));
+  const missing = ids.find((id) => !hasCover.has(id));
+  if (!missing) return null;
+  const { data: created, error } = await supabase
+    .from('content_draft_images')
+    .insert({ draft_id: missing, post_index: 0, image_prompt: '', provider_slug: '', model_id: '' })
+    .select('id')
+    .single();
+  if (error || !created) return null;
+  return (created as { id: string }).id;
 }
 
 /**
@@ -238,7 +238,8 @@ async function runImagePromptLLM(
       providerId,
       modelUuid,
       sessionId,
-      stage: 'image_prompt'
+      stage: 'image_prompt',
+      deadlineMs: 90_000
     });
     return { text: output.text, providerSlug, model };
   };
@@ -481,7 +482,8 @@ async function processClaimedImage(row: DraftImageRow): Promise<{ imageId: strin
             { role: 'user' as const, content: user }
           ],
           temperature: 0.2,
-          maxTokens: 500
+          maxTokens: 500,
+          deadlineMs: 90_000
         });
         const composed = parseComposeReview(out.output.text);
         finalPrompt = composed.final_prompt;

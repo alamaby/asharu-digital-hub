@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isCronAuthorized } from '@/lib/content/cron-auth';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { runAutomationTick } from '@/lib/automation/runner';
+import { loadAutomationConfig } from '@/lib/automation/config';
 
-export const maxDuration = 300;
+// CPU hemat: poller idle <10s; kerja berat di-retry tick berikut (idempoten).
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   return handle(request);
@@ -22,6 +23,14 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'service not configured' }, { status: 500 });
   }
   try {
+    const cfg = await loadAutomationConfig(supabase);
+    if (!cfg) {
+      return NextResponse.json({ ok: true, skipped: 'disabled', error: 'config automation belum ada' });
+    }
+    if (!cfg.isEnabled) {
+      return NextResponse.json({ ok: true, skipped: 'disabled' });
+    }
+    const { runAutomationTick } = await import('@/lib/automation/runner');
     const result = await runAutomationTick(supabase);
     return NextResponse.json(result);
   } catch (e) {

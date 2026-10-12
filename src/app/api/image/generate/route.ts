@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '@/lib/content/cron-auth';
-import { processImageTick } from '@/lib/image/worker';
 
 export const maxDuration = 300;
 
@@ -10,6 +9,7 @@ async function handle(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
+    const { processImageTick } = await import('@/lib/image/worker');
     const result = await processImageTick();
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {

@@ -9,17 +9,13 @@ import {
   type SocialPostConfig
 } from '@/lib/social/config';
 import {
-  fetchPublishingLimit,
-  publishThreadChain,
-  refreshLongLivedToken
-} from '@/lib/social/threads';
-import {
   MAX_QUEUE_ATTEMPTS,
   claimDueQueueItem,
   reapStaleClaims
 } from '@/lib/social/queue';
 
-export const maxDuration = 300;
+// CPU hemat: poller idle <10s; kerja berat di-retry tick berikut (idempoten).
+export const maxDuration = 120;
 
 function isRetryable(message: string): boolean {
   return /429|rate|timeout|5\d\d|fetch failed|network/i.test(message);
@@ -88,6 +84,35 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'threads_user_id not set — finish Fase 0 OAuth' }, { status: 500 });
   }
 
+  // 0. Reaper: klaim basi dari tick yang mati di tengah dikembalikan ke antrean.
+  // Best-effort — kegagalan reaper tidak boleh menggagalkan tick yang sehat.
+  const reap = await reapStaleClaims(supabase);
+  if (reap.errors.length > 0) {
+    console.error(`[social/post] reaper gagal: ${reap.errors.join('; ')}`);
+  }
+
+  // Klaim 1 antrean jatuh tempo (idempoten, race-safe). Klaim DIVERIFIKASI
+  // lewat `select('id')`: bila invocation lain menang, update mengenai 0 baris
+  // TANPA error — tanpa cek ini dua tick yang tumpang tindih akan mem-publish
+  // thread yang sama dua kali.
+  const claim = await claimDueQueueItem(supabase);
+  if (claim.outcome === 'idle') {
+    return NextResponse.json({ idle: true, requeued: reap.requeued });
+  }
+  if (claim.outcome === 'raced') {
+    return NextResponse.json({ idle: true, raced: true });
+  }
+  if (claim.outcome === 'exhausted') {
+    return NextResponse.json({ error: 'max attempts', queueId: claim.item.id }, { status: 500 });
+  }
+  const item = claim.item;
+
+  const {
+    fetchPublishingLimit,
+    publishThreadChain,
+    refreshLongLivedToken
+  } = await import('@/lib/social/threads');
+
   const { data: tokenData, error: tokenError } = await supabase.rpc(
     'vault_decrypt_secret_by_name',
     { p_name: account.vault_secret_name }
@@ -144,29 +169,6 @@ async function handle(request: NextRequest) {
   if (quotaUsage !== null && quotaUsage >= 250) {
     return NextResponse.json({ error: 'threads publishing quota exhausted (250/24h)' }, { status: 429 });
   }
-
-  // 0. Reaper: klaim basi dari tick yang mati di tengah dikembalikan ke antrean.
-  // Best-effort — kegagalan reaper tidak boleh menggagalkan tick yang sehat.
-  const reap = await reapStaleClaims(supabase);
-  if (reap.errors.length > 0) {
-    console.error(`[social/post] reaper gagal: ${reap.errors.join('; ')}`);
-  }
-
-  // Klaim 1 antrean jatuh tempo (idempoten, race-safe). Klaim DIVERIFIKASI
-  // lewat `select('id')`: bila invocation lain menang, update mengenai 0 baris
-  // TANPA error — tanpa cek ini dua tick yang tumpang tindih akan mem-publish
-  // thread yang sama dua kali.
-  const claim = await claimDueQueueItem(supabase);
-  if (claim.outcome === 'idle') {
-    return NextResponse.json({ idle: true, requeued: reap.requeued });
-  }
-  if (claim.outcome === 'raced') {
-    return NextResponse.json({ idle: true, raced: true });
-  }
-  if (claim.outcome === 'exhausted') {
-    return NextResponse.json({ error: 'max attempts', queueId: claim.item.id }, { status: 500 });
-  }
-  const item = claim.item;
 
   const { data: draft } = await supabase
     .from('content_drafts')

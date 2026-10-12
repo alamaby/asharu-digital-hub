@@ -68,4 +68,21 @@ describe('runErrorDigestTick', () => {
     expect(res.eventCount).toBe(0);
     expect(sendFn).not.toHaveBeenCalled();
   });
+
+  it('empty config returns not-sent', async () => {
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === 'error_notification_configs') {
+          return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
+        }
+        return {
+          select: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+        };
+      }),
+      rpc: vi.fn()
+    } as never;
+    const res = await (await import('./error-digest')).runErrorDigestTick(sb, { now: fixedNow });
+    expect(res).toEqual({ sent: false, categories: [], eventCount: 0 });
+  });
 });

@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-10-10 22:44 WIB (Kartu Contoh Hasil Pipeline Sintetis di Homepage, gate 1345 tests ✓, build 130 pages ✓)
+Last updated: 2026-10-12 22:41 WIB (Fluid Active CPU Optimization, gate 1366 tests ✓, build 122 pages ✓)
 
 ## Current State
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-10 22:44 WIB (Kartu Contoh Hasil Pipeline Sintetis di Home
 
 ## Recent Entries
 
+- [2026-10-12 224100-fluid-active-cpu-optimization.md](2026-10-12/224100-fluid-active-cpu-optimization.md) — Optimasi Fluid Active CPU: lazy import cron poller, reorder claim social, fix N+1 image enqueue, MAX_PER_TICK studio 2, deadline LLM 90s, turunkan maxDuration (120/180), reschedule pg_cron migrasi submodule. Gate 1366 tests ✓, build 122 pages ✓.
 - [2026-10-10 224400-contoh-hasil-pipeline-homepage.md](2026-10-10/224400-contoh-hasil-pipeline-homepage.md) — Kartu contoh alur pipeline sintetis di seksi `#mesin-riset` homepage (brief → draf → review → siap terbit), chrome bilingual, data verbatim. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-10 220800-diagram-pipeline-riset-mermaid-dan-konektor.md](2026-10-10/220800-diagram-pipeline-riset-mermaid-dan-konektor.md) — Diagram flowchart Mermaid 6 tahap riset di README + panah konektor dekoratif aria-hidden antar kartu pipeline di homepage. Gate 1345 tests ✓, build ✓, 0 lint error.
 - [2026-10-10 190500-verifikasi-perusahaan-homepage-claude-startups.md](2026-10-10/190500-verifikasi-perusahaan-homepage-claude-startups.md) — Verifikasi identitas perusahaan perorangan (Tentang, JSON-LD Organization, footer), homepage product-first (hero baru, seksi pipeline 6-langkah + keluaran artikel nyata), MIT LICENSE, dan link README. Gate 1345 tests ✓, build ✓, 0 lint error.

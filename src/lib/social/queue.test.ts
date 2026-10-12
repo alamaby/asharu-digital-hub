@@ -151,6 +151,11 @@ describe('claimDueQueueItem', () => {
     await expect(claimDueQueueItem(client, { now: NOW })).resolves.toEqual({ outcome: 'idle' });
   });
 
+  it('idle does not require token saat antrean kosong', async () => {
+    const client = makeClient([]);
+    await expect(claimDueQueueItem(client, { now: NOW })).resolves.toEqual({ outcome: 'idle' });
+  });
+
   it('mengklaim baris due: status posting, attempts +1, claimed_at terisi', async () => {
     const rows = [queueRow()];
     const client = makeClient(rows);

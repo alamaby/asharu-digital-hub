@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isCronAuthorized } from '@/lib/content/cron-auth';
 import { createSupabaseService } from '@/lib/supabase/server';
-import { runErrorDigestTick } from '@/lib/notifications/error-digest';
 
 export const maxDuration = 60;
 
@@ -22,6 +21,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'service not configured' }, { status: 500 });
   }
   try {
+    const { runErrorDigestTick } = await import('@/lib/notifications/error-digest');
     const result = await runErrorDigestTick(supabase);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
