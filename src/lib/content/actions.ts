@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { consumeRateLimit, getClientIp } from './rate-limit';
 import { getServiceClient } from '@/lib/supabase/service';
+import { createSupabaseServer } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { extractUrls } from '@/lib/utils/urls';
 import { RESEARCH_TEMPLATE_SLUGS, getResearchTemplateHint } from '@/lib/research/templates';
@@ -312,15 +313,21 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
     templateSlug = tpl.slug;
   }
 
-  // created_by is the signed-in user if any; null for anonymous submit.
+  // Autentikasi: Sesi riset baru wajib login (diselaraskan dengan LOGIN_ONLY_INTERNAL_PATHS).
+  const userClient = await createSupabaseServer();
   const {
     data: { user }
-  } = await supabase.auth.getUser();
+  } = (await userClient?.auth.getUser()) ?? { data: { user: null } };
+
+  if (!user) {
+    return { success: false, error: 'Login diperlukan untuk membuat riset baru' };
+  }
 
   const { data: inserted, error } = await supabase
     .from('content_research_sessions')
     .insert({
       status: 'pending',
+      created_by: user.id,
       mechanism,
       template_slug: templateSlug,
       topic: data.topic,
@@ -351,8 +358,7 @@ export async function createResearchSession(formData: FormData): Promise<ActionR
       discovering_model_id: stageModelIds.discovering_model_id,
       verifying_model_id: stageModelIds.verifying_model_id,
       scoring_model_id: stageModelIds.scoring_model_id,
-      developing_model_id: stageModelIds.developing_model_id,
-      created_by: user?.id ?? null
+      developing_model_id: stageModelIds.developing_model_id
     } as unknown as Record<string, unknown>)
     .select('id')
     .single();

@@ -71,6 +71,14 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
     - Tampilan visual status sirkuit di dashboard admin `KeyBoard.tsx` dan `ImageBoards.tsx` (badge warna hijau/kuning/merah).
   - Penambahan unit tests di `src/lib/circuit-breaker/circuit.test.ts` (7 tests pass), `counters.test.ts` (7 tests pass), `key-pool.test.ts` (6 tests pass), dan `image/key-pool.test.ts` (4 tests pass).
   - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (142 files, 1405 tests pass).
+- 2026-11-18 11:12:00 — Selesai Penyempurnaan Form State Hygiene LoginForm & Harmonisasi Akses /konten/baru Login-Only:
+  - Refaktor `LoginForm.tsx` ke FSM `loginFormReducer` dengan fase `idle` | `submitting` | `success` | `error` dan tombol reset "Gunakan email lain".
+  - Penambahan kunci terjemahan `useDifferentEmail` di `src/messages/id.json` dan `src/messages/en.json`.
+  - Penambahan 9 unit test komprehensif di `src/components/auth/LoginForm.test.tsx`.
+  - Harmonisasi rute `/konten/baru` sebagai **wajib login**:
+    - `createResearchSession` memverifikasi sesi user via `createSupabaseServer()`, menolak unauthorized, dan menyimpan `created_by = user.id`.
+    - Sinkronisasi komentar dokumentasi `(admin)/layout.tsx` dan penutupan blocker legacy di `.memory/README.md`.
+  - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (143 files, 1414 tests pass).
 
 ## Notes
 - Mengacu pada standar TOGAF proporsional dan arsitektur *Non-Destructive Migrations*.

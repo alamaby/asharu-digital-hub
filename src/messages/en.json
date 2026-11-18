@@ -413,7 +413,8 @@
       "submit": "Send Sign-In Link",
       "submitting": "Sending…",
       "success": "A link has been sent. Check your email to sign in. The link is valid for 1 hour.",
-      "error": "Could not send the link. Check the email or try again."
+      "error": "Could not send the link. Check the email or try again.",
+      "useDifferentEmail": "Use a different email"
     },
     "logout": "Sign out",
     "loggedInAs": "Signed in as {email}",

@@ -14,11 +14,11 @@ interface Props {
 
 /**
  * Layout grup non-publik: provider tema + sidebar dan shell TailAdmin.
- * Tanpa guard di sini — guard milik tiap area (`admin/layout` untuk guard
- * admin; halaman `/konten/baru` dan `/masuk` tetap publik). Slot sidebar
- * membaca `profiles.is_admin` (server) sehingga item admin tidak flicker;
- * akibatnya rute grup ini dinamis menurut kebutuhan — trade-off yang
- * disengaja, halaman publik di grup `(public)` tetap SSG penuh.
+ * Tanpa guard di sini — guard dikelola oleh middleware (LOGIN_ONLY_INTERNAL_PATHS
+ * untuk `/konten/baru`, `/studio`, `/lab`; ADMIN_INTERNAL_PATHS untuk area admin;
+ * dan `/masuk` sebagai pintu masuk auth publik). Slot sidebar membaca `profiles.is_admin`
+ * (server) sehingga item admin tidak flicker; akibatnya rute grup ini dinamis menurut
+ * kebutuhan — trade-off yang disengaja, halaman publik di grup `(public)` tetap SSG penuh.
  */
 export default async function NonPublicLayout({ children, params }: Props) {
   const { locale: rawLocale } = await params;

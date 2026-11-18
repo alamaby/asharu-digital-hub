@@ -413,7 +413,8 @@
       "submit": "Kirim Tautan Masuk",
       "submitting": "Mengirim…",
       "success": "Tautan telah dikirim. Cek email Anda untuk masuk. Tautan berlaku selama 1 jam.",
-      "error": "Gagal mengirim tautan. Periksa email atau coba lagi."
+      "error": "Gagal mengirim tautan. Periksa email atau coba lagi.",
+      "useDifferentEmail": "Gunakan email lain"
     },
     "logout": "Keluar",
     "loggedInAs": "Masuk sebagai {email}",

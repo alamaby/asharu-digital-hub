@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-11-18 10:10 WIB (Key Pool Circuit Breaker FSM, gate 1405 tests ✓, typecheck ✓, lint ✓)
+Last updated: 2026-11-18 11:12 WIB (Login Form FSM & /konten/baru Login-Only, gate 1414 tests ✓, typecheck ✓, lint ✓)
 
 ## Current State
 
@@ -39,7 +39,7 @@ Last updated: 2026-11-18 10:10 WIB (Key Pool Circuit Breaker FSM, gate 1405 test
 
 - [x] **Apply 3 migrasi baru ke prod SELESAI (7 Okt 16:36):** `atomic_rate_limit` (`20261007093539`, RPC `consume_rate_limit` + `cleanup_expired_rate_limits`), `social_queue_claim_guard` (`20261007093545`, `claimed_at` + index reaper), `atomic_counters` (`20261007093613`, counter usage/failure atomik). Terverifikasi: 4 function + kolom + index ada, tanpa finding security baru. Apply #3 sempat gagal sekali (GRANT signature `text,uuid` → dikoreksi `text,uuid,int`, rollback penuh, retry sukses).
 - [ ] **Verifikasi durasi function pasca-deploy:** entri `functions` untuk `/api/content/process` di `vercel.json` dihapus (route mendeklarasikan `maxDuration = 300`). Pastikan tidak ada function yang dibunuh di 60s pada tick riset/automation setelah deploy (cek log function).
-- [ ] **[KEPUTUSAN USER] `/konten/baru` login-only vs anon:** middleware whitelist (11 Sep) tidak memasukkan `/konten/baru` ke rute publik → wajib login, tetapi komentar `(admin)/layout.tsx` masih menyebut "tetap publik" dan `createResearchSession` masih mendukung anon + honeypot + rate limit. Samakan dokumentasi dengan perilaku, atau buka kembali akses anon (butuh keputusan).
+- [x] **[KEPUTUSAN USER] `/konten/baru` login-only SELESAI (18 Nov):** Diputuskan dan diselaraskan bahwa `/konten/baru` wajib login (`LOGIN_ONLY_INTERNAL_PATHS`), `createResearchSession` memverifikasi sesi user via `createSupabaseServer`, `created_by = user.id` tersimpan, dan komentar `(admin)/layout.tsx` diperbarui.
 - [ ] **Race poster Threads belum diuji live:** fix klaim (`raced` bila 0 baris) sudah ditest dengan klien fake + test route. Verifikasi lanjutan (opsional): amati `social_post_logs` tidak pernah punya dua baris `post_index` sama untuk satu `queue_id` setelah beberapa hari berjalan.
 
 - [ ] **Pulihkan draf threads `0bcf2f6e` [USER ACTION]:** guard sudah terpasang (`fix(research)`), tapi datanya masih rusak. Jalankan `node scripts/repair-thread-0bcf.mjs` (hanya CETAK SQL, tidak menyentuh DB), review output, lalu eksekusi statement `UPDATE ... WHERE id='0bcf2f6e…' AND generated_thread->'main'->>'id'='main'` manual via Supabase SQL editor. Sesudah itu: cek `/id/konten/review/0bcf2f6e-cf39-4c21-83b4-0c1e6e4b0862` tab ID berisi Indonesia. Setelah update, `replies[0].en` masih beraksen Indonesia (artefak duplicate-key LLM) — opsional diedit manual.
@@ -76,6 +76,7 @@ Last updated: 2026-11-18 10:10 WIB (Key Pool Circuit Breaker FSM, gate 1405 test
 
 ## Recent Entries
 
+- [2026-11-18 111200-login-form-fsm-and-konten-baru-login-only.md](2026-11-18/111200-login-form-fsm-and-konten-baru-login-only.md) — Penyempurnaan Form State Hygiene LoginForm FSM & Harmonisasi Akses /konten/baru Login-Only: loginFormReducer (idle/submitting/success/error) dengan tombol reset, i18n useDifferentEmail, verifikasi user di createResearchSession, dan penutupan blocker legacy. Gate 1414 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 101000-keypool-circuit-breaker-fsm.md](2026-11-18/101000-keypool-circuit-breaker-fsm.md) — Key Pool Circuit Breaker FSM & Self-Healing Auto-Recovery: status CLOSED/OPEN/HALF_OPEN, auto-probe reactivation setelah cooldown 15 menit, reset saat eksekusi berhasil, dan visual badge di admin dashboard. Gate 1405 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 095600-draft-article-sync-chunk-tracker.md](2026-11-18/095600-draft-article-sync-chunk-tracker.md) — Sinkronisasi Dual-Lifecycle Artikel & Tracker Progres Chunked Development: auto-archive artikel publik saat reject/reset draf, sync draf saat seluruh bahasa terarsip, dan visibilitas persentase draf di halaman status riset developing. Gate 1396 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 094200-async-workers-explicit-fsm.md](2026-11-18/094200-async-workers-explicit-fsm.md) — Async Workers Explicit FSM & Multi-Post Queue Progress: domain resolver StudioPhase & DraftImagePhase dengan processing pulse badge, optimistic claim guard 10 menit, dan pelacak ThreadPublishProgress. Gate 1387 tests ✓, typecheck ✓, lint ✓.
