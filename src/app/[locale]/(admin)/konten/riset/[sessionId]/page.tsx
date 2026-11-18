@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/auth/is-admin';
 import { RetryOwnSessionButton } from '@/components/content/RetryOwnSessionButton';
+import { calculateDevelopmentProgress } from '@/lib/research/development';
 
 interface PageProps {
   params: Promise<{ locale: string; sessionId: string }>;
@@ -54,12 +55,32 @@ export default async function ResearchStatusPage({ params }: PageProps) {
 
   const retryable = ['failed', 'awaiting_selection', 'completed'].includes(s.status);
   const admin = await isAdmin().catch(() => false);
+  const devProgress = s.status === 'developing'
+    ? await calculateDevelopmentProgress(supabase, sessionId).catch(() => null)
+    : null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <Link href={{ pathname: '/konten/baru' }} className="text-sm text-ink-muted hover:text-primary">← Buat riset baru</Link>
       <h1 className="mt-2 text-2xl font-bold text-ink">{s.topic ?? `Riset ${s.id.slice(0, 8)}`}</h1>
       <p className="mt-2 text-sm text-ink-muted">Status: <span className="font-semibold text-ink">{s.status}</span></p>
+      {s.status === 'developing' && devProgress && devProgress.totalPairs > 0 ? (
+        <div className="mt-4 rounded-lg border border-line bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-medium text-ink">
+            <span>Progres Penyusunan Draf</span>
+            <span>{devProgress.completedPairs} dari {devProgress.totalPairs} draf ({devProgress.percent}%)</span>
+          </div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-line/40">
+            <div
+              className="h-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${devProgress.percent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
+            Worker menyusun draf secara bertahap untuk mencegah timeout. Tick otomatis berlanjut setiap 5 menit.
+          </p>
+        </div>
+      ) : null}
       {fallbackNote ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Model yang dipilih sempat error/kosong sehingga otomatis diganti model lain ({fallbackNote.message.slice(0, 220)}).

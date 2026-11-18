@@ -183,6 +183,96 @@ export async function resolveTargetPlatforms(
   }));
 }
 
+export interface DevelopmentProgress {
+  sessionId: string;
+  totalPairs: number;
+  completedPairs: number;
+  remainingPairs: number;
+  percent: number;
+  isComplete: boolean;
+}
+
+/**
+ * Menghitung progres granular draf pasangan (topik × platform × produk) pada tahap developing.
+ *
+ * Alasan Bisnis:
+ * Tahap developing dieksekusi secara chunked (DEVELOP_PAIRS_PER_TICK) oleh cron background
+ * untuk mencegah timeout Vercel (120-180 detik).
+ * Fungsi ini memberikan visibilitas status transisi yang terukur bagi dasbor admin dan pengguna,
+ * sehingga mereka dapat memantau progres numerik (mis. "4 dari 6 draf selesai (67%)")
+ * alih-alih menghadapi status 'developing' statis selama 30 menit.
+ */
+export async function calculateDevelopmentProgress(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<DevelopmentProgress> {
+  const { data: session } = await supabase
+    .from('content_research_sessions')
+    .select('id, mechanism, platform_slug, platform_slugs')
+    .eq('id', sessionId)
+    .maybeSingle();
+
+  if (!session) {
+    return { sessionId, totalPairs: 0, completedPairs: 0, remainingPairs: 0, percent: 0, isComplete: false };
+  }
+  const sess = session as { id: string; mechanism: string | null; platform_slug: string | null; platform_slugs: string[] | null };
+  const isDua = sess.mechanism === 'dua';
+
+  const { data: topics } = await supabase
+    .from('content_research_topics')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('status', 'shortlisted');
+  const allTopics = (topics ?? []) as { id: string }[];
+  if (allTopics.length === 0) {
+    return { sessionId, totalPairs: 0, completedPairs: 0, remainingPairs: 0, percent: 0, isComplete: false };
+  }
+
+  const targets = await resolveTargetPlatforms(supabase, sess);
+  if (targets.length === 0) {
+    return { sessionId, totalPairs: 0, completedPairs: 0, remainingPairs: 0, percent: 0, isComplete: false };
+  }
+
+  let productCount = 1;
+  let fixedProductIds: string[] = [];
+  if (isDua) {
+    const { data: registeredRows } = await supabase
+      .from('content_research_session_products')
+      .select('product_id')
+      .eq('session_id', sessionId);
+    fixedProductIds = ((registeredRows ?? []) as { product_id: string }[]).map((r) => r.product_id);
+    productCount = Math.max(1, fixedProductIds.length);
+  }
+
+  const totalPairs = allTopics.length * targets.length * (isDua ? productCount : 1);
+
+  const topicIds = allTopics.map((t) => t.id);
+  const { data: existingDrafts } = await supabase
+    .from('content_drafts')
+    .select('research_topic_id, platform_slug, product_id')
+    .in('research_topic_id', topicIds);
+  type ExistingRow = { research_topic_id: string | null; platform_slug: string | null; product_id: string | null };
+  const donePairs = new Set(
+    ((existingDrafts ?? []) as ExistingRow[])
+      .map((d) => pairKey(d.research_topic_id, d.platform_slug, isDua ? d.product_id : null))
+      .filter((v) => !v.startsWith('null|'))
+  );
+
+  const completedPairs = donePairs.size;
+  const remainingPairs = Math.max(0, totalPairs - completedPairs);
+  const percent = totalPairs > 0 ? Math.min(100, Math.round((completedPairs / totalPairs) * 100)) : 0;
+  const isComplete = remainingPairs === 0 && totalPairs > 0;
+
+  return {
+    sessionId,
+    totalPairs,
+    completedPairs,
+    remainingPairs,
+    percent,
+    isComplete
+  };
+}
+
 export async function runDevelopment(
   supabase: SupabaseClient,
   sessionId: string,

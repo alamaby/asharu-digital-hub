@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_THREAD_REPLIES_DB, DEVELOP_PAIRS_PER_TICK, auditThreadEmoji, auditThreadLength, hasEmoji, normalizePlaceholder, parseThread, repositionPlaceholder, sanitizeThreadText, isPlaceholderPostText, isPlaceholderThread, shouldAcceptRepairThread } from './thread';
-import { classifyFixedProducts, countFixedProductDeferrals, estimatePendingPairsExact, FIXED_PRODUCT_DEFER_LIMIT, buildArticleMinimalThread, requiredArticleLangs } from './development';
+import {
+  classifyFixedProducts,
+  countFixedProductDeferrals,
+  estimatePendingPairsExact,
+  FIXED_PRODUCT_DEFER_LIMIT,
+  buildArticleMinimalThread,
+  requiredArticleLangs,
+  calculateDevelopmentProgress
+} from './development';
 import { AFFILIATE_OPENERS_ID, AFFILIATE_OPENERS_EN, buildSingleReplyRewritePrompt, buildThreadPrompt } from '@/lib/llm/prompt';
 
 const P = '{{PRODUCT_URL}}';
@@ -712,5 +720,117 @@ describe('artikel helpers', () => {
     const t = buildArticleMinimalThread({ id: null, en: null });
     expect(t.main.id).toBe('(artikel)');
     expect(t.main.en).toBe('(article)');
+  });
+});
+
+describe('calculateDevelopmentProgress', () => {
+  type Row = Record<string, unknown>;
+  function makeProgressMockClient(data: Record<string, Row[]>) {
+    return {
+      from: (table: string) => {
+        let rows = [...(data[table] ?? [])];
+        const builder: Record<string, unknown> = {};
+        Object.assign(builder, {
+          select: () => builder,
+          eq: (col: string, val: unknown) => {
+            rows = rows.filter((r) => r[col] === val);
+            return builder;
+          },
+          neq: (col: string, val: unknown) => {
+            rows = rows.filter((r) => r[col] !== val);
+            return builder;
+          },
+          in: (col: string, vals: unknown[]) => {
+            rows = rows.filter((r) => vals.includes(r[col]));
+            return builder;
+          },
+          order: () => builder,
+          maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+          then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null })
+        });
+        return builder as never;
+      }
+    };
+  }
+
+  it('mengembalikan 0 jika session tidak ditemukan', async () => {
+    const mock = makeProgressMockClient({});
+    const res = await calculateDevelopmentProgress(mock as never, 'sess-missing');
+    expect(res).toEqual({
+      sessionId: 'sess-missing',
+      totalPairs: 0,
+      completedPairs: 0,
+      remainingPairs: 0,
+      percent: 0,
+      isComplete: false
+    });
+  });
+
+  it('menghitung progres 0% saat belum ada draf yang selesai', async () => {
+    const mock = makeProgressMockClient({
+      content_research_sessions: [
+        { id: 'sess-1', mechanism: 'satu', platform_slug: 'twitter', platform_slugs: null }
+      ],
+      content_research_topics: [
+        { id: 'top-1', session_id: 'sess-1', status: 'shortlisted' },
+        { id: 'top-2', session_id: 'sess-1', status: 'shortlisted' }
+      ],
+      platforms: [{ slug: 'twitter', max_chars: 280, is_active: true }],
+      content_drafts: []
+    });
+
+    const res = await calculateDevelopmentProgress(mock as never, 'sess-1');
+    expect(res.totalPairs).toBe(2);
+    expect(res.completedPairs).toBe(0);
+    expect(res.remainingPairs).toBe(2);
+    expect(res.percent).toBe(0);
+    expect(res.isComplete).toBe(false);
+  });
+
+  it('menghitung progres 50% saat separuh draf selesai', async () => {
+    const mock = makeProgressMockClient({
+      content_research_sessions: [
+        { id: 'sess-1', mechanism: 'satu', platform_slug: 'twitter', platform_slugs: null }
+      ],
+      content_research_topics: [
+        { id: 'top-1', session_id: 'sess-1', status: 'shortlisted' },
+        { id: 'top-2', session_id: 'sess-1', status: 'shortlisted' }
+      ],
+      platforms: [{ slug: 'twitter', max_chars: 280, is_active: true }],
+      content_drafts: [
+        { research_topic_id: 'top-1', platform_slug: 'twitter', product_id: null }
+      ]
+    });
+
+    const res = await calculateDevelopmentProgress(mock as never, 'sess-1');
+    expect(res.totalPairs).toBe(2);
+    expect(res.completedPairs).toBe(1);
+    expect(res.remainingPairs).toBe(1);
+    expect(res.percent).toBe(50);
+    expect(res.isComplete).toBe(false);
+  });
+
+  it('menghitung 100% dan isComplete = true saat seluruh draf selesai', async () => {
+    const mock = makeProgressMockClient({
+      content_research_sessions: [
+        { id: 'sess-1', mechanism: 'satu', platform_slug: 'twitter', platform_slugs: null }
+      ],
+      content_research_topics: [
+        { id: 'top-1', session_id: 'sess-1', status: 'shortlisted' },
+        { id: 'top-2', session_id: 'sess-1', status: 'shortlisted' }
+      ],
+      platforms: [{ slug: 'twitter', max_chars: 280, is_active: true }],
+      content_drafts: [
+        { research_topic_id: 'top-1', platform_slug: 'twitter', product_id: null },
+        { research_topic_id: 'top-2', platform_slug: 'twitter', product_id: null }
+      ]
+    });
+
+    const res = await calculateDevelopmentProgress(mock as never, 'sess-1');
+    expect(res.totalPairs).toBe(2);
+    expect(res.completedPairs).toBe(2);
+    expect(res.remainingPairs).toBe(0);
+    expect(res.percent).toBe(100);
+    expect(res.isComplete).toBe(true);
   });
 });

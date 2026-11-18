@@ -43,16 +43,49 @@ export async function approveArticleAndPublish(
   return result;
 }
 
-/** Arsipkan artikel (tarik dari publik tanpa hapus baris). */
+/**
+ * Arsipkan artikel (tarik dari publik tanpa hapus baris).
+ *
+ * Alasan Bisnis:
+ * Menyelaraskan siklus hidup publikasi dengan draf induk di `content_drafts`.
+ * Bila semua bahasa dari draf artikel terkait telah diarsipkan dari situs publik,
+ * status draf diselaraskan agar tidak menggantung sebagai 'approved' tanpa artikel aktif.
+ */
 export async function archiveArticle(articleId: string): Promise<{ success: boolean; error?: string }> {
   if (!(await isAdmin())) return { success: false, error: 'forbidden' };
   const supabase = createSupabaseService();
   if (!supabase) return { success: false, error: 'Supabase not configured' };
+
+  // Ambil draft_id sebelum arsip
+  const { data: artRow } = await supabase
+    .from('articles')
+    .select('id, draft_id')
+    .eq('id', articleId)
+    .maybeSingle();
+
+  const draftId = (artRow as { draft_id?: string | null } | null)?.draft_id ?? null;
+
   const { error } = await supabase
     .from('articles')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
     .eq('id', articleId);
   if (error) return { success: false, error: error.message };
+
+  if (draftId) {
+    // Periksa apakah masih ada artikel terbit lain untuk draf ini
+    const { data: remainingActive } = await supabase
+      .from('articles')
+      .select('id')
+      .eq('draft_id', draftId)
+      .eq('status', 'published');
+    if (!remainingActive || remainingActive.length === 0) {
+      await supabase
+        .from('content_drafts')
+        .update({ status: 'needs_review', updated_at: new Date().toISOString() })
+        .eq('id', draftId);
+    }
+  }
+
   revalidatePath('/artikel');
   revalidatePath('/artikel/[slug]', 'page');
   return { success: true };
@@ -497,8 +530,12 @@ export interface RejectArticleResult {
 }
 
 /**
- * Tolak draf artikel: set status='rejected'.
- * Admin required. Revalidate review page.
+ * Tolak draf artikel: set status='rejected' dan otomatis arsipkan artikel publik pasangannya.
+ *
+ * Alasan Bisnis:
+ * Menghilangkan inkonsistensi dual-lifecycle. Jika admin menolak sebuah draf artikel,
+ * artikel publik yang mungkin telah terbit sebelumnya tidak boleh dibiarkan tetap berstatus
+ * 'published' di situs publik (/artikel). Semua baris artikel terkait ditarik menjadi 'archived'.
  */
 export async function rejectArticleDraft(draftId: string): Promise<RejectArticleResult> {
   if (!(await isAdmin())) {
@@ -508,20 +545,34 @@ export async function rejectArticleDraft(draftId: string): Promise<RejectArticle
   if (!supabase) return { success: false, error: 'Supabase not configured' };
   if (!draftId) return { success: false, error: 'draftId required' };
 
+  const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from('content_drafts')
-    .update({ status: 'rejected', updated_at: new Date().toISOString() })
+    .update({ status: 'rejected', updated_at: nowIso })
     .eq('id', draftId);
   if (error) return { success: false, error: error.message };
 
+  // Tarik artikel yang terbit dari publik
+  await supabase
+    .from('articles')
+    .update({ status: 'archived', updated_at: nowIso })
+    .eq('draft_id', draftId)
+    .eq('status', 'published');
+
+  revalidatePath('/artikel');
+  revalidatePath('/artikel/[slug]', 'page');
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');
   return { success: true };
 }
 
 /**
- * Reset draf ke needs_review (setelah revisi admin).
- * Admin required.
+ * Reset draf ke needs_review (setelah revisi admin) dan unpublish sementara versi publik.
+ *
+ * Alasan Bisnis:
+ * Ketika draf dikembalikan ke meja review untuk perbaikan substansi, versi lama
+ * di situs publik ditarik sementara ('archived') agar pengunjung tidak membaca
+ * konten yang sedang dinyatakan perlu perbaikan sebelum disetujui dan diterbitkan ulang.
  */
 export async function resetArticleApproval(draftId: string): Promise<RejectArticleResult> {
   if (!(await isAdmin())) {
@@ -531,12 +582,22 @@ export async function resetArticleApproval(draftId: string): Promise<RejectArtic
   if (!supabase) return { success: false, error: 'Supabase not configured' };
   if (!draftId) return { success: false, error: 'draftId required' };
 
+  const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from('content_drafts')
-    .update({ status: 'needs_review', updated_at: new Date().toISOString() })
+    .update({ status: 'needs_review', updated_at: nowIso })
     .eq('id', draftId);
   if (error) return { success: false, error: error.message };
 
+  // Tarik sementara artikel terbit ke archived selama proses perbaikan berlangsung
+  await supabase
+    .from('articles')
+    .update({ status: 'archived', updated_at: nowIso })
+    .eq('draft_id', draftId)
+    .eq('status', 'published');
+
+  revalidatePath('/artikel');
+  revalidatePath('/artikel/[slug]', 'page');
   revalidatePath('/konten/review');
   revalidatePath('/konten/review/[draftId]', 'page');
   return { success: true };

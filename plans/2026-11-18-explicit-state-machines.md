@@ -29,8 +29,7 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
 - [x] Inventarisasi seluruh mesin status implisit di codebase (`src/` dan `supabase/migrations/`).
 - [x] Analisis celah arsitektur dan failure modes untuk setiap mesin status.
 - [x] Implementasi Gelombang 2 (Fase 1): Transisi eksplisit worker image & studio (`processing` status + `claimed_at` guard) serta pelacak progres antrean sosial.
-- [ ] Implementasi Fase 2: Sinkronisasi siklus draf artikel vs penerbitan publik (`articles`).
-- [ ] Implementasi Fase 3: State tracker chunked development pada sesi riset.
+- [x] Implementasi Gelombang 3 (Fase 2 & 3): Sinkronisasi siklus draf artikel vs penerbitan publik (`articles`) dan state tracker chunked development pada sesi riset (`calculateDevelopmentProgress`).
 - [ ] Implementasi Fase 4: Circuit breaker dengan status `HALF-OPEN` dan auto-cooldown.
 - [x] Implementasi Gelombang 1 (Fase 5): Reducer state machine pada form klien (`ContentRequestForm`, `EndpointTryClient`).
 
@@ -54,6 +53,15 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
   - Implementasi `ThreadPublishProgress` dan `getThreadQueueProgress` di `src/lib/social/queue.ts` untuk visibilitas progres rantai multi-post (`social_post_logs`).
   - Penambahan unit tests FSM di `src/lib/studio/worker.test.ts`, `src/lib/image/worker.test.ts`, dan `src/lib/social/queue.test.ts`.
   - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (141 files, 1387 tests pass).
+- 2026-11-18 09:56:00 — Selesai Gelombang 3 (Draft vs Article Lifecycle & Multi-Chunk Research Tracker):
+  - Sinkronisasi dual-lifecycle artikel publik & draf (`content_drafts` vs `articles`):
+    - Penyelarasan `archiveArticle` untuk memeriksa kelengkapan arsip seluruh locale dan mengembalikan status draft ke `needs_review` jika tidak ada lagi artikel publik yang aktif.
+    - Penambahan auto-archive publikasi aktif pada `rejectArticleDraft` dan `resetArticleApproval` untuk mencegah "zombie published articles" saat draf ditolak atau dikembalikan ke tahap review.
+  - Tracker eksplisit progres chunked development sesi riset:
+    - Fungsi domain `calculateDevelopmentProgress` di `src/lib/research/development.ts` yang menghitung pasangan topik × platform × produk (total, selesai, sisa, persentase).
+    - Tampilan visual progres bar dan indikator kuantitatif ("X dari Y draf (Z%)") di halaman status riset `src/app/[locale]/(admin)/konten/riset/[sessionId]/page.tsx` saat status `developing`.
+  - Penambahan unit tests komprehensif di `actions-article-edit.test.ts` (23 tests pass) dan `development.test.ts` (80 tests pass).
+  - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (141 files, 1396 tests pass).
 
 ## Notes
 - Mengacu pada standar TOGAF proporsional dan arsitektur *Non-Destructive Migrations*.

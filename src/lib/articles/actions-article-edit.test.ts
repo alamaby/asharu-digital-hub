@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { updateArticleDraft, rejectArticleDraft, resetArticleApproval, updatePublishedArticle } from './actions';
+import {
+  updateArticleDraft,
+  rejectArticleDraft,
+  resetArticleApproval,
+  updatePublishedArticle,
+  archiveArticle
+} from './actions';
 
 // Hoisted mocks
 const revalidatePathMock = vi.fn();
@@ -48,17 +54,21 @@ function makeMockClient(tables: Record<string, Row[]>) {
               mutation = null;
             }
           };
-          return {
+          const makeUpdateStep = (): Record<string, unknown> => ({
             eq: (col: string, val: unknown) => {
               rows = rows.filter((r) => r[col] === val);
-              return {
-                eq: (col2: string, val2: unknown) => { rows = rows.filter((r) => r[col2] === val2); apply(); return { select: () => ({ maybeSingle: async () => ({ data: rows[0] ?? null, error: null }) }) }; },
-                select: () => ({ maybeSingle: async () => { apply(); return { data: rows[0] ?? null, error: null }; } }),
-                then: (resolve: (v: unknown) => unknown) => { apply(); return resolve({ data: null, error: null }); }
-              };
+              apply();
+              return makeUpdateStep();
             },
-            select: () => ({ maybeSingle: async () => { apply(); return { data: rows[0] ?? null, error: null }; } })
-          };
+            select: () => ({
+              maybeSingle: async () => { apply(); return { data: rows[0] ?? null, error: null }; }
+            }),
+            then: (resolve: (v: unknown) => unknown) => {
+              apply();
+              return resolve({ data: null, error: null });
+            }
+          });
+          return makeUpdateStep();
         }
       });
       return builder as never;
@@ -356,6 +366,19 @@ describe('rejectArticleDraft', () => {
     expect(res.error).toBeUndefined();
     expect(revalidatePathMock).toHaveBeenCalled();
   });
+
+  it('otomatis mengarsipkan artikel published yang terikat dengan draft', async () => {
+    const tables = {
+      content_drafts: [{ id: 'draft-001', status: 'approved' }],
+      articles: [{ id: 'art-001', draft_id: 'draft-001', status: 'published' }]
+    };
+    svcClient = makeMockClient(tables);
+
+    const res = await rejectArticleDraft('draft-001');
+    expect(res.success).toBe(true);
+    expect(tables.articles[0]!.status).toBe('archived');
+    expect(tables.content_drafts[0]!.status).toBe('rejected');
+  });
 });
 
 describe('resetArticleApproval', () => {
@@ -379,6 +402,66 @@ describe('resetArticleApproval', () => {
     const res = await resetArticleApproval('draft-001');
     expect(res.success).toBe(true);
     expect(revalidatePathMock).toHaveBeenCalled();
+  });
+
+  it('otomatis mengarsipkan artikel published saat persetujuan di-reset', async () => {
+    const tables = {
+      content_drafts: [{ id: 'draft-001', status: 'approved' }],
+      articles: [{ id: 'art-001', draft_id: 'draft-001', status: 'published' }]
+    };
+    svcClient = makeMockClient(tables);
+
+    const res = await resetArticleApproval('draft-001');
+    expect(res.success).toBe(true);
+    expect(tables.articles[0]!.status).toBe('archived');
+    expect(tables.content_drafts[0]!.status).toBe('needs_review');
+  });
+});
+
+describe('archiveArticle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isAdminMock.mockResolvedValue(true);
+    svcClient = null;
+  });
+
+  it('tolak non-admin', async () => {
+    isAdminMock.mockResolvedValue(false);
+    svcClient = makeMockClient({});
+    const res = await archiveArticle('art-001');
+    expect(res.success).toBe(false);
+    expect(res.error).toBe('forbidden');
+  });
+
+  it('mengarsipkan artikel dan menyelaraskan status draft ke needs_review jika seluruh locale terarsip', async () => {
+    const tables = {
+      content_drafts: [{ id: 'draft-001', status: 'approved' }],
+      articles: [{ id: 'art-001', draft_id: 'draft-001', status: 'published' }]
+    };
+    svcClient = makeMockClient(tables);
+
+    const res = await archiveArticle('art-001');
+    expect(res.success).toBe(true);
+    expect(tables.articles[0]!.status).toBe('archived');
+    expect(tables.content_drafts[0]!.status).toBe('needs_review');
+    expect(revalidatePathMock).toHaveBeenCalled();
+  });
+
+  it('tidak mengubah status draft jika masih ada artikel terbit lain untuk draft yang sama', async () => {
+    const tables = {
+      content_drafts: [{ id: 'draft-001', status: 'approved' }],
+      articles: [
+        { id: 'art-001', draft_id: 'draft-001', status: 'published', locale: 'id' },
+        { id: 'art-002', draft_id: 'draft-001', status: 'published', locale: 'en' }
+      ]
+    };
+    svcClient = makeMockClient(tables);
+
+    const res = await archiveArticle('art-001');
+    expect(res.success).toBe(true);
+    expect(tables.articles[0]!.status).toBe('archived');
+    expect(tables.articles[1]!.status).toBe('published');
+    expect(tables.content_drafts[0]!.status).toBe('approved');
   });
 });
 
