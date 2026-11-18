@@ -5,6 +5,7 @@ import { reorderKeys, toggleKeyActive } from '@/lib/admin/llm-actions';
 import { SortableList } from './SortableList';
 import { ActionNoticeView, type ActionNotice } from './ActionFeedback';
 import { ReplaceKeyForm } from './LlmForms';
+import { resolveCircuitState } from '@/lib/circuit-breaker/types';
 
 interface KeyRow {
   id: string;
@@ -70,10 +71,20 @@ export function KeyBoard({ providerId, keys }: { providerId: string; keys: KeyRo
         renderItem={(id) => {
           const k = keys.find((x) => x.id === id)!;
           const rowBusy = busy !== null;
+          const circuit = resolveCircuitState(k);
           return (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-mono text-ink">#{k.priority} · {k.key_hash} <span className="text-xs text-ink-muted">({k.vault_secret_id ? k.vault_secret_id.slice(0, 8) + '…' : 'no vault'})</span></p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono text-ink">#{k.priority} · {k.key_hash} <span className="text-xs text-ink-muted">({k.vault_secret_id ? k.vault_secret_id.slice(0, 8) + '…' : 'no vault'})</span></p>
+                  {circuit === 'CLOSED' ? (
+                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">Sirkuit Normal</span>
+                  ) : circuit === 'HALF_OPEN' ? (
+                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Uji Coba (Half-Open)</span>
+                  ) : (
+                    <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">Terputus (Cooldown)</span>
+                  )}
+                </div>
                 <p className="text-xs text-ink-muted">used {k.usage_count} · fail {k.failure_count} · last {k.last_used_at ? new Date(k.last_used_at).toLocaleString('id-ID') : '—'}</p>
               </div>
               <div className="flex items-center gap-2">

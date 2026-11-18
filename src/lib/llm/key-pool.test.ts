@@ -5,12 +5,17 @@ const mockFetchOrderedKeys = vi.fn();
 const mockGetApiKeyForRow = vi.fn();
 const mockMarkUsage = vi.fn();
 const mockMarkFailure = vi.fn();
+const mockRecordCircuitSuccess = vi.fn();
 
 vi.mock('@/lib/supabase/vault', () => ({
   fetchOrderedKeys: (...args: unknown[]) => mockFetchOrderedKeys(...args),
   getApiKeyForRow: (...args: unknown[]) => mockGetApiKeyForRow(...args),
   markKeyUsage: (...args: unknown[]) => mockMarkUsage(...args),
   markKeyFailure: (...args: unknown[]) => mockMarkFailure(...args)
+}));
+
+vi.mock('@/lib/circuit-breaker/manager', () => ({
+  recordCircuitSuccess: (...args: unknown[]) => mockRecordCircuitSuccess(...args)
 }));
 
 import { KeyPool } from './key-pool';
@@ -103,5 +108,17 @@ describe('KeyPool', () => {
       return `ok:${apiKey}`;
     });
     expect(mockMarkFailure).not.toHaveBeenCalled();
+  });
+
+  it('memanggil recordCircuitSuccess untuk memulihkan sirkuit saat eksekusi berhasil', async () => {
+    const k = keyRow('k1', 0);
+    k.failure_count = 3;
+    mockFetchOrderedKeys.mockResolvedValue([k]);
+    mockGetApiKeyForRow.mockResolvedValue('sk-test');
+    const pool = new KeyPool(provider);
+
+    await pool.withFallback(async (apiKey) => `ok:${apiKey}`);
+
+    expect(mockRecordCircuitSuccess).toHaveBeenCalledWith('llm_provider_keys', 'k1', 3);
   });
 });

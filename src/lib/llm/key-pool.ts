@@ -1,6 +1,7 @@
 import type { KeyRow, ProviderRow } from './types';
 import { LLMHttpError } from './types';
 import { fetchOrderedKeys, getApiKeyForRow, markKeyFailure, markKeyUsage } from '@/lib/supabase/vault';
+import { recordCircuitSuccess } from '@/lib/circuit-breaker/manager';
 
 export interface AcquiredKey {
   row: KeyRow;
@@ -43,6 +44,7 @@ export class KeyPool {
       try {
         const result = await fn(apiKey, row);
         await markKeyUsage(row.id);
+        await recordCircuitSuccess('llm_provider_keys', row.id, row.failure_count);
         return { result, keyRow: row };
       } catch (e) {
         lastError = e;

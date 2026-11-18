@@ -6,6 +6,11 @@ vi.mock('@/lib/supabase/service', () => ({
   getServiceClient: () => clientRef.current
 }));
 
+vi.mock('@/lib/circuit-breaker/manager', () => ({
+  attemptHalfOpenProbeReactivation: vi.fn().mockResolvedValue([]),
+  recordCircuitSuccess: vi.fn().mockResolvedValue(undefined)
+}));
+
 import { fetchOrderedImageKeys } from './key-pool';
 
 interface Attempt {
@@ -22,6 +27,7 @@ function makeClient(attempts: Attempt[], calls: string[]) {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        gte: () => builder,
         order: () => builder,
         then: (onfulfilled: (v: Attempt) => unknown) => {
           n += 1;

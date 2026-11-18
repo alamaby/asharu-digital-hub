@@ -30,7 +30,7 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
 - [x] Analisis celah arsitektur dan failure modes untuk setiap mesin status.
 - [x] Implementasi Gelombang 2 (Fase 1): Transisi eksplisit worker image & studio (`processing` status + `claimed_at` guard) serta pelacak progres antrean sosial.
 - [x] Implementasi Gelombang 3 (Fase 2 & 3): Sinkronisasi siklus draf artikel vs penerbitan publik (`articles`) dan state tracker chunked development pada sesi riset (`calculateDevelopmentProgress`).
-- [ ] Implementasi Fase 4: Circuit breaker dengan status `HALF-OPEN` dan auto-cooldown.
+- [x] Implementasi Gelombang 4 (Fase 4): Circuit breaker dengan status `HALF-OPEN` dan auto-cooldown (`src/lib/circuit-breaker/`).
 - [x] Implementasi Gelombang 1 (Fase 5): Reducer state machine pada form klien (`ContentRequestForm`, `EndpointTryClient`).
 
 ## Risks
@@ -62,6 +62,15 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
     - Tampilan visual progres bar dan indikator kuantitatif ("X dari Y draf (Z%)") di halaman status riset `src/app/[locale]/(admin)/konten/riset/[sessionId]/page.tsx` saat status `developing`.
   - Penambahan unit tests komprehensif di `actions-article-edit.test.ts` (23 tests pass) dan `development.test.ts` (80 tests pass).
   - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (141 files, 1396 tests pass).
+- 2026-11-18 10:10:00 — Selesai Gelombang 4 (Key Pool Circuit Breaker FSM):
+  - Arsitektur Circuit Breaker Eksplisit (`CLOSED` | `OPEN` | `HALF_OPEN`):
+    - Tipe domain dan resolver `resolveCircuitState()` di `src/lib/circuit-breaker/types.ts`.
+    - Mekanisme self-healing otomatis `attemptHalfOpenProbeReactivation()` di `src/lib/circuit-breaker/manager.ts` yang mengaktifkan kembali kunci/model yang telah melewati masa cooldown (15 menit) untuk pengujian mandiri tanpa intervensi manual.
+    - Fungsi `resetFailureCounter()` di `src/lib/supabase/counters.ts` dan `recordCircuitSuccess()` untuk memulihkan sirkuit ke `CLOSED` saat eksekusi berhasil, mengeliminasi akumulasi kegagalan jangka panjang.
+    - Integrasi ke `fetchOrderedKeys` dan `fetchOrderedModels` di `src/lib/supabase/vault.ts`, serta `fetchOrderedImageKeys` di `src/lib/image/key-pool.ts`.
+    - Tampilan visual status sirkuit di dashboard admin `KeyBoard.tsx` dan `ImageBoards.tsx` (badge warna hijau/kuning/merah).
+  - Penambahan unit tests di `src/lib/circuit-breaker/circuit.test.ts` (7 tests pass), `counters.test.ts` (7 tests pass), `key-pool.test.ts` (6 tests pass), dan `image/key-pool.test.ts` (4 tests pass).
+  - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (142 files, 1405 tests pass).
 
 ## Notes
 - Mengacu pada standar TOGAF proporsional dan arsitektur *Non-Destructive Migrations*.

@@ -6,6 +6,7 @@ import {
   incrementUsageCounter
 } from './counters';
 import { reportError } from '@/lib/notifications/error-events';
+import { attemptHalfOpenProbeReactivation } from '@/lib/circuit-breaker/manager';
 
 /**
  * Decrypt a Vault secret by id (service_role only).
@@ -49,6 +50,9 @@ export async function getApiKeyForRow(row: KeyRow): Promise<string> {
  * Used by KeyPool.
  */
 export async function fetchOrderedKeys(providerId: string): Promise<KeyRow[]> {
+  // Evaluasi dan reaktivasi kunci cooldown yang siap masuk fase HALF_OPEN probe
+  await attemptHalfOpenProbeReactivation('llm_provider_keys', providerId);
+
   const supabase = getServiceClient();
   const { data, error } = await supabase
     .from('llm_provider_keys')
@@ -81,6 +85,9 @@ export async function markKeyFailure(keyId: string): Promise<void> {
 }
 
 export async function fetchOrderedModels(providerId: string): Promise<ModelRow[]> {
+  // Evaluasi dan reaktivasi model cooldown yang siap masuk fase HALF_OPEN probe
+  await attemptHalfOpenProbeReactivation('llm_models', providerId);
+
   const supabase = getServiceClient();
   const { data, error } = await supabase
     .from('llm_models')

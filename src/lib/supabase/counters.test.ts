@@ -1,15 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRpc = vi.fn();
+const mockFrom = vi.fn();
 
 vi.mock('./service', () => ({
-  getServiceClient: () => ({ rpc: (...args: unknown[]) => mockRpc(...args) })
+  getServiceClient: () => ({
+    rpc: (...args: unknown[]) => mockRpc(...args),
+    from: (...args: unknown[]) => mockFrom(...args)
+  })
 }));
 
 import {
   DEFAULT_FAILURE_THRESHOLD,
   incrementFailureCounter,
-  incrementUsageCounter
+  incrementUsageCounter,
+  resetFailureCounter
 } from './counters';
 
 beforeEach(() => {
@@ -71,5 +76,19 @@ describe('incrementFailureCounter', () => {
     await expect(incrementFailureCounter('llm_models', 'm')).resolves.toBe(0);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('tidak mengembalikan angka'));
     errorSpy.mockRestore();
+  });
+});
+
+describe('resetFailureCounter', () => {
+  it('mengupdate failure_count = 0 pada baris tabel yang bersangkutan', async () => {
+    const mockEq = vi.fn().mockResolvedValue({ data: null, error: null });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    mockFrom.mockReturnValue({ update: mockUpdate });
+
+    await resetFailureCounter('llm_provider_keys', 'key-123');
+
+    expect(mockFrom).toHaveBeenCalledWith('llm_provider_keys');
+    expect(mockUpdate).toHaveBeenCalledWith({ failure_count: 0 });
+    expect(mockEq).toHaveBeenCalledWith('id', 'key-123');
   });
 });

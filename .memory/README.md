@@ -1,7 +1,7 @@
 # Asharu Digital Hub — Project Memory Index
 
 Format version: 1
-Last updated: 2026-11-18 09:56 WIB (Draft Article Sync & Chunk Tracker, gate 1396 tests ✓, typecheck ✓, lint ✓)
+Last updated: 2026-11-18 10:10 WIB (Key Pool Circuit Breaker FSM, gate 1405 tests ✓, typecheck ✓, lint ✓)
 
 ## Current State
 
@@ -76,7 +76,7 @@ Last updated: 2026-11-18 09:56 WIB (Draft Article Sync & Chunk Tracker, gate 139
 
 ## Recent Entries
 
-- [2026-11-18 094200-async-workers-explicit-fsm.md](2026-11-18/094200-async-workers-explicit-fsm.md) — Async Workers Explicit FSM: transisi fase diskrit & claim guard anti-reclaim untuk Studio dan Draft Images, visual badge processing, dan helper progres rantai multi-post sosial. Gate 1387 tests ✓, typecheck ✓, lint ✓.
+- [2026-11-18 101000-keypool-circuit-breaker-fsm.md](2026-11-18/101000-keypool-circuit-breaker-fsm.md) — Key Pool Circuit Breaker FSM & Self-Healing Auto-Recovery: status CLOSED/OPEN/HALF_OPEN, auto-probe reactivation setelah cooldown 15 menit, reset saat eksekusi berhasil, dan visual badge di admin dashboard. Gate 1405 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 095600-draft-article-sync-chunk-tracker.md](2026-11-18/095600-draft-article-sync-chunk-tracker.md) — Sinkronisasi Dual-Lifecycle Artikel & Tracker Progres Chunked Development: auto-archive artikel publik saat reject/reset draf, sync draf saat seluruh bahasa terarsip, dan visibilitas persentase draf di halaman status riset developing. Gate 1396 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 094200-async-workers-explicit-fsm.md](2026-11-18/094200-async-workers-explicit-fsm.md) — Async Workers Explicit FSM & Multi-Post Queue Progress: domain resolver StudioPhase & DraftImagePhase dengan processing pulse badge, optimistic claim guard 10 menit, dan pelacak ThreadPublishProgress. Gate 1387 tests ✓, typecheck ✓, lint ✓.
 - [2026-11-18 092500-frontend-state-hygiene-fsm.md](2026-11-18/092500-frontend-state-hygiene-fsm.md) — Frontend State Hygiene: refaktor explicit state machine reducers pada ContentRequestForm & EndpointTryClient, eliminasi impossible states dan cross-contamination isPending. Gate 1376 tests ✓, typecheck ✓, lint ✓.

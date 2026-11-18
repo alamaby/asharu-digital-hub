@@ -13,6 +13,7 @@ import { SortableList } from '../llm/SortableList';
 import { ActionNoticeView, type ActionNotice } from '../llm/ActionFeedback';
 import { Link } from '@/i18n/navigation';
 import { AddImageKeyForm, AddImageModelForm, ReplaceImageKeyForm } from './ImageForms';
+import { resolveCircuitState } from '@/lib/circuit-breaker/types';
 
 export interface ImageProvider {
   id: string;
@@ -232,10 +233,20 @@ export function ImageKeyBoard({ providerId, providerName, providerSlug, keys }: 
         renderItem={(id) => {
           const k = keys.find((x) => x.id === id)!;
           const rowBusy = busy !== null;
+          const circuit = resolveCircuitState(k);
           return (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-mono text-ink">#{k.priority} · {k.key_hash} <span className="text-xs text-ink-muted">...{k.key_suffix ?? '????'} · {k.label}</span></p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono text-ink">#{k.priority} · {k.key_hash} <span className="text-xs text-ink-muted">...{k.key_suffix ?? '????'} · {k.label}</span></p>
+                  {circuit === 'CLOSED' ? (
+                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">Sirkuit Normal</span>
+                  ) : circuit === 'HALF_OPEN' ? (
+                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Uji Coba (Half-Open)</span>
+                  ) : (
+                    <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">Terputus (Cooldown)</span>
+                  )}
+                </div>
                 <p className="text-xs text-ink-muted">used {k.usage_count} · fail {k.failure_count}</p>
               </div>
               <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { getServiceClient } from '@/lib/supabase/service';
 import { incrementFailureCounter, incrementUsageCounter } from '@/lib/supabase/counters';
+import { attemptHalfOpenProbeReactivation, recordCircuitSuccess } from '@/lib/circuit-breaker/manager';
 import { ImageHttpError } from './types';
 import type { ImageKeyRow, ImageProviderRow } from './types';
 
@@ -51,6 +52,9 @@ function sleepMs(ms: number): Promise<void> {
 }
 
 export async function fetchOrderedImageKeys(providerId: string): Promise<ImageKeyRow[]> {
+  // Evaluasi dan reaktivasi kunci image cooldown yang siap masuk fase HALF_OPEN probe
+  await attemptHalfOpenProbeReactivation('image_provider_keys', providerId);
+
   const supabase = getServiceClient();
   const query = () =>
     supabase
@@ -112,6 +116,7 @@ export class ImageKeyPool {
       try {
         const result = await fn(apiKey, row);
         await markImageKeyUsage(row.id);
+        await recordCircuitSuccess('image_provider_keys', row.id, row.failure_count);
         return { result, keyRow: row };
       } catch (e) {
         lastError = e;

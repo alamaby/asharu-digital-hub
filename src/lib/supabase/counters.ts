@@ -48,3 +48,22 @@ export async function incrementFailureCounter(
   }
   return data;
 }
+
+/**
+ * Reset `failure_count` ke 0 saat kunci/model berhasil digunakan.
+ *
+ * Alasan Bisnis:
+ * Memulihkan sirkuit yang berada di fase HALF_OPEN kembali ke status CLOSED normal,
+ * serta mencegah 'false-tripping' akibat akumulasi kegagalan acak jangka panjang
+ * pada kunci yang sehari-harinya berfungsi baik.
+ */
+export async function resetFailureCounter(table: CounterTable, id: string): Promise<void> {
+  const supabase = getServiceClient();
+  const { error } = await supabase
+    .from(table)
+    .update({ failure_count: 0 })
+    .eq('id', id);
+  if (error) {
+    console.error(`resetFailureCounter(${table}, ${id}): ${error.message}`);
+  }
+}
