@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DraftImageRow } from '@/lib/image/types';
-import { isExhaustedPending } from '@/lib/image/types';
+import { isExhaustedPending, resolveDraftImagePhase } from '@/lib/image/types';
 import { DEFAULT_TIMEZONE, formatDateTimeSeconds } from '@/lib/utils/format';
 import { requestedImageModelUuid } from '@/lib/image/requested-label';
 
@@ -32,19 +32,25 @@ interface Props {
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800',
+  queued: 'bg-amber-100 text-amber-800',
+  processing: 'bg-cyan-100 text-cyan-800 animate-pulse',
   prompt_ready: 'bg-violet-100 text-violet-800',
   ready: 'bg-sky-100 text-sky-800',
   selected: 'bg-emerald-100 text-emerald-800',
-  failed: 'bg-red-100 text-red-800'
+  failed: 'bg-red-100 text-red-800',
+  stuck: 'bg-red-100 text-red-800'
 };
 
 /** Label badge berbahasa Indonesia (jangan tampilkan slug mentah DB). */
 export const IMAGE_STATUS_LABEL: Record<string, string> = {
   pending: 'Antre',
+  queued: 'Antre',
+  processing: 'Sedang diproses',
   prompt_ready: 'Draf prompt',
   ready: 'Siap',
   selected: 'Dipilih',
-  failed: 'Gagal'
+  failed: 'Gagal',
+  stuck: 'Macet'
 };
 
 function placeholderFor(img: DraftImageRow, imageBroken: boolean): { cls: string; text: string } {
@@ -106,15 +112,14 @@ function providerModelLabel(img: DraftImageRow, modelOptions?: Props['modelOptio
   return `${model.provider_slug} · ${model.model_id} ${suffix}${styleSuffix}`;
 }
 /** Baris kedua timeline per status (selain "Masuk antrean"). Null = tak ada. */
-function stageLineFor(status: string, updatedAt: string, attempts?: number | null): string | null {
-  if (status === 'pending') {
-    return isExhaustedPending(status, attempts)
-      ? 'Macet — percobaan worker habis.'
-      : 'Menunggu diproses worker…';
-  }
-  if (status === 'prompt_ready') return `Draf prompt siap: ${updatedAt}`;
-  if (status === 'ready' || status === 'selected') return `Selesai dibuat: ${updatedAt}`;
-  if (status === 'failed') return `Terakhir dicoba: ${updatedAt}`;
+function stageLineFor(img: DraftImageRow, updatedAt: string): string | null {
+  const phase = resolveDraftImagePhase(img);
+  if (phase === 'stuck') return 'Macet — percobaan worker habis.';
+  if (phase === 'processing') return 'Sedang diproses worker…';
+  if (phase === 'queued') return 'Menunggu diproses worker…';
+  if (phase === 'prompt_ready') return `Draf prompt siap: ${updatedAt}`;
+  if (phase === 'ready' || phase === 'selected') return `Selesai dibuat: ${updatedAt}`;
+  if (phase === 'failed') return `Terakhir dicoba: ${updatedAt}`;
   return null;
 }
 /** Nama file unduhan: basename URL Storage bila berekstensi, else visual-<id>.png. */
@@ -267,7 +272,7 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
             const imageBroken = broken.has(img.id);
             const ph = placeholderFor(img, imageBroken);
             const hasImage = Boolean(img.public_url) && !imageBroken;
-            const stageLine = stageLineFor(img.status, fmtTime(img.updated_at), img.attempts);
+            const stageLine = stageLineFor(img, fmtTime(img.updated_at));
             return (
               <div
                 key={img.id}
@@ -292,10 +297,10 @@ export function ImageHistoryCarousel({ rows, selectedId, variant = 'cover', isPe
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {(() => {
-                    const stuck = isExhaustedPending(img.status, img.attempts);
+                    const phase = resolveDraftImagePhase(img);
                     return (
-                      <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${stuck ? 'bg-red-100 text-red-800' : STATUS_BADGE[img.status] ?? 'bg-surface text-ink-muted'}`}>
-                        {stuck ? 'Macet' : IMAGE_STATUS_LABEL[img.status] ?? img.status}
+                      <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${STATUS_BADGE[phase] ?? STATUS_BADGE[img.status] ?? 'bg-surface text-ink-muted'}`}>
+                        {IMAGE_STATUS_LABEL[phase] ?? IMAGE_STATUS_LABEL[img.status] ?? img.status}
                       </span>
                     );
                   })()}

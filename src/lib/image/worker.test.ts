@@ -62,6 +62,7 @@ vi.mock('@/lib/image/storage', () => ({
 }));
 
 import { claimPendingImage, enqueueNextMissingImage, processImageTick, reapStuckImages } from './worker';
+import { resolveDraftImagePhase } from './types';
 import { runLLMCompletion } from '@/lib/llm/completion';
 
 function matches(r: Row, filters: Filter[]): boolean {
@@ -368,6 +369,33 @@ describe('enqueueNextMissingImage', () => {
     };
     await enqueueNextMissingImage();
     expect(queryCount.selects).toBeLessThanOrEqual(2);
+  });
+
+  describe('resolveDraftImagePhase FSM', () => {
+    const fixedNow = new Date('2026-11-18T10:00:00.000Z').getTime();
+
+    it('identifies ready, selected, prompt_ready and failed statuses directly', () => {
+      expect(resolveDraftImagePhase({ status: 'ready' })).toBe('ready');
+      expect(resolveDraftImagePhase({ status: 'selected' })).toBe('selected');
+      expect(resolveDraftImagePhase({ status: 'prompt_ready' })).toBe('prompt_ready');
+      expect(resolveDraftImagePhase({ status: 'failed' })).toBe('failed');
+    });
+
+    it('identifies stuck status when attempts are exhausted', () => {
+      expect(resolveDraftImagePhase({ status: 'pending', attempts: 3 }, fixedNow)).toBe('stuck');
+      expect(resolveDraftImagePhase({ status: 'pending', attempts: 5 }, fixedNow)).toBe('stuck');
+    });
+
+    it('identifies processing status when claimed recently', () => {
+      const recent = new Date(fixedNow - 4 * 60 * 1000).toISOString(); // 4 mins ago
+      expect(resolveDraftImagePhase({ status: 'pending', attempts: 1, updated_at: recent }, fixedNow)).toBe('processing');
+    });
+
+    it('identifies queued status when attempts is 0 or claim is timed out', () => {
+      expect(resolveDraftImagePhase({ status: 'pending', attempts: 0 }, fixedNow)).toBe('queued');
+      const stale = new Date(fixedNow - 12 * 60 * 1000).toISOString(); // 12 mins ago
+      expect(resolveDraftImagePhase({ status: 'pending', attempts: 1, updated_at: stale }, fixedNow)).toBe('queued');
+    });
   });
 });
 

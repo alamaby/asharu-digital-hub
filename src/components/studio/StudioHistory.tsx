@@ -5,7 +5,7 @@ import { Check, Copy, Download, Eye, RefreshCw, RotateCcw, Trash2 } from 'lucide
 import { useTranslations } from 'next-intl';
 import type { Locale } from '@/i18n/routing';
 import { formatDateTime, formatDateTimeSeconds } from '@/lib/utils/format';
-import type { StudioGenerationRow, StudioListOptions } from '@/lib/studio/types';
+import { type StudioGenerationRow, type StudioListOptions, resolveStudioPhase } from '@/lib/studio/types';
 import { retryFailedStudioImage, deleteStudioImage, listUserImages } from '@/lib/studio/actions';
 
 interface OptionLists {
@@ -76,7 +76,10 @@ function toListOptions(f: HistoryFilters): StudioListOptions {
 const STATUS_CLASS: Record<string, string> = {
   ready: 'bg-sky-100 text-sky-800',
   failed: 'bg-red-100 text-red-800',
-  pending: 'bg-amber-100 text-amber-800'
+  pending: 'bg-amber-100 text-amber-800',
+  queued: 'bg-amber-100 text-amber-800',
+  processing: 'bg-cyan-100 text-cyan-800 animate-pulse',
+  stuck: 'bg-red-100 text-red-800'
 };
 
 const selectCls =
@@ -463,13 +466,21 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
         </p>
       ) : (
         <ol className="mt-4 space-y-4">
-          {images.map((img, idx) => (
+          {images.map((img, idx) => {
+            const phase = resolveStudioPhase(img);
+            return (
             <li key={img.id} data-testid="studio-row" className="rounded-lg border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span
-                  className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_CLASS[img.status] ?? 'bg-surface text-ink-muted'}`}
+                  className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_CLASS[phase] ?? STATUS_CLASS[img.status] ?? 'bg-surface text-ink-muted'}`}
                 >
-                  {img.status === 'ready' ? tHist('ready') : img.status === 'failed' ? tHist('failed') : tHist('pending')}
+                  {phase === 'ready'
+                    ? tHist('ready')
+                    : phase === 'failed' || phase === 'stuck'
+                    ? tHist('failed')
+                    : phase === 'processing'
+                    ? tHist('processing')
+                    : tHist('pending')}
                 </span>
                 {img.reference_public_url ? (
                   <span
@@ -729,7 +740,8 @@ export function StudioHistory({ images: initialImages, pollingIntervalSec, optio
                 </div>
               </details>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
 

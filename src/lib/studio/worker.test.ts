@@ -55,6 +55,7 @@ vi.mock('@/lib/image/config', () => ({
 }));
 
 import { processOneStudioImage } from './worker';
+import { resolveStudioPhase } from './types';
 
 const provPixazo: Row = {
   id: 'prov-pixazo',
@@ -279,5 +280,30 @@ describe('processOneStudioImage — strict-fail pin user', () => {
     const fin = finalStatus(updates)?.patch as Row;
     expect(fin.status).toBe('failed');
     expect(fin.final_prompt).toBe('a cute cartoon cat sitting on a wooden chair, pastel colors');
+  });
+
+  describe('resolveStudioPhase FSM', () => {
+    const fixedNow = new Date('2026-11-18T10:00:00.000Z').getTime();
+
+    it('identifies ready and failed statuses directly', () => {
+      expect(resolveStudioPhase({ status: 'ready' })).toBe('ready');
+      expect(resolveStudioPhase({ status: 'failed' })).toBe('failed');
+    });
+
+    it('identifies stuck status when attempts are exhausted', () => {
+      expect(resolveStudioPhase({ status: 'pending', attempts: 3 }, fixedNow)).toBe('stuck');
+      expect(resolveStudioPhase({ status: 'pending', attempts: 4 }, fixedNow)).toBe('stuck');
+    });
+
+    it('identifies processing status when claimed recently', () => {
+      const recent = new Date(fixedNow - 3 * 60 * 1000).toISOString(); // 3 mins ago
+      expect(resolveStudioPhase({ status: 'pending', attempts: 1, updated_at: recent }, fixedNow)).toBe('processing');
+    });
+
+    it('identifies queued status when attempts is 0 or claim is timed out', () => {
+      expect(resolveStudioPhase({ status: 'pending', attempts: 0 }, fixedNow)).toBe('queued');
+      const stale = new Date(fixedNow - 15 * 60 * 1000).toISOString(); // 15 mins ago
+      expect(resolveStudioPhase({ status: 'pending', attempts: 1, updated_at: stale }, fixedNow)).toBe('queued');
+    });
   });
 });

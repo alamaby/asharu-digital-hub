@@ -28,7 +28,7 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
 ## Tasks
 - [x] Inventarisasi seluruh mesin status implisit di codebase (`src/` dan `supabase/migrations/`).
 - [x] Analisis celah arsitektur dan failure modes untuk setiap mesin status.
-- [ ] Implementasi Fase 1: Transisi eksplisit worker image & studio (`processing` status + `claimed_at`).
+- [x] Implementasi Gelombang 2 (Fase 1): Transisi eksplisit worker image & studio (`processing` status + `claimed_at` guard) serta pelacak progres antrean sosial.
 - [ ] Implementasi Fase 2: Sinkronisasi siklus draf artikel vs penerbitan publik (`articles`).
 - [ ] Implementasi Fase 3: State tracker chunked development pada sesi riset.
 - [ ] Implementasi Fase 4: Circuit breaker dengan status `HALF-OPEN` dan auto-cooldown.
@@ -46,6 +46,14 @@ Mengidentifikasi seluruh mesin status implisit (*implicit state machines*) di ap
   - Refaktor `EndpointTryClient.tsx` memecah `isPending` tunggal menjadi dua FSM independen: `ModelCatalogPhase` dan `ChatSessionPhase`, memisahkan tombol uji koneksi dan chat streaming/sending.
   - Unit tests komprehensif di `ContentRequestForm.test.tsx` (11 tests pass) dan `EndpointTryClient.test.tsx` (4 tests pass).
   - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (141 files, 1376 tests pass).
+- 2026-11-18 09:42:00 — Selesai Gelombang 2 (Async Workers & Queue Progress):
+  - Definisi tipe domain & FSM resolver `StudioPhase` dan `resolveStudioPhase` di `src/lib/studio/types.ts`.
+  - Definisi tipe domain & FSM resolver `DraftImagePhase` dan `resolveDraftImagePhase` di `src/lib/image/types.ts`.
+  - Guard anti-reclaim konkurensi (optimistic locking) dan pencatatan jejak `claimed_at` + `phase: 'processing'` pada `claimPendingStudioImage` (`src/lib/studio/worker.ts`) dan `claimPendingImage` (`src/lib/image/worker.ts`).
+  - Pembaruan UI badge status `StudioHistory.tsx` dan `ImageHistoryCarousel.tsx` dengan status `processing` animasi pulse.
+  - Implementasi `ThreadPublishProgress` dan `getThreadQueueProgress` di `src/lib/social/queue.ts` untuk visibilitas progres rantai multi-post (`social_post_logs`).
+  - Penambahan unit tests FSM di `src/lib/studio/worker.test.ts`, `src/lib/image/worker.test.ts`, dan `src/lib/social/queue.test.ts`.
+  - Lolos seluruh gates: typecheck (0 error), lint (0 warning), full test suite (141 files, 1387 tests pass).
 
 ## Notes
 - Mengacu pada standar TOGAF proporsional dan arsitektur *Non-Destructive Migrations*.

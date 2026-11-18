@@ -186,26 +186,60 @@ async function resolveStudioTarget(row: StudioGenerationRow, config: StudioConfi
     : 'Tidak ada provider/model image aktif.');
 }
 
-/** Klaim 1 baris studio pending (atomic via eq status) → attempts+1. */
-export async function claimPendingStudioImage(): Promise<StudioGenerationRow | null> {
+/**
+ * Klaim 1 baris studio pending (atomic via eq status) → attempts+1.
+ *
+ * Alasan Bisnis:
+ * Menggunakan optimistic concurrency control dengan guard status 'pending' dan metadata klaim aktif.
+ * Bila baris pernah diklaim (attempts > 0), baris hanya boleh diklaim ulang jika durasi
+ * pengerjaan sebelumnya telah melebihi batas timeout (10 menit). Hal ini mencegah dua tick
+ * worker yang berjalan simultan menghasilkan dua gambar duplikat untuk satu request pengguna yang sama
+ * (menghemat kuota GPU berbayar dan menjaga konsistensi state).
+ */
+export async function claimPendingStudioImage(
+  options: { now?: Date; timeoutMinutes?: number } = {}
+): Promise<StudioGenerationRow | null> {
   const supabase = getServiceClient();
-  const { data: pending } = await supabase
+  const now = options.now ?? new Date();
+  const nowIso = now.toISOString();
+  const timeoutMinutes = options.timeoutMinutes ?? 10;
+  const cutoff = new Date(now.getTime() - timeoutMinutes * 60_000).toISOString();
+
+  const { data: pendingRows } = await supabase
     .from('user_image_generations')
     .select('*')
     .eq('status', 'pending')
     .lt('attempts', MAX_ATTEMPTS)
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  const row = (pending as StudioGenerationRow | null) ?? null;
+    .limit(5);
+
+  const candidates = (pendingRows as StudioGenerationRow[] | null) ?? [];
+  const row = candidates.find((c) => {
+    if (c.attempts === 0) return true;
+    return c.updated_at < cutoff;
+  }) ?? null;
+
   if (!row) return null;
+
+  const nextMeta = {
+    ...(typeof row.llm_meta === 'object' && row.llm_meta !== null ? row.llm_meta : {}),
+    claimed_at: nowIso,
+    phase: 'processing'
+  };
+
   const { data: claimed } = await supabase
     .from('user_image_generations')
-    .update({ attempts: row.attempts + 1, updated_at: new Date().toISOString() })
+    .update({
+      attempts: row.attempts + 1,
+      updated_at: nowIso,
+      llm_meta: nextMeta
+    })
     .eq('id', row.id)
     .eq('status', 'pending')
+    .eq('attempts', row.attempts)
     .select('*')
     .maybeSingle();
+
   return (claimed as StudioGenerationRow | null) ?? null;
 }
 

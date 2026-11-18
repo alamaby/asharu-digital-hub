@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   MAX_QUEUE_ATTEMPTS,
   claimDueQueueItem,
-  reapStaleClaims
+  reapStaleClaims,
+  getThreadQueueProgress
 } from './queue';
 
 type Row = Record<string, unknown>;
@@ -254,5 +255,70 @@ describe('reapStaleClaims', () => {
 
     expect(result).toEqual({ requeued: 0, failed: 0, errors: [] });
     expect(rows[0]?.status).toBe('posting');
+  });
+
+  describe('getThreadQueueProgress', () => {
+    it('calculates 0% queued progress when no posts are published yet', async () => {
+      const mockSupabase = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => Promise.resolve({ data: [] })
+              })
+            })
+          })
+        })
+      } as unknown as SupabaseClient;
+
+      const progress = await getThreadQueueProgress(mockSupabase, 'q-1', 4, 'queued');
+      expect(progress.percent).toBe(0);
+      expect(progress.publishedCount).toBe(0);
+      expect(progress.remainingCount).toBe(4);
+      expect(progress.phase).toBe('queued');
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it('identifies partially_posted phase when some posts are logged', async () => {
+      const mockSupabase = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => Promise.resolve({ data: [{ post_index: 0 }, { post_index: 1 }] })
+              })
+            })
+          })
+        })
+      } as unknown as SupabaseClient;
+
+      const progress = await getThreadQueueProgress(mockSupabase, 'q-1', 4, 'queued');
+      expect(progress.percent).toBe(50);
+      expect(progress.publishedCount).toBe(2);
+      expect(progress.remainingCount).toBe(2);
+      expect(progress.phase).toBe('partially_posted');
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it('identifies posted phase when all posts are complete', async () => {
+      const mockSupabase = {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => Promise.resolve({ data: [{ post_index: 0 }, { post_index: 1 }, { post_index: 2 }] })
+              })
+            })
+          })
+        })
+      } as unknown as SupabaseClient;
+
+      const progress = await getThreadQueueProgress(mockSupabase, 'q-1', 3, 'posted');
+      expect(progress.percent).toBe(100);
+      expect(progress.publishedCount).toBe(3);
+      expect(progress.remainingCount).toBe(0);
+      expect(progress.phase).toBe('posted');
+      expect(progress.isComplete).toBe(true);
+    });
   });
 });

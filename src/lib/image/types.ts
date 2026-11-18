@@ -94,6 +94,64 @@ export function isExhaustedPending(status: string, attempts: number | null | und
   return status === 'pending' && (attempts ?? 0) >= IMAGE_MAX_ATTEMPTS;
 }
 
+/**
+ * Fase siklus hidup diskrit Draft Image.
+ * - 'prompt_ready': Prompt otomatis draf selesai disusun oleh LLM reasoning, menunggu render GPU.
+ * - 'queued': Masuk antrean render, belum diklaim oleh worker (attempts = 0).
+ * - 'processing': Sedang aktif diproses/dirender oleh worker image (attempts > 0, updated_at < window).
+ * - 'ready': Berhasil dirender dan tersimpan di Storage CDN.
+ * - 'selected': Dipilih sebagai cover aktif untuk draf konten terkait.
+ * - 'failed': Gagal render setelah percobaan atau fatal error.
+ * - 'stuck': Attempts habis akibat invocation worker terputus, butuh reap/retry.
+ */
+export type DraftImagePhase =
+  | 'prompt_ready'
+  | 'queued'
+  | 'processing'
+  | 'ready'
+  | 'selected'
+  | 'failed'
+  | 'stuck';
+
+/**
+ * Menghitung fase siklus hidup eksplisit untuk baris gambar draf.
+ *
+ * Alasan Bisnis:
+ * Membedakan status antrean pasif ('queued') dari status rendering aktif GPU ('processing')
+ * dan baris macet akibat timeout serverless ('stuck') tanpa mengubah constraint
+ * CHECK (status IN ('pending', 'prompt_ready', 'ready', 'failed', 'selected')) di Postgres.
+ */
+export function resolveDraftImagePhase(
+  row: {
+    status: string;
+    attempts?: number | null;
+    updated_at?: string | null;
+    llm_meta?: Record<string, unknown> | null;
+  },
+  now = Date.now(),
+  timeoutMinutes = IMAGE_STUCK_MINUTES
+): DraftImagePhase {
+  if (row.status === 'ready') return 'ready';
+  if (row.status === 'selected') return 'selected';
+  if (row.status === 'prompt_ready') return 'prompt_ready';
+  if (row.status === 'failed') return 'failed';
+
+  if (isExhaustedPending(row.status, row.attempts)) {
+    return 'stuck';
+  }
+
+  const attempts = row.attempts ?? 0;
+  if (attempts > 0) {
+    const lastUpdated = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+    const windowMs = timeoutMinutes * 60 * 1000;
+    if (now - lastUpdated < windowMs) {
+      return 'processing';
+    }
+  }
+
+  return 'queued';
+}
+
 /** Batas upload referensi (5MB → b64 ~6.7MB, masih dalam timeout 60s). */
 export const REFERENCE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const REFERENCE_IMAGE_ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;

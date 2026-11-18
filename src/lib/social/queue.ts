@@ -159,3 +159,68 @@ export async function claimDueQueueItem(
   if (claimError || !claimed) return { outcome: 'raced' };
   return { outcome: 'claimed', item: { ...item, attempts: item.attempts + 1 } };
 }
+
+export interface ThreadPublishProgress {
+  total: number;
+  publishedCount: number;
+  remainingCount: number;
+  percent: number;
+  isComplete: boolean;
+  publishedIndices: number[];
+  phase: 'queued' | 'posting' | 'partially_posted' | 'posted' | 'failed';
+}
+
+/**
+ * Menghitung progres penerbitan thread multi-post dari `social_post_logs`.
+ *
+ * Alasan Bisnis:
+ * Threads dan platform media sosial lainnya menerbitkan rangkaian posting secara berantai.
+ * Jika sebuah rantai gagal di tengah jalan (mis. kena rate-limit pada reply ke-3),
+ * sistem akan melanjutkan (resume) dari post yang belum terkirim. Fungsi ini memberikan
+ * visibilitas status transisi yang transparan ('partially_posted') bagi agen pengawas,
+ * dasbor admin, dan API monitor tanpa harus merekonstruksi log manual.
+ */
+export async function getThreadQueueProgress(
+  supabase: SupabaseClient,
+  queueId: string,
+  totalPosts: number,
+  currentStatus: string
+): Promise<ThreadPublishProgress> {
+  const { data: logs } = await supabase
+    .from('social_post_logs')
+    .select('post_index')
+    .eq('queue_id', queueId)
+    .eq('status', 'published')
+    .order('post_index', { ascending: true });
+
+  const publishedIndices = Array.from(
+    new Set(((logs ?? []) as { post_index: number }[]).map((l) => l.post_index))
+  );
+  const publishedCount = publishedIndices.length;
+  const remainingCount = Math.max(0, totalPosts - publishedCount);
+  const percent = totalPosts > 0 ? Math.min(100, Math.round((publishedCount / totalPosts) * 100)) : 0;
+  const isComplete = publishedCount >= totalPosts && totalPosts > 0;
+
+  let phase: ThreadPublishProgress['phase'] = 'queued';
+  if (currentStatus === 'posted' || isComplete) {
+    phase = 'posted';
+  } else if (currentStatus === 'failed') {
+    phase = 'failed';
+  } else if (currentStatus === 'posting') {
+    phase = 'posting';
+  } else if (publishedCount > 0) {
+    phase = 'partially_posted';
+  } else {
+    phase = 'queued';
+  }
+
+  return {
+    total: totalPosts,
+    publishedCount,
+    remainingCount,
+    percent,
+    isComplete,
+    publishedIndices,
+    phase
+  };
+}

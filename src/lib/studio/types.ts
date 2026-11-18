@@ -2,6 +2,62 @@
 
 export type StudioImageStatus = 'pending' | 'ready' | 'failed';
 
+/**
+ * Fase siklus hidup diskrit Studio Generation.
+ * Memisahkan status antrean DB 'pending' menjadi fase konkret:
+ * - 'queued': Baru dimasukkan ke antrean FIFO, belum diambil oleh worker (attempts = 0).
+ * - 'processing': Sedang aktif dieksekusi oleh worker ke provider GPU image (attempts > 0, claim masih segar).
+ * - 'ready': Berhasil di-generate dan tersimpan di storage CDN.
+ * - 'failed': Gagal permanen setelah percobaan atau error non-retryable.
+ * - 'stuck': Batas percobaan habis (attempts >= max) akibat tick worker terputus, butuh intervensi/reaper.
+ */
+export type StudioPhase = 'queued' | 'processing' | 'ready' | 'failed' | 'stuck';
+
+/**
+ * Durasi default (menit) klaim worker dianggap aktif sebelum dianggap stale.
+ * Alasan bisnis: Invocation serverless image worker memiliki maxDuration 180s (3 menit).
+ * Memberikan window 10 menit memberi toleransi 3x durasi invocation agar tick worker paralel
+ * tidak merebut pekerjaan yang sedang aktif dirender oleh GPU provider lain.
+ */
+export const STUDIO_PROCESSING_TIMEOUT_MINUTES = 10;
+
+/**
+ * Menghitung fase siklus hidup eksplisit untuk baris generate studio.
+ *
+ * Alasan Bisnis:
+ * Constraint basis data PostgreSQL CHECK (status IN ('pending', 'ready', 'failed'))
+ * tidak boleh diubah sembarangan tanpa migrasi skema. Fungsi ini memberikan view
+ * state machine diskrit tanpa melanggar skema DB dan tanpa downtime:
+ * 1. Menghindarkan pengguna dari ketidakpastian label "Menunggu" saat GPU sebenarnya sedang aktif merender.
+ * 2. Mengizinkan agen AI membedakan antrean pasif dari proses yang sedang aktif berjalan.
+ */
+export function resolveStudioPhase(
+  row: {
+    status: StudioImageStatus;
+    attempts?: number | null;
+    updated_at?: string | null;
+    llm_meta?: Record<string, unknown> | null;
+  },
+  now = Date.now(),
+  timeoutMinutes = STUDIO_PROCESSING_TIMEOUT_MINUTES
+): StudioPhase {
+  if (row.status === 'ready') return 'ready';
+  if (row.status === 'failed') return 'failed';
+
+  const attempts = row.attempts ?? 0;
+  if (attempts >= 3) return 'stuck';
+
+  if (attempts > 0) {
+    const lastUpdated = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+    const windowMs = timeoutMinutes * 60 * 1000;
+    if (now - lastUpdated < windowMs) {
+      return 'processing';
+    }
+  }
+
+  return 'queued';
+}
+
 export interface StudioAspectRow {
   slug: string;
   display_name: string;
