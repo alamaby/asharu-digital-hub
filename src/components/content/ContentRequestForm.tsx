@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useReducer, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { createResearchSession, generateIdea } from '@/lib/content/actions';
@@ -19,20 +19,136 @@ interface ContentRequestFormProps {
   isAdmin?: boolean;
 }
 
+export interface FormIdeaCoverage {
+  filled: number;
+  total: number;
+  missing: string[];
+}
+
+export type FormInteractionState =
+  | {
+      status: 'idle';
+      ideaApplied?: boolean;
+      ideaCoverage?: FormIdeaCoverage | null;
+      ideaError?: string | null;
+    }
+  | {
+      status: 'generating_idea';
+      ideaApplied?: boolean;
+      ideaCoverage?: FormIdeaCoverage | null;
+      ideaError?: string | null;
+    }
+  | {
+      status: 'submitting';
+      ideaApplied?: boolean;
+      ideaCoverage?: FormIdeaCoverage | null;
+      ideaError?: string | null;
+    }
+  | {
+      status: 'success';
+      sessionId: string | null;
+      message: string;
+      ideaApplied?: boolean;
+      ideaCoverage?: FormIdeaCoverage | null;
+      ideaError?: string | null;
+    }
+  | {
+      status: 'error';
+      message: string;
+      fieldErrors: Record<string, string>;
+      ideaApplied?: boolean;
+      ideaCoverage?: FormIdeaCoverage | null;
+      ideaError?: string | null;
+    };
+
+export type FormAction =
+  | { type: 'START_IDEA_GENERATION' }
+  | { type: 'IDEA_SUCCESS'; coverage: FormIdeaCoverage }
+  | { type: 'IDEA_ERROR'; error: string }
+  | { type: 'START_SUBMISSION' }
+  | { type: 'SUBMIT_SUCCESS'; sessionId: string | null; message: string }
+  | { type: 'SUBMIT_ERROR'; message: string; fieldErrors?: Record<string, string> }
+  | { type: 'CLEAR_FIELD_ERROR'; field: string }
+  | { type: 'RESET_FORM' };
+
+export function formReducer(state: FormInteractionState, action: FormAction): FormInteractionState {
+  switch (action.type) {
+    case 'START_IDEA_GENERATION':
+      if (state.status === 'submitting') return state;
+      return {
+        status: 'generating_idea',
+        ideaApplied: state.ideaApplied ?? false,
+        ideaCoverage: state.ideaCoverage ?? null
+      };
+    case 'IDEA_SUCCESS':
+      return {
+        status: 'idle',
+        ideaApplied: true,
+        ideaCoverage: action.coverage,
+        ideaError: null
+      };
+    case 'IDEA_ERROR':
+      return {
+        status: 'idle',
+        ideaApplied: state.ideaApplied ?? false,
+        ideaCoverage: state.ideaCoverage ?? null,
+        ideaError: action.error
+      };
+    case 'START_SUBMISSION':
+      if (state.status === 'generating_idea') return state;
+      return {
+        status: 'submitting',
+        ideaApplied: state.ideaApplied ?? false,
+        ideaCoverage: state.ideaCoverage ?? null
+      };
+    case 'SUBMIT_SUCCESS':
+      return {
+        status: 'success',
+        sessionId: action.sessionId,
+        message: action.message,
+        ideaApplied: state.ideaApplied,
+        ideaCoverage: state.ideaCoverage
+      };
+    case 'SUBMIT_ERROR':
+      return {
+        status: 'error',
+        message: action.message,
+        fieldErrors: action.fieldErrors ?? {},
+        ideaApplied: state.ideaApplied,
+        ideaCoverage: state.ideaCoverage,
+        ideaError: state.ideaError
+      };
+    case 'CLEAR_FIELD_ERROR': {
+      if (state.status !== 'error' || !(action.field in state.fieldErrors)) return state;
+      const nextFieldErrors = { ...state.fieldErrors };
+      delete nextFieldErrors[action.field];
+      return {
+        ...state,
+        fieldErrors: nextFieldErrors
+      };
+    }
+    case 'RESET_FORM':
+      return { status: 'idle' };
+    default:
+      return state;
+  }
+}
+
 export function ContentRequestForm({ platforms, categories, templates = [], llmProviders = [], llmModels = [], isAdmin = false }: ContentRequestFormProps) {
   const t = useTranslations('content.form');
-  const [pending, setPending] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [message, setMessage] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [formState, dispatch] = useReducer(formReducer, { status: 'idle' });
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [ideaGenerating, setIdeaGenerating] = useState(false);
-  const [ideaApplied, setIdeaApplied] = useState(false);
-  const [ideaCoverage, setIdeaCoverage] = useState<{ filled: number; total: number; missing: string[] } | null>(null);
-  const [ideaError, setIdeaError] = useState<string | null>(null);
   const [, startIdeaTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Derived state machine helpers
+  const isSubmitting = formState.status === 'submitting';
+  const isIdeaGenerating = formState.status === 'generating_idea';
+  const isFormBusy = isSubmitting || isIdeaGenerating;
+  const fieldErrors = formState.status === 'error' ? formState.fieldErrors : {};
+  const ideaCoverage = formState.status !== 'success' ? (formState.ideaCoverage ?? null) : null;
+  const ideaApplied = formState.status !== 'success' ? Boolean(formState.ideaApplied) : false;
+  const ideaError = (formState.status === 'idle' || formState.status === 'error') ? (formState.ideaError ?? null) : null;
 
   // Controlled fields so generateIdea can fill them
   const [topic, setTopic] = useState('');
@@ -75,10 +191,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
   const [devModelId, setDevModelId] = useState('');
 
   function handleGenerateIdea() {
-    setIdeaError(null);
-    setIdeaApplied(false);
-    setIdeaCoverage(null);
-    setIdeaGenerating(true);
+    dispatch({ type: 'START_IDEA_GENERATION' });
     startIdeaTransition(async () => {
       // Collect all current field states as hints so the idea varies with input
       const fd = new FormData();
@@ -112,14 +225,12 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
       if (isAdmin && genModelId) fd.set('ideaGenerationModelId', genModelId);
       // call server action
       const res = await generateIdea(fd);
-      setIdeaGenerating(false);
       if (!res.success || !res.idea) {
         const err = res.error ?? 'Gagal generate idea';
-        if (err.startsWith('rate_limit')) {
-          setIdeaError(`Batas 30/jam tercapai. Coba lagi nanti.`);
-        } else {
-          setIdeaError(err);
-        }
+        const msg = err.startsWith('rate_limit')
+          ? 'Batas 30/jam tercapai. Coba lagi nanti.'
+          : err;
+        dispatch({ type: 'IDEA_ERROR', error: msg });
         return;
       }
       const i = res.idea;
@@ -141,7 +252,6 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
       if (i.allowedCategories !== undefined) setAllowedCategories(i.allowedCategories!);
       if (i.excludedCategories !== undefined) setExcludedCategories(i.excludedCategories!);
       setShowAdvanced(true);
-      setIdeaApplied(true);
       // Banner kelengkapan: hitung field yang diisi LLM dari 17 kunci ide.
       const ideaRecord = i as unknown as Record<string, unknown>;
       const allKeys = ['topic', 'platform', 'tone', 'language', 'targetCategory', 'audience', 'ctaStyle', 'purpose', 'constraints', 'keywords', 'targetLocation', 'secondaryLocation', 'audienceAge', 'audienceInterests', 'accountGoal', 'allowedCategories', 'excludedCategories'];
@@ -149,31 +259,40 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
         const v = ideaRecord[k];
         return v === undefined || (typeof v === 'string' && v.trim() === '');
       });
-      setIdeaCoverage({
-        filled: allKeys.length - missing.length,
-        total: allKeys.length,
-        missing: missing.map((k) => {
-          try {
-            return t(k);
-          } catch {
-            return k;
-          }
-        })
+      dispatch({
+        type: 'IDEA_SUCCESS',
+        coverage: {
+          filled: allKeys.length - missing.length,
+          total: allKeys.length,
+          missing: missing.map((k) => {
+            try {
+              return t(k);
+            } catch {
+              return k;
+            }
+          })
+        }
       });
-      setFieldErrors({});
     });
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isFormBusy) return;
     if (selPlatforms.length === 0) {
-      setStatus('error');
-      setFieldErrors({ platforms: t('platformMinOne') });
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: t('errorTitle'),
+        fieldErrors: { platforms: t('platformMinOne') }
+      });
       return;
     }
     if (mechanism === 'dua' && (mechProducts.length === 0 || mechProducts.length > 2)) {
-      setStatus('error');
-      setFieldErrors({ mechProducts: t('productMinMax') });
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: t('errorTitle'),
+        fieldErrors: { mechProducts: t('productMinMax') }
+      });
       return;
     }
     const formData = new FormData(e.currentTarget);
@@ -188,18 +307,11 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
   }
 
   async function processForm(formData: FormData) {
-    setPending(true);
-    setStatus('idle');
-    setMessage('');
-    setFieldErrors({});
-    setSessionId(null);
+    dispatch({ type: 'START_SUBMISSION' });
 
     const result = await createResearchSession(formData);
 
     if (result.success) {
-      setStatus('success');
-      setMessage('Riset berhasil dimulai. Cek halaman riset untuk progres.');
-      setSessionId(result.sessionId ?? null);
       formRef.current?.reset();
       // reset controlled states
       setTopic('');
@@ -207,7 +319,6 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
       setMechanism('satu');
       setTemplate('');
       setMechProducts([]);
-      setIdeaCoverage(null);
       setAudience('');
       setPurpose('');
       setKeywords('');
@@ -226,26 +337,32 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
       setScoringProviderId(''); setScoringModelId('');
       setDevProviderId(''); setDevModelId('');
       setShowAdvanced(false);
-      setIdeaApplied(false);
+      dispatch({
+        type: 'SUBMIT_SUCCESS',
+        sessionId: result.sessionId ?? null,
+        message: 'Riset berhasil dimulai. Cek halaman riset untuk progres.'
+      });
     } else if (result.error === 'honeypot') {
-      setStatus('error');
-      setMessage(t('errorHoneypot'));
+      dispatch({ type: 'SUBMIT_ERROR', message: t('errorHoneypot') });
     } else if (result.error?.startsWith('rate_limit')) {
       const count = result.error.split(':')[1] ?? '5';
-      setStatus('error');
-      setMessage(t('errorRateLimit', { count }));
+      dispatch({ type: 'SUBMIT_ERROR', message: t('errorRateLimit', { count }) });
     } else if (result.fieldErrors) {
-      setFieldErrors(result.fieldErrors);
-      setStatus('error');
-      setMessage(t('errorTitle'));
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: t('errorTitle'),
+        fieldErrors: result.fieldErrors
+      });
     } else {
-      setStatus('error');
-      setMessage(result.error ?? t('errorTitle'));
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: result.error ?? t('errorTitle')
+      });
     }
-    setPending(false);
   }
 
-  if (status === 'success') {
+  if (formState.status === 'success') {
+    const sessionId = formState.sessionId;
     return (
       <div
         role="status"
@@ -288,10 +405,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           <button
             type="button"
             onClick={() => {
-              setStatus('idle');
-              setMessage('');
-              setFieldErrors({});
-              setSessionId(null);
+              dispatch({ type: 'RESET_FORM' });
             }}
             className="rounded-lg border border-emerald-300 bg-surface px-4 py-2 text-sm font-medium text-emerald-900 transition-colors hover:border-emerald-500"
           >
@@ -319,7 +433,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                 name="mechanism"
                 value="satu"
                 checked={mechanism === 'satu'}
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 onChange={() => setMechanism('satu')}
                 className="mt-1 size-4"
               />
@@ -334,7 +448,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                 name="mechanism"
                 value="dua"
                 checked={mechanism === 'dua'}
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 onChange={() => setMechanism('dua')}
                 className="mt-1 size-4"
               />
@@ -385,7 +499,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                     <button
                       type="button"
                       onClick={() => setMechProducts((prev) => prev.filter((x) => x.id !== p.id))}
-                      disabled={pending || ideaGenerating}
+                      disabled={isFormBusy}
                       className="shrink-0 rounded-md px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
                       aria-label={`✕ ${p.name}`}
                     >
@@ -400,7 +514,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             <button
               type="button"
               onClick={() => setMechPickerOpen(true)}
-              disabled={pending || ideaGenerating}
+              disabled={isFormBusy}
               className="mt-2 rounded-lg border border-line bg-background px-3 py-1.5 text-xs font-medium text-ink hover:border-primary disabled:opacity-60"
             >
               {t('pickProducts')} ({mechProducts.length}/2)
@@ -419,11 +533,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                 onConfirmSelect={(items) => {
                   setMechProducts(items);
                   setMechPickerOpen(false);
-                  setFieldErrors((prev) => {
-                    const next = { ...prev };
-                    delete next.mechProducts;
-                    return next;
-                  });
+                  dispatch({ type: 'CLEAR_FIELD_ERROR', field: 'mechProducts' });
                 }}
               />
             ) : null}
@@ -444,7 +554,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                 name="template"
                 value=""
                 checked={template === ''}
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 onChange={() => setTemplate('')}
                 className="mt-1 size-4"
               />
@@ -460,7 +570,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   name="template"
                   value={tpl.slug}
                   checked={template === tpl.slug}
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   onChange={() => setTemplate(tpl.slug)}
                   className="mt-1 size-4"
                 />
@@ -487,11 +597,11 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           <button
             type="button"
             onClick={handleGenerateIdea}
-            disabled={ideaGenerating || pending}
-            aria-busy={ideaGenerating}
+            disabled={isFormBusy}
+            aria-busy={isIdeaGenerating}
             className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {ideaGenerating ? (
+            {isIdeaGenerating ? (
               <>
                 <svg viewBox="0 0 20 20" fill="none" className="size-3.5 animate-spin" aria-hidden>
                   <circle cx="10" cy="10" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
@@ -515,7 +625,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder={t('topicPlaceholder')}
-          disabled={pending || ideaGenerating}
+          disabled={isFormBusy}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
         />
         {fieldErrors.topic ? <p className="mt-1 text-xs text-red-600">{fieldErrors.topic}</p> : null}
@@ -550,7 +660,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
               <button
                 type="button"
                 onClick={() => setSelPlatforms(realPlatforms.map((p) => p.slug))}
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted hover:border-primary disabled:opacity-60"
               >
                 {t('selectAll')}
@@ -558,7 +668,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
               <button
                 type="button"
                 onClick={() => setSelPlatforms([])}
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted hover:border-primary disabled:opacity-60"
               >
                 {t('clearAll')}
@@ -572,7 +682,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                     name="platforms"
                     value={p.slug}
                     checked={selPlatforms.includes(p.slug)}
-                    disabled={pending || ideaGenerating}
+                    disabled={isFormBusy}
                     onChange={(e) => {
                       setSelPlatforms((prev) =>
                         e.target.checked ? [...prev, p.slug] : prev.filter((s) => s !== p.slug)
@@ -603,7 +713,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             id="tone"
             name="tone"
             required
-            disabled={pending || ideaGenerating}
+            disabled={isFormBusy}
             value={tone}
             onChange={(e) => setTone(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
@@ -629,7 +739,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             required
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            disabled={pending || ideaGenerating}
+            disabled={isFormBusy}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="id">{t('languageOptions.id')}</option>
@@ -647,7 +757,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             name="targetCategory"
             value={targetCategory}
             onChange={(e) => setTargetCategory(e.target.value)}
-            disabled={pending || ideaGenerating}
+            disabled={isFormBusy}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">{t('targetCategoryPlaceholder')}</option>
@@ -671,7 +781,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           value={audience}
           onChange={(e) => setAudience(e.target.value)}
           placeholder={t('audiencePlaceholder')}
-          disabled={pending || ideaGenerating}
+          disabled={isFormBusy}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {fieldErrors.audience ? <p className="mt-1 text-xs text-red-600">{fieldErrors.audience}</p> : null}
@@ -688,7 +798,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             required
             value={ctaStyle}
             onChange={(e) => setCtaStyle(e.target.value)}
-            disabled={pending || ideaGenerating}
+            disabled={isFormBusy}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="soft_sell">{t('ctaStyleOptions.soft_sell')}</option>
@@ -710,7 +820,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
             placeholder={t('purposePlaceholder')}
-            disabled={pending || ideaGenerating}
+            disabled={isFormBusy}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           {fieldErrors.purpose ? <p className="mt-1 text-xs text-red-600">{fieldErrors.purpose}</p> : null}
@@ -728,7 +838,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           value={constraints}
           onChange={(e) => setConstraints(e.target.value)}
           placeholder={t('constraintsPlaceholder')}
-          disabled={pending || ideaGenerating}
+          disabled={isFormBusy}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
@@ -743,7 +853,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
           placeholder={t('keywordsPlaceholder')}
-          disabled={pending || ideaGenerating}
+          disabled={isFormBusy}
           className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
@@ -777,7 +887,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   max={10}
                   value={targetReplyCount}
                   onChange={(e) => setTargetReplyCount(e.target.value)}
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -795,7 +905,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={targetLocation}
                   onChange={(e) => setTargetLocation(e.target.value)}
                   placeholder="Cth: Indonesia, Bandung"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -810,7 +920,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={secondaryLocation}
                   onChange={(e) => setSecondaryLocation(e.target.value)}
                   placeholder="Cth: Jakarta, nasional"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -828,7 +938,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={audienceAge}
                   onChange={(e) => setAudienceAge(e.target.value)}
                   placeholder="Cth: 25-34 tahun"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -843,7 +953,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={audienceInterests}
                   onChange={(e) => setAudienceInterests(e.target.value)}
                   placeholder="Cth: parenting, keuangan keluarga"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -860,7 +970,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                 value={accountGoal}
                 onChange={(e) => setAccountGoal(e.target.value)}
                 placeholder="Cth: mengedukasi calon orang tua baru"
-                disabled={pending || ideaGenerating}
+                disabled={isFormBusy}
                 className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
               />
             </div>
@@ -877,7 +987,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={allowedCategories}
                   onChange={(e) => setAllowedCategories(e.target.value)}
                   placeholder={t('categoriesHint')}
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -892,7 +1002,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   value={excludedCategories}
                   onChange={(e) => setExcludedCategories(e.target.value)}
                   placeholder={t('categoriesHint')}
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -910,7 +1020,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   min={1}
                   max={720}
                   placeholder="24"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -925,7 +1035,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   min={3}
                   max={50}
                   placeholder="12"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -940,7 +1050,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   min={1}
                   max={10}
                   placeholder="3"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -955,7 +1065,7 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
                   min={1}
                   max={10}
                   placeholder="3"
-                  disabled={pending || ideaGenerating}
+                  disabled={isFormBusy}
                   className="mt-1 block w-full rounded-lg border border-line bg-background px-3 py-2 text-sm text-ink disabled:opacity-60"
                 />
               </div>
@@ -964,11 +1074,11 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
               <div className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] p-3">
                 <p className="text-xs font-semibold text-ink">{t('stageModelSectionTitle')}</p>
                 <p className="text-[11px] text-ink-muted">{t('stageModelSectionHint')}</p>
-                <StageModelPicker stage="idea_generation" label={t('stageLabel.idea_generation')} providers={llmProviders} models={llmModels} providerId={genProviderId} modelId={genModelId} onProviderChange={setGenProviderId} onModelChange={setGenModelId} disabled={pending || ideaGenerating} />
-                <StageModelPicker stage="discovering" label={t('stageLabel.discovering')} providers={llmProviders} models={llmModels} providerId={discProviderId} modelId={discModelId} onProviderChange={setDiscProviderId} onModelChange={setDiscModelId} disabled={pending || ideaGenerating} />
-                <StageModelPicker stage="verifying" label={t('stageLabel.verifying')} providers={llmProviders} models={llmModels} providerId={verifyProviderId} modelId={verifyModelId} onProviderChange={setVerifyProviderId} onModelChange={setVerifyModelId} disabled={pending || ideaGenerating} />
-                <StageModelPicker stage="scoring" label={t('stageLabel.scoring')} providers={llmProviders} models={llmModels} providerId={scoringProviderId} modelId={scoringModelId} onProviderChange={setScoringProviderId} onModelChange={setScoringModelId} disabled={pending || ideaGenerating} />
-                <StageModelPicker stage="developing" label={t('stageLabel.developing')} providers={llmProviders} models={llmModels} providerId={devProviderId} modelId={devModelId} onProviderChange={setDevProviderId} onModelChange={setDevModelId} disabled={pending || ideaGenerating} />
+                <StageModelPicker stage="idea_generation" label={t('stageLabel.idea_generation')} providers={llmProviders} models={llmModels} providerId={genProviderId} modelId={genModelId} onProviderChange={setGenProviderId} onModelChange={setGenModelId} disabled={isFormBusy} />
+                <StageModelPicker stage="discovering" label={t('stageLabel.discovering')} providers={llmProviders} models={llmModels} providerId={discProviderId} modelId={discModelId} onProviderChange={setDiscProviderId} onModelChange={setDiscModelId} disabled={isFormBusy} />
+                <StageModelPicker stage="verifying" label={t('stageLabel.verifying')} providers={llmProviders} models={llmModels} providerId={verifyProviderId} modelId={verifyModelId} onProviderChange={setVerifyProviderId} onModelChange={setVerifyModelId} disabled={isFormBusy} />
+                <StageModelPicker stage="scoring" label={t('stageLabel.scoring')} providers={llmProviders} models={llmModels} providerId={scoringProviderId} modelId={scoringModelId} onProviderChange={setScoringProviderId} onModelChange={setScoringModelId} disabled={isFormBusy} />
+                <StageModelPicker stage="developing" label={t('stageLabel.developing')} providers={llmProviders} models={llmModels} providerId={devProviderId} modelId={devModelId} onProviderChange={setDevProviderId} onModelChange={setDevModelId} disabled={isFormBusy} />
                 <StageModelPicker stage="regen_affiliate" label={t('stageLabel.regen_affiliate')} providers={llmProviders} models={llmModels} providerId="" modelId="" onProviderChange={() => {}} onModelChange={() => {}} disabled />
                 <p className="text-[11px] text-ink-muted">{t('stageLabel.regen_affiliate_hint')}</p>
               </div>
@@ -979,11 +1089,11 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
 
       <button
         type="submit"
-        disabled={pending || ideaGenerating}
-        aria-busy={pending}
+        disabled={isFormBusy}
+        aria-busy={isSubmitting}
         className="btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {pending ? (
+        {isSubmitting ? (
           <>
             <svg
               viewBox="0 0 20 20"
@@ -1006,13 +1116,13 @@ export function ContentRequestForm({ platforms, categories, templates = [], llmP
         )}
       </button>
 
-      {status === 'error' ? (
+      {formState.status === 'error' ? (
         <p
           role="status"
           aria-live="polite"
           className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
         >
-          {message}
+          {formState.message}
         </p>
       ) : null}
     </form>

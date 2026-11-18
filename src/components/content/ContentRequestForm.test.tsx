@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ContentRequestForm } from './ContentRequestForm';
+import { ContentRequestForm, formReducer } from './ContentRequestForm';
 import { renderWithMessages } from '@/test/utils';
 
 const mockCategories = [{ slug: 'fashion', display_name: 'Fashion' }];
@@ -93,5 +93,71 @@ describe('ContentRequestForm', () => {
     expect(await screen.findByText('Riset berhasil dimulai', {}, { timeout: 5000 })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Lihat riset' });
     expect(link).toHaveAttribute('href', `/konten/riset/${sessId}`);
+  });
+
+  describe('formReducer FSM', () => {
+    it('manages idea generation lifecycle transitions cleanly', () => {
+      const s0 = { status: 'idle' } as const;
+      const s1 = formReducer(s0, { type: 'START_IDEA_GENERATION' });
+      expect(s1.status).toBe('generating_idea');
+
+      const coverage = { filled: 15, total: 17, missing: ['keywords', 'constraints'] };
+      const s2 = formReducer(s1, { type: 'IDEA_SUCCESS', coverage });
+      expect(s2.status).toBe('idle');
+      expect(s2.ideaApplied).toBe(true);
+      expect(s2.ideaCoverage).toEqual(coverage);
+
+      const s3 = formReducer(s2, { type: 'START_IDEA_GENERATION' });
+      expect(s3.status).toBe('generating_idea');
+      // Retains existing coverage while generating new
+      expect(s3.ideaCoverage).toEqual(coverage);
+
+      const s4 = formReducer(s3, { type: 'IDEA_ERROR', error: 'Batas tercapai' });
+      expect(s4.status).toBe('idle');
+      expect(s4.ideaError).toBe('Batas tercapai');
+    });
+
+    it('manages submission lifecycle transitions and prevents conflicting states', () => {
+      const s0 = { status: 'idle' } as const;
+      const s1 = formReducer(s0, { type: 'START_SUBMISSION' });
+      expect(s1.status).toBe('submitting');
+
+      // Guard: Cannot start idea generation while submitting
+      const guardedIdea = formReducer(s1, { type: 'START_IDEA_GENERATION' });
+      expect(guardedIdea.status).toBe('submitting');
+
+      const s2 = formReducer(s1, {
+        type: 'SUBMIT_ERROR',
+        message: 'Validasi gagal',
+        fieldErrors: { topic: 'Topik terlalu pendek' }
+      });
+      expect(s2.status).toBe('error');
+      if (s2.status === 'error') {
+        expect(s2.message).toBe('Validasi gagal');
+        expect(s2.fieldErrors).toEqual({ topic: 'Topik terlalu pendek' });
+      }
+
+      const s3 = formReducer(s2, { type: 'START_SUBMISSION' });
+      expect(s3.status).toBe('submitting');
+
+      const s4 = formReducer(s3, {
+        type: 'SUBMIT_SUCCESS',
+        sessionId: 'test-session-123',
+        message: 'Riset dimulai'
+      });
+      expect(s4.status).toBe('success');
+      if (s4.status === 'success') {
+        expect(s4.sessionId).toBe('test-session-123');
+      }
+
+      const s5 = formReducer(s4, { type: 'RESET_FORM' });
+      expect(s5.status).toBe('idle');
+    });
+
+    it('guards against submission while idea generation is active', () => {
+      const sActive = { status: 'generating_idea' } as const;
+      const result = formReducer(sActive, { type: 'START_SUBMISSION' });
+      expect(result.status).toBe('generating_idea');
+    });
   });
 });

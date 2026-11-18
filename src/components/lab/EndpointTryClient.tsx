@@ -66,6 +66,20 @@ function MetricBox({
 const selectCls =
   'w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary';
 
+export type ModelCatalogPhase =
+  | { type: 'idle' }
+  | { type: 'loading' }
+  | { type: 'success'; latencyMs: number | null }
+  | { type: 'error'; message: string };
+
+export type ChatSessionPhase =
+  | { type: 'idle' }
+  | { type: 'sending' }
+  | { type: 'streaming' }
+  | { type: 'success'; result: EndpointChatResult; streamed: boolean }
+  | { type: 'aborted' }
+  | { type: 'error'; message: string };
+
 export function EndpointTryPageClient({ locale, timeZone, quota, history, error }: Props) {
   const t = useTranslations('lab.try');
   const tResult = useTranslations('lab.result');
@@ -95,8 +109,16 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
   const [result, setResult] = useState<EndpointChatResult | null>(null);
   const [resultStreamed, setResultStreamed] = useState(false);
   const [notice, setNotice] = useState<string | null>(error);
-  const [isPending, startTransition] = useTransition();
+
+  // Disjoint explicit state machines
+  const [modelPhase, setModelPhase] = useState<ModelCatalogPhase>({ type: 'idle' });
+  const [chatPhase, setChatPhase] = useState<ChatSessionPhase>({ type: 'idle' });
   const [isHistoryPending, startHistoryTransition] = useTransition();
+
+  const isTestingModels = modelPhase.type === 'loading';
+  const isChatSending = chatPhase.type === 'sending';
+  const isChatStreaming = chatPhase.type === 'streaming';
+  const isChatActive = isChatSending || isChatStreaming;
   const [pageData, setPageData] = useState<{
     items: EndpointTryRunRow[];
     total: number;
@@ -161,32 +183,44 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
       setNotice(t('baseUrlInvalid'));
       return;
     }
-    startTransition(async () => {
-      try {
-        const res = await fetch('/api/endpoint-try/models', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ kind, baseUrl: baseUrl.replace(/\/+$/, ''), apiKey: apiKey.trim() })
-        });
-        const json = await res.json() as { ok?: boolean; models?: EndpointModelsResult['models']; latencyMs?: number; error?: string };
-        if (!res.ok || json.error) {
-          setNotice(json.error ?? `HTTP ${res.status}`);
-          setModels([]);
-          setModelsLatencyMs(null);
-          return;
-        }
-        setModels(json.models ?? []);
-        setModelsLatencyMs(json.latencyMs ?? null);
-        const first = json.models?.[0];
-        if (first && !selectedModel) {
-          setSelectedModel(first.id);
-        }
-      } catch (e) {
-        setNotice(e instanceof Error ? e.message : 'Gagal memuat model.');
+    setModelPhase({ type: 'loading' });
+    try {
+      const res = await fetch('/api/endpoint-try/models', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind, baseUrl: baseUrl.replace(/\/+$/, ''), apiKey: apiKey.trim() })
+      });
+      const json = await res.json() as { ok?: boolean; models?: EndpointModelsResult['models']; latencyMs?: number; error?: string };
+      if (!res.ok || json.error) {
+        const errMsg = json.error ?? `HTTP ${res.status}`;
+        setNotice(errMsg);
         setModels([]);
         setModelsLatencyMs(null);
+        setModelPhase({ type: 'error', message: errMsg });
+        return;
       }
-    });
+      setModels(json.models ?? []);
+      setModelsLatencyMs(json.latencyMs ?? null);
+      const first = json.models?.[0];
+      if (first && !selectedModel) {
+        setSelectedModel(first.id);
+      }
+      setModelPhase({ type: 'success', latencyMs: json.latencyMs ?? null });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Gagal memuat model.';
+      setNotice(errMsg);
+      setModels([]);
+      setModelsLatencyMs(null);
+      setModelPhase({ type: 'error', message: errMsg });
+    }
+  }
+
+  function stopChat() {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setChatPhase({ type: 'aborted' });
   }
 
   async function sendChat(isStreamMode: boolean) {
@@ -223,96 +257,110 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
       stream: isStreamMode
     };
 
-    startTransition(async () => {
-      const startedAt = Date.now();
-      try {
-        if (isStreamMode) {
-          // Streaming: baca SSE chunks via fetch + readable stream.
-          const res = await fetch('/api/endpoint-try/chat', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-          });
-          if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            setNotice(`HTTP ${res.status}: ${text.slice(0, 300)}`);
-            return;
+    setChatPhase({ type: isStreamMode ? 'streaming' : 'sending' });
+    const startedAt = Date.now();
+    try {
+      if (isStreamMode) {
+        // Streaming: baca SSE chunks via fetch + readable stream.
+        const res = await fetch('/api/endpoint-try/chat', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          const errMsg = `HTTP ${res.status}: ${text.slice(0, 300)}`;
+          setNotice(errMsg);
+          setChatPhase({ type: 'error', message: errMsg });
+          await saveAndReset(payload, null, errMsg);
+          return;
+        }
+        const reader = res.body?.getReader();
+        if (!reader) {
+          const errMsg = 'Stream kosong — coba lagi.';
+          setNotice(errMsg);
+          setChatPhase({ type: 'error', message: errMsg });
+          await saveAndReset(payload, null, errMsg);
+          return;
+        }
+        const decoder = new TextDecoder();
+        let textAccum = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const str = decoder.decode(value, { stream: true });
+          // Hanya proses chunk baru dari bacaan ini (hindari duplikasi).
+          const newChunks = parseSseChunks(str);
+          for (const c of newChunks) {
+            const delta = kind === 'anthropic'
+              ? extractAnthropicStreamText(c)
+              : extractOpenAIStreamText(c);
+            if (delta) textAccum += delta;
           }
-          const reader = res.body?.getReader();
-          if (!reader) {
-            setNotice('Stream kosong — coba lagi.');
-            return;
-          }
-          const decoder = new TextDecoder();
-          let textAccum = '';
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const str = decoder.decode(value, { stream: true });
-            // Hanya proses chunk baru dari bacaan ini (hindari duplikasi).
-            const newChunks = parseSseChunks(str);
-            for (const c of newChunks) {
-              const delta = kind === 'anthropic'
-                ? extractAnthropicStreamText(c)
-                : extractOpenAIStreamText(c);
-              if (delta) textAccum += delta;
-            }
-            setResult({
-              text: textAccum,
-              usage: null,
-              finishReason: null,
-              latencyMs: Date.now() - startedAt,
-              tokensPerSec: null
-            });
-            setResultStreamed(true);
-          }
-          reader.releaseLock();
-          abortRef.current = null;
-          const latencyMs = Date.now() - startedAt;
-          const finalResult: EndpointChatResult = {
+          setResult({
             text: textAccum,
             usage: null,
             finishReason: null,
-            latencyMs,
+            latencyMs: Date.now() - startedAt,
             tokensPerSec: null
-          };
-          setResult(finalResult);
-          setResultStreamed(true);
-          await saveAndReset(payload, finalResult, null);
-        } else {
-          // Non-streaming.
-          const res = await fetch('/api/endpoint-try/chat', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal
           });
-          const json = await res.json() as { ok?: boolean; text?: string; usage?: unknown; finishReason?: string | null; latencyMs?: number; tokensPerSec?: number | null; error?: string };
-          if (!res.ok || !json.ok) {
-            setNotice(json.error ?? `HTTP ${res.status}`);
-            await saveAndReset(payload, null, json.error ?? `HTTP ${res.status}`);
-            return;
-          }
-          const chatResult: EndpointChatResult = {
-            text: json.text ?? '',
-            usage: json.usage as EndpointChatResult['usage'] ?? null,
-            finishReason: json.finishReason ?? null,
-            latencyMs: json.latencyMs ?? 0,
-            tokensPerSec: json.tokensPerSec ?? null
-          };
-          setResult(chatResult);
-          setResultStreamed(false);
-          await saveAndReset(payload, chatResult, null);
+          setResultStreamed(true);
         }
-      } catch (e) {
+        reader.releaseLock();
+        abortRef.current = null;
+        const latencyMs = Date.now() - startedAt;
+        const finalResult: EndpointChatResult = {
+          text: textAccum,
+          usage: null,
+          finishReason: null,
+          latencyMs,
+          tokensPerSec: null
+        };
+        setResult(finalResult);
+        setResultStreamed(true);
+        setChatPhase({ type: 'success', result: finalResult, streamed: true });
+        await saveAndReset(payload, finalResult, null);
+      } else {
+        // Non-streaming.
+        const res = await fetch('/api/endpoint-try/chat', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        const json = await res.json() as { ok?: boolean; text?: string; usage?: unknown; finishReason?: string | null; latencyMs?: number; tokensPerSec?: number | null; error?: string };
+        if (!res.ok || !json.ok) {
+          const errMsg = json.error ?? `HTTP ${res.status}`;
+          setNotice(errMsg);
+          setChatPhase({ type: 'error', message: errMsg });
+          await saveAndReset(payload, null, errMsg);
+          return;
+        }
+        const chatResult: EndpointChatResult = {
+          text: json.text ?? '',
+          usage: json.usage as EndpointChatResult['usage'] ?? null,
+          finishReason: json.finishReason ?? null,
+          latencyMs: json.latencyMs ?? 0,
+          tokensPerSec: json.tokensPerSec ?? null
+        };
+        setResult(chatResult);
+        setResultStreamed(false);
+        setChatPhase({ type: 'success', result: chatResult, streamed: false });
+        await saveAndReset(payload, chatResult, null);
+      }
+    } catch (e) {
+      if (controller.signal.aborted) {
+        setChatPhase({ type: 'aborted' });
+      } else {
         const msg = e instanceof Error ? e.message : 'Gagal mengirim chat.';
         setNotice(msg);
+        setChatPhase({ type: 'error', message: msg });
         await saveAndReset(payload, null, msg);
-      } finally {
-        abortRef.current = null;
       }
-    });
+    } finally {
+      abortRef.current = null;
+    }
   }
 
   async function saveAndReset(payload: unknown, result: EndpointChatResult | null, errorMsg: string | null) {
@@ -443,10 +491,11 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
           <div className="sm:col-span-2">
             <button
               onClick={loadModels}
-              disabled={isPending}
+              disabled={isTestingModels || isChatActive}
+              aria-busy={isTestingModels}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {isPending ? t('testing') : t('testButton')}
+              {isTestingModels ? t('testing') : t('testButton')}
             </button>
             {modelsLatencyMs !== null ? (
               <p className="mt-2 text-xs text-ink-muted">
@@ -490,7 +539,8 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
           </div>
           <button
             onClick={loadModels}
-            disabled={isPending}
+            disabled={isTestingModels || isChatActive}
+            aria-busy={isTestingModels}
             className="rounded-md border border-line px-4 py-2 text-sm text-ink transition-colors hover:bg-surface/50 disabled:opacity-50"
           >
             {t('refresh')}
@@ -564,27 +614,30 @@ export function EndpointTryPageClient({ locale, timeZone, quota, history, error 
           <div className="flex gap-2">
             <button
               onClick={() => sendChat(false)}
-              disabled={isPending || !apiKey.trim() || !prompt.trim()}
+              disabled={isChatActive || isTestingModels || !apiKey.trim() || !prompt.trim()}
+              aria-busy={isChatSending}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {isPending ? t('sendingButton') : t('sendButton')}
+              {isChatSending ? t('sendingButton') : t('sendButton')}
             </button>
             <button
               onClick={() => sendChat(true)}
-              disabled={isPending || !apiKey.trim() || !prompt.trim()}
+              disabled={isChatActive || isTestingModels || !apiKey.trim() || !prompt.trim()}
+              aria-busy={isChatStreaming}
               className="rounded-md border border-line px-4 py-2 text-sm text-ink transition-colors hover:bg-surface/50 disabled:opacity-50"
               title={t('streamLabel')}
             >
-              {t('sendStreamButton')}
+              {isChatStreaming ? t('sendingButton') : t('sendStreamButton')}
             </button>
-            {isPending && (
+            {isChatActive ? (
               <button
-                onClick={() => { abortRef.current?.abort(); setNotice(null); }}
+                type="button"
+                onClick={stopChat}
                 className="rounded-md border border-line px-4 py-2 text-sm text-ink transition-colors hover:bg-surface/50"
               >
                 {t('stopButton')}
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
